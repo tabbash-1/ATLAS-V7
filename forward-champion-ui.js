@@ -17,7 +17,7 @@ function payload(){
 async function stats(){
  const badge=$('forwardBadge'),grid=$('forwardMetrics'),note=$('forwardNotes');if(!grid)return;
  try{
-  await fetch('/api/forward/update').then(r=>r.json()).catch(()=>null);
+  await fetch('/api/forward/update',{method:'POST'}).then(r=>r.json()).catch(()=>null);
   const j=await fetch(`/api/forward/stats?symbol=${encodeURIComponent(sym())}&horizon=24`).then(r=>r.json());
   grid.innerHTML=[
    ['Matured',j.matured_observations||0],['Champion N',j.champion?.n||0],['Challenger N',j.challenger?.n||0],

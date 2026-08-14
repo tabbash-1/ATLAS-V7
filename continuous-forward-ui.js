@@ -54,7 +54,7 @@ async function runCycle(){
   if(!window.runAtlasOpportunityScan)throw new Error('Opportunity scanner is not ready.');
   await window.runAtlasOpportunityScan();
   const result=await recordRows(window.ATLAS_OPPORTUNITY_ROWS||[]);
-  await fetch('/api/forward/update').catch(()=>null);
+  await fetch('/api/forward/update',{method:'POST'}).catch(()=>null);
   if(note)note.innerHTML=`Last cycle: ${new Date().toLocaleString()} · ${result.stored} stored · ${result.dedup} deduped · ${result.errors} errors · ${result.candidates} qualifying candidates.`;
   if(badge){badge.textContent='ACTIVE';badge.className='pill buy';}
   if(window.refreshPerformanceDashboard)window.refreshPerformanceDashboard();

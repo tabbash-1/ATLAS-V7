@@ -5,7 +5,7 @@ async function refresh(){
  const badge=$('performanceBadge'),grid=$('performanceMetrics'),body=$('performanceBreakdownBody'),meta=$('performanceMeta');if(!grid||!body)return;
  badge.textContent='UPDATING';badge.className='pill working';
  try{
-  await fetch('/api/forward/update').catch(()=>null);
+  await fetch('/api/forward/update',{method:'POST'}).catch(()=>null);
   const j=await fetch('/api/performance/dashboard?horizon=24').then(r=>r.json()),o=j.overall_champion||{};
   grid.innerHTML=[
    ['Matured',j.matured||0],['Hit rate',o.hit_rate_pct==null?'—':`${fmt(o.hit_rate_pct,1)}%`],['Avg 24h',o.avg_return_pct==null?'—':`${fmt(o.avg_return_pct)}%`],

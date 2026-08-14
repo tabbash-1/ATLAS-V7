@@ -865,16 +865,22 @@ def data_quality_report():
     if missing_dir:issues.append(f'{missing_dir} forward rows missing direction')
     if duplicate_buckets:issues.append(f'{duplicate_buckets} duplicate 50m buckets')
     if stale_smart:issues.append('stale smart-money snapshots')
+    provider_counts={}
+    for r in smart:
+      pp=r.get('futures_provider') or 'BINANCE_USDM_PUBLIC'
+      provider_counts[pp]=provider_counts.get(pp,0)+1
+    core_counts={s:sum(1 for r in smart if r.get('symbol')==s) for s in SYMBOLS}
     quality=100
     if len(forward)<30: issues.append(f'insufficient forward sample ({len(forward)}/30)'); quality-=35
-    if len(smart)<14: issues.append(f'insufficient smart-money sample ({len(smart)}/14)'); quality-=25
+    core_min=min(core_counts.values()) if core_counts else 0
+    if core_min<7: issues.append('insufficient core smart-money coverage ('+', '.join(f'{s}:{core_counts.get(s,0)}/7' for s in SYMBOLS)+')'); quality-=25
     quality-=min(25,missing_entry*3)
     quality-=min(20,missing_dir*3)
     quality-=min(20,duplicate_buckets*2)
     quality-=min(20,len(stale_smart)*3)
     return {'quality_score':max(0,quality),'forward_rows':len(forward),'smart_money_rows':len(smart),
             'missing_entry':missing_entry,'missing_direction':missing_dir,'duplicate_buckets':duplicate_buckets,
-            'stale_smart_money':stale_smart,'issues':issues,'status':'HEALTHY' if quality>=85 else 'WATCH' if quality>=65 else 'DEGRADED',
+            'stale_smart_money':stale_smart,'provider_counts':provider_counts,'core_symbol_counts':core_counts,'issues':issues,'status':'HEALTHY' if quality>=85 else 'WATCH' if quality>=65 else 'DEGRADED',
             'research_only':True,'live_execution':False}
 
 def drift_report(horizon=24,recent_n=30,prior_n=60):
@@ -1409,6 +1415,16 @@ def previous(symbol):
       if x.get('symbol')==symbol:last=x
     return last
 
+def previous_provider(symbol, provider):
+    last=None
+    for x in read_all():
+      if x.get('symbol')!=symbol: continue
+      p=x.get('futures_provider')
+      # Older pre-provider rows were Binance USD-M.
+      if p is None: p='BINANCE_USDM_PUBLIC'
+      if p==provider:last=x
+    return last
+
 def orderbook_metrics(depth):
     bids=depth.get('bids',[])[:20]; asks=depth.get('asks',[])[:20]
     bid_notional=sum(fnum(p,0)*fnum(q,0) for p,q,*_ in bids)
@@ -1463,7 +1479,7 @@ def _bybit_linear_capture(symbol):
     bidn,askn,imb=orderbook_metrics(depth)
     mark=fnum(t.get('markPrice')); walls=liquidity_walls(depth,mark)
     oi_val=fnum(t.get('openInterest'))
-    prev=previous(symbol); prev_oi=fnum(prev.get('open_interest')) if prev else None
+    prev=previous_provider(symbol,'BYBIT_LINEAR_PUBLIC'); prev_oi=fnum(prev.get('open_interest')) if prev else None
     oi_change=((oi_val/prev_oi-1)*100) if oi_val is not None and prev_oi else None
     funding=fnum(t.get('fundingRate'))
     pc=fnum(t.get('price24hPcnt')); pc=(pc*100) if pc is not None else None
@@ -1479,9 +1495,9 @@ def _bybit_linear_capture(symbol):
       'orderbook_bid_notional_top20':round(bidn,2),'orderbook_ask_notional_top20':round(askn,2),
       'orderbook_imbalance':round(imb,6),'orderbook_bid_walls':walls['bid_walls'],'orderbook_ask_walls':walls['ask_walls'],
       'price_change_24h_pct':pc,'quote_volume_24h':fnum(t.get('turnover24h')),
-      'experimental_score':score_snapshot(funding,flow_ratio,imb,oi_change),'factor_label':'EXPERIMENTAL_UNVALIDATED',
+      'experimental_score':score_snapshot(funding,flow_ratio,imb,oi_change),'factor_label':'EXPERIMENTAL_PROVIDER_SPECIFIC_UNVALIDATED',
       'whale_exchange_flow':None,'whale_provider_status':'NOT_CONNECTED','live_execution':False,
-      'futures_provider':'BYBIT_LINEAR_PUBLIC','flow_proxy':'RECENT_500_TAKER_TRADES',
+      'futures_provider':'BYBIT_LINEAR_PUBLIC','futures_evidence_validated':False,'flow_proxy':'RECENT_500_TAKER_TRADES',
       'sources':['Bybit V5 linear public market data'],
     }
 
@@ -1498,7 +1514,7 @@ def capture(symbol):
       bidn,askn,imb=orderbook_metrics(depth)
       walls=liquidity_walls(depth,premium.get('markPrice'))
       oi_val=fnum(oi.get('openInterest'))
-      prev=previous(symbol); prev_oi=fnum(prev.get('open_interest')) if prev else None
+      prev=previous_provider(symbol,'BINANCE_USDM_PUBLIC'); prev_oi=fnum(prev.get('open_interest')) if prev else None
       oi_change=((oi_val/prev_oi-1)*100) if oi_val is not None and prev_oi else None
       funding=fnum(premium.get('lastFundingRate')); tr=fnum(taker.get('buySellRatio'))
       snap={
@@ -1512,7 +1528,7 @@ def capture(symbol):
         'price_change_24h_pct':fnum(ticker.get('priceChangePercent')),'quote_volume_24h':fnum(ticker.get('quoteVolume')),
         'experimental_score':score_snapshot(funding,tr,imb,oi_change),'factor_label':'EXPERIMENTAL_UNVALIDATED',
         'whale_exchange_flow':None,'whale_provider_status':'NOT_CONNECTED','live_execution':False,
-        'futures_provider':'BINANCE_USDM_PUBLIC','flow_proxy':'BINANCE_TAKER_RATIO_1H',
+        'futures_provider':'BINANCE_USDM_PUBLIC','futures_evidence_validated':True,'flow_proxy':'BINANCE_TAKER_RATIO_1H',
         'sources':['Binance USDⓈ-M public market data'],
       }
       MARKET_DATA_STATE['futures']['last_provider']='fapi.binance.com'
@@ -1525,12 +1541,21 @@ def capture(symbol):
       with ARCHIVE.open('a') as f: f.write(json.dumps(snap,separators=(',',':'))+'\n')
     return snap
 
-def smart_money_forward_rows(symbol=None):
+def active_smart_money_provider(symbol):
+    rows=[x for x in read_all() if x.get('symbol')==symbol]
+    if not rows:return None
+    return rows[-1].get('futures_provider') or 'BINANCE_USDM_PUBLIC'
+
+def smart_money_forward_rows(symbol=None, provider=None):
     rows=read_all()
     if symbol: rows=[x for x in rows if x.get('symbol')==symbol]
-    bysym={s:[] for s in SYMBOLS}
+    if provider:
+      rows=[x for x in rows if (x.get('futures_provider') or 'BINANCE_USDM_PUBLIC')==provider]
+    bysym={s:[] for s in ON_DEMAND_SYMBOLS}
     for x in read_all():
-      if x.get('symbol') in bysym: bysym[x['symbol']].append(x)
+      sx=x.get('symbol')
+      xp=x.get('futures_provider') or 'BINANCE_USDM_PUBLIC'
+      if sx in bysym and (not provider or xp==provider): bysym[sx].append(x)
     for s in bysym: bysym[s].sort(key=lambda x:x.get('captured_at_ms',0))
     out=[]
     for x in rows:
@@ -1540,7 +1565,6 @@ def smart_money_forward_rows(symbol=None):
         series=bysym.get(x.get('symbol'),[])
         for h in HORIZONS:
           target=t+h*3600*1000
-          # first captured snapshot at/after horizon, with <=90m tolerance after target
           cand=next((y for y in series if y.get('captured_at_ms',0)>=target and y.get('captured_at_ms',0)<=target+90*60*1000),None)
           if cand and fnum(cand.get('mark_price')):
             fr[str(h)]=round((fnum(cand['mark_price'])/base-1)*100,5)
@@ -1548,8 +1572,9 @@ def smart_money_forward_rows(symbol=None):
       y=dict(x); y['forward_return_pct']=fr; out.append(y)
     return out
 
-def factor_stats(symbol):
-    rows=smart_money_forward_rows(symbol)
+def factor_stats(symbol, provider=None):
+    provider=provider or active_smart_money_provider(symbol)
+    rows=smart_money_forward_rows(symbol,provider)
     factors=[('funding_rate','Funding'),('oi_change_pct','OI Δ'),('taker_ratio','Taker ratio'),('orderbook_imbalance','Book imbalance'),('experimental_score','Experimental score')]
     result=[]
     for key,label in factors:
@@ -1583,8 +1608,9 @@ def directional_hit_rate(key, pairs):
     return round(hits/usable*100,2) if usable else None
 
 def validation_summary(symbol):
-    rows=smart_money_forward_rows(symbol)
-    stats=factor_stats(symbol)
+    provider=active_smart_money_provider(symbol)
+    rows=smart_money_forward_rows(symbol,provider)
+    stats=factor_stats(symbol,provider)
     # enrich factor stats with directional hit rate per horizon
     keymap={x['key']:x for x in stats}
     for key,item in keymap.items():
@@ -1600,15 +1626,18 @@ def validation_summary(symbol):
     elif n24>=100: readiness='VALIDATION_READY'
     elif n24>=30: readiness='EARLY_RESEARCH'
     else: readiness='NOT_READY'
-    return {'symbol':symbol,'snapshots':len(rows),'matured':matured,'readiness':readiness,'stats':stats,'research_only':True,'live_execution':False}
+    return {'symbol':symbol,'provider':provider,'snapshots':len(rows),'matured':matured,'readiness':readiness,'stats':stats,'research_only':True,'live_execution':False}
 
 def status():
-    rows=read_all(); counts={s:0 for s in SYMBOLS}
+    rows=read_all(); counts={s:0 for s in ON_DEMAND_SYMBOLS}; providers={}
     for x in rows:
       if x.get('symbol') in counts:counts[x['symbol']]+=1
+      p=x.get('futures_provider') or 'BINANCE_USDM_PUBLIC'
+      providers[p]=providers.get(p,0)+1
     enriched=smart_money_forward_rows()
     matured={str(h):sum(1 for x in enriched if x.get('forward_return_pct',{}).get(str(h)) is not None) for h in HORIZONS}
-    return {'collector':'ATLAS_V4_2','online':True,'symbols':list(SYMBOLS),'interval':'1h','counts':counts,
+    return {'collector':'ATLAS_V4_2','online':True,'symbols':list(SYMBOLS),'research_universe':list(ON_DEMAND_SYMBOLS),'interval':'1h','counts':counts,
+      'provider_counts':providers,'active_providers':{s:active_smart_money_provider(s) for s in SYMBOLS},
       'last_capture':rows[-1]['captured_at'] if rows else None,'archive_file':str(ARCHIVE.name),
       'matured_forward_labels':matured,'live_execution':False}
 
@@ -1697,11 +1726,15 @@ def cloud_score_symbol(symbol,btc_ks):
     if not direction:return None
     snap=None; futures_available=False
     try:
-      snap=capture(symbol); futures_available=True
+      snap=capture(symbol)
+      futures_available=bool(snap.get('futures_evidence_validated', (snap.get('futures_provider') or 'BINANCE_USDM_PUBLIC')=='BINANCE_USDM_PUBLIC'))
     except Exception:
       snap={}
-    fscore=fnum(snap.get('experimental_score'),0); funding=fnum(snap.get('funding_rate'),0);oi=fnum(snap.get('oi_change_pct'),0)
-    taker=fnum(snap.get('taker_ratio'),1);book=fnum(snap.get('orderbook_imbalance'),0)
+    fscore=fnum(snap.get('experimental_score'),0) if futures_available else 0
+    funding=fnum(snap.get('funding_rate'),0) if futures_available else 0
+    oi=fnum(snap.get('oi_change_pct'),0) if futures_available else 0
+    taker=fnum(snap.get('taker_ratio'),1) if futures_available else 1
+    book=fnum(snap.get('orderbook_imbalance'),0) if futures_available else 0
     base=58
     base+=min(12,max(0,(rv-1)*12))
     base+=8 if (direction=='LONG' and rel>=60) or (direction=='SHORT' and rel<=40) else -5 if (direction=='LONG' and rel<=35) or (direction=='SHORT' and rel>=65) else 0
@@ -1724,7 +1757,7 @@ def cloud_score_symbol(symbol,btc_ks):
     return {'symbol':symbol,'direction':direction,'entry':px,'champion_score':score,'champion_take':score>=60,
       'final_score':score,'opportunity_score':score,'execution_decision':f'{direction}_CANDIDATE' if score>=80 else f'{direction}_WATCH',
       'trade_plan_status':'PLAN_READY' if rr is not None else 'INCOMPLETE','rr_tp1':None,'rr_tp2':round(rr,3) if rr is not None else None,'anomaly_score':None,
-      'portfolio_allowed':None,'futures_available':futures_available,'futures_score':fscore if futures_available else None,'liquidity_score':None,'volume_quality':round(max(0,min(100,45+(rv-1)*35)),2),'relative_volume':round(rv,3),
+      'portfolio_allowed':None,'futures_available':futures_available,'futures_provider':snap.get('futures_provider'),'futures_score':fscore if futures_available else None,'liquidity_score':None,'volume_quality':round(max(0,min(100,45+(rv-1)*35)),2),'relative_volume':round(rv,3),
       'funding_rate':funding,'oi_change_pct':oi,'taker_ratio':taker,'orderbook_imbalance':book,
       'relative_strength_score':round(rel,2),'regime':'TREND_UP' if trend_up else 'TREND_DOWN',
       'support_strength':60,'support_distance_pct':round(sd,3) if sd is not None else None,
@@ -1914,9 +1947,11 @@ class Handler(SimpleHTTPRequestHandler):
         if u.path=='/api/smart-money/validation':
           sym=q.get('symbol',['BTCUSDT'])[0]; return self._json(validation_summary(sym))
         if u.path=='/api/smart-money/timeline':
-          sym=q.get('symbol',['BTCUSDT'])[0]; limit=int(q.get('limit',['200'])[0]); return self._json({'symbol':sym,'records':smart_money_forward_rows(sym)[-limit:]})
+          sym=q.get('symbol',['BTCUSDT'])[0]; limit=int(q.get('limit',['200'])[0]); provider=q.get('provider',[active_smart_money_provider(sym)])[0]
+          return self._json({'symbol':sym,'provider':provider,'records':smart_money_forward_rows(sym,provider)[-limit:]})
         if u.path=='/api/smart-money/factor-stats':
-          sym=q.get('symbol',['BTCUSDT'])[0]; return self._json({'symbol':sym,'stats':factor_stats(sym),'research_only':True})
+          sym=q.get('symbol',['BTCUSDT'])[0]; provider=active_smart_money_provider(sym)
+          return self._json({'symbol':sym,'provider':provider,'stats':factor_stats(sym,provider),'research_only':True})
         if u.path=='/api/alerts/status':
           return self._json(alert_status())
         if u.path=='/api/cloud-forward/status':
@@ -1948,7 +1983,7 @@ class Handler(SimpleHTTPRequestHandler):
         if u.path=='/api/forward/stats':
           sym=q.get('symbol',[None])[0]; horizon=int(q.get('horizon',['24'])[0]); return self._json(forward_stats(sym,horizon))
         if u.path=='/api/forward/update':
-          return self._json(update_forward_returns())
+          return self._json({'error':'use POST /api/forward/update from the ATLAS interface'},405,headers={'Allow':'POST'})
         if u.path=='/api/learning/validation':
           sym=q.get('symbol',[None])[0]; horizon=int(q.get('horizon',['24'])[0]); return self._json(validate_learning_rules(sym,horizon))
         if u.path=='/api/learning/failure-rules':
@@ -1981,6 +2016,9 @@ class Handler(SimpleHTTPRequestHandler):
       if not self._same_origin_write(): return self._json({'error':'same-origin request required'},403)
       if u.path=='/api/cloud-forward/run':
         try:return self._json(cloud_forward_cycle())
+        except Exception as e:return self._json({'error':str(e)},500)
+      if u.path=='/api/forward/update':
+        try:return self._json(update_forward_returns())
         except Exception as e:return self._json({'error':str(e)},500)
       if u.path=='/api/canary/stages/apply':
         try:

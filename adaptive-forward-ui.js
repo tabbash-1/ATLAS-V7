@@ -3,7 +3,7 @@ const $=id=>document.getElementById(id),fmt=(v,d=3)=>v==null?'—':Number(v).toF
 async function refresh(){
  const badge=$('adaptiveForwardBadge'),grid=$('adaptiveForwardMetrics'),note=$('adaptiveForwardNotes');if(!grid)return;
  try{
-  await fetch('/api/forward/update').catch(()=>null);
+  await fetch('/api/forward/update',{method:'POST'}).catch(()=>null);
   const j=await fetch('/api/adaptive/forward-comparison?horizon=24').then(r=>r.json());
   const f=j.fixed||{},a=j.adaptive_shadow||{};
   grid.innerHTML=[

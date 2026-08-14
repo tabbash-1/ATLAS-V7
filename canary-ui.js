@@ -3,7 +3,7 @@ const $=id=>document.getElementById(id),fmt=(v,d=3)=>v==null?'—':Number(v).toF
 async function refresh(){
  const badge=$('canaryBadge'),grid=$('canaryMetrics'),note=$('canaryNotes');if(!grid)return;
  try{
-  await fetch('/api/forward/update').catch(()=>null);
+  await fetch('/api/forward/update',{method:'POST'}).catch(()=>null);
   const j=await fetch('/api/canary/report?horizon=24').then(r=>r.json());
   grid.innerHTML=[
    ['Eligible rows',j.eligible_rows||0],['Control N',j.control_n||0],['Canary N',j.canary_n||0],

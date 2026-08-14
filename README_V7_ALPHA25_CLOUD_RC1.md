@@ -47,3 +47,13 @@ This is intentionally conservative.
 `ATLAS_RELEASE=V7-ALPHA25-CLOUD-RC1`
 
 Research only. Live execution disabled.
+
+
+## RC1.2 integrity review
+- Bybit fallback remains research continuity only; its proxy flow is not treated as equivalent to Binance 1h taker-ratio evidence.
+- Confirmed Alert / Cloud futures gate accepts only explicitly validated futures evidence.
+- OI change is never calculated across different providers.
+- Smart-Money validation/factor statistics are segmented by active futures provider.
+- Core data-quality coverage requires BTCUSDT and ETHUSDT samples, not merely aggregate rows.
+- `/api/forward/update` is now a same-origin POST mutation rather than a state-changing GET.
+- The Cloud command tile opens the System workspace directly for easier navigation.

@@ -88,6 +88,12 @@
     if(!b) return;
     switchWorkspace(b.dataset.workspace);
   });
+  const cloudTile=$('cmdCloudValue')?.closest('.command-tile');
+  if(cloudTile){
+    cloudTile.style.cursor='pointer';
+    cloudTile.title='Open System & Data workspace';
+    cloudTile.addEventListener('click',()=>switchWorkspace('system'));
+  }
   switchWorkspace(localStorage.getItem('atlas.v7.workspace')||'command',false);
 
   // Mirror existing source-of-truth status into the always-visible Command Strip.

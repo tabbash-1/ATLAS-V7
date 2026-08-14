@@ -22,7 +22,7 @@ function render(){
 async function stats(){
  const body=$('playbookStatsBody'),meta=$('playbookStatsMeta');if(!body)return;
  try{
-  await fetch('/api/forward/update').catch(()=>null);
+  await fetch('/api/forward/update',{method:'POST'}).catch(()=>null);
   const j=await fetch('/api/playbooks/stats?horizon=24').then(r=>r.json());
   const rows=j.playbooks||[];
   body.innerHTML=rows.length?rows.map(x=>`<tr><td>${x.playbook}</td><td>${x.n}</td><td>${x.hit_rate_pct==null?'—':fmt(x.hit_rate_pct)+'%'}</td><td>${x.avg_return_pct==null?'—':fmt(x.avg_return_pct,3)+'%'}</td><td>${x.profit_factor_proxy==null?'—':fmt(x.profit_factor_proxy,2)}</td><td>${x.max_drawdown_proxy==null?'—':fmt(x.max_drawdown_proxy,3)}</td></tr>`).join(''):'<tr><td colspan="6">No matured playbook observations yet.</td></tr>';
