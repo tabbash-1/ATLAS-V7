@@ -1444,34 +1444,83 @@ def score_snapshot(funding,taker,book_imb,oi_change):
     if oi_change is not None: score += max(-15,min(15,oi_change*2))
     return round(max(-100,min(100,score)))
 
-def capture(symbol):
-    if symbol not in ON_DEMAND_SYMBOLS: raise ValueError('Symbol is not in the ATLAS on-demand research universe.')
-    base='https://fapi.binance.com'
-    premium=get_json(f'{base}/fapi/v1/premiumIndex?symbol={symbol}','futures')
-    oi=get_json(f'{base}/fapi/v1/openInterest?symbol={symbol}','futures')
-    takers=get_json(f'{base}/futures/data/takerlongshortRatio?symbol={symbol}&period=1h&limit=2','futures')
-    depth=get_json(f'{base}/fapi/v1/depth?symbol={symbol}&limit=100','futures')
-    ticker=get_json(f'{base}/fapi/v1/ticker/24hr?symbol={symbol}','futures')
-    taker=takers[-1] if isinstance(takers,list) and takers else {}
+def _bybit_linear_capture(symbol):
+    """Production public derivatives fallback for research continuity when Binance USD-M is unavailable."""
+    base='https://api.bybit.com'
+    q=urllib.parse.quote(symbol)
+    tick=get_json(f'{base}/v5/market/tickers?category=linear&symbol={q}')
+    book=get_json(f'{base}/v5/market/orderbook?category=linear&symbol={q}&limit=100')
+    trades=get_json(f'{base}/v5/market/recent-trade?category=linear&symbol={q}&limit=500')
+    tlist=((tick or {}).get('result') or {}).get('list') or []
+    if not tlist: raise RuntimeError('Bybit ticker returned no data')
+    t=tlist[0]
+    bres=(book or {}).get('result') or {}
+    depth={'bids':bres.get('b') or [],'asks':bres.get('a') or []}
+    rlist=((trades or {}).get('result') or {}).get('list') or []
+    buy_vol=sum(fnum(x.get('size'),0) for x in rlist if str(x.get('side')).lower()=='buy')
+    sell_vol=sum(fnum(x.get('size'),0) for x in rlist if str(x.get('side')).lower()=='sell')
+    flow_ratio=(buy_vol/sell_vol) if sell_vol else (2.0 if buy_vol else 1.0)
     bidn,askn,imb=orderbook_metrics(depth)
-    walls=liquidity_walls(depth,premium.get('markPrice'))
-    oi_val=fnum(oi.get('openInterest'))
+    mark=fnum(t.get('markPrice')); walls=liquidity_walls(depth,mark)
+    oi_val=fnum(t.get('openInterest'))
     prev=previous(symbol); prev_oi=fnum(prev.get('open_interest')) if prev else None
     oi_change=((oi_val/prev_oi-1)*100) if oi_val is not None and prev_oi else None
-    funding=fnum(premium.get('lastFundingRate')); tr=fnum(taker.get('buySellRatio'))
-    snap={
+    funding=fnum(t.get('fundingRate'))
+    pc=fnum(t.get('price24hPcnt')); pc=(pc*100) if pc is not None else None
+    MARKET_DATA_STATE['futures']['last_provider']='api.bybit.com'
+    MARKET_DATA_STATE['futures']['last_success_at']=now_iso()
+    MARKET_DATA_STATE['futures']['last_error']=None
+    return {
       'schema':'ATLAS_SM_V2','captured_at':now_iso(),'captured_at_ms':int(time.time()*1000),'symbol':symbol,
-      'mark_price':fnum(premium.get('markPrice')),'index_price':fnum(premium.get('indexPrice')),
-      'funding_rate':funding,'next_funding_time':premium.get('nextFundingTime'),
+      'mark_price':mark,'index_price':fnum(t.get('indexPrice')),
+      'funding_rate':funding,'next_funding_time':t.get('nextFundingTime'),
       'open_interest':oi_val,'oi_change_pct':round(oi_change,5) if oi_change is not None else None,
-      'taker_ratio':tr,'taker_buy_vol':fnum(taker.get('buyVol')),'taker_sell_vol':fnum(taker.get('sellVol')),
+      'taker_ratio':flow_ratio,'taker_buy_vol':buy_vol,'taker_sell_vol':sell_vol,
       'orderbook_bid_notional_top20':round(bidn,2),'orderbook_ask_notional_top20':round(askn,2),
-      'orderbook_imbalance':round(imb,6),'orderbook_bid_walls':walls['bid_walls'],'orderbook_ask_walls':walls['ask_walls'],'price_change_24h_pct':fnum(ticker.get('priceChangePercent')),
-      'quote_volume_24h':fnum(ticker.get('quoteVolume')),
-      'experimental_score':score_snapshot(funding,tr,imb,oi_change),'factor_label':'EXPERIMENTAL_UNVALIDATED',
+      'orderbook_imbalance':round(imb,6),'orderbook_bid_walls':walls['bid_walls'],'orderbook_ask_walls':walls['ask_walls'],
+      'price_change_24h_pct':pc,'quote_volume_24h':fnum(t.get('turnover24h')),
+      'experimental_score':score_snapshot(funding,flow_ratio,imb,oi_change),'factor_label':'EXPERIMENTAL_UNVALIDATED',
       'whale_exchange_flow':None,'whale_provider_status':'NOT_CONNECTED','live_execution':False,
-      'sources':['Binance USDⓈ-M public market data'],
+      'futures_provider':'BYBIT_LINEAR_PUBLIC','flow_proxy':'RECENT_500_TAKER_TRADES',
+      'sources':['Bybit V5 linear public market data'],
     }
+
+def capture(symbol):
+    if symbol not in ON_DEMAND_SYMBOLS: raise ValueError('Symbol is not in the ATLAS on-demand research universe.')
+    try:
+      base='https://fapi.binance.com'
+      premium=get_json(f'{base}/fapi/v1/premiumIndex?symbol={symbol}','futures')
+      oi=get_json(f'{base}/fapi/v1/openInterest?symbol={symbol}','futures')
+      takers=get_json(f'{base}/futures/data/takerlongshortRatio?symbol={symbol}&period=1h&limit=2','futures')
+      depth=get_json(f'{base}/fapi/v1/depth?symbol={symbol}&limit=100','futures')
+      ticker=get_json(f'{base}/fapi/v1/ticker/24hr?symbol={symbol}','futures')
+      taker=takers[-1] if isinstance(takers,list) and takers else {}
+      bidn,askn,imb=orderbook_metrics(depth)
+      walls=liquidity_walls(depth,premium.get('markPrice'))
+      oi_val=fnum(oi.get('openInterest'))
+      prev=previous(symbol); prev_oi=fnum(prev.get('open_interest')) if prev else None
+      oi_change=((oi_val/prev_oi-1)*100) if oi_val is not None and prev_oi else None
+      funding=fnum(premium.get('lastFundingRate')); tr=fnum(taker.get('buySellRatio'))
+      snap={
+        'schema':'ATLAS_SM_V2','captured_at':now_iso(),'captured_at_ms':int(time.time()*1000),'symbol':symbol,
+        'mark_price':fnum(premium.get('markPrice')),'index_price':fnum(premium.get('indexPrice')),
+        'funding_rate':funding,'next_funding_time':premium.get('nextFundingTime'),
+        'open_interest':oi_val,'oi_change_pct':round(oi_change,5) if oi_change is not None else None,
+        'taker_ratio':tr,'taker_buy_vol':fnum(taker.get('buyVol')),'taker_sell_vol':fnum(taker.get('sellVol')),
+        'orderbook_bid_notional_top20':round(bidn,2),'orderbook_ask_notional_top20':round(askn,2),
+        'orderbook_imbalance':round(imb,6),'orderbook_bid_walls':walls['bid_walls'],'orderbook_ask_walls':walls['ask_walls'],
+        'price_change_24h_pct':fnum(ticker.get('priceChangePercent')),'quote_volume_24h':fnum(ticker.get('quoteVolume')),
+        'experimental_score':score_snapshot(funding,tr,imb,oi_change),'factor_label':'EXPERIMENTAL_UNVALIDATED',
+        'whale_exchange_flow':None,'whale_provider_status':'NOT_CONNECTED','live_execution':False,
+        'futures_provider':'BINANCE_USDM_PUBLIC','flow_proxy':'BINANCE_TAKER_RATIO_1H',
+        'sources':['Binance USDⓈ-M public market data'],
+      }
+      MARKET_DATA_STATE['futures']['last_provider']='fapi.binance.com'
+      MARKET_DATA_STATE['futures']['last_success_at']=now_iso()
+      MARKET_DATA_STATE['futures']['last_error']=None
+    except Exception as primary_error:
+      MARKET_DATA_STATE['futures']['last_error']=f'Binance USD-M unavailable: {primary_error}'
+      snap=_bybit_linear_capture(symbol)
     with ARCHIVE_LOCK:
       with ARCHIVE.open('a') as f: f.write(json.dumps(snap,separators=(',',':'))+'\n')
     return snap
