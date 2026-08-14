@@ -1,0 +1,713 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ATLAS V7 — Institutional Crypto Intelligence Terminal</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo">A</div>
+        <div><h1>ATLAS</h1><p>Quant Intelligence Terminal</p></div>
+      </div>
+
+      <button id="addAssetBtn" class="primary">＋ Add Asset</button>
+      <div class="section-title">WATCHLIST</div>
+      <div id="watchlist" class="watchlist"></div>
+
+      <div class="sidebar-footer">
+        <div class="status-dot"></div>
+        <span>Research mode</span>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <div class="eyebrow">ATLAS V7 · COMMAND CENTER</div>
+          <h2 id="activeTitle">BTC / USDT</h2>
+        </div>
+        <div class="controls">
+          <select id="intervalSelect" aria-label="Timeframe">
+            <option value="15">15m</option>
+            <option value="60">1H</option>
+            <option value="240">4H</option>
+            <option value="D" selected>1D</option>
+            <option value="W">1W</option>
+          </select>
+          <button id="analyzeBtn" class="analyze-btn">▶ Analyze Live</button>
+          <button id="backtestBtn" class="backtest-btn">⏪ Run Backtest</button>
+          <button id="themeToggleBtn" class="theme-toggle" type="button" aria-label="Switch theme" title="Switch Light / Dark"><span id="themeToggleIcon">☀️</span><span id="themeToggleText">Light</span></button><button id="settingsBtn">Data Settings</button>
+          <button id="importBtn">Import Trial JSON</button>
+          <input id="fileInput" type="file" accept="application/json,.json" hidden />
+        </div>
+      </header>
+
+      <section class="command-strip" aria-label="ATLAS command status">
+        <article class="command-tile command-primary">
+          <span class="command-label">MASTER CONVICTION</span>
+          <strong id="cmdMasterValue">WAITING</strong>
+          <small id="cmdMasterSub">No live analysis</small>
+        </article>
+        <article class="command-tile">
+          <span class="command-label">MARKET REGIME</span>
+          <strong id="cmdRegimeValue">—</strong>
+          <small>Structure context</small>
+        </article>
+        <article class="command-tile">
+          <span class="command-label">TRADE PLAN</span>
+          <strong id="cmdPlanValue">WAITING</strong>
+          <small>Entry · SL · TP · R:R</small>
+        </article>
+        <article class="command-tile">
+          <span class="command-label">PORTFOLIO RISK</span>
+          <strong id="cmdRiskValue">WAITING</strong>
+          <small>Correlation-aware</small>
+        </article>
+        <article class="command-tile">
+          <span class="command-label">PLAYBOOK</span>
+          <strong id="cmdPlaybookValue">—</strong>
+          <small>Scenario research</small>
+        </article>
+        <article class="command-tile">
+          <span class="command-label">DRIFT</span>
+          <strong id="cmdDriftValue">CHECKING</strong>
+          <small>Edge health</small>
+        </article>
+        <article class="command-tile">
+          <span class="command-label">CLOUD LAB</span>
+          <strong id="cmdCloudValue">CHECKING</strong>
+          <small>24/7 forward research</small>
+        </article>
+      </section>
+
+      <section class="grid chart-grid">
+        <article class="card chart-card">
+          <div class="card-head">
+            <div><span class="pill live">TRADINGVIEW</span><span id="tvSymbolLabel" class="muted">BINANCE:BTCUSDT</span></div>
+            <div class="muted small">Interactive market chart</div>
+          </div>
+          <div id="tradingview-host" class="tv-host"></div>
+        </article>
+
+        <article class="card signal-card">
+          <div class="card-head"><div><strong>CURRENT SETUP</strong><div class="muted tiny">Execution geometry · research only</div></div><span id="signalState" class="pill neutral">WAIT</span></div>
+          <div class="signal-score"><span id="confidence">—</span><small>confidence</small></div>
+          <div class="kv"><span>Entry</span><strong id="entry">—</strong></div>
+          <div class="kv"><span>Stop loss</span><strong id="stop">—</strong></div>
+          <div class="kv"><span>Take profit</span><strong id="target">—</strong></div>
+          <div class="kv"><span>Risk / Reward</span><strong id="rr">—</strong></div>
+          <div class="divider"></div>
+          <p class="muted small">Signals remain WAIT until a strategy engine or imported validated trial provides a decision.</p>
+        </article>
+      </section>
+
+      <nav class="atlas-workspace-nav" id="atlasWorkspaceNav" aria-label="ATLAS workspace">
+        <button class="workspace-tab active" data-workspace="command"><span>⌁</span> Command</button>
+        <button class="workspace-tab" data-workspace="market"><span>◫</span> Market</button>
+        <button class="workspace-tab" data-workspace="trade"><span>◇</span> Trade</button>
+        <button class="workspace-tab" data-workspace="research"><span>⌘</span> Research</button>
+        <button class="workspace-tab" data-workspace="learning"><span>◎</span> Learning</button>
+        <button class="workspace-tab" data-workspace="system"><span>⚙</span> System</button>
+      </nav>
+      <div id="atlasWorkspacePanels" class="atlas-workspace-panels"></div>
+
+      <section class="grid lower-grid">
+        <article class="card">
+          <div class="card-head"><strong>MARKET ENGINE</strong><span id="engineBadge" class="pill neutral">READY</span></div>
+          <div class="engine-grid">
+            <div><span>Trend</span><b id="trendState">Pending</b></div>
+            <div><span>Momentum</span><b id="momentumState">Pending</b></div>
+            <div><span>Volume</span><b id="volumeState">Pending</b></div>
+            <div><span>Structure</span><b id="structureState">Pending</b></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-head"><strong>REAL MARKET TRIAL</strong><span id="trialBadge" class="pill neutral">NO DATA</span></div>
+          <div id="trialContent" class="trial-empty">Import <code>FINAL_REAL_MARKET_TRIAL_SUMMARY.json</code> to inspect actual results.</div>
+        </article>
+      </section>
+
+      <section class="card metrics-card">
+        <div class="card-head">
+          <div><strong>ATLAS CONFIRMED OPPORTUNITY ALERTS — ALPHA 25</strong><div class="muted small">High-confidence LONG / SHORT only · strict confirmation gate · cooldown · browser + in-app alerts.</div></div>
+          <span id="confirmedAlertBadge" class="pill neutral">ARMING</span>
+        </div>
+        <div class="backtest-actions"><button id="alertEnableBrowserBtn">Enable Browser Alerts</button><button id="alertSoundBtn">Sound: ON</button><button id="alertRefreshBtn">Refresh Alerts</button></div>
+        <div id="confirmedAlertMetrics" class="trial-grid"><div><span>Status</span><b>Waiting for alert engine</b></div></div>
+        <div id="confirmedAlertNotes" class="comparison-box muted small">Only confirmed opportunities can create an alert.</div>
+        <div class="v42-table-wrap"><table class="v42-table"><thead><tr><th>Time</th><th>Asset</th><th>Side</th><th>Score</th><th>Entry</th><th>R:R</th><th>Playbook</th></tr></thead><tbody id="confirmedAlertBody"><tr><td colspan="7">No confirmed opportunity has fired yet.</td></tr></tbody></table></div>
+      </section>
+      <section class="card metrics-card">
+        <div class="card-head">
+          <div><strong>ATLAS MASTER CONVICTION ENGINE</strong><div class="muted small">Combines base signal · S/R · volume · breakout quality · futures context · sample-size-weighted historical evidence.</div></div>
+          <span id="masterBadge" class="pill neutral">WAITING</span>
+        </div>
+        <div id="masterMetrics" class="trial-grid">
+          <div><span>Master decision</span><b>WAITING</b></div><div><span>Conviction</span><b>—</b></div><div><span>Base</span><b>—</b></div><div><span>S/R + confluence</span><b>—</b></div>
+          <div><span>Volume</span><b>—</b></div><div><span>Breakout/Breakdown</span><b>—</b></div><div><span>Futures</span><b>—</b></div><div><span>Liquidity</span><b>—</b></div><div><span>Historical</span><b>—</b></div>
+        </div>
+        <div id="masterNotes" class="comparison-box muted small">Waiting for a live analysis. Research-only; no capital execution.</div>
+      </section>
+
+      <section class="card metrics-card">
+        <div class="card-head">
+          <div><strong>V5 CONFLUENCE ENGINE — S/R + VOLUME</strong><div class="muted small">Dynamic support/resistance strength · relative volume · OBV flow · breakout/rejection gate</div></div>
+          <span id="confluenceBadge" class="pill neutral">READY</span>
+        </div>
+        <div id="confluenceMetrics" class="trial-grid">
+          <div><span>Decision</span><b>READY</b></div><div><span>Support</span><b>—</b></div><div><span>Resistance</span><b>—</b></div><div><span>Rel. Volume</span><b>—</b></div>
+          <div><span>Volume Flow</span><b>—</b></div><div><span>Breakout ↑</span><b>—</b></div><div><span>Breakdown ↓</span><b>—</b></div><div><span>Gate reason</span><b>—</b></div>
+        </div>
+        <p class="muted tiny">Research-only alpha. S/R strength is calculated from repeated pivots, recency, touch volume and rejection wicks. It must be forward-tested before affecting capital.</p>
+      </section>
+
+      <section class="card metrics-card">
+        <div class="card-head">
+          <div><strong>V5 FUTURES INTELLIGENCE</strong><div class="muted small">Funding · OI change · taker pressure · order-book imbalance · crowding/squeeze context. Research-only confirmation layer.</div></div>
+          <span id="futuresIntelBadge" class="pill neutral">WAITING</span>
+        </div>
+        <div id="futuresIntelMetrics" class="trial-grid">
+          <div><span>Futures score</span><b>—</b></div><div><span>Alignment</span><b>—</b></div><div><span>Crowding</span><b>—</b></div><div><span>Squeeze</span><b>—</b></div>
+          <div><span>Funding</span><b>—</b></div><div><span>OI Δ</span><b>—</b></div><div><span>Taker ratio</span><b>—</b></div><div><span>Book imbalance</span><b>—</b></div>
+        </div>
+      </section>
+
+
+      <section class="card metrics-card">
+        <div class="card-head">
+          <div><strong>V5 LIQUIDITY + LIQUIDATION INTELLIGENCE</strong><div class="muted small">Observed Binance order-book walls · distance/strength · estimated liquidation pressure from crowding + OI. True liquidation maps require a separate provider.</div></div>
+          <span id="liquidityBadge" class="pill neutral">WAITING</span>
+        </div>
+        <div id="liquidityMetrics" class="trial-grid">
+          <div><span>Liquidity score</span><b>—</b></div><div><span>Nearest bid wall</span><b>—</b></div><div><span>Nearest ask wall</span><b>—</b></div><div><span>Long liq. pressure</span><b>—</b></div>
+          <div><span>Short liq. pressure</span><b>—</b></div><div><span>Order book source</span><b>—</b></div><div><span>Liquidations source</span><b>ESTIMATED</b></div><div><span>Status</span><b>RESEARCH ONLY</b></div>
+        </div>
+        <div id="liquidityNotes" class="comparison-box muted small">Waiting for liquidity context.</div>
+      </section>
+
+      <section class="card metrics-card">
+        <div class="card-head">
+          <div><strong>V5 PATTERN MEMORY + FORWARD RETURNS</strong><div class="muted small">Stores each confluence setup, labels future outcomes and compares the current setup with matured historical cases.</div></div>
+          <span id="memoryBadge" class="pill neutral">WAITING</span>
+        </div>
+        <div id="memoryMetrics" class="trial-grid">
+          <div><span>Observations</span><b>0</b></div><div><span>1h matured</span><b>0</b></div><div><span>4h matured</span><b>0</b></div><div><span>12h matured</span><b>0</b></div><div><span>24h matured</span><b>0</b></div><div><span>Status</span><b>COLLECTING</b></div>
+        </div>
+        <div id="similarityResult" class="comparison-box muted small">No current pattern comparison yet.</div>
+        <div id="memorySetupStats" class="comparison-box muted small">Waiting for matured setup outcomes.</div>
+        <p class="muted tiny">No capital decision should use Pattern Memory until enough observations mature and out-of-sample validation is completed.</p>
+      </section>
+
+      <section class="card metrics-card">
+        <div class="card-head"><strong>LIVE ENGINE METRICS</strong><span id="providerLabel" class="muted small">No analysis yet</span></div>
+        <div id="metricsGrid" class="trial-grid"><div><span>EMA 20</span><b>—</b></div><div><span>EMA 50</span><b>—</b></div><div><span>RSI 14</span><b>—</b></div><div><span>ATR 14</span><b>—</b></div><div><span>Volume ratio</span><b>—</b></div><div><span>Engine score</span><b>—</b></div></div>
+      </section>
+
+
+      <section class="card backtest-card">
+        <div class="card-head">
+          <div><strong>V3 BACKTEST ENGINE</strong><div class="muted small">Frozen V2 rules · next-candle entry · conservative intrabar handling</div></div>
+          <span id="backtestBadge" class="pill neutral">NOT RUN</span>
+        </div>
+        <div class="backtest-controls">
+          <label>Candles<select id="backtestCandles"><option value="500">500</option><option value="1000" selected>1000</option><option value="2000">2000</option></select></label>
+          <label>Initial capital<input id="backtestCapital" type="number" value="10000" min="100" step="100" /></label>
+          <label>Risk / trade %<input id="backtestRisk" type="number" value="1" min="0.1" max="10" step="0.1" /></label>
+          <label>Fee / side %<input id="backtestFee" type="number" value="0.1" min="0" max="2" step="0.01" /></label>
+        </div>
+        <div id="backtestMeta" class="muted small backtest-meta">Run a historical test for the selected asset and timeframe.</div>
+        <div id="backtestMetrics" class="trial-grid backtest-metrics">
+          <div><span>Verdict</span><b>—</b></div><div><span>Trades</span><b>—</b></div><div><span>Win rate</span><b>—</b></div>
+          <div><span>Net return</span><b>—</b></div><div><span>Profit factor</span><b>—</b></div><div><span>Max DD</span><b>—</b></div>
+          <div><span>Sharpe*</span><b>—</b></div><div><span>Avg R</span><b>—</b></div><div><span>Final equity</span><b>—</b></div>
+        </div>
+        <div class="backtest-actions">
+          <button id="exportBacktestBtn" disabled>Export FINAL JSON</button>
+          <button id="showTradesBtn" disabled>Show Trade Log</button>
+        </div>
+        <div id="tradeLog" class="trade-log" hidden></div>
+        <p class="muted tiny">*Sharpe shown here is a per-trade research statistic, not a conventional annualized portfolio Sharpe. PASS requires ≥20 trades, positive return, profit factor ≥1.20, and max drawdown ≤25%.</p>
+      </section>
+
+
+      <section class="card v4-card">
+        <div class="card-head">
+          <div><strong>V4 MULTI-FACTOR LAB</strong><div class="muted small">Regime-aware backtest · Derivatives shadow factor · compare against frozen V3</div></div>
+          <span id="v4Badge" class="pill neutral">NOT RUN</span>
+        </div>
+        <div class="v4-grid">
+          <div class="v4-panel">
+            <div class="panel-title">MARKET REGIME</div>
+            <div id="regimeGrid" class="trial-grid v4-metrics">
+              <div><span>Regime</span><b>—</b></div><div><span>Volatility</span><b>—</b></div><div><span>ADX 14</span><b>—</b></div>
+              <div><span>ATR %</span><b>—</b></div><div><span>EMA spread %</span><b>—</b></div><div><span>Risk scalar</span><b>—</b></div>
+            </div>
+          </div>
+          <div class="v4-panel">
+            <div class="panel-title">DERIVATIVES SHADOW FACTOR <span class="pill working">LIVE ONLY</span></div>
+            <div id="derivativesGrid" class="trial-grid v4-metrics">
+              <div><span>Funding</span><b>—</b></div><div><span>Open interest</span><b>—</b></div><div><span>Taker ratio</span><b>—</b></div>
+              <div><span>Crowding</span><b>—</b></div><div><span>Flow</span><b>—</b></div><div><span>Score</span><b>—</b></div>
+            </div>
+            <div id="derivativesMeta" class="muted tiny">Not fetched. Binance derivatives factor is kept out of long-history backtests until ATLAS builds its own archive.</div>
+          </div>
+        </div>
+        <div class="backtest-actions">
+          <button id="analyzeV4Btn">Analyze V4 Live</button>
+          <button id="runV4Btn">Run V4 Backtest</button>
+          <button id="compareV4Btn" disabled>Compare V3 ↔ V4</button>
+          <button id="exportV4Btn" disabled>Export V4 JSON</button>
+        </div>
+        <div id="v4Meta" class="muted small backtest-meta">V4 changes one thing at a time: first regime gating. Derivatives are observational only in this stage.</div>
+        <div id="v4BacktestMetrics" class="trial-grid backtest-metrics">
+          <div><span>Verdict</span><b>—</b></div><div><span>Trades</span><b>—</b></div><div><span>Win rate</span><b>—</b></div>
+          <div><span>Net return</span><b>—</b></div><div><span>Profit factor</span><b>—</b></div><div><span>Max DD</span><b>—</b></div>
+          <div><span>Sharpe*</span><b>—</b></div><div><span>Avg R</span><b>—</b></div><div><span>Blocked signals</span><b>—</b></div>
+        </div>
+        <div id="v4Comparison" class="comparison-box" hidden></div>
+        <p class="muted tiny">Research rule: V4 is accepted only if it improves out-of-sample robustness, not merely one backtest. No live execution is enabled.</p>
+      </section>
+
+
+      <section class="card smart-money-card">
+        <div class="card-head">
+          <div><strong>V4.1 SMART MONEY ARCHIVE</strong><div class="muted small">Hourly local research archive · Binance derivatives + order-flow snapshots · whale layer ready for provider integration</div></div>
+          <span id="smServerBadge" class="pill neutral">CHECKING</span>
+        </div>
+        <div class="v4-grid">
+          <div class="v4-panel">
+            <div class="panel-title">SMART MONEY SNAPSHOT <span class="pill working">RESEARCH ONLY</span></div>
+            <div id="smSnapshotGrid" class="trial-grid v4-metrics">
+              <div><span>Score*</span><b>—</b></div><div><span>Funding</span><b>—</b></div><div><span>Open interest</span><b>—</b></div>
+              <div><span>OI Δ</span><b>—</b></div><div><span>Taker ratio</span><b>—</b></div><div><span>Book imbalance</span><b>—</b></div>
+            </div>
+            <div id="smMeta" class="muted tiny">Waiting for local collector server.</div>
+          </div>
+          <div class="v4-panel">
+            <div class="panel-title">ARCHIVE STATUS</div>
+            <div id="smArchiveGrid" class="trial-grid v4-metrics">
+              <div><span>BTC snapshots</span><b>—</b></div><div><span>ETH snapshots</span><b>—</b></div><div><span>Interval</span><b>1h</b></div>
+              <div><span>Last capture</span><b>—</b></div><div><span>Whale flow</span><b>NOT CONNECTED</b></div><div><span>Execution</span><b>DISABLED</b></div>
+            </div>
+            <div class="muted tiny">Whale/exchange-flow data is intentionally left unfilled until a verifiable provider is connected. No synthetic whale data is used.</div>
+          </div>
+        </div>
+        <div class="backtest-actions">
+          <button id="smCaptureBtn">Capture Smart Money Now</button>
+          <button id="smRefreshBtn">Refresh Archive</button>
+          <button id="smExportBtn">Export Archive JSON</button>
+        </div>
+        <p class="muted tiny">*Smart Money Score is experimental factor telemetry, not a probability of profit and not a trading instruction. It will enter strategy logic only after walk-forward/out-of-sample validation.</p>
+      </section>
+
+
+      <section class="card smart-money-card">
+        <div class="card-head">
+          <div><strong>V4.2 SMART MONEY TIMELINE + FORWARD RETURNS</strong><div class="muted small">Each snapshot is labeled with what price did after 1h / 4h / 12h / 24h · factor evidence, not trading advice</div></div>
+          <span id="v42Badge" class="pill neutral">WAITING FOR DATA</span>
+        </div>
+        <div class="backtest-actions">
+          <button id="v42RefreshBtn">Refresh V4.2 Research</button>
+        </div>
+        <div id="v42Maturity" class="trial-grid v4-metrics">
+          <div><span>Snapshots</span><b>—</b></div><div><span>1h labels</span><b>—</b></div><div><span>4h labels</span><b>—</b></div>
+          <div><span>12h labels</span><b>—</b></div><div><span>24h labels</span><b>—</b></div><div><span>Validation</span><b>NOT READY</b></div>
+        </div>
+        <div class="v42-table-wrap"><table class="v42-table"><thead><tr><th>Time</th><th>Price</th><th>Funding</th><th>OI Δ</th><th>Taker</th><th>Book</th><th>Score*</th><th>+1h</th><th>+4h</th><th>+12h</th><th>+24h</th></tr></thead><tbody id="v42TimelineBody"><tr><td colspan="11">Waiting for snapshots…</td></tr></tbody></table></div>
+        <div class="panel-title" style="margin-top:18px">FACTOR ATTRIBUTION <span class="pill working">OBSERVATIONAL</span></div>
+        <div id="v42FactorStats" class="comparison-box">At least 3 matured observations are required even to display correlation; substantially more data is required before strategy use.</div>
+        <p class="muted tiny">*Experimental score remains unvalidated. Correlation is descriptive and does not establish causation or profitability. ATLAS will not promote a factor into execution logic from this screen alone.</p>
+      </section>
+
+
+      <section class="card smart-money-card">
+        <div class="card-head">
+          <div><strong>V5 OPPORTUNITY SCANNER</strong><div class="muted small">Two-stage ranking · regime/relative strength first · Futures/Liquidity/Pattern Memory enrichment for top candidates</div></div>
+          <span id="opportunityBadge" class="pill neutral">NOT RUN</span>
+        </div>
+        <div class="backtest-actions"><button id="opportunityScanBtn">Scan Crypto Opportunities</button><button id="opportunityExportBtn">Export Scan JSON</button></div>
+        <div id="opportunityMeta" class="muted small backtest-meta">Ranks BTC · ETH · SOL · XRP · BNB · DOGE · ZEC using the currently selected timeframe. Research-only; score is not a probability.</div>
+        <div class="v42-table-wrap"><table class="v42-table"><thead><tr><th>#</th><th>Asset</th><th>Base</th><th>Regime</th><th>Rel vs BTC</th><th>Volume</th><th>Anomaly</th><th>Stage 1</th><th>Futures</th><th>Liquidity</th><th>Hist 24h</th><th>Final</th><th>R:R2</th><th>Playbook</th><th>Execution</th></tr></thead><tbody id="opportunityBody"><tr><td colspan="15">Run the opportunity scan.</td></tr></tbody></table></div>
+        <p class="muted tiny">The scanner first compares opportunities across the market. Futures, liquidity, Pattern Memory and news will be used as enrichment/validation layers rather than allowing one noisy factor to dominate the ranking.</p>
+      </section>
+
+
+      <section class="card metrics-card">
+        <div class="card-head">
+          <div><strong>ATLAS STAGE EXPANSION & ROLLBACK — ALPHA 24</strong><div class="muted small">15% → 30% → 50% Shadow stages · independent pass criteria · automatic rollback on failure or safety risk.</div></div>
+          <span id="stageBadge" class="pill neutral">CHECKING</span>
+        </div>
+        <div class="backtest-actions"><button id="stageRefreshBtn">Refresh Stage State</button><button id="stageApplyBtn">Apply Stage Decision Now</button></div>
+        <div id="stageMetrics" class="trial-grid"><div><span>Status</span><b>Waiting for stage evidence</b></div></div>
+        <div id="stageNotes" class="comparison-box muted small">Stage transitions affect Shadow assignment only.</div>
+        <div class="v42-table-wrap"><table class="v42-table"><thead><tr><th>Stage</th><th>Canary N</th><th>Control N</th><th>Paired Δ</th><th>Risk-adj Δ</th><th>DD worsening</th><th>Verdict</th></tr></thead><tbody id="stageBody"><tr><td colspan="7">No stage data yet.</td></tr></tbody></table></div>
+      </section>
+
+      <section class="card metrics-card">
+        <div class="card-head">
+          <div><strong>ATLAS CONTROLLED CANARY — ALPHA 23</strong><div class="muted small">15% deterministic Shadow Canary · 85% Control · paired counterfactual · safety hold.</div></div>
+          <span id="canaryBadge" class="pill neutral">COLLECTING</span>
+        </div>
+        <div class="backtest-actions"><button id="canaryRefreshBtn">Refresh Canary Test</button></div>
+        <div id="canaryMetrics" class="trial-grid"><div><span>Status</span><b>Waiting for eligible future observations</b></div></div>
+        <div id="canaryNotes" class="comparison-box muted small">No feature is activated automatically.</div>
+      </section>
+
+      <section class="card metrics-card">
+        <div class="card-head">
+          <div><strong>ATLAS PROMOTION GATE — ALPHA 22</strong><div class="muted small">Pre-registered promotion criteria · PASS/FAIL audit · no automatic activation.</div></div>
+          <span id="promotionGateBadge" class="pill neutral">CHECKING</span>
+        </div>
+        <div class="backtest-actions"><button id="promotionGateRefreshBtn">Refresh Promotion Gate</button></div>
+        <div id="promotionGateMetrics" class="trial-grid"><div><span>Status</span><b>Waiting for evidence</b></div></div>
+        <div id="promotionGateNotes" class="comparison-box muted small">Passing only makes a feature eligible for controlled canary research.</div>
+        <div class="v42-table-wrap"><table class="v42-table"><thead><tr><th>Adaptive gate</th><th>Result</th><th>Value</th><th>Threshold</th><th>Detail</th></tr></thead><tbody id="promotionGateBody"><tr><td colspan="5">No gate evaluation yet.</td></tr></tbody></table></div>
+      </section>
+
+      <section class="card metrics-card">
+        <div class="card-head">
+          <div><strong>ATLAS ADAPTIVE vs FIXED — ALPHA 21</strong><div class="muted small">Forward test of fixed risk versus frozen adaptive shadow sizing · return / drawdown / risk-adjusted comparison.</div></div>
+          <span id="adaptiveForwardBadge" class="pill neutral">COLLECTING</span>
+        </div>
+        <div class="backtest-actions"><button id="adaptiveForwardRefreshBtn">Refresh Adaptive Forward Test</button></div>
+        <div id="adaptiveForwardMetrics" class="trial-grid"><div><span>Status</span><b>Waiting for matured observations</b></div></div>
+        <div id="adaptiveForwardNotes" class="comparison-box muted small">No adaptive sizing is applied to actual research positions.</div>
+      </section>
+
+      <section class="card metrics-card">
+        <div class="card-head">
+          <div><strong>ATLAS ADAPTIVE EDGE ALLOCATION — ALPHA 20</strong><div class="muted small">Regime × Playbook expectancy · recency blend · conservative shadow allocation.</div></div>
+          <span id="adaptiveBadge" class="pill neutral">COLLECTING</span>
+        </div>
+        <div class="backtest-actions"><button id="adaptiveRefreshBtn">Refresh Adaptive Edge</button></div>
+        <div id="adaptiveMetrics" class="trial-grid"><div><span>Status</span><b>Waiting for matured outcomes</b></div></div>
+        <div id="adaptiveNotes" class="comparison-box muted small">Shadow allocation only.</div>
+        <div class="v42-table-wrap"><table class="v42-table"><thead><tr><th>Regime</th><th>Playbook</th><th>N</th><th>Avg</th><th>Recent avg</th><th>Blended hit</th><th>Shadow size</th><th>Status</th></tr></thead><tbody id="adaptiveBody"><tr><td colspan="8">No adaptive evidence yet.</td></tr></tbody></table></div>
+      </section>
+
+      <section class="card metrics-card">
+        <div class="card-head">
+          <div><strong>ATLAS DATA QUALITY & DRIFT — ALPHA 19</strong><div class="muted small">Archive health · expectation drift · hit-rate drift · drawdown expansion · playbook decay.</div></div>
+          <span id="driftBadge" class="pill neutral">CHECKING</span>
+        </div>
+        <div class="backtest-actions"><button id="driftRefreshBtn">Refresh Drift Monitor</button></div>
+        <div id="driftMetrics" class="trial-grid"><div><span>Status</span><b>Waiting for forward data</b></div></div>
+        <div id="driftNotes" class="comparison-box muted small">Drift monitor has not run yet.</div>
+        <div class="v42-table-wrap"><table class="v42-table"><thead><tr><th>Playbook</th><th>Recent N</th><th>Prior N</th><th>Recent avg</th><th>Prior avg</th><th>Δ</th><th>Drift</th></tr></thead><tbody id="driftPlaybookBody"><tr><td colspan="7">No drift data yet.</td></tr></tbody></table></div>
+      </section>
+
+      <section class="card metrics-card">
+        <div class="card-head">
+          <div><strong>ATLAS CLOUD FORWARD WORKER — ALPHA 18</strong><div class="muted small">Server-side 24/7 research scans · automatic freeze · forward maturation · health status.</div></div>
+          <span id="cloudForwardBadge" class="pill neutral">CHECKING</span>
+        </div>
+        <div class="backtest-actions"><button id="cloudForwardRunBtn">Run Cloud Cycle Now</button><button id="cloudForwardRefreshBtn">Refresh Cloud Status</button></div>
+        <div id="cloudForwardMetrics" class="trial-grid"><div><span>Status</span><b>Loading worker state</b></div></div>
+        <div id="cloudForwardNotes" class="comparison-box muted small">Cloud worker has not reported yet.</div>
+        <p class="muted tiny">Uses a server-side research scanner and never sends orders. Browser-based Alpha 17 remains available as a parallel reference.</p>
+      </section>
+
+      <section class="card metrics-card">
+        <div class="card-head">
+          <div><strong>ATLAS CONTINUOUS FORWARD LAB — ALPHA 17</strong><div class="muted small">Automatic opportunity scans · qualifying setup freeze · deduplication · future maturation.</div></div>
+          <span id="continuousBadge" class="pill neutral">OFF</span>
+        </div>
+        <div class="backtest-controls">
+          <label><input id="continuousEnabled" type="checkbox"> Enable continuous lab while dashboard is running</label>
+          <label>Scan every (minutes)<input id="continuousInterval" type="number" value="60" min="15" max="1440" step="15"></label>
+          <label>Minimum Final Score<input id="continuousMinScore" type="number" value="68" min="50" max="100" step="1"></label>
+          <label>Max records per scan<input id="continuousMaxPerScan" type="number" value="3" min="1" max="7" step="1"></label>
+        </div>
+        <div class="backtest-actions"><button id="continuousSaveBtn">Save / Start</button><button id="continuousRunNowBtn">Run Cycle Now</button></div>
+        <div id="continuousNotes" class="comparison-box muted small">No automatic cycle has run yet.</div>
+        <p class="muted tiny">Runs only while this dashboard process is active. It never sends exchange orders.</p>
+      </section>
+
+      <section class="card metrics-card">
+        <div class="card-head">
+          <div><strong>ATLAS PERFORMANCE DASHBOARD — ALPHA 17</strong><div class="muted small">Forward expectancy · hit rate · PF proxy · drawdown proxy · breakdown by market context.</div></div>
+          <span id="performanceBadge" class="pill neutral">COLLECTING</span>
+        </div>
+        <div class="backtest-controls">
+          <label>Breakdown<select id="performanceGroup"><option value="by_symbol">By asset</option><option value="by_direction">Long vs Short</option><option value="by_score_bucket">Score bucket</option><option value="by_playbook">Playbook</option><option value="by_regime">Regime</option><option value="by_source">Manual vs Continuous</option></select></label>
+        </div>
+        <div class="backtest-actions"><button id="performanceRefreshBtn">Refresh Performance</button></div>
+        <div id="performanceMetrics" class="trial-grid"><div><span>Status</span><b>Waiting for matured forward observations</b></div></div>
+        <div class="v42-table-wrap"><table class="v42-table"><thead><tr><th>Group</th><th>N</th><th>Hit</th><th>Avg 24h</th><th>PF proxy</th><th>DD proxy</th></tr></thead><tbody id="performanceBreakdownBody"><tr><td colspan="6">No matured observations yet.</td></tr></tbody></table></div>
+        <div id="performanceMeta" class="muted small backtest-meta">Research-only performance lab.</div>
+      </section>
+
+      <section class="card metrics-card">
+        <div class="card-head">
+          <div><strong>ATLAS TRADER PLAYBOOKS — ALPHA 16</strong><div class="muted small">Institutional-style scenario labels · management logic · forward performance by playbook.</div></div>
+          <span id="playbookBadge" class="pill neutral">WAITING</span>
+        </div>
+        <div class="backtest-actions"><button id="playbookRefreshBtn">Refresh Playbooks</button></div>
+        <div id="playbookMetrics" class="trial-grid"><div><span>Status</span><b>Waiting for current setup</b></div></div>
+        <div id="playbookNotes" class="comparison-box muted small">Playbooks are research labels only.</div>
+        <div class="v42-table-wrap"><table class="v42-table"><thead><tr><th>Playbook</th><th>N</th><th>Hit</th><th>Avg 24h</th><th>PF proxy</th><th>DD proxy</th></tr></thead><tbody id="playbookStatsBody"><tr><td colspan="6">No matured playbook observations yet.</td></tr></tbody></table></div>
+        <div id="playbookStatsMeta" class="muted small backtest-meta">Collecting forward observations.</div>
+      </section>
+
+      <section class="card metrics-card">
+        <div class="card-head">
+          <div><strong>ATLAS CHAMPION vs CHALLENGER — ALPHA 15</strong><div class="muted small">Forward-only frozen decisions · validated penalties vs unchanged baseline · 24h expectancy comparison.</div></div>
+          <span id="forwardBadge" class="pill neutral">COLLECTING</span>
+        </div>
+        <div class="backtest-actions"><button id="forwardRecordBtn">Freeze Current Forward Observation</button><button id="forwardRefreshBtn">Refresh Forward Results</button></div>
+        <div id="forwardMetrics" class="trial-grid"><div><span>Status</span><b>Waiting for future outcomes</b></div></div>
+        <div id="forwardNotes" class="comparison-box muted small">Champion remains unchanged. Challenger runs in shadow.</div>
+      </section>
+
+      <section class="card metrics-card">
+        <div class="card-head">
+          <div><strong>ATLAS VALIDATION & PROMOTION — ALPHA 14</strong><div class="muted small">Chronological Discovery → Validation · out-of-sample rejection · expectancy / drawdown checks.</div></div>
+          <span id="validationBadge" class="pill neutral">COLLECTING</span>
+        </div>
+        <div class="backtest-actions"><button id="validationRefreshBtn">Run Validation</button></div>
+        <div id="validationMetrics" class="trial-grid"><div><span>Status</span><b>Waiting for enough matured outcomes</b></div></div>
+        <div id="validationNotes" class="comparison-box muted small">No rule is promoted into live scoring automatically.</div>
+        <div class="v42-table-wrap"><table class="v42-table"><thead><tr><th>Rule</th><th>Discovery N</th><th>Validation N</th><th>Val avg</th><th>Hit drop</th><th>Stable OOS?</th><th>Filter improves?</th><th>Status</th></tr></thead><tbody id="validationRulesBody"><tr><td colspan="8">No validation run yet.</td></tr></tbody></table></div>
+      </section>
+
+      <section class="card metrics-card">
+        <div class="card-head">
+          <div><strong>ATLAS POST-TRADE LEARNING — ALPHA 13</strong><div class="muted small">Failure attribution · sample-size gates · shrinkage · learned Shadow Penalties.</div></div>
+          <span id="learningBadge" class="pill neutral">COLLECTING</span>
+        </div>
+        <div class="backtest-actions"><button id="learningRefreshBtn">Refresh Learned Rules</button></div>
+        <div id="learningMetrics" class="trial-grid"><div><span>Status</span><b>Waiting for matured outcomes</b></div></div>
+        <div id="learningNotes" class="comparison-box muted small">Learned penalties remain shadow-only.</div>
+        <div class="v42-table-wrap"><table class="v42-table"><thead><tr><th>Failure pattern</th><th>N</th><th>Hit</th><th>Baseline</th><th>Avg 24h</th><th>Stable?</th><th>Status</th><th>Shadow penalty</th></tr></thead><tbody id="learningRulesBody"><tr><td colspan="8">No learned rules yet.</td></tr></tbody></table></div>
+      </section>
+
+      <section class="card metrics-card">
+        <div class="card-head">
+          <div><strong>ATLAS EARLY WARNING — ALPHA 12</strong><div class="muted small">Volume / volatility / return shock · OI expansion · taker aggression · order-book imbalance · squeeze risk.</div></div>
+          <span id="anomalyBadge" class="pill neutral">WAITING</span>
+        </div>
+        <div id="anomalyMetrics" class="trial-grid"><div><span>Status</span><b>Waiting for live analysis</b></div></div>
+        <div id="anomalyNotes" class="comparison-box muted small">Early warning only; not a trade signal.</div>
+      </section>
+
+      <section class="card metrics-card">
+        <div class="card-head">
+          <div><strong>ATLAS PORTFOLIO RISK — ALPHA 11</strong><div class="muted small">Correlation-aware risk budget · position sizing · cluster exposure protection.</div></div>
+          <span id="portfolioRiskBadge" class="pill neutral">WAITING</span>
+        </div>
+        <div class="backtest-controls">
+          <label>Equity<input id="portfolioEquity" type="number" value="10000" min="100"></label>
+          <label>Base risk %<input id="portfolioBaseRisk" type="number" value="1" min="0.1" max="5" step="0.1"></label>
+          <label>Max portfolio risk %<input id="portfolioMaxRisk" type="number" value="4" min="0.5" max="20" step="0.25"></label>
+          <label>Max correlated risk %<input id="portfolioCorrRisk" type="number" value="2.25" min="0.5" max="10" step="0.25"></label>
+          <label>Leverage cap<input id="portfolioLeverage" type="number" value="1" min="1" max="20" step="1"></label>
+        </div>
+        <div class="backtest-actions"><button id="portfolioRunBtn">Recalculate Risk</button><button id="portfolioAddBtn">Add Current Plan to Research Portfolio</button></div>
+        <div id="portfolioRiskMetrics" class="trial-grid"><div><span>Status</span><b>Waiting</b></div></div>
+        <div id="portfolioRiskNotes" class="comparison-box muted small">Research-only risk layer.</div>
+        <div class="v42-table-wrap"><table class="v42-table"><thead><tr><th>Asset</th><th>Direction</th><th>Risk</th><th>Entry</th><th>Stop</th><th></th></tr></thead><tbody id="portfolioPositionsBody"><tr><td colspan="6">No research positions added.</td></tr></tbody></table></div>
+      </section>
+
+      <section class="card metrics-card">
+        <div class="card-head">
+          <div><strong>ATLAS TRADE MANAGEMENT — ALPHA 10</strong><div class="muted small">Entry zone · structural/ATR invalidation · TP1/TP2 before S/R or liquidity obstacles · R:R quality gate.</div></div>
+          <span id="tradeMgmtBadge" class="pill neutral">WAITING</span>
+        </div>
+        <div id="tradeMgmtMetrics" class="trial-grid">
+          <div><span>Status</span><b>Run a live analysis</b></div>
+        </div>
+        <div id="tradeMgmtNotes" class="comparison-box muted small">Research-only; no execution.</div>
+      </section>
+
+      <section class="card metrics-card">
+        <div class="card-head">
+          <div><strong>EXIT RESEARCH LAB</strong><div class="muted small">Compares fixed 1.5 ATR stop / 2R target against S/R-aware partial exits and trailing.</div></div>
+          <span id="exitLabBadge" class="pill neutral">NOT RUN</span>
+        </div>
+        <div class="backtest-controls"><label>Round-trip cost proxy (bps)<input id="exitCostBps" type="number" value="20" min="0" max="200" step="1"></label></div><div class="backtest-actions"><button id="runExitLabBtn">Run Exit Lab</button></div>
+        <div id="exitLabMetrics" class="trial-grid"><div><span>Status</span><b>Not tested</b></div></div>
+        <div id="exitLabMeta" class="muted small backtest-meta">Uses sequential historical snapshots; research only.</div>
+      </section>
+
+      <section class="card metrics-card">
+        <div class="card-head">
+          <div><strong>ATLAS EVENT RADAR — SHADOW MODE</strong><div class="muted small">Classify high-impact events, preserve market context, and learn 1h/4h/12h/24h forward reactions before allowing news into conviction.</div></div>
+          <span id="eventRadarBadge" class="pill neutral">SHADOW READY</span>
+        </div>
+        <div class="backtest-controls">
+          <label>Event title<input id="eventTitle" type="text" placeholder="e.g. Fed rate decision / ETF approval / exchange exploit"></label>
+          <label>Type<select id="eventType"><option>OTHER</option><option>MACRO_RATE</option><option>MACRO_CPI</option><option>MACRO_JOBS</option><option>REGULATION</option><option>ETF</option><option>EXCHANGE_SECURITY</option><option>EXCHANGE_OUTAGE</option><option>TOKEN_UNLOCK</option><option>LISTING</option><option>NETWORK_UPGRADE</option><option>WHALE_TRANSFER</option><option>GEOPOLITICAL</option></select></label>
+          <label>Source tier<select id="eventSourceTier"><option>UNKNOWN</option><option>TIER1</option><option>PRIMARY</option></select></label>
+          <label>Scope<select id="eventScope"><option>MARKET</option><option>ASSET</option></select></label>
+          <label>Source<input id="eventSource" type="text" placeholder="Source name"></label>
+          <label>Confirmed <input id="eventConfirmed" type="checkbox"></label>
+          <label>Actual<input id="eventActual" type="number" step="any" placeholder="Optional"></label>
+          <label>Consensus<input id="eventConsensus" type="number" step="any" placeholder="Optional"></label>
+          <label>Previous<input id="eventPrevious" type="number" step="any" placeholder="Optional"></label>
+          <label>Surprise scale<input id="eventScale" type="number" step="any" min="0" placeholder="Auto if blank"></label>
+        </div>
+        <label class="muted small">Summary<textarea id="eventSummary" rows="2" placeholder="Optional short factual summary"></textarea></label>
+        <div class="backtest-actions"><button id="eventSyncBtn">Sync Official News</button><button id="eventRecordBtn">Record Shadow Event</button><button id="eventRefreshBtn">Refresh Event Memory</button></div>
+        <div id="eventPreview" class="comparison-box muted small">Events are observational only. They cannot change the Final Opportunity Score in Alpha 7.</div>
+        <div id="eventSources" class="muted small backtest-meta">Loading automatic source registry…</div><div id="eventStats" class="muted small backtest-meta">Waiting for event memory.</div>
+        <div class="v42-table-wrap"><table class="v42-table"><thead><tr><th>Time</th><th>Type</th><th>Event / Source</th><th>Impact</th><th>Direction</th><th>Market Reaction</th><th>1h Move</th></tr></thead><tbody id="eventRadarBody"><tr><td colspan="7">No events yet.</td></tr></tbody></table></div>
+        <p class="muted tiny">Impact is a research severity score, not a probability or trade instruction. Source quality and confirmation status are stored separately.</p>
+      </section>
+
+      <section class="card smart-money-card">
+        <div class="card-head">
+          <div><strong>SPOT ALPHA LAB V1</strong><div class="muted small">Long-only / Cash · cross-sectional ranking · cost-aware research baseline</div></div>
+          <span id="spotAlphaBadge" class="pill neutral">NOT RUN</span>
+        </div>
+        <div class="backtest-controls">
+          <label>Estimated round-trip cost (bps)<input id="spotCostBps" type="number" value="20" min="0" max="200" step="1"></label>
+        </div>
+        <div class="backtest-actions">
+          <button id="runSpotAlphaBtn">Run Spot Alpha Scan</button>
+          <button id="exportSpotAlphaBtn">Export Scan JSON</button>
+        </div>
+        <div id="spotAlphaMeta" class="muted small backtest-meta">First baseline: rank liquid crypto assets using 30/90-day momentum, trend quality, volume confirmation and volatility penalty, then subtract estimated trading friction.</div>
+        <div class="v42-table-wrap"><table class="v42-table"><thead><tr>
+          <th>#</th><th>Asset</th><th>30D</th><th>90D</th><th>Trend</th><th>Vol</th><th>Alpha score*</th><th>Action*</th><th>Net edge proxy*</th><th>Max allocation*</th>
+        </tr></thead><tbody id="spotAlphaBody"><tr><td colspan="10">Run the research scan.</td></tr></tbody></table></div>
+        <p class="muted tiny">*Unvalidated research outputs. They are not probabilities or trading instructions. V1 deliberately uses transparent fixed weights; the next stage will calibrate weights only from walk-forward forward-return evidence and compare against BTC buy-and-hold and cash.</p>
+      </section>
+
+
+      <section class="card smart-money-card">
+        <div class="card-head">
+          <div><strong>SPOT PORTFOLIO + WALK-FORWARD LAB</strong><div class="muted small">BTC · ETH · SOL · XRP · BNB · DOGE · ZEC · or CASH · next-day execution · costs included</div></div>
+          <span id="wfBadge" class="pill neutral">NOT RUN</span>
+        </div>
+        <div class="backtest-controls">
+          <label>Initial capital<input id="wfCapital" type="number" value="10000" min="100" step="100"></label>
+          <label>Top assets<select id="wfTopN"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option></select></label>
+          <label>Rebalance days<select id="wfRebalanceDays"><option value="3">3</option><option value="7" selected>7</option><option value="14">14</option><option value="30">30</option></select></label>
+          <label>Round-trip cost bps<input id="wfCostBps" type="number" value="20" min="0" max="200" step="1"></label>
+          <label>Minimum alpha score<input id="wfMinScore" type="number" value="15" min="-100" max="100" step="1"></label>
+          <label>Max asset weight %<input id="wfMaxWeight" type="number" value="50" min="5" max="100" step="5"></label>
+        </div>
+        <div class="backtest-actions">
+          <button id="wfRunBtn">Run Portfolio Walk-Forward</button>
+          <button id="wfExportBtn" disabled>Export Result JSON</button>
+          <button id="wfShowLogBtn" disabled>Show Recent Rebalances</button>
+        </div>
+        <div id="wfMeta" class="muted small backtest-meta">Fixed baseline weights. No parameter optimization is performed in this version.</div>
+        <div id="wfMetrics" class="trial-grid backtest-metrics">
+          <div><span>Final equity</span><b>—</b></div><div><span>Net return</span><b>—</b></div><div><span>CAGR</span><b>—</b></div>
+          <div><span>Max DD</span><b>—</b></div><div><span>Sharpe</span><b>—</b></div><div><span>Fees paid</span><b>—</b></div>
+          <div><span>Turnover</span><b>—</b></div><div><span>Cash days</span><b>—</b></div><div><span>Rebalances</span><b>—</b></div>
+          <div><span>BTC Buy & Hold</span><b>—</b></div><div><span>BTC Max DD</span><b>—</b></div><div><span>Alpha vs BTC</span><b>—</b></div>
+        </div>
+        <div id="wfLog" class="trade-log" hidden></div>
+        <p class="muted tiny">Research-only. The ranking weights are intentionally frozen and transparent. A strategy is not accepted because one historical period looks good; subsequent versions must use purged walk-forward folds and parameter stability tests.</p>
+      </section>
+
+
+      <section class="card smart-money-card">
+        <div class="card-head">
+          <div><strong>SMART MONEY VALIDATION LAB</strong><div class="muted small">Forward returns + factor attribution · 1h / 4h / 12h / 24h · research gate before strategy use</div></div>
+          <span id="smvBadge" class="pill neutral">NOT READY</span>
+        </div>
+        <div class="backtest-actions"><button id="smvRefreshBtn">Refresh Validation</button><button id="smvExportBtn">Export Validation JSON</button></div>
+        <div id="smvReadiness" class="trial-grid backtest-metrics">
+          <div><span>Snapshots</span><b>—</b></div><div><span>1h matured</span><b>—</b></div><div><span>4h matured</span><b>—</b></div>
+          <div><span>12h matured</span><b>—</b></div><div><span>24h matured</span><b>—</b></div><div><span>Readiness</span><b>NOT READY</b></div>
+        </div>
+        <div class="panel-title" style="margin-top:16px">FACTOR ATTRIBUTION</div>
+        <div class="v42-table-wrap"><table class="v42-table"><thead><tr><th>Factor</th><th>1h r</th><th>1h hit</th><th>4h r</th><th>4h hit</th><th>12h r</th><th>12h hit</th><th>24h r</th><th>24h hit</th></tr></thead><tbody id="smvFactorBody"><tr><td colspan="9">Waiting for matured observations…</td></tr></tbody></table></div>
+        <div class="panel-title" style="margin-top:16px">RECENT FORWARD-RETURN LABELS</div>
+        <div class="v42-table-wrap"><table class="v42-table"><thead><tr><th>Time</th><th>Price</th><th>Score</th><th>+1h</th><th>+4h</th><th>+12h</th><th>+24h</th></tr></thead><tbody id="smvTimelineBody"><tr><td colspan="7">Collecting…</td></tr></tbody></table></div>
+        <p class="muted tiny">Promotion rule: Smart Money factors stay observational until enough matured observations exist and they improve out-of-sample portfolio performance after costs. Correlation or hit rate alone is not sufficient.</p>
+      </section>
+
+      <section class="card assets-card">
+        <div class="card-head"><strong>MULTI‑ASSET UNIVERSE</strong><span class="muted small">Crypto · Stocks · Forex · Indices · Commodities</span></div>
+        <div id="assetTable" class="asset-table"></div>
+      </section>
+
+      <footer>ATLAS research prototype · Live execution disabled · TradingView chart is visual market data, not ATLAS execution.</footer>
+    </main>
+  </div>
+
+  <dialog id="assetDialog">
+    <form method="dialog" id="assetForm">
+      <div class="dialog-head"><h3>Add asset</h3><button value="cancel" class="icon-btn">✕</button></div>
+      <label>Display name<input id="assetName" placeholder="Gold" required /></label>
+      <label>TradingView symbol<input id="assetSymbol" placeholder="OANDA:XAUUSD" required /></label>
+      <label>Asset class
+        <select id="assetClass">
+          <option>Crypto</option><option>Stock</option><option>Forex</option><option>Index</option><option>Commodity</option>
+        </select>
+      </label>
+      <button id="saveAssetBtn" value="default" class="primary wide">Add to ATLAS</button>
+    </form>
+  </dialog>
+
+  <dialog id="settingsDialog">
+    <form method="dialog" id="settingsForm">
+      <div class="dialog-head"><h3>Market data settings</h3><button value="cancel" class="icon-btn">✕</button></div>
+      <p class="muted small">Binance crypto data works without a key. Stocks, forex, indices and commodities use Twelve Data.</p>
+      <label>Twelve Data API key<input id="twelveApiKey" type="password" placeholder="Paste API key" autocomplete="off" /></label>
+      <button id="saveSettingsBtn" value="default" class="primary wide">Save locally</button>
+    </form>
+  </dialog>
+
+  <script src="market-engine.js"></script>
+  <script src="confluence-engine.js"></script>
+  <script src="futures-intelligence.js"></script>
+  <script src="liquidity-liquidation-engine.js"></script>
+  <script src="master-conviction-engine.js"></script>
+  <script src="regime-relative-engine.js"></script>
+  <script src="playbook-engine.js"></script>
+  <script src="anomaly-engine.js"></script>
+  <script src="portfolio-risk-engine.js"></script>
+  <script src="trade-management-engine.js"></script>
+  <script src="exit-research-engine.js"></script>
+  <script src="backtest-engine.js"></script>
+  <script src="v4-engine.js"></script>
+  <script src="app.js"></script>
+  <script src="smart-money-ui.js"></script>
+  <script src="smart-money-v42.js"></script>
+  <script src="spot-alpha-engine.js"></script>
+  <script src="spot-alpha-ui.js"></script>
+  <script src="portfolio-walkforward-engine.js"></script>
+  <script src="portfolio-walkforward-ui.js"></script>
+  <script src="smart-money-validation-ui.js"></script>
+  <script src="confluence-ui.js"></script>
+  <script src="futures-intelligence-ui.js"></script>
+  <script src="pattern-memory-ui.js"></script>
+  <script src="liquidity-liquidation-ui.js"></script>
+  <script src="master-conviction-ui.js"></script>
+  <script src="event-intelligence-engine.js"></script>
+  <script src="event-surprise-engine.js"></script>
+  <script src="final-opportunity-engine.js"></script>
+  <script src="opportunity-scanner-ui.js"></script>
+  <script src="event-intelligence-ui.js"></script>
+  <script src="trade-management-ui.js"></script>
+  <script src="portfolio-risk-ui.js"></script>
+  <script src="anomaly-ui.js"></script>
+  <script src="post-trade-learning-ui.js"></script>
+  <script src="learning-validation-ui.js"></script>
+  <script src="forward-champion-ui.js"></script>
+  <script src="playbook-ui.js"></script>
+  <script src="continuous-forward-ui.js"></script>
+  <script src="cloud-forward-ui.js"></script>
+  <script src="drift-monitor-ui.js"></script>
+  <script src="adaptive-edge-ui.js"></script>
+  <script src="adaptive-forward-ui.js"></script>
+  <script src="promotion-gate-ui.js"></script>
+  <script src="canary-ui.js"></script>
+  <script src="stage-expansion-ui.js"></script>
+  <script src="performance-dashboard-ui.js"></script>
+  <script src="v7-ui-redesign.js"></script>
+  <script src="theme-toggle.js"></script>
+  <script src="confirmed-alerts-ui.js"></script>
+  <div id="atlasAlertToastHost" class="atlas-alert-toast-host" aria-live="polite"></div>
+</body>
+</html>
