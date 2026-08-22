@@ -3,4 +3,4 @@ WORKDIR /app
 COPY . /app
 ENV PYTHONUNBUFFERED=1
 EXPOSE 8080
-CMD ["python3", "collector_server.py"]
+CMD ["python3", "cloud_start.py"]

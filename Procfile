@@ -1,1 +1,1 @@
-web: python3 collector_server.py
+web: python3 cloud_start.py
