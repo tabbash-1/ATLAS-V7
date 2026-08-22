@@ -29,27 +29,25 @@ jobs:
           for f in *.js; do
             node --check "$f"
           done
-      - name: ATLAS AI regression tests
+      - name: ATLAS regression tests
         run: |
           node tests/atlas-ai-trade-geometry.test.js
           python tests/test_ai_validation.py
-      - name: Verify AI deployment entrypoints
+      - name: Verify production entrypoints
         run: |
           grep -q 'cloud_start.py' Procfile
           grep -q 'cloud_start.py' render.yaml
           grep -q 'cloud_start.py' Dockerfile
-          grep -q 'OPENAI_API_KEY' render.yaml
-          grep -q 'sync: false' render.yaml
-      - name: Verify ATLAS AI safety invariants
+          grep -q 'mountPath: /var/data' render.yaml
+          ! grep -q 'OPENAI_API_KEY' render.yaml
+      - name: Verify safety invariants
         run: |
           grep -q '/api/ai/analyze' atlas_ai_server.py
-          grep -q '/api/ai/status' atlas_ai_server.py
-          grep -q '/api/ai/validation' atlas_ai_server.py
-          grep -q '/api/ai/attribution' atlas_ai_server.py
           grep -q 'live_execution.*False' atlas_ai_server.py
           grep -q 'ATLAS_AI_ANALYSIS_PACKET_V1' atlas-ai-analysis-layer.js
           grep -q 'atlasApplyDecisionGate' atlas-decision-quality.js
-      - name: Production runtime, migration and persistence smoke test
+          grep -q 'optional/off' cloud_start.py
+      - name: Free core production runtime, migration and persistence smoke test
         env:
           PORT: '18080'
           ATLAS_DATA_DIR: /tmp/atlas-ci-data
@@ -72,8 +70,11 @@ jobs:
             return 1
           }
           stop_server() {
-            kill "$pid" 2>/dev/null || true
-            wait "$pid" 2>/dev/null || true
+            if [ -n "${pid:-}" ]; then
+              kill "$pid" 2>/dev/null || true
+              wait "$pid" 2>/dev/null || true
+              pid=''
+            fi
           }
           cleanup() {
             stop_server
@@ -85,10 +86,8 @@ jobs:
 
           start_server
           curl --fail --silent http://127.0.0.1:18080/health | grep -q '"status": "ok"'
-          curl --fail --silent http://127.0.0.1:18080/production-status.html | grep -q 'ATLAS V7 · Production Status'
-          curl --fail --silent http://127.0.0.1:18080/api/ai/status | grep -q '"provider": "OpenAI Responses API"'
-          curl --fail --silent http://127.0.0.1:18080/api/ai/validation | grep -q '"research_only": true'
-          curl --fail --silent http://127.0.0.1:18080/api/ai/attribution | grep -q '"live_execution": false'
+          curl --fail --silent http://127.0.0.1:18080/production-status.html | grep -q 'free core engine'
+          curl --fail --silent http://127.0.0.1:18080/api/smart-money/status | grep -q '"online": true'
           curl --fail --silent http://127.0.0.1:18080/api/system/readiness | grep -q '"persistent_data_dir": "/tmp/atlas-ci-data"'
           test -f "$ATLAS_DATA_DIR/$legacy_file"
           curl --fail --silent http://127.0.0.1:18080/api/data-quality | grep -q '"forward_rows": 1'
@@ -103,3 +102,23 @@ jobs:
           stop_server
           start_server
           curl --fail --silent http://127.0.0.1:18080/api/data-quality | grep -q '"forward_rows": 2'
+      - name: Optional AI gateway boot smoke test
+        env:
+          PORT: '18081'
+          ATLAS_DATA_DIR: /tmp/atlas-ci-ai-data
+          ATLAS_CLOUD_FORWARD_ENABLED: '0'
+          OPENAI_API_KEY: 'ci-placeholder-not-used'
+        run: |
+          set -euo pipefail
+          rm -rf "$ATLAS_DATA_DIR"
+          python3 cloud_start.py > /tmp/atlas-ai-server.log 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; cat /tmp/atlas-ai-server.log' EXIT
+          for i in $(seq 1 20); do
+            if curl --fail --silent http://127.0.0.1:18081/health >/dev/null; then
+              break
+            fi
+            sleep 0.25
+          done
+          curl --fail --silent http://127.0.0.1:18081/api/ai/status | grep -q '"provider": "OpenAI Responses API"'
+          curl --fail --silent http://127.0.0.1:18081/api/ai/status | grep -q '"configured": true'
