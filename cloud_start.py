@@ -18,4 +18,7 @@ for name in archive_candidates:
     if persistent.exists() and not local.exists():
         local.write_bytes(persistent.read_bytes())
 
-runpy.run_path(str(BASE / "collector_server.py"), run_name="__main__")
+# atlas_ai_server subclasses the existing collector handler and preserves all
+# legacy ATLAS routes/loops while adding /api/ai/analyze. The collector itself
+# remains untouched so rollback is one-file simple.
+runpy.run_path(str(BASE / "atlas_ai_server.py"), run_name="__main__")
