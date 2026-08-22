@@ -22,7 +22,7 @@ jobs:
           node-version: '22'
       - name: Python syntax
         run: |
-          python -m py_compile collector_server.py cloud_start.py atlas_ai_server.py
+          python -m py_compile collector_server.py cloud_start.py atlas_ai_server.py tests/test_ai_validation.py
       - name: JavaScript syntax
         run: |
           set -e
@@ -32,6 +32,7 @@ jobs:
       - name: ATLAS AI regression tests
         run: |
           node tests/atlas-ai-trade-geometry.test.js
+          python tests/test_ai_validation.py
       - name: Verify AI deployment entrypoints
         run: |
           grep -q 'cloud_start.py' Procfile
@@ -41,6 +42,7 @@ jobs:
         run: |
           grep -q '/api/ai/analyze' atlas_ai_server.py
           grep -q '/api/ai/status' atlas_ai_server.py
+          grep -q '/api/ai/validation' atlas_ai_server.py
           grep -q 'live_execution.*False' atlas_ai_server.py
           grep -q 'ATLAS_AI_ANALYSIS_PACKET_V1' atlas-ai-analysis-layer.js
           grep -q 'atlasApplyDecisionGate' atlas-decision-quality.js

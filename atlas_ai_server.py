@@ -59,11 +59,45 @@ def openai_analyze(packet):
         AI_STATUS['errors']+=1; AI_STATUS['last_error_at']=atlas.now_iso(); AI_STATUS['last_error']=str(e); raise
     finally: AI_STATUS['last_latency_ms']=round((time.time()-started)*1000)
 
+def _validation_payload(packet,thesis,provider):
+    decision=str(thesis.get('decision') or '').upper()
+    if decision not in ('LONG','SHORT'): return None
+    asset=packet.get('asset') or {}; symbol=str(asset.get('symbol') or '').upper().replace('BINANCE:','')
+    if symbol not in atlas.ON_DEMAND_SYMBOLS: return None
+    zone=thesis.get('entry_zone'); entry=None
+    if isinstance(zone,list) and len(zone)>=2:
+        vals=[atlas.fnum(x) for x in zone[:2]]
+        if all(x is not None for x in vals): entry=sum(vals)/2
+    if entry is None: entry=atlas.fnum((packet.get('trade_geometry') or {}).get('current_price'))
+    if not entry: return None
+    confidence=atlas.fnum(thesis.get('confidence'),0); rr=atlas.fnum(thesis.get('risk_reward'))
+    return {'symbol':symbol,'direction':decision,'entry':entry,'champion_score':confidence,'final_score':confidence,
+            'champion_take':True,'execution_decision':f'ATLAS_AI_{decision}','trade_plan_status':'PLAN_READY',
+            'rr_tp2':rr,'regime':thesis.get('market_regime'),'playbook_primary':'ATLAS_AI_VALIDATION',
+            'playbook_score':confidence,'playbook_all':['ATLAS_AI_VALIDATION'],
+            'auto_source':provider,'dedup_minutes':50}
+
+def record_ai_validation(packet,thesis,provider):
+    payload=_validation_payload(packet,thesis,provider)
+    if not payload:return {'stored':False,'reason':'WAIT_OR_INVALID_GEOMETRY'}
+    try:
+        result=atlas.forward_observe(payload)
+        if isinstance(result,dict) and 'stored' in result:return result
+        return {'stored':True,'record':result}
+    except Exception as e:return {'stored':False,'reason':'VALIDATION_STORE_ERROR','error':str(e)}
+
 class Handler(atlas.Handler):
     def do_GET(self):
         u=urllib.parse.urlparse(self.path)
         if u.path=='/api/ai/status':
             return self._json({'ok':True,'provider':'OpenAI Responses API','configured':AI_STATUS['configured'],'model':ATLAS_AI_MODEL,'structured_outputs':True,'status':dict(AI_STATUS),'research_only':True,'live_execution':False})
+        if u.path=='/api/ai/validation':
+            q=urllib.parse.parse_qs(u.query); sym=q.get('symbol',[None])[0]
+            horizons={str(h):atlas.forward_stats(sym,h) for h in atlas.HORIZONS}
+            rows=[r for r in atlas.forward_rows(sym) if str(r.get('auto_source') or '').startswith('ATLAS_AI')]
+            matured={str(h):sum(1 for r in rows if atlas.fnum((r.get('forward_return_pct') or {}).get(str(h))) is not None) for h in atlas.HORIZONS}
+            n24=matured['24']; readiness='ROBUSTNESS_TEST_READY' if n24>=200 else 'VALIDATION_READY' if n24>=100 else 'EARLY_RESEARCH' if n24>=30 else 'NOT_READY'
+            return self._json({'symbol':sym,'observations':len(rows),'matured':matured,'readiness':readiness,'horizons':horizons,'research_only':True,'live_execution':False})
         return super().do_GET()
 
     def do_POST(self):
@@ -76,7 +110,8 @@ class Handler(atlas.Handler):
             packet=json.loads(self.rfile.read(n).decode('utf-8') or '{}')
             if not isinstance(packet,dict) or packet.get('schema')!='ATLAS_AI_ANALYSIS_PACKET_V1': return self._json({'ok':False,'error':'invalid ATLAS AI packet'},400)
             thesis=openai_analyze(packet)
-            return self._json({'ok':True,'provider':'OpenAI Responses API','model':ATLAS_AI_MODEL,'thesis':thesis,'research_only':True,'live_execution':False})
+            validation=record_ai_validation(packet,thesis,'ATLAS_AI_OPENAI')
+            return self._json({'ok':True,'provider':'OpenAI Responses API','model':ATLAS_AI_MODEL,'thesis':thesis,'validation':validation,'research_only':True,'live_execution':False})
         except Exception as e:
             return self._json({'ok':False,'error':str(e),'fallback_expected':True,'research_only':True,'live_execution':False},503)
 
