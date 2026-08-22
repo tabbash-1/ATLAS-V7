@@ -85,6 +85,7 @@ jobs:
 
           start_server
           curl --fail --silent http://127.0.0.1:18080/health | grep -q '"status": "ok"'
+          curl --fail --silent http://127.0.0.1:18080/production-status.html | grep -q 'ATLAS V7 · Production Status'
           curl --fail --silent http://127.0.0.1:18080/api/ai/status | grep -q '"provider": "OpenAI Responses API"'
           curl --fail --silent http://127.0.0.1:18080/api/ai/validation | grep -q '"research_only": true'
           curl --fail --silent http://127.0.0.1:18080/api/ai/attribution | grep -q '"live_execution": false'
