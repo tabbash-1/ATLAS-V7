@@ -9,13 +9,13 @@
 </style>
 </head>
 <body><main>
-<header><div><div class="eyebrow">ATLAS V7 · OPERATIONS</div><h1 class="title">Production Status</h1><div class="sub">Live self-check · research system · no live execution</div></div><div id="overall" class="pill">Checking…</div></header>
+<header><div><div class="eyebrow">ATLAS V7 · OPERATIONS</div><h1 class="title">Production Status</h1><div class="sub">Live self-check · free core engine · research only · no live execution</div></div><div id="overall" class="pill">Checking…</div></header>
 <section class="grid">
 <div class="card"><div class="label">Service</div><div id="service" class="value">—</div><div id="uptime" class="detail">—</div></div>
-<div class="card"><div class="label">AI Gateway</div><div id="ai" class="value">—</div><div id="aimeta" class="detail">—</div></div>
-<div class="card"><div class="label">Readiness</div><div id="ready" class="value">—</div><div id="quality" class="detail">—</div></div>
+<div class="card"><div class="label">Core Engine</div><div id="engine" class="value">—</div><div id="engmeta" class="detail">No paid AI required</div></div>
+<div class="card"><div class="label">Research Maturity</div><div id="maturity" class="value">—</div><div id="quality" class="detail">—</div></div>
 <div class="card wide"><div class="label">Workers</div><div class="row"><span>Smart Money</span><span id="smart">—</span></div><div class="row"><span>Cloud Forward</span><span id="cloud">—</span></div><div class="row"><span>Data directory</span><span id="dataDir">—</span></div></div>
-<div class="card wide"><div class="label">AI Validation Sample</div><div id="obs" class="value">—</div><div id="matured" class="detail">—</div><div class="bar"><i id="samplebar"></i></div></div>
+<div class="card wide"><div class="label">Forward Validation Sample</div><div id="obs" class="value">—</div><div id="matured" class="detail">—</div><div class="bar"><i id="samplebar"></i></div></div>
 <div class="card full"><div class="label">Diagnostics</div><pre id="diagnostics">Waiting for production endpoints…</pre></div>
 </section><div class="footer">Auto-refresh every 30 seconds · Last check: <span id="last">—</span></div>
 </main>
@@ -23,20 +23,19 @@
 const $=id=>document.getElementById(id); const cls=(ok,warn=false)=>ok?'ok':warn?'warn':'bad';
 async function j(path){const r=await fetch(path,{cache:'no-store'}); if(!r.ok) throw new Error(path+' HTTP '+r.status); return r.json()}
 async function refresh(){
- const errors=[]; let health,ai,rd,val;
- try{health=await j('/health')}catch(e){errors.push(String(e))}
- try{ai=await j('/api/ai/status')}catch(e){errors.push(String(e))}
- try{rd=await j('/api/system/readiness')}catch(e){errors.push(String(e))}
- try{val=await j('/api/ai/validation')}catch(e){errors.push(String(e))}
+ const errors=[]; let health,rd,sm,cloud,dq,fwd,ai;
+ for(const [name,path] of [['health','/health'],['readiness','/api/system/readiness'],['smart','/api/smart-money/status'],['cloud','/api/cloud-forward/status'],['quality','/api/data-quality'],['forward','/api/forward/stats?horizon=24'],['ai','/api/ai/status']]){
+   try{const x=await j(path); if(name==='health')health=x; else if(name==='readiness')rd=x; else if(name==='smart')sm=x; else if(name==='cloud')cloud=x; else if(name==='quality')dq=x; else if(name==='forward')fwd=x; else ai=x}catch(e){errors.push(String(e))}
+ }
  const hOk=health?.status==='ok'; $('service').textContent=hOk?'ONLINE':'ERROR'; $('service').className='value '+cls(hOk); $('uptime').textContent=health?`Uptime ${Math.round(health.uptime_seconds||0)} sec · ${health.service||'ATLAS'}`:'Health endpoint unavailable';
- const aiOk=ai?.configured===true; $('ai').textContent=aiOk?'CONFIGURED':'NOT CONFIGURED'; $('ai').className='value '+cls(aiOk,!aiOk); $('aimeta').textContent=ai?`${ai.model||'unknown model'} · requests ${ai.status?.requests||0} · successes ${ai.status?.successes||0}`:'AI endpoint unavailable';
- const ready=rd?.ready===true; $('ready').textContent=ready?'READY':(rd?'DEGRADED':'ERROR'); $('ready').className='value '+cls(ready,!!rd); $('quality').textContent=rd?`Data quality ${rd.data_quality?.quality_score ?? '—'} · ${rd.data_quality?.status||'unknown'}`:'Readiness endpoint unavailable';
- $('smart').textContent=rd?.smart_money_ok?'HEALTHY':(rd?'WARMING / DEGRADED':'—'); $('smart').className=cls(!!rd?.smart_money_ok,!!rd);
- $('cloud').textContent=rd?.cloud_forward_ok?'HEALTHY':(rd?'WARMING / DEGRADED':'—'); $('cloud').className=cls(!!rd?.cloud_forward_ok,!!rd);
- $('dataDir').textContent=rd?.persistent_data_dir||'—';
- const n=val?.observations||0; const n24=val?.matured?.['24']||0; $('obs').textContent=`${n} observations`; $('matured').textContent=`24h matured: ${n24} · ${val?.readiness||'unknown'}`; $('samplebar').style.width=Math.min(100,n24/2)+'%';
- const overall=hOk && aiOk && !!rd; $('overall').textContent=overall?(ready?'● PRODUCTION READY':'● ONLINE · COLLECTING'):'● ATTENTION'; $('overall').className='pill '+cls(overall,!!health);
- $('diagnostics').textContent=JSON.stringify({health,ai:{configured:ai?.configured,model:ai?.model,status:ai?.status},readiness:rd,ai_validation:val,errors},null,2); $('last').textContent=new Date().toLocaleString();
+ const coreOk=hOk && sm?.online===true; $('engine').textContent=coreOk?'ACTIVE':'STARTING'; $('engine').className='value '+cls(coreOk,!!health); $('engmeta').textContent=ai?.configured===true?`Core engine active · optional AI connected`:`Core engine active · optional AI off · $0 API cost`;
+ const q=dq||rd?.data_quality; const qScore=q?.quality_score??0; const qStatus=q?.status||'COLLECTING'; const researchReady=qStatus==='HEALTHY'; $('maturity').textContent=researchReady?'MATURE':'COLLECTING'; $('maturity').className='value '+cls(researchReady,true); $('quality').textContent=`Data quality ${qScore} · ${qStatus}`;
+ const smartLive=sm?.online===true; const smartCounts=sm?.counts||{}; const coreCount=(smartCounts.BTCUSDT||0)+(smartCounts.ETHUSDT||0); $('smart').textContent=smartLive?(coreCount>0?`HEALTHY · ${coreCount} core snapshots`:'WARMING'):'ERROR'; $('smart').className=cls(smartLive && coreCount>0,smartLive);
+ const cloudEnabled=cloud?.enabled!==false; const cloudCycles=cloud?.cycles||0; const cloudErrors=cloud?.errors||0; const cloudHealthy=cloudEnabled && cloudErrors===0; $('cloud').textContent=cloudHealthy?(cloudCycles>0?`HEALTHY · ${cloudCycles} cycles`:'WARMING'):'ATTENTION'; $('cloud').className=cls(cloudHealthy && cloudCycles>0,cloudHealthy);
+ const dataDir=rd?.persistent_data_dir||'—'; const persistent=dataDir==='/var/data'; $('dataDir').textContent=dataDir; $('dataDir').className=persistent?'ok':'warn';
+ const total=dq?.forward_rows||0; const matured=fwd?.matured_observations||0; $('obs').textContent=`${total} observations`; $('matured').textContent=`24h matured: ${matured} · ${fwd?.verdict||'COLLECTING'}`; $('samplebar').style.width=Math.min(100,matured/2)+'%';
+ const operational=hOk && coreOk && persistent && cloudEnabled; $('overall').textContent=operational?'● OPERATIONAL · COLLECTING':'● ATTENTION'; $('overall').className='pill '+cls(operational,!!health);
+ $('diagnostics').textContent=JSON.stringify({health,core_engine:{active:coreOk,optional_ai_connected:ai?.configured===true},smart_money:sm,cloud_forward:cloud,persistent_data_dir:dataDir,data_quality:dq,forward_24h:fwd,legacy_readiness:rd,errors},null,2); $('last').textContent=new Date().toLocaleString();
 }
 refresh(); setInterval(refresh,30000);
 </script></body></html>
