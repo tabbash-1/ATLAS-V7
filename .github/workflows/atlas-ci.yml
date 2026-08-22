@@ -47,3 +47,24 @@ jobs:
           grep -q 'live_execution.*False' atlas_ai_server.py
           grep -q 'ATLAS_AI_ANALYSIS_PACKET_V1' atlas-ai-analysis-layer.js
           grep -q 'atlasApplyDecisionGate' atlas-decision-quality.js
+      - name: Production entrypoint smoke test
+        env:
+          PORT: '18080'
+          ATLAS_DATA_DIR: /tmp/atlas-ci-data
+          ATLAS_CLOUD_FORWARD_ENABLED: '0'
+        run: |
+          set -euo pipefail
+          python3 cloud_start.py > /tmp/atlas-server.log 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true; cat /tmp/atlas-server.log' EXIT
+          for i in $(seq 1 20); do
+            if curl --fail --silent http://127.0.0.1:18080/health >/tmp/atlas-health.json; then
+              break
+            fi
+            sleep 0.25
+          done
+          curl --fail --silent http://127.0.0.1:18080/health | grep -q '"status": "ok"'
+          curl --fail --silent http://127.0.0.1:18080/api/ai/status | grep -q '"provider": "OpenAI Responses API"'
+          curl --fail --silent http://127.0.0.1:18080/api/ai/validation | grep -q '"research_only": true'
+          curl --fail --silent http://127.0.0.1:18080/api/ai/attribution | grep -q '"live_execution": false'
+          curl --fail --silent http://127.0.0.1:18080/api/system/readiness | grep -q '"persistent_data_dir": "/tmp/atlas-ci-data"'
