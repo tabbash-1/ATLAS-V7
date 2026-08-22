@@ -5,9 +5,21 @@ from http.server import ThreadingHTTPServer
 import collector_server as atlas
 
 _ORIGINAL_CAPTURE = atlas.capture
+_ORIGINAL_CLOUD_SCORE = atlas.cloud_score_symbol
 BOOT_ID = f"{int(time.time())}-{os.getpid()}"
 RUNTIME_STARTED_AT = time.time()
 WORKER_STATE = {}
+_CLOUD_CONTEXT = threading.local()
+CLOUD_RUNTIME_STATE = {
+    'mode':'SPOT_FIRST_WITH_FRESH_SMART_MONEY_CONTEXT',
+    'score_calls':0,
+    'fresh_snapshot_reuses':0,
+    'spot_only_fallbacks':0,
+    'last_symbol':None,
+    'last_score_started_at':None,
+    'last_score_finished_at':None,
+    'last_score_error':None,
+}
 
 KRAKEN_SYMBOLS = {
     'BTCUSDT': ('PF_XBTUSD', 'PI_XBTUSD'),
@@ -81,7 +93,32 @@ def _kraken_capture(symbol):
     }
 
 
+def _fresh_archived_snapshot(symbol,max_age_seconds=7200):
+    now_ms=int(time.time()*1000)
+    for row in reversed(atlas.read_all()[-500:]):
+        if row.get('symbol')!=symbol:
+            continue
+        ts=int(row.get('captured_at_ms') or 0)
+        if ts and now_ms-ts <= max_age_seconds*1000:
+            return row
+        return None
+    return None
+
+
 def resilient_capture(symbol):
+    # Cloud Forward is a ranking/collection worker. During its universe-scoring
+    # phase, never block on a fresh derivatives request for every asset. Reuse
+    # already-collected derivatives context when fresh; otherwise let the base
+    # scorer continue in its existing spot-only path. The hourly Smart Money
+    # worker still performs the real provider capture independently.
+    if getattr(_CLOUD_CONTEXT,'score_universe',False):
+        cached=_fresh_archived_snapshot(symbol)
+        if cached is not None:
+            CLOUD_RUNTIME_STATE['fresh_snapshot_reuses']+=1
+            return cached
+        CLOUD_RUNTIME_STATE['spot_only_fallbacks']+=1
+        raise RuntimeError('No fresh archived futures context; cloud scorer continuing spot-only')
+
     try:
         return _ORIGINAL_CAPTURE(symbol)
     except Exception as primary:
@@ -97,6 +134,25 @@ def resilient_capture(symbol):
 
 
 atlas.capture=resilient_capture
+
+
+def fast_cloud_score_symbol(symbol,btc_ks):
+    CLOUD_RUNTIME_STATE['score_calls']+=1
+    CLOUD_RUNTIME_STATE['last_symbol']=symbol
+    CLOUD_RUNTIME_STATE['last_score_started_at']=atlas.now_iso()
+    CLOUD_RUNTIME_STATE['last_score_error']=None
+    _CLOUD_CONTEXT.score_universe=True
+    try:
+        return _ORIGINAL_CLOUD_SCORE(symbol,btc_ks)
+    except Exception as exc:
+        CLOUD_RUNTIME_STATE['last_score_error']=f'{type(exc).__name__}: {exc}'
+        raise
+    finally:
+        _CLOUD_CONTEXT.score_universe=False
+        CLOUD_RUNTIME_STATE['last_score_finished_at']=atlas.now_iso()
+
+
+atlas.cloud_score_symbol=fast_cloud_score_symbol
 
 
 def _supervise(name, target, restart_delay=5):
@@ -133,6 +189,7 @@ class RuntimeHandler(atlas.Handler):
                 'workers':WORKER_STATE,
                 'smart_money':atlas.SMART_MONEY_STATE,
                 'cloud_forward':atlas.CLOUD_FORWARD_STATE,
+                'cloud_runtime':CLOUD_RUNTIME_STATE,
                 'market_data':atlas.MARKET_DATA_STATE,
                 'research_only':True,
                 'live_execution':False,
@@ -165,5 +222,6 @@ if __name__=='__main__':
     print(f'Boot ID: {BOOT_ID}', flush=True)
     print(f'Data: {atlas.DATA}', flush=True)
     print('Futures providers: Binance USD-M -> Bybit -> Kraken Futures', flush=True)
+    print('Cloud Forward: spot-first scoring with fresh archived futures context', flush=True)
     print(f'Listening on port {port}', flush=True)
     server.serve_forever(poll_interval=0.25)
