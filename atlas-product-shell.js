@@ -34,7 +34,7 @@
       <div id="apsStopCard" class="aps-card"><div class="aps-label">Stop</div><div id="apsStop" class="aps-value">—</div></div>
       <div id="apsTargetCard" class="aps-card"><div class="aps-label">Target / R:R</div><div id="apsTarget" class="aps-value">—</div></div>
     </div>
-    <div class="aps-actions"><button id="apsAnalyze" class="aps-analyze">▶ ANALYZE</button><div id="apsStatus" class="aps-note">Ready</div></div>
+    <div class="aps-actions"><button id="apsAnalyze" class="aps-analyze">▶ ANALYZE</button><div id="apsStatus" class="aps-note">Ready · existing engines preserved</div></div>
     <div class="aps-summary-grid">
       <div class="aps-summary"><strong>Why</strong><div id="apsWhy">Run analysis to see the strongest evidence.</div></div>
       <div class="aps-summary"><strong>Risks</strong><div id="apsRisks">Risk context will be summarized here.</div></div>
@@ -130,7 +130,7 @@
     $('apsChanges').textContent=buildChanges(decision);
     const btn=$('analyzeBtn');
     $('apsAnalyze').disabled=!!btn?.disabled;
-    $('apsStatus').textContent=btn?.disabled?'Analysis running…':decision==='WAIT'?'WAIT = no executable trade plan':'Research decision ready';
+    $('apsStatus').textContent=btn?.disabled?'Analysis running… · existing engines preserved':decision==='WAIT'?'WAIT = no executable trade plan · existing engines preserved':'Research decision ready · existing engines preserved';
     $('apsAdvanced').textContent=document.body.classList.contains('atlas-advanced-open')?'Hide Advanced':'Advanced Research';
   }
 
