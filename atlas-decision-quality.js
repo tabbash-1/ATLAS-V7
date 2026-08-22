@@ -4,7 +4,11 @@ function aqSide(x){const s=String(x||'').toUpperCase();if(/LONG|BUY|BULL/.test(s
 function atlasTradeReadiness(packet,thesis){
   const direction=aqSide(thesis?.decision),g=packet?.trade_geometry||{},side=direction>0?g.long:direction<0?g.short:null;
   const rr=Number.isFinite(+thesis?.risk_reward)?+thesis.risk_reward:Number(side?.rr),htf=aqSide(packet?.multi_timeframe?.higher_timeframe_bias),ltf=aqSide(packet?.multi_timeframe?.entry_timing_bias);
-  let align=.5,timing=.5;if(direction){align=htf===direction?1:(htf===0?.55:0);timing=ltf===direction?1:(ltf===0?.55:.2);}
+  let align=.5,timing=.5;
+  if(direction){
+    if(htf===direction)align=1;else if(htf===0)align=.55;else align=0;
+    if(ltf===direction)timing=1;else if(ltf===0)timing=.55;else timing=.2;
+  }
   const rrScore=Number.isFinite(rr)?aqClamp(rr/2.25,0,1):0,geometry=side&&Array.isArray(side.entry_zone)&&Number.isFinite(+side.stop_loss)&&Number.isFinite(+side.tp1)?1:0,vol=String(g.volatility_regime||'UNKNOWN'),volScore=vol==='EXTREME'?.35:vol==='HIGH'?.7:vol==='UNKNOWN'?.55:1;
   const score=Math.round((align*.28+timing*.18+rrScore*.28+geometry*.16+volScore*.10)*100);
   return{score,rr:Number.isFinite(rr)?rr:null,volatility_regime:vol,htf_alignment:align,entry_timing_alignment:timing,geometry_complete:!!geometry};
