@@ -1,3 +1,6 @@
+import sys
+from pathlib import Path
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import atlas_ai_server as ai
 
 packet={'asset':{'symbol':'BINANCE:BTCUSDT'},'trade_geometry':{'current_price':100}}
