@@ -5,12 +5,8 @@ from pathlib import Path
 BASE = Path(__file__).resolve().parent
 
 # Production-safe defaults. Existing explicit environment values always win.
-# Render services created before render.yaml was added do not automatically
-# inherit Blueprint env vars, so make the runtime self-configuring.
 if os.environ.get("RENDER") and not os.environ.get("ATLAS_DATA_DIR"):
     persistent_mount = Path("/var/data")
-    # Use the persistent mount when it is actually attached. Otherwise retain
-    # the legacy data directory rather than failing startup.
     if persistent_mount.exists() and os.access(str(persistent_mount), os.W_OK):
         os.environ["ATLAS_DATA_DIR"] = str(persistent_mount)
 
@@ -27,8 +23,6 @@ os.environ.setdefault("ATLAS_ALERT_COOLDOWN_MINUTES", "240")
 DATA_DIR = Path(os.environ.get("ATLAS_DATA_DIR", str(BASE / "data")))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-# Seed legacy state only when the destination has no copy. This preserves
-# accumulated production observations across deploys/restarts.
 persistent_candidates = [
     "smart_money_archive.jsonl",
     "smart_money_archive.json",
@@ -44,9 +38,8 @@ for name in persistent_candidates:
     if source.exists() and not target.exists():
         shutil.copy2(source, target)
 
-# OpenAI is optional. Without an API key ATLAS runs the full deterministic
-# collector/analysis/forward-validation engine and incurs no AI API cost.
-# If a key is explicitly configured later, the AI gateway is enabled.
-entrypoint = "atlas_ai_server.py" if os.environ.get("OPENAI_API_KEY", "").strip() else "collector_server.py"
-print(f"ATLAS production boot: data={DATA_DIR} ai={'enabled' if entrypoint == 'atlas_ai_server.py' else 'optional/off'}")
+# Default to the free resilient runtime. It keeps the full deterministic ATLAS
+# engine and adds a third public futures fallback suitable for US-hosted Render.
+entrypoint = "atlas_runtime_server.py"
+print(f"ATLAS production boot: data={DATA_DIR} runtime=resilient-free")
 runpy.run_path(str(BASE / entrypoint), run_name="__main__")
