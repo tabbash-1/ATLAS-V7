@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ATLAS AI Analyst</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="main" style="max-width:1200px;margin:0 auto;padding:24px">
+    <header class="topbar">
+      <div><div class="eyebrow">ATLAS V7 · AI ANALYST</div><h2 id="activeTitle">BTC / USDT</h2></div>
+      <div class="controls">
+        <select id="atlasAiAssetSelect" aria-label="Asset">
+          <option value="BINANCE:BTCUSDT">BTC / USDT</option>
+          <option value="BINANCE:ETHUSDT">ETH / USDT</option>
+          <option value="BINANCE:SOLUSDT">SOL / USDT</option>
+          <option value="BINANCE:XRPUSDT">XRP / USDT</option>
+          <option value="BINANCE:BNBUSDT">BNB / USDT</option>
+          <option value="BINANCE:DOGEUSDT">DOGE / USDT</option>
+          <option value="BINANCE:ZECUSDT">ZEC / USDT</option>
+        </select>
+      </div>
+    </header>
+    <section class="card chart-card">
+      <div class="card-head"><div><span class="pill live">ATLAS DATA</span> <span id="tvSymbolLabel" class="muted">BINANCE:BTCUSDT</span></div><div class="muted small">1W · 1D · 12H · 6H · 4H · 1H · 30M · 15M</div></div>
+      <div class="comparison-box muted small">This workspace uses ATLAS market data and the existing V7 market engine. The AI decision is quality-gated; insufficient or conflicting evidence becomes WAIT.</div>
+    </section>
+    <section class="card metrics-card"><div class="card-head"><strong>AI WORKSPACE STATUS</strong><span class="pill neutral">RESEARCH ONLY</span></div><div class="trial-grid"><div><span>Timeframes</span><b>8</b></div><div><span>Historical structure</span><b>ENABLED</b></div><div><span>Quality gate</span><b>ENABLED</b></div><div><span>Live execution</span><b>DISABLED</b></div></div></section>
+  </main>
+  <script src="market-engine.js"></script>
+  <script src="atlas-timeframe-engine.js"></script>
+  <script src="atlas-ai-analysis-layer.js"></script>
+  <script src="atlas-decision-quality.js"></script>
+  <script>
+    const sel=document.getElementById('atlasAiAssetSelect');
+    sel.addEventListener('change',()=>{const v=sel.value;document.getElementById('tvSymbolLabel').textContent=v;document.getElementById('activeTitle').textContent=sel.options[sel.selectedIndex].textContent;});
+  </script>
+  <script src="atlas-ai-ui.js"></script>
+</body>
+</html>
