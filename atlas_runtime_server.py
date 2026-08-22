@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-import json, os, threading, time, urllib.parse, urllib.request
+import json, os, threading, time, urllib.parse, urllib.request, traceback
 from http.server import ThreadingHTTPServer
 
 import collector_server as atlas
 
 _ORIGINAL_CAPTURE = atlas.capture
+BOOT_ID = f"{int(time.time())}-{os.getpid()}"
+RUNTIME_STARTED_AT = time.time()
+WORKER_STATE = {}
 
 KRAKEN_SYMBOLS = {
     'BTCUSDT': ('PF_XBTUSD', 'PI_XBTUSD'),
@@ -95,14 +98,72 @@ def resilient_capture(symbol):
 
 atlas.capture=resilient_capture
 
+
+def _supervise(name, target, restart_delay=5):
+    state=WORKER_STATE.setdefault(name,{'starts':0,'unexpected_exits':0,'last_started_at':None,'last_exit_at':None,'last_error':None})
+    while True:
+        state['starts']+=1
+        state['last_started_at']=atlas.now_iso()
+        state['last_error']=None
+        try:
+            target()
+            state['unexpected_exits']+=1
+            state['last_exit_at']=atlas.now_iso()
+            state['last_error']='worker returned unexpectedly'
+            print(f'[runtime] {name} returned unexpectedly; restarting in {restart_delay}s', flush=True)
+        except BaseException as exc:
+            state['unexpected_exits']+=1
+            state['last_exit_at']=atlas.now_iso()
+            state['last_error']=f'{type(exc).__name__}: {exc}'
+            print(f'[runtime] {name} crashed: {state["last_error"]}', flush=True)
+            traceback.print_exc()
+        time.sleep(restart_delay)
+
+
+class RuntimeHandler(atlas.Handler):
+    def do_GET(self):
+        u=urllib.parse.urlparse(self.path)
+        if u.path=='/api/runtime/status':
+            return self._json({
+                'ok':True,
+                'boot_id':BOOT_ID,
+                'uptime_seconds':round(time.time()-RUNTIME_STARTED_AT,1),
+                'pid':os.getpid(),
+                'data_dir':str(atlas.DATA),
+                'workers':WORKER_STATE,
+                'smart_money':atlas.SMART_MONEY_STATE,
+                'cloud_forward':atlas.CLOUD_FORWARD_STATE,
+                'market_data':atlas.MARKET_DATA_STATE,
+                'research_only':True,
+                'live_execution':False,
+            })
+        return super().do_GET()
+
+
+class AtlasHTTPServer(ThreadingHTTPServer):
+    daemon_threads=True
+    allow_reuse_address=True
+    request_queue_size=128
+
+
 if __name__=='__main__':
     os.chdir(atlas.ROOT)
-    threading.Thread(target=atlas.auto_loop,daemon=True).start()
-    threading.Thread(target=atlas.news_loop,daemon=True).start()
-    threading.Thread(target=atlas.cloud_forward_loop,daemon=True).start()
     port=int(os.environ.get('PORT','8080'))
-    print('ATLAS V7 resilient production runtime')
-    print(f'Data: {atlas.DATA}')
-    print('Futures providers: Binance USD-M -> Bybit -> Kraken Futures')
-    print(f'Listening on port {port}')
-    ThreadingHTTPServer(('0.0.0.0',port),atlas.Handler).serve_forever()
+
+    # Bind the web listener before starting any external-data worker. This keeps
+    # Render health checks independent from Binance/Bybit/Kraken/news latency.
+    server=AtlasHTTPServer(('0.0.0.0',port),RuntimeHandler)
+
+    for name,target in (
+        ('smart_money',atlas.auto_loop),
+        ('news',atlas.news_loop),
+        ('cloud_forward',atlas.cloud_forward_loop),
+    ):
+        threading.Thread(target=_supervise,args=(name,target),daemon=True,name=f'atlas-{name}').start()
+
+    print('ATLAS V7 resilient production runtime', flush=True)
+    print(f'Boot ID: {BOOT_ID}', flush=True)
+    print(f'Data: {atlas.DATA}', flush=True)
+    print('Futures providers: Binance USD-M -> Bybit -> Kraken Futures', flush=True)
+    print(f'Listening on port {port}', flush=True)
+    server.serve_forever(poll_interval=0.25)
