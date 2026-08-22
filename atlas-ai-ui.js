@@ -2,18 +2,24 @@
   function esc(x){return String(x??'—').replace(/[&<>]/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[s]));}
   function ensureCard(){if(document.getElementById('atlasAiAnalystCard'))return;const card=document.createElement('section');card.id='atlasAiAnalystCard';card.className='card metrics-card';card.innerHTML=`<div class="card-head"><div><strong>ATLAS AI ANALYST</strong><div class="muted small">Multi-timeframe · historical structure · liquidity · smart money · server-side AI · research only</div></div><span id="atlasAiBadge" class="pill neutral">READY</span></div><div class="backtest-actions"><button id="atlasAiRunBtn" class="analyze-btn">Analyze with ATLAS AI</button></div><div id="atlasAiDecision" class="trial-grid"><div><span>Decision</span><b>WAITING</b></div><div><span>Confidence</span><b>—</b></div><div><span>Regime</span><b>—</b></div><div><span>R:R</span><b>—</b></div></div><div id="atlasAiPlan" class="comparison-box muted small">Waiting for structured multi-timeframe analysis.</div>`;const anchor=document.querySelector('.metrics-card');(anchor?.parentNode||document.querySelector('main')||document.body).insertBefore(card,anchor||null);document.getElementById('atlasAiRunBtn').addEventListener('click',run);}
   function activeAsset(){const label=document.getElementById('tvSymbolLabel')?.textContent?.trim()||'BINANCE:BTCUSDT';return {name:document.getElementById('activeTitle')?.textContent?.trim()||label,symbol:label,cls:'Crypto'};}
+  async function getJson(path){try{const r=await fetch(path);return r.ok?await r.json():null;}catch(_e){return null;}}
   async function evidence(asset){
-    let smartMoney=null;const symbol=String(asset?.symbol||'BINANCE:BTCUSDT').replace(/^BINANCE:/,'');
-    try{const r=await fetch(`/api/smart-money/latest?symbol=${encodeURIComponent(symbol)}`);if(r.ok){const j=await r.json();smartMoney=j.snapshot||null;}}catch(_e){}
+    const symbol=String(asset?.symbol||'BINANCE:BTCUSDT').replace(/^BINANCE:/,'');
+    const [sm,memory,events]=await Promise.all([
+      getJson(`/api/smart-money/latest?symbol=${encodeURIComponent(symbol)}`),
+      getJson(`/api/confluence/memory-stats?symbol=${encodeURIComponent(symbol)}`),
+      getJson('/api/events/latest')
+    ]);
+    const relevantEvents=(events?.events||[]).filter(x=>(x.scope||'MARKET')==='MARKET'||x.symbol===symbol).slice(-12);
     return {
-      smartMoney,
+      smartMoney:sm?.snapshot||null,
       futures:window.ATLAS_LATEST_FUTURES||null,
       liquidity:window.ATLAS_LIQUIDITY||null,
       confluence:window.ATLAS_LATEST_CONFLUENCE||null,
       masterConviction:window.ATLAS_MASTER||null,
-      patternMemory:window.ATLAS_LAST_PATTERN_MEMORY||null,
-      eventIntelligence:window.ATLAS_LAST_EVENT_INTELLIGENCE||null,
-      portfolioRisk:window.ATLAS_LAST_PORTFOLIO_RISK||null
+      patternMemory:memory?{observations:memory.observations||0,matured:memory.matured||{},setups:(memory.setups||[]).slice(0,8)}:null,
+      eventIntelligence:relevantEvents.length?{events:relevantEvents}:null,
+      portfolioRisk:window.ATLAS_PORTFOLIO_ASSESSMENT||null
     };
   }
   async function callAI(packet){try{const r=await fetch('/api/ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(packet)});if(!r.ok)throw new Error(`AI gateway HTTP ${r.status}`);const j=await r.json();if(j?.ok&&j?.thesis)return {...j.thesis,_provider:j.provider||'AI',_model:j.model||''};throw new Error(j?.error||'AI unavailable');}catch(e){const f=packet.fallback_thesis;return {...f,_provider:'ATLAS deterministic fallback',_model:'',_fallback_error:e.message};}}
