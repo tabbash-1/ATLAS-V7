@@ -15,6 +15,8 @@ os.environ.setdefault("ATLAS_CLOUD_FORWARD_ENABLED", "1")
 os.environ.setdefault("ATLAS_CLOUD_FORWARD_INTERVAL_SECONDS", "3600")
 os.environ.setdefault("ATLAS_CLOUD_FORWARD_MIN_SCORE", "68")
 os.environ.setdefault("ATLAS_CLOUD_FORWARD_MAX_PER_CYCLE", "3")
+os.environ.setdefault("ATLAS_RESEARCH_SAMPLE_MIN_SCORE", "50")
+os.environ.setdefault("ATLAS_RESEARCH_SAMPLE_MAX_PER_CYCLE", "3")
 os.environ.setdefault("ATLAS_ALERT_MIN_SCORE", "82")
 os.environ.setdefault("ATLAS_ALERT_MIN_RR", "2.0")
 os.environ.setdefault("ATLAS_ALERT_MIN_VOLUME_QUALITY", "58")
@@ -38,8 +40,8 @@ for name in persistent_candidates:
     if source.exists() and not target.exists():
         shutil.copy2(source, target)
 
-# Default to the free resilient runtime. It keeps the full deterministic ATLAS
-# engine and adds a third public futures fallback suitable for US-hosted Render.
-entrypoint = "atlas_runtime_server.py"
-print(f"ATLAS production boot: data={DATA_DIR} runtime=resilient-free")
+# Production keeps the hardened free runtime, now with a separate research
+# sampling lane. Signal/alert thresholds remain unchanged.
+entrypoint = "atlas_research_runtime_server.py"
+print(f"ATLAS production boot: data={DATA_DIR} runtime=resilient-free-research")
 runpy.run_path(str(BASE / entrypoint), run_name="__main__")
