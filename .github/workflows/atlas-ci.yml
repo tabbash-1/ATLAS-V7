@@ -17,7 +17,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '22'
       - name: Python syntax
@@ -49,8 +49,13 @@ jobs:
           grep -q '/api/runtime/status' atlas_runtime_server.py
           grep -q 'request_queue_size=128' atlas_runtime_server.py
           grep -q 'CLOUD_FORWARD_RESEARCH_SAMPLE' atlas_research_runtime_server.py
+          grep -q 'CLOUD_FORWARD_SHADOW_DIRECTION_RESEARCH' atlas_research_runtime_server.py
+          grep -q 'SHADOW_DIRECTIONAL_PROXY' atlas_research_runtime_server.py
+          grep -q "'champion_take': False" atlas_research_runtime_server.py
+          grep -q "sample\['champion_take'\] = False" atlas_research_runtime_server.py
           grep -q 'RESEARCH_OBSERVATION_ONLY' atlas_research_runtime_server.py
           grep -q 'CLOUD_FORWARD_MIN_SCORE' atlas_research_runtime_server.py
+          grep -q 'min(59.0' atlas_research_runtime_server.py
           grep -q 'ATLAS_CLOUD_FORWARD_MIN_SCORE.*68' cloud_start.py
           grep -q 'ATLAS_ALERT_MIN_SCORE.*82' cloud_start.py
           grep -q 'live_execution.*False' collector_server.py
