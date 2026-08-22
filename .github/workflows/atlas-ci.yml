@@ -46,6 +46,8 @@ jobs:
           grep -q 'KRAKEN_FUTURES_PUBLIC' atlas_runtime_server.py
           grep -q 'futures.kraken.com' atlas_runtime_server.py
           grep -q 'Binance USD-M -> Bybit -> Kraken Futures' atlas_runtime_server.py
+          grep -q '/api/runtime/status' atlas_runtime_server.py
+          grep -q 'request_queue_size=128' atlas_runtime_server.py
           grep -q 'live_execution.*False' collector_server.py
           grep -q 'ATLAS_AI_ANALYSIS_PACKET_V1' atlas-ai-analysis-layer.js
           grep -q 'atlasApplyDecisionGate' atlas-decision-quality.js
@@ -88,6 +90,8 @@ jobs:
 
           start_server
           curl --fail --silent http://127.0.0.1:18080/health | grep -q '"status": "ok"'
+          curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"ok": true'
+          curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"boot_id"'
           curl --fail --silent http://127.0.0.1:18080/production-status.html | grep -q 'free core engine'
           curl --fail --silent http://127.0.0.1:18080/api/smart-money/status | grep -q '"online": true'
           curl --fail --silent http://127.0.0.1:18080/api/system/readiness | grep -q '"persistent_data_dir": "/tmp/atlas-ci-data"'
@@ -103,4 +107,5 @@ jobs:
 
           stop_server
           start_server
+          curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"ok": true'
           curl --fail --silent http://127.0.0.1:18080/api/data-quality | grep -q '"forward_rows": 2'
