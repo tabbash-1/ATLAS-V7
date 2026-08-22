@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ATLAS V7 · Production Status</title>
+<style>
+:root{color-scheme:dark;--bg:#080b12;--card:#101622;--line:#253047;--text:#e9eef8;--muted:#8c9ab3;--ok:#55d68b;--warn:#f4c95d;--bad:#ff6b7a;--accent:#9d7cff}*{box-sizing:border-box}body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:radial-gradient(circle at top,#151b2a 0,#080b12 48%);color:var(--text)}main{max-width:1100px;margin:auto;padding:28px 18px 60px}header{display:flex;gap:18px;align-items:flex-start;justify-content:space-between;margin-bottom:22px}.eyebrow{font-size:12px;letter-spacing:.15em;color:var(--accent);font-weight:800}.title{font-size:clamp(28px,5vw,48px);margin:5px 0 8px}.sub{color:var(--muted);font-size:14px}.pill{border:1px solid var(--line);border-radius:999px;padding:10px 14px;font-size:13px;white-space:nowrap}.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}.card{grid-column:span 4;background:rgba(16,22,34,.88);border:1px solid var(--line);border-radius:18px;padding:18px;box-shadow:0 12px 35px rgba(0,0,0,.22)}.wide{grid-column:span 6}.full{grid-column:1/-1}.label{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}.value{font-size:27px;font-weight:800}.detail{font-size:13px;color:var(--muted);margin-top:8px;line-height:1.5}.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}pre{margin:0;white-space:pre-wrap;word-break:break-word;font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;color:#b7c5dc;max-height:380px;overflow:auto}.bar{height:8px;background:#1b2434;border-radius:99px;overflow:hidden;margin-top:12px}.bar>i{display:block;height:100%;background:linear-gradient(90deg,#7c64ff,#55d68b);width:0}.row{display:flex;justify-content:space-between;gap:12px;border-top:1px solid rgba(37,48,71,.65);padding:10px 0;font-size:13px}.row:first-of-type{border-top:0}.row span:last-child{font-weight:700;text-align:right}.footer{color:var(--muted);font-size:12px;margin-top:18px;text-align:center}@media(max-width:760px){header{display:block}.pill{display:inline-block;margin-top:14px}.card,.wide{grid-column:1/-1}.value{font-size:23px}}
+</style>
+</head>
+<body><main>
+<header><div><div class="eyebrow">ATLAS V7 · OPERATIONS</div><h1 class="title">Production Status</h1><div class="sub">Live self-check · research system · no live execution</div></div><div id="overall" class="pill">Checking…</div></header>
+<section class="grid">
+<div class="card"><div class="label">Service</div><div id="service" class="value">—</div><div id="uptime" class="detail">—</div></div>
+<div class="card"><div class="label">AI Gateway</div><div id="ai" class="value">—</div><div id="aimeta" class="detail">—</div></div>
+<div class="card"><div class="label">Readiness</div><div id="ready" class="value">—</div><div id="quality" class="detail">—</div></div>
+<div class="card wide"><div class="label">Workers</div><div class="row"><span>Smart Money</span><span id="smart">—</span></div><div class="row"><span>Cloud Forward</span><span id="cloud">—</span></div><div class="row"><span>Data directory</span><span id="dataDir">—</span></div></div>
+<div class="card wide"><div class="label">AI Validation Sample</div><div id="obs" class="value">—</div><div id="matured" class="detail">—</div><div class="bar"><i id="samplebar"></i></div></div>
+<div class="card full"><div class="label">Diagnostics</div><pre id="diagnostics">Waiting for production endpoints…</pre></div>
+</section><div class="footer">Auto-refresh every 30 seconds · Last check: <span id="last">—</span></div>
+</main>
+<script>
+const $=id=>document.getElementById(id); const cls=(ok,warn=false)=>ok?'ok':warn?'warn':'bad';
+async function j(path){const r=await fetch(path,{cache:'no-store'}); if(!r.ok) throw new Error(path+' HTTP '+r.status); return r.json()}
+async function refresh(){
+ const errors=[]; let health,ai,rd,val;
+ try{health=await j('/health')}catch(e){errors.push(String(e))}
+ try{ai=await j('/api/ai/status')}catch(e){errors.push(String(e))}
+ try{rd=await j('/api/system/readiness')}catch(e){errors.push(String(e))}
+ try{val=await j('/api/ai/validation')}catch(e){errors.push(String(e))}
+ const hOk=health?.status==='ok'; $('service').textContent=hOk?'ONLINE':'ERROR'; $('service').className='value '+cls(hOk); $('uptime').textContent=health?`Uptime ${Math.round(health.uptime_seconds||0)} sec · ${health.service||'ATLAS'}`:'Health endpoint unavailable';
+ const aiOk=ai?.configured===true; $('ai').textContent=aiOk?'CONFIGURED':'NOT CONFIGURED'; $('ai').className='value '+cls(aiOk,!aiOk); $('aimeta').textContent=ai?`${ai.model||'unknown model'} · requests ${ai.status?.requests||0} · successes ${ai.status?.successes||0}`:'AI endpoint unavailable';
+ const ready=rd?.ready===true; $('ready').textContent=ready?'READY':(rd?'DEGRADED':'ERROR'); $('ready').className='value '+cls(ready,!!rd); $('quality').textContent=rd?`Data quality ${rd.data_quality?.quality_score ?? '—'} · ${rd.data_quality?.status||'unknown'}`:'Readiness endpoint unavailable';
+ $('smart').textContent=rd?.smart_money_ok?'HEALTHY':(rd?'WARMING / DEGRADED':'—'); $('smart').className=cls(!!rd?.smart_money_ok,!!rd);
+ $('cloud').textContent=rd?.cloud_forward_ok?'HEALTHY':(rd?'WARMING / DEGRADED':'—'); $('cloud').className=cls(!!rd?.cloud_forward_ok,!!rd);
+ $('dataDir').textContent=rd?.persistent_data_dir||'—';
+ const n=val?.observations||0; const n24=val?.matured?.['24']||0; $('obs').textContent=`${n} observations`; $('matured').textContent=`24h matured: ${n24} · ${val?.readiness||'unknown'}`; $('samplebar').style.width=Math.min(100,n24/2)+'%';
+ const overall=hOk && aiOk && !!rd; $('overall').textContent=overall?(ready?'● PRODUCTION READY':'● ONLINE · COLLECTING'):'● ATTENTION'; $('overall').className='pill '+cls(overall,!!health);
+ $('diagnostics').textContent=JSON.stringify({health,ai:{configured:ai?.configured,model:ai?.model,status:ai?.status},readiness:rd,ai_validation:val,errors},null,2); $('last').textContent=new Date().toLocaleString();
+}
+refresh(); setInterval(refresh,30000);
+</script></body></html>
