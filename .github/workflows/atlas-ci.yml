@@ -49,7 +49,7 @@ jobs:
           grep -q 'live_execution.*False' atlas_ai_server.py
           grep -q 'ATLAS_AI_ANALYSIS_PACKET_V1' atlas-ai-analysis-layer.js
           grep -q 'atlasApplyDecisionGate' atlas-decision-quality.js
-      - name: Production runtime and persistence smoke test
+      - name: Production runtime, migration and persistence smoke test
         env:
           PORT: '18080'
           ATLAS_DATA_DIR: /tmp/atlas-ci-data
@@ -57,6 +57,8 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf "$ATLAS_DATA_DIR"
+          legacy_file=champion_challenger_forward.jsonl
+          printf '%s\n' '{"schema":"ATLAS_FORWARD_V1","id":"ci-legacy-seed","captured_at":"2026-01-01T00:00:00+00:00","captured_at_ms":1767225600000,"symbol":"BTCUSDT","direction":"LONG","entry":99,"champion_score":70,"champion_take":true,"challenger_score":70,"challenger_take":true,"challenger_threshold":60,"playbook_all":[],"auto_source":"CI_LEGACY_MIGRATION_TEST","forward_return_pct":{}}' > "$legacy_file"
           start_server() {
             python3 cloud_start.py > /tmp/atlas-server.log 2>&1 &
             pid=$!
@@ -73,7 +75,13 @@ jobs:
             kill "$pid" 2>/dev/null || true
             wait "$pid" 2>/dev/null || true
           }
-          trap 'stop_server; cat /tmp/atlas-server.log' EXIT
+          cleanup() {
+            stop_server
+            rm -f "$legacy_file"
+            cat /tmp/atlas-server.log 2>/dev/null || true
+          }
+          pid=''
+          trap cleanup EXIT
 
           start_server
           curl --fail --silent http://127.0.0.1:18080/health | grep -q '"status": "ok"'
@@ -81,14 +89,16 @@ jobs:
           curl --fail --silent http://127.0.0.1:18080/api/ai/validation | grep -q '"research_only": true'
           curl --fail --silent http://127.0.0.1:18080/api/ai/attribution | grep -q '"live_execution": false'
           curl --fail --silent http://127.0.0.1:18080/api/system/readiness | grep -q '"persistent_data_dir": "/tmp/atlas-ci-data"'
+          test -f "$ATLAS_DATA_DIR/$legacy_file"
+          curl --fail --silent http://127.0.0.1:18080/api/data-quality | grep -q '"forward_rows": 1'
 
           curl --fail --silent \
             -H 'Origin: http://127.0.0.1:18080' \
             -H 'Content-Type: application/json' \
             --data '{"symbol":"BTCUSDT","direction":"LONG","entry":100,"champion_score":70,"auto_source":"CI_PERSISTENCE_TEST"}' \
             http://127.0.0.1:18080/api/forward/observe | grep -q '"schema": "ATLAS_FORWARD_V1"'
-          curl --fail --silent http://127.0.0.1:18080/api/data-quality | grep -q '"forward_rows": 1'
+          curl --fail --silent http://127.0.0.1:18080/api/data-quality | grep -q '"forward_rows": 2'
 
           stop_server
           start_server
-          curl --fail --silent http://127.0.0.1:18080/api/data-quality | grep -q '"forward_rows": 1'
+          curl --fail --silent http://127.0.0.1:18080/api/data-quality | grep -q '"forward_rows": 2'
