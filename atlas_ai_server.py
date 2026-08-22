@@ -59,6 +59,41 @@ def openai_analyze(packet):
         AI_STATUS['errors']+=1; AI_STATUS['last_error_at']=atlas.now_iso(); AI_STATUS['last_error']=str(e); raise
     finally: AI_STATUS['last_latency_ms']=round((time.time()-started)*1000)
 
+def _bin(prefix,value,cuts=(55,70,85)):
+    v=atlas.fnum(value)
+    if v is None:return f'{prefix}_UNKNOWN'
+    if v<cuts[0]:return f'{prefix}_LT_{cuts[0]}'
+    if v<cuts[1]:return f'{prefix}_{cuts[0]}_{cuts[1]-1}'
+    if v<cuts[2]:return f'{prefix}_{cuts[1]}_{cuts[2]-1}'
+    return f'{prefix}_GE_{cuts[2]}'
+
+def _score_sign_tag(prefix,obj):
+    if not isinstance(obj,dict):return f'{prefix}_MISSING'
+    v=atlas.fnum(obj.get('score'))
+    if v is None:v=atlas.fnum(obj.get('experimental_score'))
+    if v is None:return f'{prefix}_UNKNOWN'
+    return f'{prefix}_POS' if v>10 else f'{prefix}_NEG' if v<-10 else f'{prefix}_NEUTRAL'
+
+def _context_tags(packet,thesis):
+    mt=packet.get('multi_timeframe') or {}; ev=packet.get('evidence') or {}; g=packet.get('trade_geometry') or {}; q=thesis.get('decision_quality') or {}
+    tags=['ATLAS_AI_VALIDATION']
+    htf=str(mt.get('higher_timeframe_bias') or 'UNKNOWN').upper().replace(' ','_')
+    ltf=str(mt.get('entry_timing_bias') or 'UNKNOWN').upper().replace(' ','_')
+    vol=str(g.get('volatility_regime') or 'UNKNOWN').upper().replace(' ','_')
+    tags += [f'AI_HTF_{htf}',f'AI_LTF_{ltf}',f'AI_VOL_{vol}',_bin('AI_CONF',thesis.get('confidence'))]
+    if q:
+        tags += [_bin('AI_QUALITY',q.get('quality_score')),_bin('AI_READY',q.get('trade_readiness_score'))]
+        tags.append(f"AI_GATE_{str(q.get('gate') or 'UNKNOWN').upper()}")
+    rr=atlas.fnum(thesis.get('risk_reward'))
+    tags.append('AI_RR_UNKNOWN' if rr is None else 'AI_RR_LT_1_5' if rr<1.5 else 'AI_RR_1_5_1_99' if rr<2 else 'AI_RR_2_2_99' if rr<3 else 'AI_RR_GE_3')
+    tags += [_score_sign_tag('AI_FUT',ev.get('futures')),_score_sign_tag('AI_LIQ',ev.get('liquidity')),_score_sign_tag('AI_SM',ev.get('smart_money'))]
+    mc=ev.get('master_conviction')
+    if isinstance(mc,dict):
+        md=str(mc.get('decision') or mc.get('signal') or 'UNKNOWN').upper()
+        tags.append(f'AI_MASTER_{md}')
+    else:tags.append('AI_MASTER_MISSING')
+    return sorted(set(tags))
+
 def _validation_payload(packet,thesis,provider):
     decision=str(thesis.get('decision') or '').upper()
     if decision not in ('LONG','SHORT'): return None
@@ -74,7 +109,7 @@ def _validation_payload(packet,thesis,provider):
     return {'symbol':symbol,'direction':decision,'entry':entry,'champion_score':confidence,'final_score':confidence,
             'champion_take':True,'execution_decision':f'ATLAS_AI_{decision}','trade_plan_status':'PLAN_READY',
             'rr_tp2':rr,'regime':thesis.get('market_regime'),'playbook_primary':'ATLAS_AI_VALIDATION',
-            'playbook_score':confidence,'playbook_all':['ATLAS_AI_VALIDATION'],
+            'playbook_score':confidence,'playbook_all':_context_tags(packet,thesis),
             'auto_source':provider,'dedup_minutes':50}
 
 def record_ai_validation(packet,thesis,provider):
@@ -85,6 +120,35 @@ def record_ai_validation(packet,thesis,provider):
         if isinstance(result,dict) and 'stored' in result:return result
         return {'stored':True,'record':result}
     except Exception as e:return {'stored':False,'reason':'VALIDATION_STORE_ERROR','error':str(e)}
+
+def _directional_return(row,horizon):
+    v=atlas.fnum((row.get('forward_return_pct') or {}).get(str(horizon)))
+    if v is None:return None
+    return v if row.get('direction')=='LONG' else -v
+
+def ai_attribution(symbol=None,horizon=24,min_n=5):
+    rows=[r for r in atlas.forward_rows(symbol) if str(r.get('auto_source') or '').startswith('ATLAS_AI')]
+    matured=[]
+    for r in rows:
+        dr=_directional_return(r,horizon)
+        if dr is not None:matured.append((r,dr))
+    baseline=[x[1] for x in matured]; base=atlas._seq_metrics(baseline)
+    groups={}
+    for r,dr in matured:
+        for tag in r.get('playbook_all') or []:
+            if not str(tag).startswith('AI_'):continue
+            groups.setdefault(tag,[]).append(dr)
+    factors=[]
+    for tag,vals in groups.items():
+        if len(vals)<min_n:continue
+        m=atlas._seq_metrics(vals)
+        delta=None
+        if m.get('avg_return_pct') is not None and base.get('avg_return_pct') is not None:delta=m['avg_return_pct']-base['avg_return_pct']
+        factors.append({'tag':tag,**m,'delta_vs_baseline_avg_pct':round(delta,4) if delta is not None else None})
+    factors.sort(key=lambda x:(x['n'],x.get('delta_vs_baseline_avg_pct') if x.get('delta_vs_baseline_avg_pct') is not None else -999),reverse=True)
+    strongest=sorted(factors,key=lambda x:(x.get('delta_vs_baseline_avg_pct') if x.get('delta_vs_baseline_avg_pct') is not None else -999),reverse=True)[:8]
+    weakest=sorted(factors,key=lambda x:(x.get('delta_vs_baseline_avg_pct') if x.get('delta_vs_baseline_avg_pct') is not None else 999))[:8]
+    return {'symbol':symbol,'horizon_h':horizon,'observations':len(rows),'matured':len(matured),'minimum_group_n':min_n,'baseline':base,'factors':factors,'strongest_associations':strongest,'weakest_associations':weakest,'method':'frozen decision-context tags grouped against directional forward returns; descriptive association only','research_only':True,'live_execution':False}
 
 class Handler(atlas.Handler):
     def do_GET(self):
@@ -98,6 +162,9 @@ class Handler(atlas.Handler):
             matured={str(h):sum(1 for r in rows if atlas.fnum((r.get('forward_return_pct') or {}).get(str(h))) is not None) for h in atlas.HORIZONS}
             n24=matured['24']; readiness='ROBUSTNESS_TEST_READY' if n24>=200 else 'VALIDATION_READY' if n24>=100 else 'EARLY_RESEARCH' if n24>=30 else 'NOT_READY'
             return self._json({'symbol':sym,'observations':len(rows),'matured':matured,'readiness':readiness,'horizons':horizons,'research_only':True,'live_execution':False})
+        if u.path=='/api/ai/attribution':
+            q=urllib.parse.parse_qs(u.query); sym=q.get('symbol',[None])[0]; horizon=int(q.get('horizon',['24'])[0]); min_n=max(2,int(q.get('min_n',['5'])[0]))
+            return self._json(ai_attribution(sym,horizon,min_n))
         return super().do_GET()
 
     def do_POST(self):
