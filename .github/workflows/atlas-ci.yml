@@ -29,6 +29,9 @@ jobs:
           for f in *.js; do
             node --check "$f"
           done
+      - name: ATLAS AI regression tests
+        run: |
+          node tests/atlas-ai-trade-geometry.test.js
       - name: Verify AI deployment entrypoints
         run: |
           grep -q 'cloud_start.py' Procfile

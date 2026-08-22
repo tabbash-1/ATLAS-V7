@@ -1,0 +1,8 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const ctx={console,window:{},module:{exports:{}},roundPrice:x=>x==null?null:+Number(x).toFixed(8),emaSeries:(v,n)=>v.map((_,i)=>v.slice(Math.max(0,i-n+1),i+1).reduce((a,b)=>a+b,0)/Math.min(i+1,n)),analyzeMarket:c=>({signal:c.at(-1).close>=c[0].close?'BUY':'SELL',engine:{trend:c.at(-1).close>=c[0].close?'Bullish':'Bearish'}})};vm.createContext(ctx);
+vm.runInContext(fs.readFileSync('atlas-ai-analysis-layer.js','utf8'),ctx);vm.runInContext(fs.readFileSync('atlas-decision-quality.js','utf8'),ctx);
+function candles(start,step,n=240){return Array.from({length:n},(_,i)=>{const close=start+step*i+Math.sin(i/7)*2;return{time:i*3600000,open:close-.5,high:close+2,low:close-2,close,volume:1000+(i%10)*50}})}
+const bull=candles(100,0.2);const tfs={'1W':bull,'1D':bull,'12H':bull,'6H':bull,'4H':bull,'1H':bull,'30M':bull,'15M':bull};
+const packet=ctx.window.ATLAS_AI_ANALYSIS_LAYER.buildAtlasAIAnalysisPacket({asset:{symbol:'BINANCE:BTCUSDT'},timeframes:tfs,masterConviction:{decision:'LONG'},liquidity:{score:60},futures:{score:50},smartMoney:{experimental_score:40}});assert(packet.trade_geometry);assert.strictEqual(packet.multi_timeframe.higher_timeframe_bias,'BULLISH');assert.strictEqual(packet.multi_timeframe.entry_timing_bias,'BULLISH');assert(['LONG','WAIT'].includes(packet.fallback_thesis.decision));
+const bad={...packet.fallback_thesis,decision:'LONG',entry_zone:[100,101],stop_loss:99,take_profit_1:101.4,risk_reward:.4};const gated=ctx.window.ATLAS_DECISION_QUALITY.atlasApplyDecisionGate(packet,bad);assert.strictEqual(gated.decision,'WAIT');
+console.log('ATLAS AI trade geometry tests PASS');
