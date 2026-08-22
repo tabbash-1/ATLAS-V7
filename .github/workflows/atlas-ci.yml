@@ -61,6 +61,15 @@ jobs:
           grep -q 'live_execution.*False' collector_server.py
           grep -q 'ATLAS_AI_ANALYSIS_PACKET_V1' atlas-ai-analysis-layer.js
           grep -q 'atlasApplyDecisionGate' atlas-decision-quality.js
+      - name: Verify additive product shell invariants
+        run: |
+          grep -q 'atlasProductShell' atlas-product-shell.js
+          grep -q "\$('analyzeBtn')?.click" atlas-product-shell.js
+          grep -q 'existing engines preserved' atlas-product-shell.js
+          grep -q 'atlas-product-shell.js' theme-toggle.js
+          ! grep -q '\.remove(' atlas-product-shell.js
+          ! grep -q 'CLOUD_FORWARD_MIN_SCORE' atlas-product-shell.js
+          ! grep -q 'ATLAS_ALERT_MIN_SCORE' atlas-product-shell.js
       - name: Free core production runtime, migration and persistence smoke test
         env:
           PORT: '18080'
@@ -103,7 +112,7 @@ jobs:
           curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"ok": true'
           curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"boot_id"'
           curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"research_lane"'
-          curl --fail --silent http://127.0.0.1:18080/production-status.html | grep -q 'free core engine'
+          curl --fail --silent http://127.0.0.1:18080/production-status.html | grep -q 'Research Progress'
           curl --fail --silent http://127.0.0.1:18080/api/smart-money/status | grep -q '"online": true'
           curl --fail --silent http://127.0.0.1:18080/api/system/readiness | grep -q '"persistent_data_dir": "/tmp/atlas-ci-data"'
           test -f "$ATLAS_DATA_DIR/$legacy_file"
