@@ -38,6 +38,8 @@ jobs:
           grep -q 'cloud_start.py' Procfile
           grep -q 'cloud_start.py' render.yaml
           grep -q 'cloud_start.py' Dockerfile
+          grep -q 'OPENAI_API_KEY' render.yaml
+          grep -q 'sync: false' render.yaml
       - name: Verify ATLAS AI safety invariants
         run: |
           grep -q '/api/ai/analyze' atlas_ai_server.py
