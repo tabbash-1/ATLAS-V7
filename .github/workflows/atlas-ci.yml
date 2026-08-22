@@ -1,0 +1,43 @@
+name: ATLAS CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Python syntax
+        run: |
+          python -m py_compile collector_server.py cloud_start.py atlas_ai_server.py
+      - name: JavaScript syntax
+        run: |
+          set -e
+          for f in *.js; do
+            node --check "$f"
+          done
+      - name: Verify AI deployment entrypoints
+        run: |
+          grep -q 'cloud_start.py' Procfile
+          grep -q 'cloud_start.py' render.yaml
+          grep -q 'cloud_start.py' Dockerfile
+      - name: Verify ATLAS AI safety invariants
+        run: |
+          grep -q '/api/ai/analyze' atlas_ai_server.py
+          grep -q '/api/ai/status' atlas_ai_server.py
+          grep -q 'live_execution.*False' atlas_ai_server.py
+          grep -q 'ATLAS_AI_ANALYSIS_PACKET_V1' atlas-ai-analysis-layer.js
+          grep -q 'atlasApplyDecisionGate' atlas-decision-quality.js
