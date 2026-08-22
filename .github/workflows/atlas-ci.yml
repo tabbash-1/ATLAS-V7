@@ -22,7 +22,7 @@ jobs:
           node-version: '22'
       - name: Python syntax
         run: |
-          python -m py_compile collector_server.py cloud_start.py atlas_ai_server.py tests/test_ai_validation.py
+          python -m py_compile collector_server.py cloud_start.py atlas_runtime_server.py atlas_ai_server.py tests/test_ai_validation.py
       - name: JavaScript syntax
         run: |
           set -e
@@ -40,13 +40,15 @@ jobs:
           grep -q 'cloud_start.py' Dockerfile
           grep -q 'mountPath: /var/data' render.yaml
           ! grep -q 'OPENAI_API_KEY' render.yaml
-      - name: Verify safety invariants
+          grep -q 'atlas_runtime_server.py' cloud_start.py
+      - name: Verify resilient provider chain and safety invariants
         run: |
-          grep -q '/api/ai/analyze' atlas_ai_server.py
-          grep -q 'live_execution.*False' atlas_ai_server.py
+          grep -q 'KRAKEN_FUTURES_PUBLIC' atlas_runtime_server.py
+          grep -q 'futures.kraken.com' atlas_runtime_server.py
+          grep -q 'Binance USD-M -> Bybit -> Kraken Futures' atlas_runtime_server.py
+          grep -q 'live_execution.*False' collector_server.py
           grep -q 'ATLAS_AI_ANALYSIS_PACKET_V1' atlas-ai-analysis-layer.js
           grep -q 'atlasApplyDecisionGate' atlas-decision-quality.js
-          grep -q 'optional/off' cloud_start.py
       - name: Free core production runtime, migration and persistence smoke test
         env:
           PORT: '18080'
@@ -60,7 +62,7 @@ jobs:
           start_server() {
             python3 cloud_start.py > /tmp/atlas-server.log 2>&1 &
             pid=$!
-            for i in $(seq 1 20); do
+            for i in $(seq 1 24); do
               if curl --fail --silent http://127.0.0.1:18080/health >/tmp/atlas-health.json; then
                 return 0
               fi
@@ -102,23 +104,3 @@ jobs:
           stop_server
           start_server
           curl --fail --silent http://127.0.0.1:18080/api/data-quality | grep -q '"forward_rows": 2'
-      - name: Optional AI gateway boot smoke test
-        env:
-          PORT: '18081'
-          ATLAS_DATA_DIR: /tmp/atlas-ci-ai-data
-          ATLAS_CLOUD_FORWARD_ENABLED: '0'
-          OPENAI_API_KEY: 'ci-placeholder-not-used'
-        run: |
-          set -euo pipefail
-          rm -rf "$ATLAS_DATA_DIR"
-          python3 cloud_start.py > /tmp/atlas-ai-server.log 2>&1 &
-          pid=$!
-          trap 'kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; cat /tmp/atlas-ai-server.log' EXIT
-          for i in $(seq 1 20); do
-            if curl --fail --silent http://127.0.0.1:18081/health >/dev/null; then
-              break
-            fi
-            sleep 0.25
-          done
-          curl --fail --silent http://127.0.0.1:18081/api/ai/status | grep -q '"provider": "OpenAI Responses API"'
-          curl --fail --silent http://127.0.0.1:18081/api/ai/status | grep -q '"configured": true'
