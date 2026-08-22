@@ -22,7 +22,7 @@ jobs:
           node-version: '22'
       - name: Python syntax
         run: |
-          python -m py_compile collector_server.py cloud_start.py atlas_runtime_server.py atlas_ai_server.py tests/test_ai_validation.py
+          python -m py_compile collector_server.py cloud_start.py atlas_runtime_server.py atlas_research_runtime_server.py atlas_ai_server.py tests/test_ai_validation.py
       - name: JavaScript syntax
         run: |
           set -e
@@ -40,7 +40,7 @@ jobs:
           grep -q 'cloud_start.py' Dockerfile
           grep -q 'mountPath: /var/data' render.yaml
           ! grep -q 'OPENAI_API_KEY' render.yaml
-          grep -q 'atlas_runtime_server.py' cloud_start.py
+          grep -q 'atlas_research_runtime_server.py' cloud_start.py
       - name: Verify resilient provider chain and safety invariants
         run: |
           grep -q 'KRAKEN_FUTURES_PUBLIC' atlas_runtime_server.py
@@ -48,6 +48,11 @@ jobs:
           grep -q 'Binance USD-M -> Bybit -> Kraken Futures' atlas_runtime_server.py
           grep -q '/api/runtime/status' atlas_runtime_server.py
           grep -q 'request_queue_size=128' atlas_runtime_server.py
+          grep -q 'CLOUD_FORWARD_RESEARCH_SAMPLE' atlas_research_runtime_server.py
+          grep -q 'RESEARCH_OBSERVATION_ONLY' atlas_research_runtime_server.py
+          grep -q 'CLOUD_FORWARD_MIN_SCORE' atlas_research_runtime_server.py
+          grep -q 'ATLAS_CLOUD_FORWARD_MIN_SCORE.*68' cloud_start.py
+          grep -q 'ATLAS_ALERT_MIN_SCORE.*82' cloud_start.py
           grep -q 'live_execution.*False' collector_server.py
           grep -q 'ATLAS_AI_ANALYSIS_PACKET_V1' atlas-ai-analysis-layer.js
           grep -q 'atlasApplyDecisionGate' atlas-decision-quality.js
@@ -92,6 +97,7 @@ jobs:
           curl --fail --silent http://127.0.0.1:18080/health | grep -q '"status": "ok"'
           curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"ok": true'
           curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"boot_id"'
+          curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"research_lane"'
           curl --fail --silent http://127.0.0.1:18080/production-status.html | grep -q 'free core engine'
           curl --fail --silent http://127.0.0.1:18080/api/smart-money/status | grep -q '"online": true'
           curl --fail --silent http://127.0.0.1:18080/api/system/readiness | grep -q '"persistent_data_dir": "/tmp/atlas-ci-data"'
