@@ -77,8 +77,12 @@ _install_storage_hardening(_collector)
 from research_memory_bridge import install as _install_research_memory_bridge
 _install_research_memory_bridge(_collector)
 
+# Freeze Entry/SL/TP geometry on new observations when existing ATLAS evidence
+# is sufficient. This wrapper is additive only and never changes decision fields.
+from trade_path_settlement import install_geometry_freezer as _install_trade_geometry_freezer
+_install_trade_geometry_freezer(_collector)
+
 # Add a strictly read-only outcome ledger over frozen forward observations.
-# This layer cannot mutate scores, thresholds, signals, archives, or execution.
 from trade_outcome_runtime import install as _install_trade_outcome_runtime
 _install_trade_outcome_runtime(_collector)
 
