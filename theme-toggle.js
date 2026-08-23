@@ -45,15 +45,19 @@
     });
   }
 
-  // Product shell is a first-class production surface and must not depend on
-  // optional analysis layers loading successfully. Load it independently and
-  // use a version token so Safari cannot remain pinned to an older shell.
-  const PRODUCT_SHELL_VERSION='0dd4112-bootstrap1';
+  const PRODUCT_SHELL_VERSION='2cf4743';
   loadScript(`atlas-product-shell.js?v=${PRODUCT_SHELL_VERSION}`,'atlas-product-shell')
-    .then(()=>window.dispatchEvent(new CustomEvent('atlas:product-shell-ready')))
+    .then(async()=>{
+      window.dispatchEvent(new CustomEvent('atlas:product-shell-ready'));
+      try{
+        await loadScript('atlas-decision-explanation.js?v=1','atlas-decision-explanation');
+        window.ATLAS_DECISION_EXPLANATION?.refresh?.();
+      }catch(err){
+        console.error('ATLAS decision explanation layer failed:',err);
+      }
+    })
     .catch(err=>console.error('ATLAS product shell bootstrap failed:',err));
 
-  // Optional/additive analysis layers: one failure must never block the rest.
   const scripts=['atlas-timeframe-engine.js','atlas-ai-analysis-layer.js','atlas-decision-quality.js','atlas-ai-ui.js'];
   (async()=>{
     for(const src of scripts){
