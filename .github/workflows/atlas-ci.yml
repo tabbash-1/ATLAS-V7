@@ -22,7 +22,7 @@ jobs:
           node-version: '22'
       - name: Python syntax
         run: |
-          python -m py_compile collector_server.py cloud_start.py atlas_runtime_server.py atlas_research_runtime_server.py atlas_ai_server.py research_memory_bridge.py tests/test_ai_validation.py tests/test_research_memory_bridge.py
+          python -m py_compile collector_server.py cloud_start.py atlas_runtime_server.py atlas_research_runtime_server.py atlas_ai_server.py research_memory_bridge.py research_coverage.py tests/test_ai_validation.py tests/test_research_memory_bridge.py tests/test_research_coverage.py
       - name: JavaScript syntax
         run: |
           set -e
@@ -34,6 +34,7 @@ jobs:
           node tests/atlas-ai-trade-geometry.test.js
           python tests/test_ai_validation.py
           PYTHONPATH=. python tests/test_research_memory_bridge.py
+          PYTHONPATH=. python tests/test_research_coverage.py
       - name: Verify production entrypoints
         run: |
           grep -q 'cloud_start.py' Procfile
@@ -59,6 +60,9 @@ jobs:
           grep -q 'RESEARCH_OBSERVATION_ONLY' atlas_research_runtime_server.py
           grep -q 'CLOUD_FORWARD_MIN_SCORE' atlas_research_runtime_server.py
           grep -q 'min(59.0' atlas_research_runtime_server.py
+          grep -q 'choose_research_samples' atlas_research_runtime_server.py
+          grep -q 'LEAST_COVERED_OLDEST_FIRST' atlas_research_runtime_server.py
+          grep -q 'ATLAS_RESEARCH_COVERAGE_STALE_HOURS' atlas_research_runtime_server.py
           grep -q 'ATLAS_CLOUD_FORWARD_MIN_SCORE.*68' cloud_start.py
           grep -q 'ATLAS_ALERT_MIN_SCORE.*82' cloud_start.py
           grep -q 'live_execution.*False' collector_server.py
@@ -115,6 +119,7 @@ jobs:
           curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"ok": true'
           curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"boot_id"'
           curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"research_lane"'
+          curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"coverage_summary"'
           curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"research_memory_bridge"'
           curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"enabled": true'
           curl --fail --silent http://127.0.0.1:18080/production-status.html | grep -q 'Research Progress'
