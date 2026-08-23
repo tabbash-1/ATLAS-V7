@@ -50,7 +50,7 @@
     .then(async()=>{
       window.dispatchEvent(new CustomEvent('atlas:product-shell-ready'));
       try{
-        await loadScript('atlas-decision-explanation.js?v=1','atlas-decision-explanation');
+        await loadScript('atlas-decision-explanation.js?v=2','atlas-decision-explanation');
         window.ATLAS_DECISION_EXPLANATION?.refresh?.();
       }catch(err){
         console.error('ATLAS decision explanation layer failed:',err);
