@@ -16,9 +16,15 @@
     if(avg<0&&hit<50)return n>=100?'NEGATIVE EDGE EVIDENCE':'EARLY NEGATIVE READ';
     return 'MIXED EVIDENCE';
   }
+  function guard(n){return n>=200?'ROBUSTNESS':n>=100?'VALIDATION':n>=30?'EARLY':'SMALL SAMPLE';}
   async function attrib(symbol,horizon){
     const q=new URLSearchParams({horizon:String(horizon),min_n:'2'});if(symbol)q.set('symbol',symbol);
     const r=await fetch(`/api/ai/attribution?${q.toString()}`,{cache:'no-store'});
+    if(!r.ok)throw Error(`HTTP ${r.status}`);return r.json();
+  }
+  async function breakdown(symbol,horizon){
+    const q=new URLSearchParams({horizon:String(horizon)});if(symbol)q.set('symbol',symbol);
+    const r=await fetch(`/api/ai/edge-breakdown?${q.toString()}`,{cache:'no-store'});
     if(!r.ok)throw Error(`HTTP ${r.status}`);return r.json();
   }
   function renderSummary(p){
@@ -39,6 +45,10 @@
     const body=$('edgeAssetBody');if(!body)return;
     body.innerHTML=rows.map(x=>{const m=x.baseline||{},n=Number(x.matured||0);return `<tr><td>${x.symbol||'ALL'}</td><td>${n}</td><td>${pct(m.hit_rate_pct)}</td><td>${signedPct(m.avg_return_pct)}</td><td>${pct(m.max_drawdown_proxy)}</td><td>${readiness(n)}</td></tr>`}).join('');
   }
+  function renderBreakdown(id,rows){
+    const body=$(id);if(!body)return;
+    body.innerHTML=(rows&&rows.length)?rows.map(x=>{const n=Number(x.n||0);return `<tr><td>${String(x.group||'UNKNOWN').replaceAll('_',' ')}</td><td>${n}</td><td>${pct(x.hit_rate_pct)}</td><td>${signedPct(x.avg_return_pct)}</td><td>${pct(x.max_drawdown_proxy)}</td><td>${x.sample_status||guard(n)}</td></tr>`}).join(''):'<tr><td colspan="6">No matured observations yet.</td></tr>';
+  }
   function renderFactors(p){
     const body=$('edgeFactorBody');if(!body)return;
     const factors=[...(p.strongest_associations||[]).slice(0,5),...(p.weakest_associations||[]).slice(0,5)].filter((x,i,a)=>a.findIndex(y=>y.tag===x.tag)===i);
@@ -47,11 +57,11 @@
   async function refresh(){
     const badge=$('edgeProofBadge');if(badge){badge.textContent='CHECKING';badge.className='pill working';}
     try{
-      const [global24,horizons,assets]=await Promise.all([
-        attrib(null,24),Promise.all(HORIZONS.map(h=>attrib(null,h))),Promise.all(SYMBOLS.map(s=>attrib(s,24)))
+      const [global24,horizons,assets,b24]=await Promise.all([
+        attrib(null,24),Promise.all(HORIZONS.map(h=>attrib(null,h))),Promise.all(SYMBOLS.map(s=>attrib(s,24))),breakdown(null,24)
       ]);
-      renderSummary(global24);renderHorizons(horizons);renderAssets(assets);renderFactors(global24);
-      if($('edgeProofNotes'))$('edgeProofNotes').textContent='AI-only frozen LONG/SHORT observations. Returns are directional and forward-looking; WAIT decisions are not counted as trades. No live execution.';
+      renderSummary(global24);renderHorizons(horizons);renderAssets(assets);renderBreakdown('edgeDirectionBody',b24.by_direction);renderBreakdown('edgeRegimeBody',b24.by_regime);renderFactors(global24);
+      if($('edgeProofNotes'))$('edgeProofNotes').textContent='AI-only frozen LONG/SHORT observations. Direction and regime rows remain descriptive until each group clears its own sample guard. No live execution.';
     }catch(e){
       if(badge){badge.textContent='UNAVAILABLE';badge.className='pill neutral';}
       if($('edgeProofNotes'))$('edgeProofNotes').textContent=`Edge proof data unavailable: ${e.message}`;
