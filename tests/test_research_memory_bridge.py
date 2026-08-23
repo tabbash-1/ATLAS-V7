@@ -69,3 +69,25 @@ def test_bridge_is_fail_open_when_memory_write_fails():
     assert result['stored'] is True
     assert state['mirror_errors'] == 1
     assert 'memory unavailable' in state['last_error']
+
+
+def test_deduped_forward_row_is_not_mirrored():
+    class DedupCollector(FakeCollector):
+        def forward_observe(self, row):
+            self.forward_calls.append(row)
+            return {'stored': False, 'reason': 'DEDUPED'}
+
+    c = DedupCollector()
+    state = bridge.install(c)
+    result = c.forward_observe(sample_row())
+    assert result['stored'] is False
+    assert len(c.memory_calls) == 0
+    assert state['skipped_deduped'] == 1
+
+
+if __name__ == '__main__':
+    test_build_payload_maps_direction_and_price()
+    test_install_mirrors_new_cloud_rows_only()
+    test_bridge_is_fail_open_when_memory_write_fails()
+    test_deduped_forward_row_is_not_mirrored()
+    print('research memory bridge tests: ok')
