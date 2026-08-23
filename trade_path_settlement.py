@@ -1,8 +1,9 @@
-"""Read-only TP/SL path settlement for frozen ATLAS forward observations.
+"""Frozen trade geometry + read-only TP/SL path settlement for ATLAS.
 
-This layer never changes ATLAS scoring, thresholds, signals, Pattern Memory or
-execution. New observations may be enriched with an auditable frozen geometry
-when the existing ATLAS row already contains enough information to derive it.
+This module is intentionally isolated from the decision engine. It never changes
+scores, thresholds, LONG/SHORT decisions, Pattern Memory, alerts, or execution.
+It only freezes geometry for newly stored observations when the existing ATLAS
+row contains enough information, then evaluates that frozen geometry later.
 """
 
 import json
@@ -10,6 +11,7 @@ import threading
 import time
 import urllib.parse
 import urllib.request
+from pathlib import Path
 
 MAX_HORIZON_H = 24
 CACHE_SECONDS = 300
@@ -24,24 +26,20 @@ def _fnum(value):
         return None
 
 
-def freeze_geometry(row):
-    x = dict(row or {})
-    if x.get('frozen_trade_geometry'):
-        return x
-
+def derive_geometry(payload):
+    """Derive immutable SL/TP geometry only from already-existing ATLAS fields."""
+    x = dict(payload or {})
     entry = _fnum(x.get('entry'))
     rr2 = _fnum(x.get('rr_tp2'))
     direction = str(x.get('direction') or '').upper()
     sd = _fnum(x.get('support_distance_pct'))
     rd = _fnum(x.get('resistance_distance_pct'))
     if not entry or entry <= 0 or direction not in ('LONG', 'SHORT') or not rr2 or rr2 <= 0:
-        x['trade_geometry_status'] = 'UNAVAILABLE'
-        return x
+        return None
 
     if direction == 'LONG':
         if rd is None or rd <= 0:
-            x['trade_geometry_status'] = 'UNAVAILABLE'
-            return x
+            return None
         tp2 = entry * (1 + rd / 100.0)
         reward = tp2 - entry
         risk = reward / rr2
@@ -49,19 +47,16 @@ def freeze_geometry(row):
         tp1 = entry + risk
     else:
         if sd is None or sd <= 0:
-            x['trade_geometry_status'] = 'UNAVAILABLE'
-            return x
+            return None
         tp2 = entry * (1 - sd / 100.0)
         reward = entry - tp2
         risk = reward / rr2
         sl = entry + risk
         tp1 = entry - risk
 
-    if risk <= 0 or sl <= 0 or tp1 <= 0 or tp2 <= 0:
-        x['trade_geometry_status'] = 'UNAVAILABLE'
-        return x
-
-    x['frozen_trade_geometry'] = {
+    if risk <= 0 or min(sl, tp1, tp2) <= 0:
+        return None
+    return {
         'entry': round(entry, 12),
         'stop_loss': round(sl, 12),
         'tp1': round(tp1, 12),
@@ -74,8 +69,56 @@ def freeze_geometry(row):
         'tp1_method': 'ONE_R_CHECKPOINT',
         'frozen_at_observation': True,
     }
-    x['trade_geometry_status'] = 'FROZEN'
-    return x
+
+
+def geometry_archive_path(collector):
+    return Path(collector.DATA) / 'trade_geometry.jsonl'
+
+
+def read_geometry_archive(collector):
+    path = geometry_archive_path(collector)
+    out = []
+    if path.exists():
+        with path.open() as f:
+            for line in f:
+                try:
+                    out.append(json.loads(line))
+                except Exception:
+                    pass
+    return out
+
+
+def geometry_by_forward_id(collector):
+    return {str(x.get('forward_observation_id')): x for x in read_geometry_archive(collector) if x.get('forward_observation_id')}
+
+
+def _persist_geometry(collector, forward_row, geometry):
+    forward_id = str((forward_row or {}).get('id') or '')
+    if not forward_id or not geometry:
+        return {'stored': False, 'reason': 'MISSING_ID_OR_GEOMETRY'}
+    path = geometry_archive_path(collector)
+    lock = getattr(collector, 'ARCHIVE_LOCK', None)
+    if lock is None:
+        lock = threading.RLock()
+    with lock:
+        existing = read_geometry_archive(collector)
+        if any(str(x.get('forward_observation_id') or '') == forward_id for x in existing):
+            return {'stored': False, 'reason': 'DEDUP_FORWARD_ID'}
+        rec = {
+            'schema': 'ATLAS_FROZEN_TRADE_GEOMETRY_V1',
+            'forward_observation_id': forward_id,
+            'captured_at': forward_row.get('captured_at'),
+            'captured_at_ms': forward_row.get('captured_at_ms'),
+            'symbol': forward_row.get('symbol'),
+            'direction': forward_row.get('direction'),
+            'signal_qualified': bool(forward_row.get('champion_take')),
+            'geometry': geometry,
+            'research_only': True,
+            'live_execution': False,
+        }
+        with path.open('a') as f:
+            f.write(json.dumps(rec, separators=(',', ':')) + '\n')
+        return {'stored': True, 'record': rec}
 
 
 def _request_klines(symbol, interval, start_ms, end_ms, limit=1000):
@@ -86,26 +129,17 @@ def _request_klines(symbol, interval, start_ms, end_ms, limit=1000):
         '&endTime=' + str(int(end_ms)) +
         '&limit=' + str(int(limit))
     )
-    urls = [
-        'https://data-api.binance.vision' + path,
-        'https://api-gcp.binance.com' + path,
-        'https://api1.binance.com' + path,
-    ]
     errors = []
-    for url in urls:
+    for base in ('https://data-api.binance.vision', 'https://api-gcp.binance.com', 'https://api1.binance.com'):
         try:
-            req = urllib.request.Request(url, headers={'User-Agent': 'ATLAS-Outcome/1.0', 'Accept': 'application/json'})
+            req = urllib.request.Request(base + path, headers={'User-Agent': 'ATLAS-Outcome/1.0', 'Accept': 'application/json'})
             with urllib.request.urlopen(req, timeout=15) as response:
                 raw = json.loads(response.read().decode('utf-8'))
             if not isinstance(raw, list):
                 raise RuntimeError('invalid kline response')
             return [{
-                'open_time': int(k[0]),
-                'open': float(k[1]),
-                'high': float(k[2]),
-                'low': float(k[3]),
-                'close': float(k[4]),
-                'close_time': int(k[6]),
+                'open_time': int(k[0]), 'open': float(k[1]), 'high': float(k[2]),
+                'low': float(k[3]), 'close': float(k[4]), 'close_time': int(k[6]),
             } for k in raw]
         except Exception as exc:
             errors.append(str(exc))
@@ -130,14 +164,10 @@ def _touches(candle, price):
 
 
 def _first_event(candles, geometry, allow_ambiguous=True):
-    sl = float(geometry['stop_loss'])
-    tp1 = float(geometry['tp1'])
-    tp2 = float(geometry['tp2'])
+    sl, tp1, tp2 = float(geometry['stop_loss']), float(geometry['tp1']), float(geometry['tp2'])
     tp1_seen = False
     for candle in candles:
-        hit_sl = _touches(candle, sl)
-        hit_tp1 = _touches(candle, tp1)
-        hit_tp2 = _touches(candle, tp2)
+        hit_sl, hit_tp1, hit_tp2 = _touches(candle, sl), _touches(candle, tp1), _touches(candle, tp2)
         if hit_sl and (hit_tp1 or hit_tp2):
             return {'event': 'SAME_CANDLE_AMBIGUOUS' if allow_ambiguous else 'AMBIGUOUS', 'candle': candle, 'tp1_seen_before': tp1_seen}
         if hit_sl:
@@ -150,23 +180,23 @@ def _first_event(candles, geometry, allow_ambiguous=True):
 
 
 def _resolve_same_candle(symbol, candle, geometry):
-    rows = _request_klines(symbol, '1m', candle['open_time'], candle['close_time'], 10)
-    return _first_event(rows, geometry, allow_ambiguous=False)
+    return _first_event(_request_klines(symbol, '1m', candle['open_time'], candle['close_time'], 10), geometry, allow_ambiguous=False)
 
 
-def settle_row(row, now_ms=None):
-    x = freeze_geometry(row)
-    geometry = x.get('frozen_trade_geometry')
+def settle_row(row, geometry_record=None, now_ms=None, candle_loader=None):
+    geometry = (geometry_record or {}).get('geometry') if geometry_record else None
     base = {
-        'id': x.get('id'), 'symbol': x.get('symbol'), 'direction': x.get('direction'),
-        'captured_at': x.get('captured_at'), 'captured_at_ms': x.get('captured_at_ms'),
-        'signal_qualified': bool(x.get('champion_take')), 'geometry': geometry,
-        'geometry_status': x.get('trade_geometry_status') or ('FROZEN' if geometry else 'UNAVAILABLE'),
+        'id': row.get('id'), 'symbol': row.get('symbol'), 'direction': row.get('direction'),
+        'captured_at': row.get('captured_at'), 'captured_at_ms': row.get('captured_at_ms'),
+        'score': _fnum(row.get('final_score')) if row.get('final_score') is not None else _fnum(row.get('champion_score')),
+        'entry': _fnum(row.get('entry')), 'source': row.get('auto_source'),
+        'signal_qualified': bool(row.get('champion_take')), 'geometry': geometry,
+        'geometry_status': 'FROZEN' if geometry else 'UNAVAILABLE',
         'research_only': True, 'live_execution': False,
     }
     if not geometry:
         return {**base, 'path_outcome': 'GEOMETRY_UNAVAILABLE', 'terminal': False, 'r_multiple': None}
-    start_ms = int(x.get('captured_at_ms') or 0)
+    start_ms = int(row.get('captured_at_ms') or 0)
     if not start_ms:
         return {**base, 'path_outcome': 'TIMESTAMP_UNAVAILABLE', 'terminal': False, 'r_multiple': None}
     now_ms = int(now_ms or time.time() * 1000)
@@ -174,37 +204,27 @@ def settle_row(row, now_ms=None):
     if end_ms <= start_ms:
         return {**base, 'path_outcome': 'OPEN', 'terminal': False, 'r_multiple': None}
     try:
-        candles = _cached_5m(str(x.get('symbol')), start_ms, end_ms)
+        loader = candle_loader or _cached_5m
+        candles = loader(str(row.get('symbol')), start_ms, end_ms)
         event = _first_event(candles, geometry)
-        if event['event'] == 'SAME_CANDLE_AMBIGUOUS' and event.get('candle'):
-            resolved = _resolve_same_candle(str(x.get('symbol')), event['candle'], geometry)
-            if resolved['event'] in ('SL', 'TP2'):
-                event = resolved
-            else:
-                event = {'event': 'AMBIGUOUS', 'candle': event['candle'], 'tp1_seen_before': event.get('tp1_seen_before', False)}
+        if candle_loader is None and event['event'] == 'SAME_CANDLE_AMBIGUOUS' and event.get('candle'):
+            resolved = _resolve_same_candle(str(row.get('symbol')), event['candle'], geometry)
+            event = resolved if resolved['event'] in ('SL', 'TP2') else {'event': 'AMBIGUOUS', 'candle': event['candle']}
     except Exception as exc:
         return {**base, 'path_outcome': 'MARKET_DATA_ERROR', 'terminal': False, 'r_multiple': None, 'error': str(exc)}
 
-    rr2 = float(geometry.get('rr_tp2') or 0)
     elapsed_h = max(0.0, (end_ms - start_ms) / 3600000.0)
-    ev = event['event']
+    ev, rr2 = event['event'], float(geometry.get('rr_tp2') or 0)
     if ev == 'SL':
         outcome, r, terminal = 'LOSS', -1.0, True
     elif ev == 'TP2':
         outcome, r, terminal = 'WIN_TP2', rr2, True
-    elif ev == 'AMBIGUOUS':
+    elif ev in ('AMBIGUOUS', 'SAME_CANDLE_AMBIGUOUS'):
         outcome, r, terminal = 'AMBIGUOUS', None, False
     elif ev == 'TP1_ONLY':
-        if elapsed_h >= MAX_HORIZON_H:
-            outcome, r, terminal = 'WIN_TP1_EXPIRED', 1.0, True
-        else:
-            outcome, r, terminal = 'OPEN_AFTER_TP1', None, False
+        outcome, r, terminal = ('WIN_TP1_EXPIRED', 1.0, True) if elapsed_h >= MAX_HORIZON_H else ('OPEN_AFTER_TP1', None, False)
     else:
-        if elapsed_h >= MAX_HORIZON_H:
-            outcome, r, terminal = 'EXPIRED', 0.0, True
-        else:
-            outcome, r, terminal = 'OPEN', None, False
-
+        outcome, r, terminal = ('EXPIRED', 0.0, True) if elapsed_h >= MAX_HORIZON_H else ('OPEN', None, False)
     candle = event.get('candle') or {}
     return {
         **base, 'path_outcome': outcome, 'path_event': ev, 'terminal': terminal,
@@ -214,22 +234,76 @@ def settle_row(row, now_ms=None):
     }
 
 
+def build_path_ledger(rows, geometry_map, scope='signals', symbol=None, limit=100, now_ms=None):
+    scope = str(scope or 'signals').lower()
+    symbol = str(symbol or '').upper() or None
+    selected = []
+    for row in rows or []:
+        if str(row.get('direction') or '').upper() not in ('LONG', 'SHORT'):
+            continue
+        if scope == 'signals' and not bool(row.get('champion_take')):
+            continue
+        if symbol and str(row.get('symbol') or '').upper() != symbol:
+            continue
+        selected.append(row)
+    selected.sort(key=lambda x: int(x.get('captured_at_ms') or 0), reverse=True)
+    selected = selected[:max(1, min(500, int(limit or 100)))]
+    return [settle_row(row, geometry_map.get(str(row.get('id') or '')), now_ms=now_ms) for row in selected]
+
+
+def summarize_path(items):
+    terminal = [x for x in items if x.get('terminal')]
+    wins = [x for x in terminal if str(x.get('path_outcome')).startswith('WIN_')]
+    losses = [x for x in terminal if x.get('path_outcome') == 'LOSS']
+    expired = [x for x in terminal if x.get('path_outcome') == 'EXPIRED']
+    rs = [float(x['r_multiple']) for x in terminal if x.get('r_multiple') is not None]
+    positive_r = sum(x for x in rs if x > 0)
+    negative_r = abs(sum(x for x in rs if x < 0))
+    return {
+        'total': len(items), 'terminal': len(terminal), 'open': len(items) - len(terminal),
+        'wins': len(wins), 'losses': len(losses), 'expired': len(expired),
+        'win_rate_pct': round(100 * len(wins) / (len(wins) + len(losses)), 2) if wins or losses else None,
+        'net_r': round(sum(rs), 4) if rs else None,
+        'average_r': round(sum(rs) / len(rs), 4) if rs else None,
+        'profit_factor_r': round(positive_r / negative_r, 4) if negative_r > 0 else (None if positive_r == 0 else 'INF'),
+        'geometry_available': sum(1 for x in items if x.get('geometry_status') == 'FROZEN'),
+        'geometry_unavailable': sum(1 for x in items if x.get('geometry_status') != 'FROZEN'),
+        'ambiguous': sum(1 for x in items if x.get('path_outcome') == 'AMBIGUOUS'),
+    }
+
+
 def install_geometry_freezer(collector):
     if getattr(collector, '_TRADE_GEOMETRY_FREEZER_INSTALLED', False):
         return getattr(collector, 'TRADE_GEOMETRY_FREEZER_STATE', {})
     original = collector.forward_observe
-    state = {'enabled': True, 'frozen': 0, 'unavailable': 0, 'errors': 0}
+    state = {'enabled': True, 'archive': str(geometry_archive_path(collector)), 'frozen': 0, 'unavailable': 0, 'deduped': 0, 'errors': 0, 'last_error': None}
+
     def wrapped(payload):
+        geometry = None
         try:
-            enriched = freeze_geometry(payload)
-            if enriched.get('frozen_trade_geometry'):
+            geometry = derive_geometry(payload)
+        except Exception as exc:
+            state['errors'] += 1
+            state['last_error'] = f'derive: {exc}'
+        result = original(payload)
+        canonical = result.get('record') if isinstance(result, dict) and isinstance(result.get('record'), dict) else result if isinstance(result, dict) and result.get('id') else None
+        if canonical is None:
+            return result
+        if geometry is None:
+            state['unavailable'] += 1
+            return result
+        try:
+            stored = _persist_geometry(collector, canonical, geometry)
+            if stored.get('stored'):
                 state['frozen'] += 1
             else:
-                state['unavailable'] += 1
-            return original(enriched)
-        except Exception:
+                state['deduped'] += 1
+            state['last_error'] = None
+        except Exception as exc:
             state['errors'] += 1
-            return original(payload)
+            state['last_error'] = f'persist: {exc}'
+        return result
+
     collector.forward_observe = wrapped
     collector.TRADE_GEOMETRY_FREEZER_STATE = state
     collector._TRADE_GEOMETRY_FREEZER_INSTALLED = True
