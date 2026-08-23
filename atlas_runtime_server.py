@@ -3,6 +3,13 @@ import json, os, threading, time, urllib.parse, urllib.request, traceback
 from http.server import ThreadingHTTPServer
 
 import collector_server as atlas
+import research_memory_bridge
+
+# Activate the cloud-forward -> confluence-memory bridge as part of runtime
+# import/boot. atlas_research_runtime_server imports this module before it
+# starts the production workers, so every subsequently stored cloud-forward
+# research row is mirrored into the same memory used by Master Conviction.
+RESEARCH_MEMORY_BRIDGE_STATE = research_memory_bridge.install(atlas)
 
 _ORIGINAL_CAPTURE = atlas.capture
 _ORIGINAL_CLOUD_SCORE = atlas.cloud_score_symbol
@@ -190,6 +197,7 @@ class RuntimeHandler(atlas.Handler):
                 'smart_money':atlas.SMART_MONEY_STATE,
                 'cloud_forward':atlas.CLOUD_FORWARD_STATE,
                 'cloud_runtime':CLOUD_RUNTIME_STATE,
+                'research_memory_bridge':RESEARCH_MEMORY_BRIDGE_STATE,
                 'market_data':atlas.MARKET_DATA_STATE,
                 'research_only':True,
                 'live_execution':False,
@@ -221,6 +229,7 @@ if __name__=='__main__':
     print('ATLAS V7 resilient production runtime', flush=True)
     print(f'Boot ID: {BOOT_ID}', flush=True)
     print(f'Data: {atlas.DATA}', flush=True)
+    print(f'Research memory bridge: enabled={RESEARCH_MEMORY_BRIDGE_STATE.get("enabled")} mirrored={RESEARCH_MEMORY_BRIDGE_STATE.get("mirrored",0)}', flush=True)
     print('Futures providers: Binance USD-M -> Bybit -> Kraken Futures', flush=True)
     print('Cloud Forward: spot-first scoring with fresh archived futures context', flush=True)
     print(f'Listening on port {port}', flush=True)
