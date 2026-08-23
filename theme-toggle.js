@@ -32,19 +32,34 @@
 
   window.ATLAS_THEME={get:()=>document.documentElement.dataset.theme||'dark',set:apply};
 
-  async function loadScript(src){
-    if(document.querySelector(`script[src="${src}"]`)) return;
-    await new Promise((resolve,reject)=>{
-      const s=document.createElement('script');s.src=src;s.defer=true;s.onload=resolve;s.onerror=()=>reject(new Error(`Failed to load ${src}`));document.body.appendChild(s);
+  function loadScript(src,key=src){
+    if(document.querySelector(`script[data-atlas-loader="${key}"]`)) return Promise.resolve();
+    return new Promise((resolve,reject)=>{
+      const s=document.createElement('script');
+      s.src=src;
+      s.defer=true;
+      s.dataset.atlasLoader=key;
+      s.onload=resolve;
+      s.onerror=()=>reject(new Error(`Failed to load ${src}`));
+      document.body.appendChild(s);
     });
   }
 
-  // Existing analysis layers load first. The product shell is strictly additive:
-  // it mirrors their source-of-truth state and never moves/deletes engine nodes.
-  const scripts=['atlas-timeframe-engine.js','atlas-ai-analysis-layer.js','atlas-decision-quality.js','atlas-ai-ui.js','atlas-product-shell.js'];
+  // Product shell is a first-class production surface and must not depend on
+  // optional analysis layers loading successfully. Load it independently and
+  // use a version token so Safari cannot remain pinned to an older shell.
+  const PRODUCT_SHELL_VERSION='0dd4112-bootstrap1';
+  loadScript(`atlas-product-shell.js?v=${PRODUCT_SHELL_VERSION}`,'atlas-product-shell')
+    .then(()=>window.dispatchEvent(new CustomEvent('atlas:product-shell-ready')))
+    .catch(err=>console.error('ATLAS product shell bootstrap failed:',err));
+
+  // Optional/additive analysis layers: one failure must never block the rest.
+  const scripts=['atlas-timeframe-engine.js','atlas-ai-analysis-layer.js','atlas-decision-quality.js','atlas-ai-ui.js'];
   (async()=>{
-    for(const src of scripts) await loadScript(src);
+    for(const src of scripts){
+      try{ await loadScript(src,src); }
+      catch(err){ console.error('ATLAS optional layer failed:',src,err); }
+    }
     window.dispatchEvent(new CustomEvent('atlas:ai-ready'));
-    window.dispatchEvent(new CustomEvent('atlas:product-shell-ready'));
-  })().catch(err=>console.error('ATLAS bootstrap failed:',err));
+  })();
 })();
