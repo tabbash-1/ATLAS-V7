@@ -66,6 +66,49 @@ def test_build_payload_maps_direction_price_and_lineage():
     assert payload['auto_source'].startswith('CLOUD_FORWARD')
 
 
+def test_canonical_forward_result_accepts_direct_production_row():
+    submitted = {
+        'symbol': 'BTCUSDT', 'direction': 'LONG', 'entry': 100,
+        'auto_source': 'CLOUD_FORWARD_CI_BRIDGE_TEST',
+    }
+    stored = sample_row(id='server-generated-id', captured_at_ms=7_777_777)
+    canonical = bridge._canonical_forward_result(stored, submitted)
+    assert canonical is stored
+    assert canonical['id'] == 'server-generated-id'
+    assert canonical['captured_at_ms'] == 7_777_777
+
+
+def test_install_handles_direct_production_return_and_persists_generated_id():
+    class DirectReturnCollector(FakeCollector):
+        def forward_observe(self, row):
+            self.forward_calls.append(row)
+            stored = dict(row)
+            stored.update({
+                'schema': 'ATLAS_FORWARD_V1',
+                'id': 'generated-by-server',
+                'captured_at': '2026-08-23T01:00:00+00:00',
+                'captured_at_ms': 3_600_000,
+            })
+            return stored
+
+    c = DirectReturnCollector()
+    state = bridge.install(c)
+    result = c.forward_observe({
+        'symbol': 'BTCUSDT', 'direction': 'LONG', 'entry': 100,
+        'final_score': 56, 'execution_decision': 'RESEARCH_OBSERVATION_ONLY',
+        'research_sampling_lane': True,
+        'playbook_primary': 'SHADOW_DIRECTIONAL_PROXY',
+        'auto_source': 'CLOUD_FORWARD_CI_BRIDGE_TEST',
+    })
+    assert result['id'] == 'generated-by-server'
+    rows = c.read_confluence_all()
+    assert len(rows) == 1
+    assert rows[0]['forward_observation_id'] == 'generated-by-server'
+    assert rows[0]['forward_captured_at_ms'] == 3_600_000
+    assert state['mirrored'] == 1
+    assert state['exact_lineage_mirrors'] == 1
+
+
 def test_install_persists_exact_lineage_cloud_row_only():
     c = FakeCollector()
     state = bridge.install(c)
@@ -90,7 +133,6 @@ def test_install_persists_exact_lineage_cloud_row_only():
 
 def test_bridge_is_fail_open_when_memory_write_fails():
     c = FakeCollector()
-    # Point the archive at a directory so append fails after forward storage.
     c.CONFLUENCE_ARCHIVE = Path(c._tmp.name)
     state = bridge.install(c)
     result = c.forward_observe(sample_row(direction='SHORT'))
@@ -175,6 +217,8 @@ def test_reconcile_fallback_never_allows_24h_without_12h():
 
 if __name__ == '__main__':
     test_build_payload_maps_direction_price_and_lineage()
+    test_canonical_forward_result_accepts_direct_production_row()
+    test_install_handles_direct_production_return_and_persists_generated_id()
     test_install_persists_exact_lineage_cloud_row_only()
     test_bridge_is_fail_open_when_memory_write_fails()
     test_deduped_forward_row_is_not_mirrored()
