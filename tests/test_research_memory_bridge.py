@@ -85,9 +85,46 @@ def test_deduped_forward_row_is_not_mirrored():
     assert state['skipped_deduped'] == 1
 
 
+def test_strict_chain_rejects_later_horizon_after_gap():
+    clean, rejected = bridge._strict_chain({'1': 1.0, '4': 2.0, '12': None, '24': 4.0})
+    assert clean == {'1': 1.0, '4': 2.0, '12': None, '24': None}
+    assert rejected == ['24']
+
+
+def test_reconcile_prefers_canonical_forward_archive():
+    memory = [{
+        'symbol': 'BTCUSDT', 'captured_at_ms': 1_000_000, 'price': 100.0,
+        'forward_return_pct': {'1': 9.0, '4': 9.0, '12': None, '24': 9.0},
+    }]
+    forward = [sample_row(
+        captured_at_ms=1_000_100,
+        forward_return_pct={'1': 0.5, '4': 1.0, '12': 1.5, '24': 2.0},
+    )]
+    rows, metrics = bridge.reconcile_confluence_rows(memory, forward)
+    assert rows[0]['forward_evidence_source'] == 'CANONICAL_FORWARD_ARCHIVE'
+    assert rows[0]['forward_return_pct'] == {'1': 0.5, '4': 1.0, '12': 1.5, '24': 2.0}
+    assert metrics['linked_to_forward'] == 1
+    assert metrics['gap_rows'] == 0
+
+
+def test_reconcile_fallback_never_allows_24h_without_12h():
+    memory = [{
+        'symbol': 'BTCUSDT', 'captured_at_ms': 1_000_000, 'price': 100.0,
+        'forward_return_pct': {'1': 0.5, '4': 1.0, '12': None, '24': 2.0},
+    }]
+    rows, metrics = bridge.reconcile_confluence_rows(memory, [])
+    assert rows[0]['forward_return_pct']['24'] is None
+    assert rows[0]['maturity_integrity']['rejected_horizons'] == ['24']
+    assert metrics['gap_rows'] == 1
+    assert metrics['rejected_horizons'] == 1
+
+
 if __name__ == '__main__':
     test_build_payload_maps_direction_and_price()
     test_install_mirrors_new_cloud_rows_only()
     test_bridge_is_fail_open_when_memory_write_fails()
     test_deduped_forward_row_is_not_mirrored()
+    test_strict_chain_rejects_later_horizon_after_gap()
+    test_reconcile_prefers_canonical_forward_archive()
+    test_reconcile_fallback_never_allows_24h_without_12h()
     print('research memory bridge tests: ok')
