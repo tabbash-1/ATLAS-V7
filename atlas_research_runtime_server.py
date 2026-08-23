@@ -2,15 +2,18 @@
 import os, threading, time
 
 import atlas_runtime_server as runtime
+import research_coverage
 
 atlas = runtime.atlas
 
 RESEARCH_SAMPLE_MIN_SCORE = float(os.environ.get('ATLAS_RESEARCH_SAMPLE_MIN_SCORE', '50'))
 RESEARCH_SAMPLE_MAX_PER_CYCLE = max(1, min(7, int(os.environ.get('ATLAS_RESEARCH_SAMPLE_MAX_PER_CYCLE', '3'))))
+RESEARCH_COVERAGE_STALE_HOURS = max(2.0, float(os.environ.get('ATLAS_RESEARCH_COVERAGE_STALE_HOURS', '8')))
 RESEARCH_LANE_STATE = {
     'enabled': True,
     'min_score': RESEARCH_SAMPLE_MIN_SCORE,
     'max_per_cycle': RESEARCH_SAMPLE_MAX_PER_CYCLE,
+    'coverage_stale_hours': RESEARCH_COVERAGE_STALE_HOURS,
     'cycles': 0,
     'scored_directional': 0,
     'shadow_directional_proxies': 0,
@@ -20,10 +23,30 @@ RESEARCH_LANE_STATE = {
     'research_deduped': 0,
     'last_top_scores': [],
     'last_selected': [],
+    'coverage_by_asset': {},
+    'coverage_summary': {},
     'last_error': None,
     'last_success_at': None,
 }
 runtime.CLOUD_RUNTIME_STATE['research_lane'] = RESEARCH_LANE_STATE
+
+
+def refresh_research_coverage():
+    coverage = research_coverage.build_coverage(
+        atlas.read_forward(), atlas.ON_DEMAND_SYMBOLS, int(time.time() * 1000), RESEARCH_COVERAGE_STALE_HOURS
+    )
+    RESEARCH_LANE_STATE['coverage_by_asset'] = coverage
+    RESEARCH_LANE_STATE['coverage_summary'] = research_coverage.coverage_summary(coverage)
+    RESEARCH_LANE_STATE['coverage_last_refreshed_at'] = atlas.now_iso()
+    return coverage
+
+
+# Populate persistent coverage immediately at boot so Production Readiness does
+# not show empty runtime-only coverage while waiting for the first hourly cycle.
+try:
+    refresh_research_coverage()
+except Exception as exc:
+    RESEARCH_LANE_STATE['last_error'] = f'coverage_boot: {exc}'
 
 
 def shadow_research_score_symbol(symbol, btc_ks):
@@ -118,6 +141,8 @@ def research_cloud_forward_cycle():
     all_scored = []
     signal_candidates = []
     shadow_count = 0
+    scored_symbols = []
+    failed_symbols = []
     try:
         try:
             atlas.update_forward_returns()
@@ -137,8 +162,10 @@ def research_cloud_forward_cycle():
                     if row is not None:
                         shadow_count += 1
                 if not row:
+                    failed_symbols.append({'symbol': symbol, 'reason': 'NO_SCORE'})
                     continue
                 all_scored.append(row)
+                scored_symbols.append(symbol)
                 # Shadow proxies are structurally excluded from the signal lane,
                 # regardless of numeric score. Strict production signal logic is unchanged.
                 if (row.get('playbook_primary') != 'SHADOW_DIRECTIONAL_PROXY'
@@ -147,6 +174,7 @@ def research_cloud_forward_cycle():
             except Exception as exc:
                 state['errors'] += 1
                 state['last_error'] = f'{symbol}: {exc}'
+                failed_symbols.append({'symbol': symbol, 'reason': str(exc)})
 
         all_scored.sort(key=lambda x: x['final_score'], reverse=True)
         signal_candidates.sort(key=lambda x: x['final_score'], reverse=True)
@@ -158,7 +186,15 @@ def research_cloud_forward_cycle():
             if x['final_score'] >= RESEARCH_SAMPLE_MIN_SCORE
             and (x['symbol'], x['direction']) not in signal_keys
         ]
-        research_chosen = research_pool[:RESEARCH_SAMPLE_MAX_PER_CYCLE]
+
+        # Closing-pass change: use persistent coverage before score as the
+        # sampling priority. This prevents ETH/BNB (or any supported asset) from
+        # being starved simply because three other assets repeatedly score a few
+        # points higher. It remains research-only and cannot create a signal.
+        coverage_before = refresh_research_coverage()
+        research_chosen = research_coverage.choose_research_samples(
+            research_pool, RESEARCH_SAMPLE_MAX_PER_CYCLE, signal_keys, coverage_before
+        )
 
         state['last_failed_stage'] = 'store_signal_candidates'
         for row in signal_chosen:
@@ -187,6 +223,10 @@ def research_cloud_forward_cycle():
             sample['challenger_take'] = False
             sample['signal_threshold_at_entry'] = atlas.CLOUD_FORWARD_MIN_SCORE
             sample['research_threshold_at_entry'] = RESEARCH_SAMPLE_MIN_SCORE
+            before = coverage_before.get(sample['symbol'], {})
+            sample['coverage_observations_before'] = before.get('observations', 0)
+            sample['coverage_age_hours_before'] = before.get('age_hours')
+            sample['coverage_scheduler'] = 'LEAST_COVERED_OLDEST_FIRST'
             try:
                 result = atlas.forward_observe(sample)
                 if isinstance(result, dict) and result.get('stored') is False:
@@ -200,6 +240,8 @@ def research_cloud_forward_cycle():
                     'score': sample['final_score'],
                     'signal_qualified': False,
                     'research_method': sample.get('playbook_primary'),
+                    'coverage_observations_before': before.get('observations', 0),
+                    'coverage_age_hours_before': before.get('age_hours'),
                 })
             except Exception as exc:
                 RESEARCH_LANE_STATE['last_error'] = f'{row.get("symbol")}: {exc}'
@@ -221,7 +263,10 @@ def research_cloud_forward_cycle():
             for x in all_scored[:7]
         ]
         RESEARCH_LANE_STATE['last_selected'] = selected_summary
+        RESEARCH_LANE_STATE['last_scored_symbols'] = scored_symbols
+        RESEARCH_LANE_STATE['last_failed_symbols'] = failed_symbols
         RESEARCH_LANE_STATE['last_success_at'] = atlas.now_iso()
+        refresh_research_coverage()
 
         try:
             atlas.stage_expansion_report(24, True)
@@ -232,6 +277,10 @@ def research_cloud_forward_cycle():
         state['last_error'] = str(exc)
         RESEARCH_LANE_STATE['last_error'] = str(exc)
     finally:
+        try:
+            refresh_research_coverage()
+        except Exception as exc:
+            RESEARCH_LANE_STATE['last_error'] = RESEARCH_LANE_STATE.get('last_error') or f'coverage_refresh: {exc}'
         state['running'] = False
         state['last_finished_at'] = atlas.now_iso()
     return dict(state)
@@ -257,5 +306,6 @@ if __name__ == '__main__':
     print(f'Data: {atlas.DATA}', flush=True)
     print('Signal gate unchanged; neutral states use non-executable shadow direction research', flush=True)
     print(f'Research sample threshold: {RESEARCH_SAMPLE_MIN_SCORE}', flush=True)
+    print(f'Research coverage stale window: {RESEARCH_COVERAGE_STALE_HOURS}h', flush=True)
     print(f'Listening on port {port}', flush=True)
     server.serve_forever(poll_interval=0.25)
