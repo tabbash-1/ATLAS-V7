@@ -1,8 +1,8 @@
 """Thread-safety hardening for ATLAS JSONL persistence.
 
 The production HTTP server and background workers share one process. This layer
-serializes append operations that were historically safe in the single-worker
-prototype but can now be reached concurrently by HTTP and cloud workers.
+serializes append operations and the full forward maturity read/rewrite
+transaction so a concurrent append cannot be lost during atomic replacement.
 """
 
 
@@ -14,6 +14,7 @@ def install(collector):
     state = {
         "enabled": True,
         "forward_write_locked": False,
+        "forward_update_locked": False,
         "confluence_write_locked": False,
         "event_write_locked": False,
     }
@@ -25,6 +26,17 @@ def install(collector):
                 return original_forward_write(row)
         collector._forward_write = locked_forward_write
         state["forward_write_locked"] = True
+
+    # update_forward_returns performs read -> mutate -> temp file -> replace.
+    # Locking the entire transaction is required; locking only _forward_write
+    # cannot protect an append that lands between the read and replace phases.
+    original_forward_update = getattr(collector, "update_forward_returns", None)
+    if original_forward_update is not None:
+        def locked_forward_update(*args, **kwargs):
+            with lock:
+                return original_forward_update(*args, **kwargs)
+        collector.update_forward_returns = locked_forward_update
+        state["forward_update_locked"] = True
 
     original_confluence_observe = getattr(collector, "confluence_observe", None)
     if original_confluence_observe is not None:
