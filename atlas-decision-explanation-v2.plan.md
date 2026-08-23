@@ -1,0 +1,1 @@
+Decision explanation v2 staging marker. No runtime effect.
