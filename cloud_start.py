@@ -42,7 +42,7 @@ for name in persistent_candidates:
     if source.exists() and not target.exists():
         shutil.copy2(source, target)
 
-# Production UI cache hardening.
+# Production UI cache hardening + decision source-of-truth adapter.
 release_token = (os.environ.get("RENDER_GIT_COMMIT") or os.environ.get("ATLAS_RELEASE") or "atlas-v7").strip()
 release_token = "".join(c for c in release_token if c.isalnum() or c in "-_")[:40] or "atlas-v7"
 index_path = BASE / "index.html"
@@ -55,7 +55,13 @@ if index_path.exists():
     )
     if old_theme in html:
         html = html.replace(old_theme, versioned, 1)
-        index_path.write_text(html, encoding="utf-8")
+    decision_script = f'<script src="atlas-production-decision.js?v={release_token}"></script>'
+    if 'atlas-production-decision.js' not in html:
+        if '</body>' in html:
+            html = html.replace('</body>', f'  {decision_script}\n</body>', 1)
+        else:
+            html += '\n' + decision_script + '\n'
+    index_path.write_text(html, encoding="utf-8")
 
 # Force browsers to revalidate the UI after each production deploy.
 import collector_server as _collector
@@ -77,6 +83,11 @@ _install_storage_hardening(_collector)
 # research runtime imports. This is the actual cloud decision path.
 from production_signal_scoring import install as _install_production_signal_scoring
 _install_production_signal_scoring(_collector)
+
+# Expose that exact scorer as the browser's single source of truth. WAIT from
+# this endpoint is an explicit Production decision with a machine-readable reason.
+from production_decision_api import install as _install_production_decision_api
+_install_production_decision_api(_collector)
 
 # Bridge newly stored cloud-forward observations into Pattern Memory with exact
 # forward lineage. This remains research-only and fail-open to forward storage.
