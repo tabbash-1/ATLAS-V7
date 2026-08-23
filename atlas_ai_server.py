@@ -74,6 +74,10 @@ def _score_sign_tag(prefix,obj):
     if v is None:return f'{prefix}_UNKNOWN'
     return f'{prefix}_POS' if v>10 else f'{prefix}_NEG' if v<-10 else f'{prefix}_NEUTRAL'
 
+def _geom_tag(name,value):
+    v=atlas.fnum(value)
+    return f'GEOM_{name}={v:.12g}' if v is not None and v>0 else None
+
 def _context_tags(packet,thesis):
     mt=packet.get('multi_timeframe') or {}; ev=packet.get('evidence') or {}; g=packet.get('trade_geometry') or {}; q=thesis.get('decision_quality') or {}
     tags=['ATLAS_AI_VALIDATION']
@@ -87,6 +91,9 @@ def _context_tags(packet,thesis):
     rr=atlas.fnum(thesis.get('risk_reward'))
     tags.append('AI_RR_UNKNOWN' if rr is None else 'AI_RR_LT_1_5' if rr<1.5 else 'AI_RR_1_5_1_99' if rr<2 else 'AI_RR_2_2_99' if rr<3 else 'AI_RR_GE_3')
     tags += [_score_sign_tag('AI_FUT',ev.get('futures')),_score_sign_tag('AI_LIQ',ev.get('liquidity')),_score_sign_tag('AI_SM',ev.get('smart_money'))]
+    for name,key in [('SL','stop_loss'),('TP1','take_profit_1'),('TP2','take_profit_2'),('TP3','take_profit_3')]:
+        tag=_geom_tag(name,thesis.get(key))
+        if tag: tags.append(tag)
     mc=ev.get('master_conviction')
     if isinstance(mc,dict):
         md=str(mc.get('decision') or mc.get('signal') or 'UNKNOWN').upper()
@@ -177,25 +184,85 @@ def ai_edge_breakdown(symbol=None,horizon=24):
             'method':'AI-only directional forward returns grouped by frozen direction/regime at observation time',
             'research_only':True,'live_execution':False}
 
+def _geometry_from_row(row):
+    out={}
+    for tag in row.get('playbook_all') or []:
+        s=str(tag)
+        if not s.startswith('GEOM_') or '=' not in s: continue
+        k,v=s[5:].split('=',1); n=atlas.fnum(v)
+        if n is not None: out[k]=n
+    return {'stop_loss':out.get('SL'),'take_profit_1':out.get('TP1'),'take_profit_2':out.get('TP2'),'take_profit_3':out.get('TP3')}
+
+def _fetch_5m_klines(symbol,start_ms,end_ms):
+    qs=urllib.parse.urlencode({'symbol':symbol,'interval':'5m','startTime':int(start_ms),'endTime':int(end_ms),'limit':1000})
+    errors=[]
+    for host in ('https://api.binance.com','https://api1.binance.com','https://api2.binance.com'):
+        try:
+            req=urllib.request.Request(f'{host}/api/v3/klines?{qs}',headers={'User-Agent':atlas.UA,'Accept':'application/json'})
+            with urllib.request.urlopen(req,timeout=15) as r: return json.loads(r.read().decode('utf-8'))
+        except Exception as e: errors.append(str(e))
+    raise RuntimeError('kline providers failed: '+' | '.join(errors))
+
+def _paper_path_row(row,horizon_h=24):
+    geom=_geometry_from_row(row); sl=geom.get('stop_loss'); tp1=geom.get('take_profit_1')
+    base={'symbol':row.get('symbol'),'direction':row.get('direction'),'entry':atlas.fnum(row.get('entry')),
+          'captured_at':row.get('captured_at'),'captured_at_ms':row.get('captured_at_ms'),'score':row.get('champion_score'),
+          'regime':row.get('regime'),'geometry':geom,'horizon_h':horizon_h}
+    if not sl or not tp1:return {**base,'status':'PATH_UNAVAILABLE','reason':'candidate predates frozen SL/TP geometry or geometry was incomplete'}
+    start=int(row.get('captured_at_ms') or 0); end=min(int(time.time()*1000),start+horizon_h*3600*1000)
+    if not start:return {**base,'status':'PATH_UNAVAILABLE','reason':'missing captured_at_ms'}
+    if end<=start:return {**base,'status':'OPEN','reason':'awaiting post-entry candles'}
+    bars=_fetch_5m_klines(row.get('symbol'),start,end); direction=str(row.get('direction') or '').upper(); max_tp=0
+    for b in bars:
+        if not isinstance(b,list) or len(b)<5: continue
+        ts=int(b[0]); high=atlas.fnum(b[2]); low=atlas.fnum(b[3])
+        if high is None or low is None: continue
+        if direction=='LONG':
+            sl_hit=low<=sl; tp_hits=[i for i,k in enumerate(('take_profit_1','take_profit_2','take_profit_3'),1) if geom.get(k) and high>=geom[k]]
+        else:
+            sl_hit=high>=sl; tp_hits=[i for i,k in enumerate(('take_profit_1','take_profit_2','take_profit_3'),1) if geom.get(k) and low<=geom[k]]
+        if tp_hits:max_tp=max(max_tp,max(tp_hits))
+        tp1_hit=1 in tp_hits
+        if sl_hit and tp1_hit:return {**base,'status':'AMBIGUOUS','reason':'SL and TP1 touched inside the same 5m candle; OHLC cannot prove intrabar order','event_at_ms':ts,'max_tp_reached':max_tp,'bars_checked':len(bars)}
+        if sl_hit:return {**base,'status':'LOSS','reason':'SL touched before TP1','event_at_ms':ts,'max_tp_reached':max_tp,'bars_checked':len(bars)}
+        if tp1_hit:return {**base,'status':'WIN','reason':'TP1 touched before SL','event_at_ms':ts,'max_tp_reached':max_tp,'bars_checked':len(bars)}
+    aged=int(time.time()*1000)>=start+horizon_h*3600*1000
+    return {**base,'status':'EXPIRED' if aged else 'OPEN','reason':'neither SL nor TP1 touched within evaluated path' if aged else 'neither SL nor TP1 touched yet','max_tp_reached':max_tp,'bars_checked':len(bars)}
+
+def ai_paper_path(symbol=None,limit=20,horizon_h=24):
+    rows=[r for r in atlas.forward_rows(symbol) if str(r.get('auto_source') or '').startswith('ATLAS_AI')]
+    rows=sorted(rows,key=lambda r:int(r.get('captured_at_ms') or 0),reverse=True)[:max(1,min(int(limit),50))]
+    out=[]
+    for r in rows:
+        try: out.append(_paper_path_row(r,horizon_h))
+        except Exception as e: out.append({'symbol':r.get('symbol'),'direction':r.get('direction'),'captured_at':r.get('captured_at'),'status':'PATH_ERROR','reason':str(e)})
+    eligible=[x for x in out if x.get('status') not in ('PATH_UNAVAILABLE','PATH_ERROR')]
+    closed=[x for x in eligible if x.get('status') in ('WIN','LOSS','AMBIGUOUS','EXPIRED')]
+    wins=sum(x.get('status')=='WIN' for x in closed); losses=sum(x.get('status')=='LOSS' for x in closed); denom=wins+losses
+    return {'symbol':symbol,'horizon_h':horizon_h,'candidates':len(rows),'path_eligible':len(eligible),'closed':len(closed),'wins':wins,'losses':losses,
+            'ambiguous':sum(x.get('status')=='AMBIGUOUS' for x in closed),'win_rate_ex_ambiguous_pct':round(wins/denom*100,2) if denom else None,'rows':out,
+            'method':'5m Binance spot OHLC path; same-candle SL+TP1 is ambiguous; no exchange fill/slippage simulation','research_only':True,'live_execution':False}
+
 class Handler(atlas.Handler):
     def do_GET(self):
         u=urllib.parse.urlparse(self.path)
-        if u.path=='/api/ai/status':
-            return self._json({'ok':True,'provider':'OpenAI Responses API','configured':AI_STATUS['configured'],'model':ATLAS_AI_MODEL,'structured_outputs':True,'status':dict(AI_STATUS),'research_only':True,'live_execution':False})
+        if u.path=='/api/ai/status':return self._json({'ok':True,'provider':'OpenAI Responses API','configured':AI_STATUS['configured'],'model':ATLAS_AI_MODEL,'structured_outputs':True,'status':dict(AI_STATUS),'research_only':True,'live_execution':False})
         if u.path=='/api/ai/validation':
             q=urllib.parse.parse_qs(u.query); sym=q.get('symbol',[None])[0]
-            horizons={str(h):atlas.forward_stats(sym,h) for h in atlas.HORIZONS}
-            rows=[r for r in atlas.forward_rows(sym) if str(r.get('auto_source') or '').startswith('ATLAS_AI')]
+            horizons={str(h):atlas.forward_stats(sym,h) for h in atlas.HORIZONS}; rows=[r for r in atlas.forward_rows(sym) if str(r.get('auto_source') or '').startswith('ATLAS_AI')]
             matured={str(h):sum(1 for r in rows if atlas.fnum((r.get('forward_return_pct') or {}).get(str(h))) is not None) for h in atlas.HORIZONS}
             n24=matured['24']; readiness='ROBUSTNESS_TEST_READY' if n24>=200 else 'VALIDATION_READY' if n24>=100 else 'EARLY_RESEARCH' if n24>=30 else 'NOT_READY'
             return self._json({'symbol':sym,'observations':len(rows),'matured':matured,'readiness':readiness,'horizons':horizons,'research_only':True,'live_execution':False})
         if u.path=='/api/ai/attribution':
-            q=urllib.parse.parse_qs(u.query); sym=q.get('symbol',[None])[0]; horizon=int(q.get('horizon',['24'])[0]); min_n=max(2,int(q.get('min_n',['5'])[0]))
-            return self._json(ai_attribution(sym,horizon,min_n))
+            q=urllib.parse.parse_qs(u.query); sym=q.get('symbol',[None])[0]; horizon=int(q.get('horizon',['24'])[0]); min_n=max(2,int(q.get('min_n',['5'])[0])); return self._json(ai_attribution(sym,horizon,min_n))
         if u.path=='/api/ai/edge-breakdown':
             q=urllib.parse.parse_qs(u.query); sym=q.get('symbol',[None])[0]; horizon=int(q.get('horizon',['24'])[0])
             if horizon not in atlas.HORIZONS:return self._json({'ok':False,'error':'unsupported horizon'},400)
             return self._json(ai_edge_breakdown(sym,horizon))
+        if u.path=='/api/ai/paper-path':
+            q=urllib.parse.parse_qs(u.query); sym=q.get('symbol',[None])[0]; limit=int(q.get('limit',['20'])[0]); horizon=int(q.get('horizon',['24'])[0])
+            if horizon not in atlas.HORIZONS:return self._json({'ok':False,'error':'unsupported horizon'},400)
+            return self._json(ai_paper_path(sym,limit,horizon))
         return super().do_GET()
 
     def do_POST(self):
@@ -207,15 +274,10 @@ class Handler(atlas.Handler):
             if n<=0 or n>ATLAS_AI_MAX_BODY: return self._json({'ok':False,'error':'invalid analysis payload size'},413 if n>ATLAS_AI_MAX_BODY else 400)
             packet=json.loads(self.rfile.read(n).decode('utf-8') or '{}')
             if not isinstance(packet,dict) or packet.get('schema')!='ATLAS_AI_ANALYSIS_PACKET_V1': return self._json({'ok':False,'error':'invalid ATLAS AI packet'},400)
-            thesis=openai_analyze(packet)
-            validation=record_ai_validation(packet,thesis,'ATLAS_AI_OPENAI')
+            thesis=openai_analyze(packet); validation=record_ai_validation(packet,thesis,'ATLAS_AI_OPENAI')
             return self._json({'ok':True,'provider':'OpenAI Responses API','model':ATLAS_AI_MODEL,'thesis':thesis,'validation':validation,'research_only':True,'live_execution':False})
-        except Exception as e:
-            return self._json({'ok':False,'error':str(e),'fallback_expected':True,'research_only':True,'live_execution':False},503)
+        except Exception as e:return self._json({'ok':False,'error':str(e),'fallback_expected':True,'research_only':True,'live_execution':False},503)
 
 if __name__=='__main__':
-    os.chdir(atlas.ROOT)
-    threading.Thread(target=atlas.auto_loop,daemon=True).start(); threading.Thread(target=atlas.news_loop,daemon=True).start(); threading.Thread(target=atlas.cloud_forward_loop,daemon=True).start()
-    port=int(os.environ.get('PORT','8080'))
-    print('ATLAS V7 + AI gateway'); print(f'AI model: {ATLAS_AI_MODEL} · key configured: {bool(OPENAI_API_KEY)}'); print(f'Listening on port {port}')
-    ThreadingHTTPServer(('0.0.0.0',port),Handler).serve_forever()
+    os.chdir(atlas.ROOT); threading.Thread(target=atlas.auto_loop,daemon=True).start(); threading.Thread(target=atlas.news_loop,daemon=True).start(); threading.Thread(target=atlas.cloud_forward_loop,daemon=True).start()
+    port=int(os.environ.get('PORT','8080')); print('ATLAS V7 + AI gateway'); print(f'AI model: {ATLAS_AI_MODEL} · key configured: {bool(OPENAI_API_KEY)}'); print(f'Listening on port {port}'); ThreadingHTTPServer(('0.0.0.0',port),Handler).serve_forever()
