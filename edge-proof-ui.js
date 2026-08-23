@@ -2,8 +2,9 @@
   const $=id=>document.getElementById(id);
   const SYMBOLS=['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT'];
   const HORIZONS=[1,4,12,24];
+  const CAL_BUCKETS=['AI_CONF_LT_55','AI_CONF_55_69','AI_CONF_70_84','AI_CONF_GE_85'];
+  const CAL_LABELS={AI_CONF_LT_55:'<55',AI_CONF_55_69:'55–69',AI_CONF_70_84:'70–84',AI_CONF_GE_85:'85+'};
   const num=v=>v==null||!Number.isFinite(Number(v))?null:Number(v);
-  const fmt=(v,d=2)=>num(v)==null?'—':num(v).toFixed(d);
   const pct=v=>num(v)==null?'—':`${num(v).toFixed(2)}%`;
   const signedPct=v=>num(v)==null?'—':`${num(v)>=0?'+':''}${num(v).toFixed(3)}%`;
   function readiness(n){return n>=200?'ROBUSTNESS TEST READY':n>=100?'VALIDATION READY':n>=30?'EARLY RESEARCH':'NOT READY';}
@@ -16,7 +17,7 @@
     if(avg<0&&hit<50)return n>=100?'NEGATIVE EDGE EVIDENCE':'EARLY NEGATIVE READ';
     return 'MIXED EVIDENCE';
   }
-  function guard(n){return n>=200?'ROBUSTNESS':n>=100?'VALIDATION':n>=30?'EARLY':'SMALL SAMPLE';}
+  function guard(n){return n>=200?'ROBUSTNESS':n>=100?'VALIDATION':n>=30?'EARLY':n>=15?'DESCRIPTIVE':'SMALL SAMPLE';}
   async function attrib(symbol,horizon){
     const q=new URLSearchParams({horizon:String(horizon),min_n:'2'});if(symbol)q.set('symbol',symbol);
     const r=await fetch(`/api/ai/attribution?${q.toString()}`,{cache:'no-store'});
@@ -49,6 +50,20 @@
     const body=$(id);if(!body)return;
     body.innerHTML=(rows&&rows.length)?rows.map(x=>{const n=Number(x.n||0);return `<tr><td>${String(x.group||'UNKNOWN').replaceAll('_',' ')}</td><td>${n}</td><td>${pct(x.hit_rate_pct)}</td><td>${signedPct(x.avg_return_pct)}</td><td>${pct(x.max_drawdown_proxy)}</td><td>${x.sample_status||guard(n)}</td></tr>`}).join(''):'<tr><td colspan="6">No matured observations yet.</td></tr>';
   }
+  function renderCalibration(p){
+    const body=$('edgeCalibrationBody'), note=$('edgeCalibrationRead');if(!body)return;
+    const byTag=new Map((p?.factors||[]).map(x=>[String(x.tag||''),x]));
+    const rows=CAL_BUCKETS.map(tag=>({tag,label:CAL_LABELS[tag],...(byTag.get(tag)||{})}));
+    body.innerHTML=rows.map(x=>{const n=Number(x.n||0);return `<tr><td>${x.label}</td><td>${n}</td><td>${pct(x.hit_rate_pct)}</td><td>${signedPct(x.avg_return_pct)}</td><td>${signedPct(x.delta_vs_baseline_avg_pct)}</td><td>${guard(n)}</td></tr>`}).join('');
+    if(!note)return;
+    const usable=rows.filter(x=>Number(x.n||0)>=15&&num(x.avg_return_pct)!=null&&num(x.hit_rate_pct)!=null);
+    if(usable.length<2){note.textContent='Calibration is still descriptive: fewer than two confidence buckets have at least 15 matured 24h observations.';return;}
+    const avgMono=usable.every((x,i)=>i===0||num(x.avg_return_pct)>=num(usable[i-1].avg_return_pct));
+    const hitMono=usable.every((x,i)=>i===0||num(x.hit_rate_pct)>=num(usable[i-1].hit_rate_pct));
+    const validated=usable.every(x=>Number(x.n||0)>=30);
+    if(avgMono&&hitMono){note.textContent=`${validated?'EARLY CALIBRATION SIGNAL':'DESCRIPTIVE CALIBRATION SIGNAL'}: higher confidence buckets currently show non-decreasing hit rate and expectancy. This is not yet a threshold change recommendation.`;}
+    else{note.textContent=`${validated?'CALIBRATION WARNING':'DESCRIPTIVE WARNING'}: higher confidence is not consistently producing better 24h outcomes yet. Keep current thresholds frozen until larger out-of-sample evidence exists.`;}
+  }
   function renderFactors(p){
     const body=$('edgeFactorBody');if(!body)return;
     const factors=[...(p.strongest_associations||[]).slice(0,5),...(p.weakest_associations||[]).slice(0,5)].filter((x,i,a)=>a.findIndex(y=>y.tag===x.tag)===i);
@@ -60,8 +75,8 @@
       const [global24,horizons,assets,b24]=await Promise.all([
         attrib(null,24),Promise.all(HORIZONS.map(h=>attrib(null,h))),Promise.all(SYMBOLS.map(s=>attrib(s,24))),breakdown(null,24)
       ]);
-      renderSummary(global24);renderHorizons(horizons);renderAssets(assets);renderBreakdown('edgeDirectionBody',b24.by_direction);renderBreakdown('edgeRegimeBody',b24.by_regime);renderFactors(global24);
-      if($('edgeProofNotes'))$('edgeProofNotes').textContent='AI-only frozen LONG/SHORT observations. Direction and regime rows remain descriptive until each group clears its own sample guard. No live execution.';
+      renderSummary(global24);renderHorizons(horizons);renderAssets(assets);renderBreakdown('edgeDirectionBody',b24.by_direction);renderBreakdown('edgeRegimeBody',b24.by_regime);renderCalibration(global24);renderFactors(global24);
+      if($('edgeProofNotes'))$('edgeProofNotes').textContent='AI-only frozen LONG/SHORT observations. Direction, regime, and score calibration remain descriptive until their own sample guards mature. No live execution.';
     }catch(e){
       if(badge){badge.textContent='UNAVAILABLE';badge.className='pill neutral';}
       if($('edgeProofNotes'))$('edgeProofNotes').textContent=`Edge proof data unavailable: ${e.message}`;
