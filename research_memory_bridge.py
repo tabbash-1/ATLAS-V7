@@ -1,15 +1,18 @@
-"""Bridge production cloud-forward observations into ATLAS confluence memory.
+"""Bridge production cloud-forward observations into ATLAS Pattern Memory.
 
-This module also reconciles Pattern Memory forward returns against the canonical
-cloud-forward archive and enforces a strict maturity chain. A 24h result is not
-counted unless 1h, 4h and 12h are also present; similarly for every later
-horizon. This prevents sparse confluence observations from creating impossible
-maturity states such as 24h matured while 12h is missing.
+Cloud rows are stored with exact forward-observation lineage. Historical rows
+created before lineage support can still reconcile by direction + timestamp +
+price. All returned maturity is forced through a strict 1h -> 4h -> 12h -> 24h
+chain so sparse data can never masquerade as mature evidence.
 """
+
+import json
+import time
 
 HORIZONS = (1, 4, 12, 24)
 MATCH_WINDOW_MS = 10 * 60 * 1000
 PRICE_TOLERANCE_PCT = 0.75
+MEMORY_DEDUP_MS = 45 * 60 * 1000
 
 
 def _fnum(value):
@@ -25,7 +28,7 @@ def _is_cloud_forward(row):
 
 
 def build_confluence_payload(row):
-    """Translate one frozen cloud-forward row into confluence-memory schema."""
+    """Translate one frozen cloud-forward row into Pattern Memory schema."""
     if not isinstance(row, dict):
         return None
     symbol = str(row.get("symbol") or "").upper().replace("BINANCE:", "")
@@ -38,7 +41,6 @@ def build_confluence_payload(row):
     score = _fnum(row.get("final_score"))
     if score is None:
         score = _fnum(row.get("champion_score"))
-
     research_only = bool(row.get("research_sampling_lane")) or str(
         row.get("execution_decision") or ""
     ).upper() == "RESEARCH_OBSERVATION_ONLY"
@@ -76,11 +78,14 @@ def build_confluence_payload(row):
         "opportunity_score": row.get("opportunity_score"),
         "cloud_memory_bridge": True,
         "research_sampling_lane": bool(row.get("research_sampling_lane")),
+        "auto_source": row.get("auto_source"),
+        "forward_observation_id": row.get("id"),
+        "forward_captured_at_ms": row.get("captured_at_ms"),
+        "forward_direction": direction,
     }
 
 
 def _strict_chain(fr):
-    """Return a monotonic horizon map plus any rejected later horizons."""
     source = dict(fr or {})
     clean = {}
     missing_seen = False
@@ -98,14 +103,38 @@ def _strict_chain(fr):
     return clean, rejected
 
 
+def _memory_direction(row):
+    signal = str((row or {}).get("base_signal") or (row or {}).get("signal") or "").upper()
+    if signal == "BUY":
+        return "LONG"
+    if signal == "SELL":
+        return "SHORT"
+    return str((row or {}).get("forward_direction") or "").upper() or None
+
+
 def _match_forward(memory_row, forward_rows):
     symbol = str(memory_row.get("symbol") or "").upper()
-    mts = int(memory_row.get("captured_at_ms") or 0)
+    expected_direction = _memory_direction(memory_row)
+    exact_id = str(memory_row.get("forward_observation_id") or "")
+
+    if exact_id:
+        for row in forward_rows or []:
+            if str(row.get("id") or "") != exact_id:
+                continue
+            if str(row.get("symbol") or "").upper() != symbol:
+                continue
+            if expected_direction and str(row.get("direction") or "").upper() != expected_direction:
+                continue
+            return row, "EXACT_ID"
+
+    mts = int(memory_row.get("forward_captured_at_ms") or memory_row.get("captured_at_ms") or 0)
     mprice = _fnum(memory_row.get("price"))
     best = None
     best_dt = None
     for row in forward_rows or []:
         if not _is_cloud_forward(row) or str(row.get("symbol") or "").upper() != symbol:
+            continue
+        if expected_direction and str(row.get("direction") or "").upper() != expected_direction:
             continue
         ts = int(row.get("captured_at_ms") or row.get("event_at_ms") or 0)
         if not mts or not ts:
@@ -121,24 +150,36 @@ def _match_forward(memory_row, forward_rows):
         if best is None or dt < best_dt:
             best = row
             best_dt = dt
-    return best
+    return (best, "FUZZY_LEGACY") if best is not None else (None, None)
 
 
 def reconcile_confluence_rows(confluence_rows, forward_rows):
-    """Use canonical forward returns when linkable, then enforce strict maturity."""
     out = []
-    metrics = {"rows": 0, "linked_to_forward": 0, "gap_rows": 0, "rejected_horizons": 0}
+    metrics = {
+        "rows": 0,
+        "linked_to_forward": 0,
+        "exact_lineage_links": 0,
+        "legacy_fuzzy_links": 0,
+        "gap_rows": 0,
+        "rejected_horizons": 0,
+    }
     for row in confluence_rows or []:
         x = dict(row)
         metrics["rows"] += 1
         source_fr = x.get("forward_return_pct") or {}
-        match = _match_forward(x, forward_rows)
+        match, method = _match_forward(x, forward_rows)
         if match is not None and (match.get("forward_return_pct") or {}):
             source_fr = match.get("forward_return_pct") or {}
             metrics["linked_to_forward"] += 1
+            if method == "EXACT_ID":
+                metrics["exact_lineage_links"] += 1
+            else:
+                metrics["legacy_fuzzy_links"] += 1
             x["forward_evidence_source"] = "CANONICAL_FORWARD_ARCHIVE"
+            x["forward_link_method"] = method
         else:
             x["forward_evidence_source"] = "CONFLUENCE_FALLBACK"
+            x["forward_link_method"] = None
         clean, rejected = _strict_chain(source_fr)
         if rejected:
             metrics["gap_rows"] += 1
@@ -153,6 +194,46 @@ def reconcile_confluence_rows(confluence_rows, forward_rows):
     return out, metrics
 
 
+def _store_cloud_memory(collector, payload, forward_row):
+    """Persist one cloud memory row with exact lineage and thread-safe append."""
+    symbol = payload["symbol"]
+    forward_id = str(forward_row.get("id") or "")
+    ts = int(forward_row.get("captured_at_ms") or time.time() * 1000)
+
+    lock = getattr(collector, "ARCHIVE_LOCK", None)
+    if lock is None:
+        class _Noop:
+            def __enter__(self): return self
+            def __exit__(self, *_): return False
+        lock = _Noop()
+
+    with lock:
+        rows = collector.read_confluence_all() if hasattr(collector, "read_confluence_all") else []
+        same_symbol = [x for x in rows if x.get("symbol") == symbol]
+        if forward_id and any(str(x.get("forward_observation_id") or "") == forward_id for x in same_symbol):
+            return {"stored": False, "reason": "DEDUP_FORWARD_ID"}
+        if same_symbol:
+            latest = max(int(x.get("captured_at_ms") or 0) for x in same_symbol)
+            if latest and abs(ts - latest) < MEMORY_DEDUP_MS:
+                return {"stored": False, "reason": "DEDUP_45M"}
+
+        rec = {
+            "schema": "ATLAS_CONFLUENCE_MEMORY_V1",
+            "captured_at": forward_row.get("captured_at") or collector.now_iso(),
+            "captured_at_ms": ts,
+            "symbol": symbol,
+            "price": payload["price"],
+            "research_only": True,
+            "live_execution": False,
+        }
+        for key, value in payload.items():
+            if key not in ("symbol", "price") and value is not None:
+                rec[key] = value
+        with collector.CONFLUENCE_ARCHIVE.open("a") as f:
+            f.write(json.dumps(rec, separators=(",", ":")) + "\n")
+        return {"stored": True, "record": rec}
+
+
 def install(collector):
     """Install cloud mirror and Pattern Memory integrity reconciliation once."""
     if getattr(collector, "_RESEARCH_MEMORY_BRIDGE_INSTALLED", False):
@@ -165,12 +246,22 @@ def install(collector):
         "forward_stored": 0,
         "mirror_attempts": 0,
         "mirrored": 0,
+        "mirror_deduped": 0,
         "mirror_errors": 0,
+        "exact_lineage_mirrors": 0,
         "skipped_non_cloud": 0,
         "skipped_deduped": 0,
         "last_error": None,
         "last_symbol": None,
-        "integrity": {"enabled": bool(original_confluence_forward_rows), "rows": 0, "linked_to_forward": 0, "gap_rows": 0, "rejected_horizons": 0},
+        "integrity": {
+            "enabled": bool(original_confluence_forward_rows),
+            "rows": 0,
+            "linked_to_forward": 0,
+            "exact_lineage_links": 0,
+            "legacy_fuzzy_links": 0,
+            "gap_rows": 0,
+            "rejected_horizons": 0,
+        },
     }
 
     def bridged_forward_observe(row):
@@ -184,7 +275,9 @@ def install(collector):
             state["skipped_non_cloud"] += 1
             return result
 
-        payload = build_confluence_payload(row)
+        # Use the canonical stored row returned by forward_observe when available.
+        canonical = result.get("record") if isinstance(result, dict) and isinstance(result.get("record"), dict) else row
+        payload = build_confluence_payload(canonical)
         if payload is None:
             state["mirror_errors"] += 1
             state["last_error"] = "invalid cloud-forward row for confluence mirror"
@@ -193,8 +286,13 @@ def install(collector):
         state["mirror_attempts"] += 1
         state["last_symbol"] = payload["symbol"]
         try:
-            collector.confluence_observe(payload)
-            state["mirrored"] += 1
+            memory_result = _store_cloud_memory(collector, payload, canonical)
+            if isinstance(memory_result, dict) and memory_result.get("stored") is False:
+                state["mirror_deduped"] += 1
+            else:
+                state["mirrored"] += 1
+                if payload.get("forward_observation_id"):
+                    state["exact_lineage_mirrors"] += 1
             state["last_error"] = None
         except Exception as exc:  # fail-open: never damage forward collection
             state["mirror_errors"] += 1
@@ -210,7 +308,6 @@ def install(collector):
                 state["integrity"] = {"enabled": True, **metrics}
                 return reconciled
             except Exception as exc:
-                # Fail closed for maturity ordering even if archive reconciliation fails.
                 reconciled, metrics = reconcile_confluence_rows(raw, [])
                 state["integrity"] = {"enabled": True, **metrics, "last_error": f"{type(exc).__name__}: {exc}"}
                 return reconciled
