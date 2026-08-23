@@ -27,6 +27,18 @@ def _is_cloud_forward(row):
     return source.startswith("CLOUD_FORWARD") or bool((row or {}).get("research_sampling_lane"))
 
 
+def _canonical_forward_result(result, submitted):
+    """Return the canonical stored forward row across old/new return shapes."""
+    if isinstance(result, dict):
+        record = result.get("record")
+        if isinstance(record, dict):
+            return record
+        # collector_server.forward_observe returns ATLAS_FORWARD_V1 directly.
+        if result.get("schema") == "ATLAS_FORWARD_V1" and result.get("id"):
+            return result
+    return submitted
+
+
 def build_confluence_payload(row):
     """Translate one frozen cloud-forward row into Pattern Memory schema."""
     if not isinstance(row, dict):
@@ -275,8 +287,7 @@ def install(collector):
             state["skipped_non_cloud"] += 1
             return result
 
-        # Use the canonical stored row returned by forward_observe when available.
-        canonical = result.get("record") if isinstance(result, dict) and isinstance(result.get("record"), dict) else row
+        canonical = _canonical_forward_result(result, row)
         payload = build_confluence_payload(canonical)
         if payload is None:
             state["mirror_errors"] += 1
