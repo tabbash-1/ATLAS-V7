@@ -77,6 +77,11 @@ _install_storage_hardening(_collector)
 from research_memory_bridge import install as _install_research_memory_bridge
 _install_research_memory_bridge(_collector)
 
+# Add a strictly read-only outcome ledger over frozen forward observations.
+# This layer cannot mutate scores, thresholds, signals, archives, or execution.
+from trade_outcome_runtime import install as _install_trade_outcome_runtime
+_install_trade_outcome_runtime(_collector)
+
 # Production keeps the hardened runtime with a separate research sampling lane.
 entrypoint = "atlas_research_runtime_server.py"
 print(f"ATLAS production boot: data={DATA_DIR} runtime=resilient-free-research release={release_token}")

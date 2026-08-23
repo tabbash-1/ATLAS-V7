@@ -22,7 +22,7 @@ jobs:
           node-version: '22'
       - name: Python syntax
         run: |
-          python -m py_compile collector_server.py cloud_start.py atlas_runtime_server.py atlas_research_runtime_server.py atlas_ai_server.py research_memory_bridge.py research_coverage.py storage_hardening.py tests/test_ai_validation.py tests/test_research_memory_bridge.py tests/test_research_coverage.py tests/test_storage_hardening.py
+          python -m py_compile collector_server.py cloud_start.py atlas_runtime_server.py atlas_research_runtime_server.py atlas_ai_server.py research_memory_bridge.py research_coverage.py storage_hardening.py trade_outcome_ledger.py trade_outcome_runtime.py tests/test_ai_validation.py tests/test_research_memory_bridge.py tests/test_research_coverage.py tests/test_storage_hardening.py tests/test_trade_outcome_ledger.py
       - name: JavaScript syntax
         run: |
           set -e
@@ -36,6 +36,7 @@ jobs:
           PYTHONPATH=. python tests/test_research_memory_bridge.py
           PYTHONPATH=. python tests/test_research_coverage.py
           PYTHONPATH=. python tests/test_storage_hardening.py
+          PYTHONPATH=. python tests/test_trade_outcome_ledger.py
       - name: Verify production entrypoints
         run: |
           grep -q 'cloud_start.py' Procfile
@@ -45,6 +46,7 @@ jobs:
           ! grep -q 'OPENAI_API_KEY' render.yaml
           grep -q 'atlas_research_runtime_server.py' cloud_start.py
           grep -q '_install_storage_hardening' cloud_start.py
+          grep -q '_install_trade_outcome_runtime' cloud_start.py
       - name: Verify resilient provider chain and safety invariants
         run: |
           grep -q 'KRAKEN_FUTURES_PUBLIC' atlas_runtime_server.py
@@ -76,6 +78,8 @@ jobs:
           grep -q 'live_execution.*False' collector_server.py
           grep -q 'ATLAS_AI_ANALYSIS_PACKET_V1' atlas-ai-analysis-layer.js
           grep -q 'atlasApplyDecisionGate' atlas-decision-quality.js
+          grep -q 'UNAVAILABLE_WITHOUT_FROZEN_STOP_DISTANCE' trade_outcome_ledger.py
+          grep -q "default_scope': 'signals'" trade_outcome_runtime.py
       - name: Verify additive product shell invariants
         run: |
           grep -q 'atlasProductShell' atlas-product-shell.js
@@ -132,6 +136,9 @@ jobs:
           curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"storage_hardening"'
           curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"forward_write_locked": true'
           curl --fail --silent http://127.0.0.1:18080/production-status.html | grep -q 'Research Progress'
+          curl --fail --silent http://127.0.0.1:18080/trade-outcomes.html | grep -q 'Trade Outcomes'
+          curl --fail --silent 'http://127.0.0.1:18080/api/outcomes/summary?horizon=24&scope=signals' | grep -q 'ATLAS_TRADE_OUTCOME_SUMMARY_V1'
+          curl --fail --silent 'http://127.0.0.1:18080/api/outcomes/ledger?horizon=24&scope=signals' | grep -q 'ATLAS_TRADE_OUTCOME_LEDGER_V1'
           curl --fail --silent http://127.0.0.1:18080/api/smart-money/status | grep -q '"online": true'
           curl --fail --silent http://127.0.0.1:18080/api/system/readiness | grep -q '"persistent_data_dir": "/tmp/atlas-ci-data"'
           curl --fail --silent http://127.0.0.1:18080/api/production/readiness | grep -q '"ready_for_live_execution": false'
