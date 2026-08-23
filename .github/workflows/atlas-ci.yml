@@ -22,7 +22,7 @@ jobs:
           node-version: '22'
       - name: Python syntax
         run: |
-          python -m py_compile collector_server.py cloud_start.py atlas_runtime_server.py atlas_research_runtime_server.py atlas_ai_server.py tests/test_ai_validation.py
+          python -m py_compile collector_server.py cloud_start.py atlas_runtime_server.py atlas_research_runtime_server.py atlas_ai_server.py research_memory_bridge.py tests/test_ai_validation.py tests/test_research_memory_bridge.py
       - name: JavaScript syntax
         run: |
           set -e
@@ -33,6 +33,7 @@ jobs:
         run: |
           node tests/atlas-ai-trade-geometry.test.js
           python tests/test_ai_validation.py
+          PYTHONPATH=. python tests/test_research_memory_bridge.py
       - name: Verify production entrypoints
         run: |
           grep -q 'cloud_start.py' Procfile
@@ -48,6 +49,8 @@ jobs:
           grep -q 'Binance USD-M -> Bybit -> Kraken Futures' atlas_runtime_server.py
           grep -q '/api/runtime/status' atlas_runtime_server.py
           grep -q 'request_queue_size=128' atlas_runtime_server.py
+          grep -q 'research_memory_bridge.install(atlas)' atlas_runtime_server.py
+          grep -q "'research_memory_bridge':RESEARCH_MEMORY_BRIDGE_STATE" atlas_runtime_server.py
           grep -q 'CLOUD_FORWARD_RESEARCH_SAMPLE' atlas_research_runtime_server.py
           grep -q 'CLOUD_FORWARD_SHADOW_DIRECTION_RESEARCH' atlas_research_runtime_server.py
           grep -q 'SHADOW_DIRECTIONAL_PROXY' atlas_research_runtime_server.py
@@ -112,6 +115,8 @@ jobs:
           curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"ok": true'
           curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"boot_id"'
           curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"research_lane"'
+          curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"research_memory_bridge"'
+          curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"enabled": true'
           curl --fail --silent http://127.0.0.1:18080/production-status.html | grep -q 'Research Progress'
           curl --fail --silent http://127.0.0.1:18080/api/smart-money/status | grep -q '"online": true'
           curl --fail --silent http://127.0.0.1:18080/api/system/readiness | grep -q '"persistent_data_dir": "/tmp/atlas-ci-data"'
@@ -121,11 +126,14 @@ jobs:
           curl --fail --silent \
             -H 'Origin: http://127.0.0.1:18080' \
             -H 'Content-Type: application/json' \
-            --data '{"symbol":"BTCUSDT","direction":"LONG","entry":100,"champion_score":70,"auto_source":"CI_PERSISTENCE_TEST"}' \
+            --data '{"symbol":"BTCUSDT","direction":"LONG","entry":100,"champion_score":56,"final_score":56,"execution_decision":"RESEARCH_OBSERVATION_ONLY","research_sampling_lane":true,"playbook_primary":"SHADOW_DIRECTIONAL_PROXY","auto_source":"CLOUD_FORWARD_CI_BRIDGE_TEST"}' \
             http://127.0.0.1:18080/api/forward/observe | grep -q '"schema": "ATLAS_FORWARD_V1"'
           curl --fail --silent http://127.0.0.1:18080/api/data-quality | grep -q '"forward_rows": 2'
+          curl --fail --silent 'http://127.0.0.1:18080/api/confluence/memory-stats?symbol=BTCUSDT' | grep -q '"observations": 1'
+          curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"mirrored": 1'
 
           stop_server
           start_server
           curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"ok": true'
           curl --fail --silent http://127.0.0.1:18080/api/data-quality | grep -q '"forward_rows": 2'
+          curl --fail --silent 'http://127.0.0.1:18080/api/confluence/memory-stats?symbol=BTCUSDT' | grep -q '"observations": 1'
