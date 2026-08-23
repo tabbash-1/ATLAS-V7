@@ -73,6 +73,11 @@ _collector.Handler.end_headers = _production_no_cache_headers
 from storage_hardening import install as _install_storage_hardening
 _install_storage_hardening(_collector)
 
+# Production signal scoring must be patched on the collector module that the
+# research runtime imports. This is the actual cloud decision path.
+from production_signal_scoring import install as _install_production_signal_scoring
+_install_production_signal_scoring(_collector)
+
 # Bridge newly stored cloud-forward observations into Pattern Memory with exact
 # forward lineage. This remains research-only and fail-open to forward storage.
 from research_memory_bridge import install as _install_research_memory_bridge
