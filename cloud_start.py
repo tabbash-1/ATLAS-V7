@@ -32,6 +32,7 @@ persistent_candidates = [
     "confluence_memory.jsonl",
     "event_memory.jsonl",
     "champion_challenger_forward.jsonl",
+    "trade_geometry.jsonl",
     "canary_stage_state.json",
     "confirmed_opportunity_alerts.jsonl",
 ]
@@ -78,7 +79,7 @@ from research_memory_bridge import install as _install_research_memory_bridge
 _install_research_memory_bridge(_collector)
 
 # Freeze Entry/SL/TP geometry on new observations when existing ATLAS evidence
-# is sufficient. This wrapper is additive only and never changes decision fields.
+# is sufficient. Geometry is stored separately by exact Forward Observation ID.
 from trade_path_settlement import install_geometry_freezer as _install_trade_geometry_freezer
 _install_trade_geometry_freezer(_collector)
 
