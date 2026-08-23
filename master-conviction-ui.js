@@ -2,10 +2,17 @@
  const $=id=>document.getElementById(id); const fmt=v=>v==null?'—':Number(v).toFixed(0);
  function render(m){
    const badge=$('masterBadge'),grid=$('masterMetrics'),notes=$('masterNotes'); if(!badge||!grid||!m)return;
-   badge.textContent=`${m.score}/100 ${m.tier}`; badge.className=`pill ${m.tier==='HIGH'?'buy':m.tier==='MEDIUM'?'working':'neutral'}`;
+   const productDecision=/_CANDIDATE$/i.test(String(m.decision||''))?String(m.decision):'WAIT';
+   badge.textContent=`${productDecision} · ${m.score}/100 ${m.tier}`; badge.className=`pill ${m.tier==='HIGH'?'buy':m.tier==='MEDIUM'?'working':'neutral'}`;
    const c=m.components||{};
    const items=[['Master decision',m.decision],['Conviction',`${m.score}/100`],['Base',fmt(c.base)],['S/R + confluence',fmt(c.confluence)],['Volume',fmt(c.volume)],['Breakout/Breakdown',fmt(c.breakout_or_breakdown)],['Futures',fmt(c.futures)],['Liquidity',fmt(c.liquidity)],['Historical',fmt(c.historical)]];
    grid.innerHTML=items.map(([k,v])=>`<div><span>${k}</span><b>${v}</b></div>`).join('');
+   const productScore=$('apsConfidence');
+   if(productScore){
+     productScore.textContent=`${m.score}/100`;
+     const label=productScore.parentElement?.querySelector('.aps-label');
+     if(label) label.textContent='Setup score';
+   }
    if(notes){
      const ok=(m.confirmations||[]).join(' · ')||'None yet';
      const caution=(m.cautions||[]).join(' · ')||'None';
