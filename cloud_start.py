@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import os, runpy, shutil
+import os, runpy, shutil, urllib.parse
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent
@@ -40,8 +40,38 @@ for name in persistent_candidates:
     if source.exists() and not target.exists():
         shutil.copy2(source, target)
 
+# Production UI cache hardening.
+# Render exposes the commit SHA, giving every deploy unique critical script URLs.
+# This prevents Safari/WebKit from keeping a stale Product Shell or bootstrap.
+release_token = (os.environ.get("RENDER_GIT_COMMIT") or os.environ.get("ATLAS_RELEASE") or "atlas-v7").strip()
+release_token = "".join(c for c in release_token if c.isalnum() or c in "-_")[:40] or "atlas-v7"
+index_path = BASE / "index.html"
+if index_path.exists():
+    html = index_path.read_text(encoding="utf-8")
+    old_theme = '<script src="theme-toggle.js"></script>'
+    versioned = (
+        f'<script src="theme-toggle.js?v={release_token}"></script>\n'
+        f'  <script src="atlas-product-shell.js?v={release_token}"></script>'
+    )
+    if old_theme in html:
+        html = html.replace(old_theme, versioned, 1)
+        index_path.write_text(html, encoding="utf-8")
+
+# Force browsers to revalidate the UI after each production deploy. APIs remain
+# dynamic and are harmless under no-store as well.
+import collector_server as _collector
+_original_end_headers = _collector.Handler.end_headers
+
+def _production_no_cache_headers(self):
+    self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+    self.send_header("Pragma", "no-cache")
+    self.send_header("Expires", "0")
+    _original_end_headers(self)
+
+_collector.Handler.end_headers = _production_no_cache_headers
+
 # Production keeps the hardened free runtime, now with a separate research
 # sampling lane. Signal/alert thresholds remain unchanged.
 entrypoint = "atlas_research_runtime_server.py"
-print(f"ATLAS production boot: data={DATA_DIR} runtime=resilient-free-research")
+print(f"ATLAS production boot: data={DATA_DIR} runtime=resilient-free-research release={release_token}")
 runpy.run_path(str(BASE / entrypoint), run_name="__main__")
