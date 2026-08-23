@@ -5,10 +5,6 @@ from http.server import ThreadingHTTPServer
 import collector_server as atlas
 import research_memory_bridge
 
-# Activate the cloud-forward -> confluence-memory bridge as part of runtime
-# import/boot. atlas_research_runtime_server imports this module before it
-# starts the production workers, so every subsequently stored cloud-forward
-# research row is mirrored into the same memory used by Master Conviction.
 RESEARCH_MEMORY_BRIDGE_STATE = research_memory_bridge.install(atlas)
 
 _ORIGINAL_CAPTURE = atlas.capture
@@ -113,11 +109,6 @@ def _fresh_archived_snapshot(symbol,max_age_seconds=7200):
 
 
 def resilient_capture(symbol):
-    # Cloud Forward is a ranking/collection worker. During its universe-scoring
-    # phase, never block on a fresh derivatives request for every asset. Reuse
-    # already-collected derivatives context when fresh; otherwise let the base
-    # scorer continue in its existing spot-only path. The hourly Smart Money
-    # worker still performs the real provider capture independently.
     if getattr(_CLOUD_CONTEXT,'score_universe',False):
         cached=_fresh_archived_snapshot(symbol)
         if cached is not None:
@@ -183,6 +174,82 @@ def _supervise(name, target, restart_delay=5):
         time.sleep(restart_delay)
 
 
+def production_readiness_snapshot():
+    """One server-side source of truth for infrastructure and evidence gates."""
+    blockers=[]
+    storage=getattr(atlas,'STORAGE_HARDENING_STATE',{}) or {}
+    bridge=RESEARCH_MEMORY_BRIDGE_STATE
+    lane=CLOUD_RUNTIME_STATE.get('research_lane') or {}
+    coverage=lane.get('coverage_summary') or {}
+
+    try:
+        dq=atlas.data_quality_report()
+    except Exception as exc:
+        dq={'quality_score':0,'error':str(exc)}
+        blockers.append('DATA_QUALITY_UNAVAILABLE')
+
+    quality=float(dq.get('quality_score') or 0)
+    if quality < 90: blockers.append('DATA_QUALITY_LT_90')
+    if not os.access(str(atlas.DATA), os.W_OK): blockers.append('DATA_DIR_NOT_WRITABLE')
+    if not storage.get('enabled'): blockers.append('STORAGE_HARDENING_OFF')
+    elif not all(storage.get(k) for k in ('forward_write_locked','confluence_write_locked','event_write_locked')):
+        blockers.append('STORAGE_LOCK_INCOMPLETE')
+    if not bridge.get('enabled'): blockers.append('MEMORY_BRIDGE_OFF')
+    if int(bridge.get('mirror_errors') or 0) > 0: blockers.append('MEMORY_BRIDGE_ERRORS')
+    integrity=bridge.get('integrity') or {}
+    if not integrity.get('enabled'): blockers.append('INTEGRITY_GUARD_OFF')
+    if coverage and not coverage.get('complete'): blockers.append('ASSET_COVERAGE_INCOMPLETE')
+    if coverage.get('stale_assets'): blockers.append('ASSET_COVERAGE_STALE')
+    if lane.get('last_failed_symbols'): blockers.append('SCORING_FAILURES_LAST_CYCLE')
+
+    memory_by_asset={}
+    memory_total=0
+    matured_24=0
+    for symbol in atlas.ON_DEMAND_SYMBOLS:
+        try:
+            stats=atlas.confluence_memory_stats(symbol)
+        except Exception as exc:
+            stats={'symbol':symbol,'observations':0,'matured':{},'error':str(exc)}
+            blockers.append(f'MEMORY_STATS_ERROR_{symbol}')
+        memory_by_asset[symbol]=stats
+        memory_total += int(stats.get('observations') or 0)
+        matured_24 += int((stats.get('matured') or {}).get('24') or 0)
+
+    blockers=list(dict.fromkeys(blockers))
+    infra_ready=len(blockers)==0
+    evidence_status='COLLECTING'
+    if matured_24 >= 30: evidence_status='EARLY_RESEARCH'
+    if matured_24 >= 100 and infra_ready: evidence_status='VALIDATION_READY'
+
+    return {
+        'ok':True,
+        'boot_id':BOOT_ID,
+        'uptime_seconds':round(time.time()-RUNTIME_STARTED_AT,1),
+        'infrastructure':{'ready':infra_ready,'blockers':blockers},
+        'storage_hardening':storage,
+        'memory_bridge':bridge,
+        'coverage':coverage,
+        'data_quality':dq,
+        'pattern_memory':{
+            'observations':memory_total,
+            'matured_24h':matured_24,
+            'by_asset':memory_by_asset,
+        },
+        'evidence':{
+            'status':evidence_status,
+            'early_research_target':30,
+            'validation_target':100,
+            'remaining_to_30':max(0,30-matured_24),
+            'remaining_to_100':max(0,100-matured_24),
+        },
+        'ready_for_validation':bool(infra_ready and matured_24>=100),
+        'ready_for_live_execution':False,
+        'live_execution_blocker':'RESEARCH_ONLY_NOT_VALIDATED',
+        'research_only':True,
+        'live_execution':False,
+    }
+
+
 class RuntimeHandler(atlas.Handler):
     def do_GET(self):
         u=urllib.parse.urlparse(self.path)
@@ -198,10 +265,13 @@ class RuntimeHandler(atlas.Handler):
                 'cloud_forward':atlas.CLOUD_FORWARD_STATE,
                 'cloud_runtime':CLOUD_RUNTIME_STATE,
                 'research_memory_bridge':RESEARCH_MEMORY_BRIDGE_STATE,
+                'storage_hardening':getattr(atlas,'STORAGE_HARDENING_STATE',{}),
                 'market_data':atlas.MARKET_DATA_STATE,
                 'research_only':True,
                 'live_execution':False,
             })
+        if u.path=='/api/production/readiness':
+            return self._json(production_readiness_snapshot())
         return super().do_GET()
 
 
@@ -214,9 +284,6 @@ class AtlasHTTPServer(ThreadingHTTPServer):
 if __name__=='__main__':
     os.chdir(atlas.ROOT)
     port=int(os.environ.get('PORT','8080'))
-
-    # Bind the web listener before starting any external-data worker. This keeps
-    # Render health checks independent from Binance/Bybit/Kraken/news latency.
     server=AtlasHTTPServer(('0.0.0.0',port),RuntimeHandler)
 
     for name,target in (
