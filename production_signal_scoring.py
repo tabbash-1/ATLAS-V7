@@ -1,15 +1,16 @@
-"""ATLAS production signal scoring v2.
+"""ATLAS production signal scoring v3.
 
-Replaces the all-or-nothing EMA/RSI directional gate used by cloud_score_symbol
-with a graded four-vote direction model. The existing cloud-forward threshold,
-research lane, alert thresholds, and live-execution safeguards remain unchanged.
+Keeps the graded four-vote production decision model and adds exact score
+attribution so every candidate can explain why it qualified or remained WAIT.
+The cloud-forward threshold, alert thresholds, research lane and live-execution
+safeguards remain unchanged.
 """
 
-VERSION = "PROD_SIGNAL_SCORING_V2"
+VERSION = "PROD_SIGNAL_SCORING_V3"
 
 
 def install(atlas):
-    def cloud_score_symbol_v2(symbol, btc_ks):
+    def cloud_score_symbol_v3(symbol, btc_ks):
         ks = atlas._spot_klines(symbol)
         if len(ks) < 100:
             return None
@@ -36,8 +37,6 @@ def install(atlas):
             return None
         direction = 'LONG' if long_votes > short_votes else 'SHORT'
         votes = long_votes if direction == 'LONG' else short_votes
-        trend_up = direction == 'LONG'
-        trend_down = direction == 'SHORT'
 
         snap = None
         futures_available = False
@@ -56,30 +55,67 @@ def install(atlas):
         taker = atlas.fnum(snap.get('taker_ratio'), 1) if futures_available else 1
         book = atlas.fnum(snap.get('orderbook_imbalance'), 0) if futures_available else 0
 
-        # Keep the production threshold at 68. Calibrate the score so a coherent
-        # 4/4 price trend can reach the signal lane without requiring derivatives
-        # data or abnormal volume, while a weaker 3/4 trend still needs confirmation.
-        base = 60 + (8 if votes == 4 else 4)
-        base += min(10, max(0, (rv - 1) * 10))
-        if (direction == 'LONG' and rel >= 60) or (direction == 'SHORT' and rel <= 40):
-            base += 6
-        elif (direction == 'LONG' and rel <= 35) or (direction == 'SHORT' and rel >= 65):
-            base -= 5
+        # Exact additive score attribution. Weak volume is not a penalty in this
+        # model; it simply earns no positive volume bonus.
+        trend_base = 60 + (8 if votes == 4 else 4)
+        volume_bonus = min(10, max(0, (rv - 1) * 10))
 
+        relative_strength_adjustment = 0
+        relative_strength_reason = 'NEUTRAL'
+        if (direction == 'LONG' and rel >= 60) or (direction == 'SHORT' and rel <= 40):
+            relative_strength_adjustment = 6
+            relative_strength_reason = 'ALIGNED_STRONG'
+        elif (direction == 'LONG' and rel <= 35) or (direction == 'SHORT' and rel >= 65):
+            relative_strength_adjustment = -5
+            relative_strength_reason = 'OPPOSED_STRONG'
+
+        futures_adjustment = 0
+        futures_reason = 'NOT_AVAILABLE'
         if futures_available:
             aligned = (direction == 'LONG' and fscore > 0) or (direction == 'SHORT' and fscore < 0)
-            base += min(8, abs(fscore) * .10) if aligned else -min(8, abs(fscore) * .10)
+            magnitude = min(8, abs(fscore) * .10)
+            futures_adjustment = magnitude if aligned else -magnitude
+            futures_reason = 'ALIGNED' if aligned else 'OPPOSED'
 
         obstacle = rd if direction == 'LONG' else sd
+        obstacle_adjustment = 0
+        obstacle_reason = 'NO_OBSTACLE_DATA'
         if obstacle is not None:
             if obstacle < .7:
-                base -= 8
+                obstacle_adjustment = -8
+                obstacle_reason = 'VERY_CLOSE'
             elif obstacle < 1.4:
-                base -= 4
+                obstacle_adjustment = -4
+                obstacle_reason = 'CLOSE'
             elif obstacle > 2.5:
-                base += 3
+                obstacle_adjustment = 3
+                obstacle_reason = 'CLEAR_SPACE'
+            else:
+                obstacle_reason = 'ACCEPTABLE'
 
-        score = round(max(0, min(100, base)))
+        raw_score = (
+            trend_base
+            + volume_bonus
+            + relative_strength_adjustment
+            + futures_adjustment
+            + obstacle_adjustment
+        )
+        score = round(max(0, min(100, raw_score)))
+
+        attribution = {
+            'trend_base': round(trend_base, 3),
+            'volume_bonus': round(volume_bonus, 3),
+            'relative_strength_adjustment': round(relative_strength_adjustment, 3),
+            'relative_strength_reason': relative_strength_reason,
+            'futures_adjustment': round(futures_adjustment, 3),
+            'futures_reason': futures_reason,
+            'obstacle_adjustment': round(obstacle_adjustment, 3),
+            'obstacle_reason': obstacle_reason,
+            'obstacle_distance_pct': round(obstacle, 3) if obstacle is not None else None,
+            'raw_score': round(raw_score, 3),
+            'final_score': score,
+            'formula': 'trend_base + volume_bonus + relative_strength_adjustment + futures_adjustment + obstacle_adjustment',
+        }
 
         if direction == 'LONG' and oi >= 3 and funding >= .00035 and rv < 1 and rd is not None and rd <= 2:
             pb = 'LEVERAGE_TRAP_LONG_RISK'
@@ -125,9 +161,10 @@ def install(atlas):
             'direction_votes_long': long_votes,
             'direction_votes_short': short_votes,
             'momentum_24h_pct': round(mom24, 3),
+            'score_attribution': attribution,
             'scoring_version': VERSION,
             'auto_source': 'CLOUD_FORWARD_ALPHA18', 'dedup_minutes': 50,
         }
 
-    atlas.cloud_score_symbol = cloud_score_symbol_v2
+    atlas.cloud_score_symbol = cloud_score_symbol_v3
     return atlas.cloud_score_symbol
