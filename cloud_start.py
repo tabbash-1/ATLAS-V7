@@ -70,6 +70,14 @@ def _production_no_cache_headers(self):
 
 _collector.Handler.end_headers = _production_no_cache_headers
 
+# Bridge newly stored cloud-forward research observations into the confluence
+# memory used by Master Conviction historical similarity. This fixes the old
+# split where the cloud collector could grow while historical evidence stayed
+# at n=0 unless a user manually pressed Analyze. The bridge is fail-open and
+# cannot change scores, thresholds, alerts, or execution behavior.
+from research_memory_bridge import install as _install_research_memory_bridge
+_install_research_memory_bridge(_collector)
+
 # Production keeps the hardened free runtime, now with a separate research
 # sampling lane. Signal/alert thresholds remain unchanged.
 entrypoint = "atlas_research_runtime_server.py"
