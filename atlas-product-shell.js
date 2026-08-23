@@ -13,36 +13,36 @@
   const pretty=v=>{const s=humanize(v);return !s||s==='—'?'Not available on this analysis':s};
   function decision(){const m=text('masterBadge',''),s=text('signalState','WAIT'),r=(m&&!/WAITING|CHECKING|ARMING|READY/.test(m.toUpperCase()))?m:s,u=r.toUpperCase();return /LONG|BUY/.test(u)?'LONG':/SHORT|SELL/.test(u)?'SHORT':'WAIT'}
   function pairs(id){const r=$(id);if(!r)return[];return[...r.querySelectorAll(':scope > div')].map(d=>[d.querySelector('span')?.textContent?.trim(),d.querySelector('b')?.textContent?.trim()]).filter(x=>x[0]&&x[1]&&!/^(—|WAITING|READY|PENDING)$/i.test(x[1]))}
-  function cleanMasterNotes(raw){
-    let s=compact(raw,320);
-    if(!s||/Waiting for a live analysis/i.test(s)) return '';
-    s=s.replace(/Confirmations:\s*/i,'Confirmations: ').replace(/Cautions:\s*/i,' · Cautions: ').replace(/Blockers:\s*/i,' · Blockers: ');
-    s=s.replace(/([a-z0-9)])(Cautions:|Blockers:)/gi,'$1 · $2');
-    return humanize(s);
-  }
+  function cleanMasterNotes(raw){let s=compact(raw,320);if(!s||/Waiting for a live analysis/i.test(s)) return '';s=s.replace(/Confirmations:\s*/i,'Confirmations: ').replace(/Cautions:\s*/i,' · Cautions: ').replace(/Blockers:\s*/i,' · Blockers: ');s=s.replace(/([a-z0-9)])(Cautions:|Blockers:)/gi,'$1 · $2');return humanize(s)}
   function why(d){const m=cleanMasterNotes(text('masterNotes',''));if(m)return m;const p=pairs('confluenceMetrics').slice(0,4);return p.length?p.map(([k,v])=>`${humanize(k)}: ${humanize(v)}`).join(' · '):d==='WAIT'?'Strict directional confirmation is not complete.':'Directional confirmation is active.'}
   function risks(){const b=[],r=text('cmdRiskValue','—'),dr=text('cmdDriftValue','—'),l=text('liquidityNotes','');if(r!=='—')b.push('Portfolio risk: '+humanize(r));if(dr!=='—')b.push('Edge/drift: '+humanize(dr));if(l&&!/Waiting/i.test(l)&&!/NOT_YET_CAPTURED/i.test(l))b.push(humanize(compact(l)));if(/NOT_YET_CAPTURED|NOT_READY/i.test(l))b.push('Liquidity levels are not available yet');return b.join(' · ')||'No live risk context yet.'}
   function changes(d){const g=pairs('confluenceMetrics').find(x=>/gate reason/i.test(x[0]));if(g)return 'Missing confirmation: '+humanize(g[1]);return d==='WAIT'?`Need stronger alignment across trend (${pretty(text('trendState',''))}), momentum (${pretty(text('momentumState',''))}), volume (${pretty(text('volumeState',''))}) and structure (${pretty(text('structureState',''))}).`:'Invalidation occurs if structure, momentum, liquidity or risk alignment breaks.'}
   function syncTf(){const s=$('intervalSelect'),d=$('apsTimeframe');if(!s||!d)return;if(!d.options.length){[...s.options].forEach(o=>d.add(new Option(o.textContent,o.value)));d.onchange=()=>{s.value=d.value;s.dispatchEvent(new Event('change',{bubbles:true}))}}d.value=s.value}
+  function liveRegime(){
+    const candles=window.ATLAS_LATEST_CANDLES;
+    if(!Array.isArray(candles)||candles.length<80||typeof detectMarketRegime!=='function') return null;
+    try{const r=detectMarketRegime(candles);window.ATLAS_LATEST_REGIME=r;return r}catch(_){return null}
+  }
   function resolveRegime(){
-    const direct=text('cmdRegimeValue','');
-    if(direct&&direct!=='—') return humanize(direct);
-    const rg=document.querySelector('#regimeGrid b');
-    const val=(rg?.textContent||'').trim();
-    if(val&&val!=='—') return humanize(val);
+    const live=liveRegime();
+    if(live?.regime){const vol=live.volatility?` · ${humanize(live.volatility)} volatility`:'';return `${humanize(live.regime)}${vol}`;}
+    const direct=text('cmdRegimeValue','');if(direct&&direct!=='—') return humanize(direct);
+    const rg=document.querySelector('#regimeGrid b');const val=(rg?.textContent||'').trim();if(val&&val!=='—') return humanize(val);
     return 'Not classified on this analysis';
   }
-  function liquiditySummary(){
-    const liq=text('liquidityNotes','');
-    const sm=text('smartMoneyNotes',text('smartMoneyState',''));
-    const out=[];
-    if(liq&&!/Waiting/i.test(liq)&&!/NOT_YET_CAPTURED/i.test(liq)) out.push(humanize(compact(liq)));
-    else if(/NOT_YET_CAPTURED|NOT_READY/i.test(liq)) out.push('Liquidity levels not captured yet');
-    if(sm&&!/Waiting/i.test(sm)&&sm!=='—') out.push(humanize(compact(sm)));
-    return out.join(' · ')||'No Smart Money confirmation available on this run';
-  }
+  function liquiditySummary(){const liq=text('liquidityNotes','');const sm=text('smartMoneyNotes',text('smartMoneyState',''));const out=[];if(liq&&!/Waiting/i.test(liq)&&!/NOT_YET_CAPTURED/i.test(liq)) out.push(humanize(compact(liq)));else if(/NOT_YET_CAPTURED|NOT_READY/i.test(liq)) out.push('Liquidity levels not captured yet');if(sm&&!/Waiting/i.test(sm)&&sm!=='—') out.push(humanize(compact(sm));return out.join(' · ')||'No Smart Money confirmation available on this run'}
   function update(){syncTf();const d=decision(),de=$('apsDecision');de.textContent=d;de.className='aps-value '+d.toLowerCase();$('apsAsset').textContent=text('activeTitle','Current asset');$('apsConfidence').textContent=text('confidence','—');const w=d==='WAIT';['apsEntryCard','apsStopCard','apsTargetCard'].forEach(id=>$(id)?.classList.toggle('aps-wait-geometry',w));$('apsEntry').textContent=w?'—':text('entry');$('apsStop').textContent=w?'—':text('stop');$('apsTarget').textContent=w?'—':`${text('target')}${text('rr')!=='—'?' · '+text('rr'):''}`;$('apsRegime').textContent=resolveRegime();$('apsTrend').textContent=pretty(text('trendState',''));$('apsMomentum').textContent=pretty(text('momentumState',''));$('apsVolume').textContent=pretty(text('volumeState',''));$('apsStructure').textContent=pretty(text('structureState',''));$('apsLiquidity').textContent=liquiditySummary();$('apsWhy').textContent=why(d);$('apsRisks').textContent=risks();$('apsChanges').textContent=changes(d);const b=$('analyzeBtn');$('apsAnalyze').disabled=!!b?.disabled;$('apsStatus').textContent=b?.disabled?'Analysis running… · existing engines preserved':w?'WAIT = no executable trade plan · existing engines preserved':'Full analysis ready · existing engines preserved';$('apsAdvanced').textContent=document.body.classList.contains('atlas-advanced-open')?'Hide Advanced':'Advanced Research'}
-  $('apsAnalyze').onclick=()=>$('analyzeBtn')?.click();$('apsTheme').onclick=()=>$('themeToggleBtn')?.click();$('apsAdvanced').onclick=()=>{document.body.classList.toggle('atlas-advanced-open');update()};
+  async function refreshContextAfterAnalyze(){
+    for(let i=0;i<40;i++){
+      await new Promise(r=>setTimeout(r,250));
+      if(text('engineBadge','').toUpperCase()==='ANALYZED') break;
+    }
+    liveRegime();
+    try{if(window.refreshFuturesIntelligence) await window.refreshFuturesIntelligence(window.ATLAS_LATEST_CONFLUENCE||null)}catch(e){console.warn('ATLAS context refresh',e)}
+    if(window.refreshLiquidityIntelligence) window.refreshLiquidityIntelligence(window.ATLAS_LATEST_CONFLUENCE||null);
+    update();
+  }
+  $('apsAnalyze').onclick=()=>{$('analyzeBtn')?.click();refreshContextAfterAnalyze()};$('apsTheme').onclick=()=>$('themeToggleBtn')?.click();$('apsAdvanced').onclick=()=>{document.body.classList.toggle('atlas-advanced-open');update()};
   function crypto(){document.querySelectorAll('#watchlist .watch-item').forEach(i=>{const s=(i.querySelector('.watch-symbol')?.textContent||'').toUpperCase(),t=(i.querySelector('.class-tag')?.textContent||'').toUpperCase();i.classList.toggle('aps-hidden-noncrypto',t&&t!=='CRYPTO'&&!/USDT|BTC|ETH|SOL|XRP|BNB|DOGE|ZEC/.test(s))})}
   let p=false;new MutationObserver(()=>{if(p)return;p=true;requestAnimationFrame(()=>{p=false;crypto();update()})}).observe(document.body,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['disabled','class','value']});crypto();update();window.ATLAS_PRODUCT_SHELL={refresh:update};
 })();
