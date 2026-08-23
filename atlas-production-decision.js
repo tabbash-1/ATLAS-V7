@@ -1,15 +1,27 @@
 (function(){
-  const VERSION='ATLAS_PRODUCTION_DECISION_UI_V2';
+  const VERSION='ATLAS_PRODUCTION_DECISION_UI_V3';
   const SUPPORTED=new Set(['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT']);
 
   function symbolOf(asset){
     return String(asset?.symbol||'').toUpperCase().replace('BINANCE:','').replace(/[^A-Z0-9]/g,'');
   }
 
+  function signed(v){
+    const n=Number(v||0);
+    return `${n>=0?'+':''}${Number.isInteger(n)?n:n.toFixed(1)}`;
+  }
+
+  function attributionText(d){
+    const a=d?.score_attribution;
+    if(!a) return '';
+    return `base ${a.trend_base} · vol ${signed(a.volume_bonus)} · RS ${signed(a.relative_strength_adjustment)} · futures ${signed(a.futures_adjustment)} · obstacle ${signed(a.obstacle_adjustment)} = ${a.final_score}`;
+  }
+
   function mapDecision(d,base={}){
     const signal=d.decision==='LONG'?'BUY':d.decision==='SHORT'?'SELL':'WAIT';
     const candidate=d.candidate_direction||'NONE';
     const reason=d.wait_reason||'SIGNAL_QUALIFIED';
+    const attr=attributionText(d);
     return {
       ...base,
       signal,
@@ -25,7 +37,7 @@
         trend:d.regime||candidate,
         momentum:`Votes L${d.direction_votes_long}/S${d.direction_votes_short}`,
         volume:d.relative_volume==null?(base.engine?.volume||'—'):`RV ${Number(d.relative_volume).toFixed(2)}`,
-        structure:signal==='WAIT'?reason:(d.playbook||'SIGNAL_QUALIFIED')
+        structure:signal==='WAIT'?(attr?`${reason} · ${attr}`:reason):(d.playbook||'SIGNAL_QUALIFIED')
       },
       indicators:{...(base.indicators||{}),...(d.indicators||{})},
       production_decision:d
@@ -70,9 +82,10 @@
       if(window.refreshTradeManagement) setTimeout(()=>window.refreshTradeManagement(result,state.liveResults[key].confluence),30);
 
       if(label){
+        const attr=attributionText(data);
         const detail=data.decision==='WAIT'
-          ? `WAIT verified · ${data.wait_reason} · candidate ${data.candidate_direction||'none'} · score ${data.score??'—'}/${data.signal_threshold}`
-          : `${data.decision} verified · score ${data.score}/${data.signal_threshold} · ${data.playbook||'production signal'}`;
+          ? `WAIT verified · ${data.wait_reason} · candidate ${data.candidate_direction||'none'} · score ${data.score??'—'}/${data.signal_threshold}${attr?` · ${attr}`:''}`
+          : `${data.decision} verified · score ${data.score}/${data.signal_threshold} · ${data.playbook||'production signal'}${attr?` · ${attr}`:''}`;
         label.textContent=`ATLAS Production · ${detail}`;
       }
       if(window.setPill&&badge) window.setPill(badge,'VERIFIED',data.decision==='WAIT'?'neutral':'buy');
@@ -89,20 +102,17 @@
 
   function install(){
     const btn=document.getElementById('analyzeBtn');
-    if(!btn||btn.dataset.productionDecisionInstalled==='2') return;
+    if(!btn||btn.dataset.productionDecisionInstalled==='3') return;
     const original=btn.onclick;
-    btn.dataset.productionDecisionInstalled='2';
+    btn.dataset.productionDecisionInstalled='3';
 
     btn.onclick=async function(ev){
       const state=window.ATLAS_APP_STATE;
       const asset=state?.assets?.[state.active];
 
-      // Always preserve the original full analysis pipeline first: candles,
-      // confluence, anomaly, trade management, master conviction, memory writes.
       if(typeof original==='function') await original.call(this,ev);
       else if(typeof window.analyzeActive==='function') await window.analyzeActive();
 
-      // Production only verifies/overrides the final decision card for supported crypto.
       if(SUPPORTED.has(symbolOf(asset))) await productionVerify();
     };
 
