@@ -22,7 +22,7 @@ jobs:
           node-version: '22'
       - name: Python syntax
         run: |
-          python -m py_compile collector_server.py cloud_start.py atlas_runtime_server.py atlas_research_runtime_server.py atlas_ai_server.py research_memory_bridge.py research_coverage.py tests/test_ai_validation.py tests/test_research_memory_bridge.py tests/test_research_coverage.py
+          python -m py_compile collector_server.py cloud_start.py atlas_runtime_server.py atlas_research_runtime_server.py atlas_ai_server.py research_memory_bridge.py research_coverage.py storage_hardening.py tests/test_ai_validation.py tests/test_research_memory_bridge.py tests/test_research_coverage.py tests/test_storage_hardening.py
       - name: JavaScript syntax
         run: |
           set -e
@@ -35,6 +35,7 @@ jobs:
           python tests/test_ai_validation.py
           PYTHONPATH=. python tests/test_research_memory_bridge.py
           PYTHONPATH=. python tests/test_research_coverage.py
+          PYTHONPATH=. python tests/test_storage_hardening.py
       - name: Verify production entrypoints
         run: |
           grep -q 'cloud_start.py' Procfile
@@ -43,15 +44,22 @@ jobs:
           grep -q 'mountPath: /var/data' render.yaml
           ! grep -q 'OPENAI_API_KEY' render.yaml
           grep -q 'atlas_research_runtime_server.py' cloud_start.py
+          grep -q '_install_storage_hardening' cloud_start.py
       - name: Verify resilient provider chain and safety invariants
         run: |
           grep -q 'KRAKEN_FUTURES_PUBLIC' atlas_runtime_server.py
           grep -q 'futures.kraken.com' atlas_runtime_server.py
           grep -q 'Binance USD-M -> Bybit -> Kraken Futures' atlas_runtime_server.py
           grep -q '/api/runtime/status' atlas_runtime_server.py
+          grep -q '/api/production/readiness' atlas_runtime_server.py
+          grep -q 'ready_for_live_execution.*False' atlas_runtime_server.py
           grep -q 'request_queue_size=128' atlas_runtime_server.py
           grep -q 'research_memory_bridge.install(atlas)' atlas_runtime_server.py
           grep -q "'research_memory_bridge':RESEARCH_MEMORY_BRIDGE_STATE" atlas_runtime_server.py
+          grep -q "'storage_hardening':getattr" atlas_runtime_server.py
+          grep -q 'forward_observation_id' research_memory_bridge.py
+          grep -q 'EXACT_ID' research_memory_bridge.py
+          grep -q 'mirror_deduped' research_memory_bridge.py
           grep -q 'CLOUD_FORWARD_RESEARCH_SAMPLE' atlas_research_runtime_server.py
           grep -q 'CLOUD_FORWARD_SHADOW_DIRECTION_RESEARCH' atlas_research_runtime_server.py
           grep -q 'SHADOW_DIRECTIONAL_PROXY' atlas_research_runtime_server.py
@@ -121,10 +129,12 @@ jobs:
           curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"research_lane"'
           curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"coverage_summary"'
           curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"research_memory_bridge"'
-          curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"enabled": true'
+          curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"storage_hardening"'
+          curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"forward_write_locked": true'
           curl --fail --silent http://127.0.0.1:18080/production-status.html | grep -q 'Research Progress'
           curl --fail --silent http://127.0.0.1:18080/api/smart-money/status | grep -q '"online": true'
           curl --fail --silent http://127.0.0.1:18080/api/system/readiness | grep -q '"persistent_data_dir": "/tmp/atlas-ci-data"'
+          curl --fail --silent http://127.0.0.1:18080/api/production/readiness | grep -q '"ready_for_live_execution": false'
           test -f "$ATLAS_DATA_DIR/$legacy_file"
           curl --fail --silent http://127.0.0.1:18080/api/data-quality | grep -q '"forward_rows": 1'
 
@@ -136,9 +146,11 @@ jobs:
           curl --fail --silent http://127.0.0.1:18080/api/data-quality | grep -q '"forward_rows": 2'
           curl --fail --silent 'http://127.0.0.1:18080/api/confluence/memory-stats?symbol=BTCUSDT' | grep -q '"observations": 1'
           curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"mirrored": 1'
+          grep -q '"forward_observation_id"' "$ATLAS_DATA_DIR/confluence_memory.jsonl"
 
           stop_server
           start_server
           curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"ok": true'
           curl --fail --silent http://127.0.0.1:18080/api/data-quality | grep -q '"forward_rows": 2'
           curl --fail --silent 'http://127.0.0.1:18080/api/confluence/memory-stats?symbol=BTCUSDT' | grep -q '"observations": 1'
+          grep -q '"forward_observation_id"' "$ATLAS_DATA_DIR/confluence_memory.jsonl"
