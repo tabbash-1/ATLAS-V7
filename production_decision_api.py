@@ -1,10 +1,11 @@
 """Single source of truth for the ATLAS browser decision card.
 
 Exposes the same production cloud scorer used by the research runtime and
-normalizes it into LONG / SHORT / WAIT with explicit WAIT diagnostics.
+normalizes it into LONG / SHORT / WAIT with explicit WAIT diagnostics and
+score attribution.
 """
 
-VERSION = "PRODUCTION_DECISION_API_V1"
+VERSION = "PRODUCTION_DECISION_API_V2"
 
 
 def install(atlas):
@@ -79,6 +80,8 @@ def install(atlas):
             'wait_reason': None if qualified else reason,
             'score': score,
             'signal_threshold': threshold,
+            'score_gap_to_signal': round(threshold - score, 3) if score is not None and score < threshold else 0,
+            'score_attribution': (row or {}).get('score_attribution') if isinstance(row, dict) else None,
             'entry': px,
             'stop_loss': stop,
             'take_profit': target,
