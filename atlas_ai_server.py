@@ -126,6 +126,9 @@ def _directional_return(row,horizon):
     if v is None:return None
     return v if row.get('direction')=='LONG' else -v
 
+def _sample_status(n):
+    return 'ROBUSTNESS' if n>=200 else 'VALIDATION' if n>=100 else 'EARLY' if n>=30 else 'SMALL_SAMPLE'
+
 def ai_attribution(symbol=None,horizon=24,min_n=5):
     rows=[r for r in atlas.forward_rows(symbol) if str(r.get('auto_source') or '').startswith('ATLAS_AI')]
     matured=[]
@@ -150,6 +153,30 @@ def ai_attribution(symbol=None,horizon=24,min_n=5):
     weakest=sorted(factors,key=lambda x:(x.get('delta_vs_baseline_avg_pct') if x.get('delta_vs_baseline_avg_pct') is not None else 999))[:8]
     return {'symbol':symbol,'horizon_h':horizon,'observations':len(rows),'matured':len(matured),'minimum_group_n':min_n,'baseline':base,'factors':factors,'strongest_associations':strongest,'weakest_associations':weakest,'method':'frozen decision-context tags grouped against directional forward returns; descriptive association only','research_only':True,'live_execution':False}
 
+def ai_edge_breakdown(symbol=None,horizon=24):
+    rows=[r for r in atlas.forward_rows(symbol) if str(r.get('auto_source') or '').startswith('ATLAS_AI')]
+    matured=[]
+    for r in rows:
+        dr=_directional_return(r,horizon)
+        if dr is not None:matured.append((r,dr))
+    def grouped(keyfn):
+        groups={}
+        for r,dr in matured:
+            k=str(keyfn(r) or 'UNKNOWN').strip() or 'UNKNOWN'
+            groups.setdefault(k,[]).append(dr)
+        out=[]
+        for k,vals in groups.items():
+            m=atlas._seq_metrics(vals)
+            out.append({'group':k,'sample_status':_sample_status(len(vals)),**m})
+        out.sort(key=lambda x:(x.get('n',0),x.get('avg_return_pct') if x.get('avg_return_pct') is not None else -999),reverse=True)
+        return out
+    return {'symbol':symbol,'horizon_h':horizon,'matured':len(matured),
+            'by_direction':grouped(lambda r:r.get('direction')),
+            'by_regime':grouped(lambda r:r.get('regime')),
+            'sample_guard':{'small_sample_lt':30,'validation_ready_gte':100,'robustness_gte':200},
+            'method':'AI-only directional forward returns grouped by frozen direction/regime at observation time',
+            'research_only':True,'live_execution':False}
+
 class Handler(atlas.Handler):
     def do_GET(self):
         u=urllib.parse.urlparse(self.path)
@@ -165,6 +192,10 @@ class Handler(atlas.Handler):
         if u.path=='/api/ai/attribution':
             q=urllib.parse.parse_qs(u.query); sym=q.get('symbol',[None])[0]; horizon=int(q.get('horizon',['24'])[0]); min_n=max(2,int(q.get('min_n',['5'])[0]))
             return self._json(ai_attribution(sym,horizon,min_n))
+        if u.path=='/api/ai/edge-breakdown':
+            q=urllib.parse.parse_qs(u.query); sym=q.get('symbol',[None])[0]; horizon=int(q.get('horizon',['24'])[0])
+            if horizon not in atlas.HORIZONS:return self._json({'ok':False,'error':'unsupported horizon'},400)
+            return self._json(ai_edge_breakdown(sym,horizon))
         return super().do_GET()
 
     def do_POST(self):
