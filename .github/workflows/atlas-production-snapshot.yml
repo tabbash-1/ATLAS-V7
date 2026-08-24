@@ -7,6 +7,7 @@ on:
       - '.github/workflows/atlas-production-snapshot.yml'
       - 'production_signal_scoring.py'
       - 'production_decision_api.py'
+      - 'ai_trade_council.py'
       - 'hype_market_data.py'
       - 'cloud_start.py'
       - 'atlas_runtime_server.py'
@@ -28,7 +29,6 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-
       - name: Collect Production state safely
         shell: bash
         env:
@@ -36,88 +36,61 @@ jobs:
         run: |
           set -u
           mkdir -p status/raw status/history
-
           fetch_json() {
             name="$1"; path="$2"; out="status/raw/${name}.json"; url="${BASE_URL}${path}"
             code="$(curl -L --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 20 --max-time 120 -sS -w '%{http_code}' -o "${out}.tmp" "$url" || true)"
-            if [[ "$code" =~ ^2 ]] && jq -e . "${out}.tmp" >/dev/null 2>&1; then
-              mv "${out}.tmp" "$out"; return 0
-            fi
+            if [[ "$code" =~ ^2 ]] && jq -e . "${out}.tmp" >/dev/null 2>&1; then mv "${out}.tmp" "$out"; return 0; fi
             python3 - "$url" "$code" "${out}.tmp" "$out" <<'PY'
           import json,pathlib,sys
-          url,code,tmp,out=sys.argv[1:]
-          p=pathlib.Path(tmp); body=p.read_text(errors='replace')[:600] if p.exists() else ''
+          url,code,tmp,out=sys.argv[1:]; p=pathlib.Path(tmp); body=p.read_text(errors='replace')[:600] if p.exists() else ''
           if p.exists(): p.unlink()
           pathlib.Path(out).write_text(json.dumps({'ok':False,'url':url,'http_code':code,'error':'fetch_failed_or_non_json','body_preview':body},indent=2))
           PY
             return 1
           }
-
-          fetch_json runtime /api/runtime/status || true
-          sleep 5
-          fetch_json readiness /api/production/readiness || true
-          sleep 5
-          fetch_json outcomes /api/outcomes/summary || true
-          sleep 5
-          fetch_json geometry /api/outcomes/geometry-status || true
-
+          fetch_json runtime /api/runtime/status || true; sleep 5
+          fetch_json readiness /api/production/readiness || true; sleep 5
+          fetch_json outcomes /api/outcomes/summary || true; sleep 5
+          fetch_json geometry /api/outcomes/geometry-status || true; sleep 5
+          fetch_json ai_status /api/ai/council/status || true
           for s in BTCUSDT ETHUSDT SOLUSDT XRPUSDT BNBUSDT DOGEUSDT ZECUSDT HYPEUSDT; do
-            sleep 6
-            fetch_json "decision_${s}" "/api/decision/current?symbol=${s}" || true
+            sleep 6; fetch_json "decision_${s}" "/api/decision/current?symbol=${s}" || true
+            sleep 4; fetch_json "ai_${s}" "/api/ai/council?symbol=${s}" || true
           done
-
           python3 - <<'PY'
           import json,pathlib,datetime
           root=pathlib.Path('status/raw')
           def load(name):
               p=root/f'{name}.json'
               if not p.exists(): return {'ok':False,'error':'missing_snapshot'}
-              try: return json.loads(p.read_text())
-              except Exception as e: return {'ok':False,'error':f'invalid_json:{e}'}
+              try:return json.loads(p.read_text())
+              except Exception as e:return {'ok':False,'error':f'invalid_json:{e}'}
           symbols=['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT','HYPEUSDT']
-          decisions={s:load('decision_'+s) for s in symbols}
-          qualified=[]; waits=[]; failures=[]
+          decisions={s:load('decision_'+s) for s in symbols}; councils={s:load('ai_'+s) for s in symbols}
+          qualified=[]; waits=[]; failures=[]; ai_actions=[]; ai_failures=[]
           for s,d in decisions.items():
-              if not d.get('ok'):
-                  failures.append({'symbol':s,'error':d.get('error'),'http_code':d.get('http_code')})
-              elif d.get('signal_qualified'):
-                  qualified.append({'symbol':s,'decision':d.get('decision'),'score':d.get('score'),'threshold':d.get('signal_threshold'),'rr':d.get('risk_reward'),'playbook':d.get('playbook'),'generated_at':d.get('generated_at')})
-              else:
-                  waits.append({'symbol':s,'candidate':d.get('candidate_direction'),'score':d.get('score'),'threshold':d.get('signal_threshold'),'reason':d.get('wait_reason'),'score_gap_to_signal':d.get('score_gap_to_signal'),'score_attribution':d.get('score_attribution')})
+              if not d.get('ok'): failures.append({'symbol':s,'error':d.get('error'),'http_code':d.get('http_code')})
+              elif d.get('signal_qualified'): qualified.append({'symbol':s,'decision':d.get('decision'),'score':d.get('score'),'threshold':d.get('signal_threshold'),'rr':d.get('risk_reward'),'playbook':d.get('playbook'),'generated_at':d.get('generated_at')})
+              else: waits.append({'symbol':s,'candidate':d.get('candidate_direction'),'score':d.get('score'),'threshold':d.get('signal_threshold'),'reason':d.get('wait_reason'),'score_gap_to_signal':d.get('score_gap_to_signal'),'score_attribution':d.get('score_attribution')})
+          for s,a in councils.items():
+              if a.get('error') or a.get('ok') is False: ai_failures.append({'symbol':s,'error':a.get('error'),'http_code':a.get('http_code')})
+              else: ai_actions.append({'symbol':s,'direction':a.get('direction'),'verdict':a.get('verdict'),'confidence':a.get('confidence'),'reason':a.get('reason'),'production_decision':a.get('production_decision'),'production_score':a.get('production_score'),'judge':a.get('judge')})
           captured=datetime.datetime.now(datetime.timezone.utc)
-          summary={
-              'schema':'ATLAS_PRODUCTION_SNAPSHOT_V5_WAIT_OUTCOMES',
-              'captured_at':captured.isoformat(),
-              'source':'https://atlas-v7.onrender.com',
-              'monitor_mode':'PACED_PER_SYMBOL_READ_ONLY',
-              'runtime':load('runtime'),'readiness':load('readiness'),'outcomes':load('outcomes'),'geometry_status':load('geometry'),
-              'decisions':decisions,
-              'decision_summary':{'supported_assets':symbols,'qualified_count':len(qualified),'qualified':qualified,'wait_count':len(waits),'waits':waits,'failed_count':len(failures),'failures':failures}
-          }
+          summary={'schema':'ATLAS_PRODUCTION_SNAPSHOT_V6_AI_COUNCIL','captured_at':captured.isoformat(),'source':'https://atlas-v7.onrender.com','monitor_mode':'PACED_PER_SYMBOL_READ_ONLY','runtime':load('runtime'),'readiness':load('readiness'),'outcomes':load('outcomes'),'geometry_status':load('geometry'),'ai_status':load('ai_status'),'decisions':decisions,'ai_council':councils,'decision_summary':{'supported_assets':symbols,'qualified_count':len(qualified),'qualified':qualified,'wait_count':len(waits),'waits':waits,'failed_count':len(failures),'failures':failures},'ai_summary':{'analyzed_count':len(ai_actions),'analyses':ai_actions,'failed_count':len(ai_failures),'failures':ai_failures}}
           pathlib.Path('status/atlas-production-latest.json').write_text(json.dumps(summary,indent=2,sort_keys=True))
           history=pathlib.Path('status/history/production-snapshots.jsonl')
-          with history.open('a') as f: f.write(json.dumps(summary,separators=(',',':'))+'\n')
-
-          # WAIT Outcome Tracker: evaluates every historical WAIT at 1h/3h/6h/12h/24h
-          # using later production snapshots. No strategy threshold is changed.
+          with history.open('a') as f:f.write(json.dumps(summary,separators=(',',':'))+'\n')
+          # Keep the existing WAIT tracker contract; V6 history now also preserves frozen AI council analyses for later comparison.
           rows=[]
-          try:
-              rows=[json.loads(x) for x in history.read_text().splitlines() if x.strip()]
-          except Exception: rows=[]
+          try:rows=[json.loads(x) for x in history.read_text().splitlines() if x.strip()]
+          except Exception:rows=[]
           horizons=(1,3,6,12,24)
           def price(d):
-              # Current Production decision snapshots expose the observed market price as `entry`.
               for k in ('entry','price','current_price','market_price','last_price','close'):
                   try:
                       v=float(d.get(k))
                       if v>0:return v
-                  except: pass
-              md=d.get('market_data') or {}
-              for k in ('price','current_price','last_price','close'):
-                  try:
-                      v=float(md.get(k))
-                      if v>0:return v
-                  except: pass
+                  except:pass
               return None
           parsed=[]
           for r in rows:
@@ -130,31 +103,23 @@ jobs:
                   if not d0.get('ok') or d0.get('signal_qualified'):continue
                   p0=price(d0)
                   if not p0:continue
-                  direction=d0.get('candidate_direction') or 'NONE'
-                  item={'symbol':s,'wait_at':t0.isoformat(),'wait_price':p0,'candidate_direction':direction,'score':d0.get('score'),'threshold':d0.get('signal_threshold'),'reason':d0.get('wait_reason'),'playbook':d0.get('playbook'),'score_attribution':d0.get('score_attribution'),'horizons':{}}
+                  direction=d0.get('candidate_direction') or 'NONE'; item={'symbol':s,'wait_at':t0.isoformat(),'wait_price':p0,'candidate_direction':direction,'score':d0.get('score'),'threshold':d0.get('signal_threshold'),'reason':d0.get('wait_reason'),'playbook':d0.get('playbook'),'score_attribution':d0.get('score_attribution'),'horizons':{}}
                   future=[(t,r) for t,r in parsed[i+1:] if t>t0]
                   for h in horizons:
-                      target=t0+datetime.timedelta(hours=h)
-                      candidates=[(t,r) for t,r in future if t>=target]
+                      target=t0+datetime.timedelta(hours=h); candidates=[(t,r) for t,r in future if t>=target]
                       if not candidates:continue
-                      t1,r1=min(candidates,key=lambda x:x[0])
-                      d1=(r1.get('decisions') or {}).get(s) or {}; p1=price(d1)
+                      t1,r1=min(candidates,key=lambda x:x[0]); d1=(r1.get('decisions') or {}).get(s) or {}; p1=price(d1)
                       if not p1:continue
                       window=[]
                       for tw,rw in future:
                           if tw>t1:break
                           pw=price((rw.get('decisions') or {}).get(s) or {})
                           if pw:window.append(pw)
-                      change=(p1/p0-1)*100
-                      max_up=(max(window)/p0-1)*100 if window else change
-                      max_down=(min(window)/p0-1)*100 if window else change
-                      favorable=change if direction=='LONG' else -change if direction=='SHORT' else None
+                      change=(p1/p0-1)*100; max_up=(max(window)/p0-1)*100 if window else change; max_down=(min(window)/p0-1)*100 if window else change; favorable=change if direction=='LONG' else -change if direction=='SHORT' else None
                       item['horizons'][f'{h}h']={'observed_at':t1.isoformat(),'price':round(p1,10),'change_pct':round(change,4),'max_up_pct':round(max_up,4),'max_down_pct':round(max_down,4),'directional_return_pct':round(favorable,4) if favorable is not None else None}
                   if item['horizons']:tracker.append(item)
-          out={'schema':'ATLAS_WAIT_OUTCOME_TRACKER_V2','generated_at':captured.isoformat(),'horizons_hours':list(horizons),'note':'Measures opportunity cost of WAIT decisions from production snapshots; uses decision entry as observed price; does not alter trading thresholds.','records':tracker}
-          pathlib.Path('status/wait-outcomes.json').write_text(json.dumps(out,indent=2,sort_keys=True))
+          pathlib.Path('status/wait-outcomes.json').write_text(json.dumps({'schema':'ATLAS_WAIT_OUTCOME_TRACKER_V2','generated_at':captured.isoformat(),'horizons_hours':list(horizons),'note':'Measures opportunity cost of WAIT decisions from production snapshots; uses decision entry as observed price; does not alter trading thresholds.','records':tracker},indent=2,sort_keys=True))
           PY
-
       - name: Commit latest snapshot
         shell: bash
         run: |
