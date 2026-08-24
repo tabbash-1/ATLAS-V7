@@ -65,6 +65,7 @@ from ai_trade_council import install as _install_ai_trade_council; _install_ai_t
 from research_memory_bridge import install as _install_research_memory_bridge; _install_research_memory_bridge(_collector)
 from trade_path_settlement import install_geometry_freezer as _install_trade_geometry_freezer; _install_trade_geometry_freezer(_collector)
 from trade_outcome_runtime import install as _install_trade_outcome_runtime; _install_trade_outcome_runtime(_collector)
+from production_reliability import install as _install_production_reliability; _install_production_reliability(_collector)
 entrypoint="atlas_research_runtime_server.py"
 print(f"ATLAS production boot: data={DATA_DIR} runtime=resilient-free-research release={release_token}")
 runpy.run_path(str(BASE/entrypoint),run_name="__main__")
