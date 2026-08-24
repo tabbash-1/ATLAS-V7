@@ -95,4 +95,22 @@ if($('alertSoundBtn'))$('alertSoundBtn').textContent=settings.sound?'Sound: ON':
 window.addEventListener('atlas:opportunity-scan-complete',e=>evaluateRows(e.detail?.rows||[]));
 window.refreshConfirmedAlerts=refresh;
 setTimeout(refresh,8200);setInterval(refresh,60000);
+
+// Production-safe bootstrap for the AI Council UI. This file is already part of
+// the original page, so the new panel no longer depends on cloud_start HTML mutation.
+function bootstrapAiCouncil(){
+  if(!document.getElementById('atlasAiCouncilCard')){
+    const anchor=document.querySelector('.lower-grid')||document.querySelector('.metrics-card');
+    if(anchor){
+      const panel=document.createElement('section');
+      panel.id='atlasAiCouncilCard'; panel.className='card metrics-card ai-council-card';
+      panel.innerHTML='<div class="card-head"><div><strong>ATLAS AI TRADE COUNCIL</strong><div class="muted small">Production + Tactical 1–3H + Bull/Bear + Counterfactual + Hybrid Judge</div></div><span id="aiCouncilBadge" class="pill neutral">WAITING</span></div><div class="ai-council-grid"><div class="ai-kpi"><span>Production</span><b id="aiProdDecision">—</b><small id="aiProdScore">—</small></div><div class="ai-kpi"><span>Tactical 1–3H</span><b id="aiTactical">—</b><small id="aiTacticalRR">—</small></div><div class="ai-kpi"><span>AI Judge</span><b id="aiJudge">—</b><small id="aiConfidence">—</small></div><div class="ai-kpi"><span>Hybrid</span><b id="aiHybrid">—</b><small id="aiHybridSub">—</small></div></div><div class="ai-council-split"><div class="ai-case"><div class="panel-title">BULL CASE</div><div id="aiBullCase" class="muted small">Waiting for analysis.</div></div><div class="ai-case"><div class="panel-title">BEAR CASE</div><div id="aiBearCase" class="muted small">Waiting for analysis.</div></div></div><div class="ai-counterfactual"><div class="panel-title">BEST ACTION / COUNTERFACTUAL</div><div id="aiBestAction" class="ai-best-action">—</div><div id="aiGeometry" class="muted small">—</div><div id="aiTrigger" class="muted tiny">—</div></div><div id="aiEvidence" class="comparison-box muted small">Evidence will appear after Analyze Live.</div>';
+      anchor.parentNode.insertBefore(panel,anchor);
+    }
+  }
+  if(!window.ATLAS_PRODUCTION_DECISION_UI && !document.querySelector('script[data-atlas-production-ui]')){
+    const s=document.createElement('script');s.src='/atlas-production-decision.js?v=ai-council-v4';s.dataset.atlasProductionUi='1';document.body.appendChild(s);
+  }
+}
+setTimeout(bootstrapAiCouncil,50);
 })();
