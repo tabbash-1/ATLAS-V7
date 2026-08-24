@@ -35,7 +35,7 @@ jobs:
           BASE_URL: https://atlas-v7.onrender.com
         run: |
           set -u
-          mkdir -p status/raw
+          mkdir -p status/raw status/history
 
           fetch_json() {
             name="$1"; path="$2"; out="status/raw/${name}.json"; url="${BASE_URL}${path}"
@@ -84,9 +84,10 @@ jobs:
                   qualified.append({'symbol':s,'decision':d.get('decision'),'score':d.get('score'),'threshold':d.get('signal_threshold'),'rr':d.get('risk_reward'),'playbook':d.get('playbook'),'generated_at':d.get('generated_at')})
               else:
                   waits.append({'symbol':s,'candidate':d.get('candidate_direction'),'score':d.get('score'),'threshold':d.get('signal_threshold'),'reason':d.get('wait_reason'),'score_gap_to_signal':d.get('score_gap_to_signal'),'score_attribution':d.get('score_attribution')})
+          captured=datetime.datetime.now(datetime.timezone.utc)
           summary={
-              'schema':'ATLAS_PRODUCTION_SNAPSHOT_V4',
-              'captured_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              'schema':'ATLAS_PRODUCTION_SNAPSHOT_V5_WAIT_OUTCOMES',
+              'captured_at':captured.isoformat(),
               'source':'https://atlas-v7.onrender.com',
               'monitor_mode':'PACED_PER_SYMBOL_READ_ONLY',
               'runtime':load('runtime'),'readiness':load('readiness'),'outcomes':load('outcomes'),'geometry_status':load('geometry'),
@@ -94,6 +95,63 @@ jobs:
               'decision_summary':{'supported_assets':symbols,'qualified_count':len(qualified),'qualified':qualified,'wait_count':len(waits),'waits':waits,'failed_count':len(failures),'failures':failures}
           }
           pathlib.Path('status/atlas-production-latest.json').write_text(json.dumps(summary,indent=2,sort_keys=True))
+          history=pathlib.Path('status/history/production-snapshots.jsonl')
+          with history.open('a') as f: f.write(json.dumps(summary,separators=(',',':'))+'\n')
+
+          # WAIT Outcome Tracker: evaluates every historical WAIT at 1h/3h/6h/12h/24h
+          # using later production snapshots. No strategy threshold is changed.
+          rows=[]
+          try:
+              rows=[json.loads(x) for x in history.read_text().splitlines() if x.strip()]
+          except Exception: rows=[]
+          horizons=(1,3,6,12,24)
+          def price(d):
+              for k in ('price','current_price','market_price','last_price','close'):
+                  try:
+                      v=float(d.get(k));
+                      if v>0:return v
+                  except: pass
+              md=d.get('market_data') or {}
+              for k in ('price','current_price','last_price','close'):
+                  try:
+                      v=float(md.get(k));
+                      if v>0:return v
+                  except: pass
+              return None
+          parsed=[]
+          for r in rows:
+              try:t=datetime.datetime.fromisoformat(r['captured_at'].replace('Z','+00:00'))
+              except:continue
+              parsed.append((t,r))
+          tracker=[]
+          for i,(t0,r0) in enumerate(parsed):
+              for s,d0 in (r0.get('decisions') or {}).items():
+                  if not d0.get('ok') or d0.get('signal_qualified'):continue
+                  p0=price(d0)
+                  if not p0:continue
+                  direction=d0.get('candidate_direction') or 'NONE'
+                  item={'symbol':s,'wait_at':t0.isoformat(),'wait_price':p0,'candidate_direction':direction,'score':d0.get('score'),'threshold':d0.get('signal_threshold'),'reason':d0.get('wait_reason'),'horizons':{}}
+                  future=[(t,r) for t,r in parsed[i+1:] if t>t0]
+                  for h in horizons:
+                      target=t0+datetime.timedelta(hours=h)
+                      candidates=[(t,r) for t,r in future if t>=target]
+                      if not candidates:continue
+                      t1,r1=min(candidates,key=lambda x:x[0])
+                      d1=(r1.get('decisions') or {}).get(s) or {}; p1=price(d1)
+                      if not p1:continue
+                      window=[]
+                      for tw,rw in future:
+                          if tw>t1:break
+                          pw=price((rw.get('decisions') or {}).get(s) or {})
+                          if pw:window.append(pw)
+                      change=(p1/p0-1)*100
+                      max_up=(max(window)/p0-1)*100 if window else change
+                      max_down=(min(window)/p0-1)*100 if window else change
+                      favorable=change if direction=='LONG' else -change if direction=='SHORT' else abs(change)
+                      item['horizons'][f'{h}h']={'observed_at':t1.isoformat(),'price':round(p1,10),'change_pct':round(change,4),'max_up_pct':round(max_up,4),'max_down_pct':round(max_down,4),'directional_return_pct':round(favorable,4)}
+                  if item['horizons']:tracker.append(item)
+          out={'schema':'ATLAS_WAIT_OUTCOME_TRACKER_V1','generated_at':captured.isoformat(),'horizons_hours':list(horizons),'note':'Measures opportunity cost of WAIT decisions from production snapshots; does not alter trading thresholds.','records':tracker}
+          pathlib.Path('status/wait-outcomes.json').write_text(json.dumps(out,indent=2,sort_keys=True))
           PY
 
       - name: Commit latest snapshot
@@ -101,7 +159,7 @@ jobs:
         run: |
           git config user.name "atlas-production-monitor"
           git config user.email "atlas-monitor@users.noreply.github.com"
-          git add status/atlas-production-latest.json status/raw/*.json
+          git add status/atlas-production-latest.json status/raw/*.json status/history/production-snapshots.jsonl status/wait-outcomes.json
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "chore: update ATLAS production snapshot [skip ci]"
           git pull --rebase origin main
