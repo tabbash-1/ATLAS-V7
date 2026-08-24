@@ -45,7 +45,7 @@
     });
   }
 
-  const PRODUCT_SHELL_VERSION='2cf4743';
+  const PRODUCT_SHELL_VERSION='production-score-hype-v1';
   loadScript(`atlas-product-shell.js?v=${PRODUCT_SHELL_VERSION}`,'atlas-product-shell')
     .then(async()=>{
       window.dispatchEvent(new CustomEvent('atlas:product-shell-ready'));
