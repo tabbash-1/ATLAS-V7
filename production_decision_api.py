@@ -2,39 +2,16 @@
 
 Exposes the same production cloud scorer used by the research runtime and
 normalizes it into LONG / SHORT / WAIT with explicit WAIT diagnostics and
-score attribution. V3 adds a short in-memory cache and a bulk endpoint so
-monitoring does not hammer Render with seven independent market-data requests.
+score attribution.
 """
 
-import threading
-import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
-VERSION = "PRODUCTION_DECISION_API_V3"
-CACHE_TTL_SECONDS = 75
-_CACHE = {}
-_CACHE_LOCK = threading.Lock()
+VERSION = "PRODUCTION_DECISION_API_V2"
 
 
 def install(atlas):
     original_get = atlas.Handler.do_GET
 
-    def _cached(symbol):
-        now = time.time()
-        with _CACHE_LOCK:
-            item = _CACHE.get(symbol)
-            if item and now - item['ts'] <= CACHE_TTL_SECONDS:
-                out = dict(item['value'])
-                out['cache_hit'] = True
-                out['cache_age_seconds'] = round(now - item['ts'], 3)
-                return out
-        return None
-
-    def _store(symbol, value):
-        with _CACHE_LOCK:
-            _CACHE[symbol] = {'ts': time.time(), 'value': dict(value)}
-
-    def build_decision(symbol, use_cache=True):
+    def build_decision(symbol):
         symbol = str(symbol or '').upper().replace('BINANCE:', '')
         if symbol not in atlas.ON_DEMAND_SYMBOLS:
             return {
@@ -44,12 +21,6 @@ def install(atlas):
                 'source': VERSION,
             }
 
-        if use_cache:
-            hit = _cached(symbol)
-            if hit is not None:
-                return hit
-
-        started = time.time()
         btc = atlas._spot_klines('BTCUSDT')
         ks = btc if symbol == 'BTCUSDT' else atlas._spot_klines(symbol)
         if len(ks) < 100:
@@ -98,7 +69,7 @@ def install(atlas):
                 stop = px + atr * 1.2
                 target = sup
 
-        result = {
+        return {
             'ok': True,
             'source': VERSION,
             'scoring_version': (row or {}).get('scoring_version') if isinstance(row, dict) else None,
@@ -137,58 +108,11 @@ def install(atlas):
                 'momentum_24h_pct': mom24,
             },
             'generated_at': atlas.now_iso(),
-            'generation_ms': round((time.time() - started) * 1000, 1),
-            'cache_hit': False,
-            'cache_age_seconds': 0,
-            'research_only': True,
-            'live_execution': False,
-        }
-        _store(symbol, result)
-        return result
-
-    def build_all_decisions():
-        symbols = list(atlas.ON_DEMAND_SYMBOLS)
-        decisions = {}
-        errors = {}
-        # A small worker pool reduces wall-clock time without creating a burst
-        # large enough to overload upstream market-data providers.
-        with ThreadPoolExecutor(max_workers=3, thread_name_prefix='atlas-decision') as pool:
-            futures = {pool.submit(build_decision, s, True): s for s in symbols}
-            for future in as_completed(futures):
-                symbol = futures[future]
-                try:
-                    decisions[symbol] = future.result()
-                except Exception as exc:
-                    errors[symbol] = f'{type(exc).__name__}: {exc}'
-                    stale = _cached(symbol)
-                    if stale is not None:
-                        stale['stale_fallback'] = True
-                        stale['stale_reason'] = errors[symbol]
-                        decisions[symbol] = stale
-                    else:
-                        decisions[symbol] = {
-                            'ok': False,
-                            'symbol': symbol,
-                            'error': errors[symbol],
-                            'source': VERSION,
-                            'research_only': True,
-                            'live_execution': False,
-                        }
-        return {
-            'ok': True,
-            'source': VERSION,
-            'generated_at': atlas.now_iso(),
-            'symbols': symbols,
-            'decisions': decisions,
-            'error_count': len(errors),
-            'errors': errors,
-            'cache_ttl_seconds': CACHE_TTL_SECONDS,
             'research_only': True,
             'live_execution': False,
         }
 
     atlas.production_decision = build_decision
-    atlas.production_decisions_snapshot = build_all_decisions
 
     def do_GET(self):
         import urllib.parse
@@ -200,22 +124,6 @@ def install(atlas):
                 result = build_decision(symbol)
                 return self._json(result, 200 if result.get('ok') else 400)
             except Exception as exc:
-                stale = _cached(str(symbol).upper().replace('BINANCE:', ''))
-                if stale is not None:
-                    stale['stale_fallback'] = True
-                    stale['stale_reason'] = f'{type(exc).__name__}: {exc}'
-                    return self._json(stale, 200)
-                return self._json({
-                    'ok': False,
-                    'error': f'{type(exc).__name__}: {exc}',
-                    'source': VERSION,
-                    'research_only': True,
-                    'live_execution': False,
-                }, 500)
-        if u.path == '/api/decision/all':
-            try:
-                return self._json(build_all_decisions())
-            except Exception as exc:
                 return self._json({
                     'ok': False,
                     'error': f'{type(exc).__name__}: {exc}',
@@ -226,10 +134,4 @@ def install(atlas):
         return original_get(self)
 
     atlas.Handler.do_GET = do_GET
-    return {
-        'enabled': True,
-        'version': VERSION,
-        'endpoint': '/api/decision/current',
-        'bulk_endpoint': '/api/decision/all',
-        'cache_ttl_seconds': CACHE_TTL_SECONDS,
-    }
+    return {'enabled': True, 'version': VERSION, 'endpoint': '/api/decision/current'}
