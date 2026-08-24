@@ -22,7 +22,7 @@ async function similarityFor(r,f){
  try{
   const c=r.confluence,p={symbol:r.symbol,signal:c.signal,base_signal:c.base_signal,confidence:c.confidence,gate_state:c.gate?.state,gate_reason:c.gate?.reason,
    support_strength:c.nearest_support?.strength,support_distance_pct:c.nearest_support?.distance_pct,resistance_strength:c.nearest_resistance?.strength,resistance_distance_pct:c.nearest_resistance?.distance_pct,
-   relative_volume:c.volume?.relative_volume,volume_trend_ratio:c.volume?.volume_trend_ratio,volume_quality:c.volume?.quality_score,breakout_score:c.breakout_up?.score,breakdown_score:c.breakdown_down?.score,
+   relative_volume:c.volume?.relative_volume,volume_trend_ratio:c.volume?.volume_trend_ratio,volume_quality:c.volume?.quality_score,breakout_score:c.breakout_up?.score,breakdown_score:c.breakout_down?.score,
    futures_score:f?.score,oi_change_pct:f?.oi_change_pct,taker_ratio:f?.taker_ratio,orderbook_imbalance:f?.orderbook_imbalance,limit:30};
   const x=await fetch('/api/confluence/similar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});return x.ok?await x.json():null;
  }catch(e){return null;}
