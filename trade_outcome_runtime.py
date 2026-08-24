@@ -19,7 +19,18 @@ def install(collector):
         'requests': 0,
         'path_requests': 0,
         'last_error': None,
+        'signal_scope_semantics': 'PRODUCTION_QUALIFIED_ONLY',
     }
+
+    def scoped_rows(rows, scope):
+        scope = str(scope or 'signals').lower()
+        if scope == 'signals':
+            return [x for x in rows if trade_outcome_ledger.is_production_signal(x)]
+        if scope == 'champions':
+            return [x for x in rows if trade_outcome_ledger.is_research_champion(x)]
+        if scope == 'all':
+            return list(rows)
+        raise ValueError('scope must be signals, champions or all')
 
     def outcome_do_get(self):
         u = urllib.parse.urlparse(self.path)
@@ -40,14 +51,18 @@ def install(collector):
             if u.path == '/api/outcomes/geometry-status':
                 geometry_rows = trade_path_settlement.read_geometry_archive(collector)
                 geometry_map = trade_path_settlement.geometry_by_forward_id(collector)
-                signal_rows = [x for x in rows if bool(x.get('champion_take'))]
+                signal_rows = [x for x in rows if trade_outcome_ledger.is_production_signal(x)]
                 linked_signals = sum(1 for x in signal_rows if str(x.get('id') or '') in geometry_map)
+                research_champions = [x for x in rows if trade_outcome_ledger.is_research_champion(x)]
                 payload = {
                     'schema': 'ATLAS_TRADE_GEOMETRY_STATUS_V1',
                     'archive_rows': len(geometry_rows),
+                    'production_signal_forward_rows': len(signal_rows),
+                    'research_champion_forward_rows': len(research_champions),
                     'signal_forward_rows': len(signal_rows),
                     'signal_rows_with_frozen_geometry': linked_signals,
                     'signal_geometry_coverage_pct': round(100 * linked_signals / len(signal_rows), 2) if signal_rows else None,
+                    'signal_scope_semantics': 'PRODUCTION_QUALIFIED_ONLY',
                     'freezer': getattr(collector, 'TRADE_GEOMETRY_FREEZER_STATE', {}),
                     'research_only': True,
                     'live_execution': False,
@@ -56,12 +71,17 @@ def install(collector):
                 state['path_requests'] += 1
                 limit = int(q.get('limit', ['100'])[0])
                 geometry_map = trade_path_settlement.geometry_by_forward_id(collector)
-                items = trade_path_settlement.build_path_ledger(rows, geometry_map, scope=scope, symbol=symbol, limit=limit)
+                selected_rows = scoped_rows(rows, scope)
+                # trade_path_settlement historically treats only scope='signals'
+                # specially via champion_take. We pre-scope here and pass all so
+                # the HTTP contract uses the corrected Production semantics.
+                items = trade_path_settlement.build_path_ledger(selected_rows, geometry_map, scope='all', symbol=symbol, limit=limit)
                 if u.path == '/api/outcomes/path-summary':
                     payload = {
                         'schema': 'ATLAS_TRADE_PATH_SUMMARY_V1',
                         'scope': scope,
                         'symbol': symbol,
+                        'signal_scope_semantics': 'PRODUCTION_QUALIFIED_ONLY' if scope == 'signals' else None,
                         'overall': trade_path_settlement.summarize_path(items),
                         'methodology': 'Frozen SL/TP geometry settled from post-entry 5m candles; same-candle SL/TP conflicts are refined with 1m candles and remain ambiguous if order is still unknowable.',
                         'research_only': True,
@@ -72,6 +92,7 @@ def install(collector):
                         'schema': 'ATLAS_TRADE_PATH_LEDGER_V1',
                         'scope': scope,
                         'symbol': symbol,
+                        'signal_scope_semantics': 'PRODUCTION_QUALIFIED_ONLY' if scope == 'signals' else None,
                         'rows': items,
                         'research_only': True,
                         'live_execution': False,

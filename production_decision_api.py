@@ -1,13 +1,14 @@
 """Single source of truth for the ATLAS browser decision card.
 
 Adds research-only tactical and quick-trade lanes alongside the unchanged
-production swing decision. The production threshold is never weakened here.
-Quick Trade is a shadow classifier for short 1-2h opportunities: it requires
-real directional evidence and treats a nearby swing obstacle as an exit boundary
-rather than automatically promoting the setup into a swing trade.
+production score decision. The production score threshold is never weakened
+here. Production score qualification and execution geometry readiness are
+reported separately so a high score cannot masquerade as a good trade plan when
+the structural target offers less reward than the stop risk.
 """
 
-VERSION = "PRODUCTION_DECISION_API_V5_QUICK_TRADE_SHADOW"
+VERSION = "PRODUCTION_DECISION_API_V6_GEOMETRY_GUARD"
+GEOMETRY_MIN_RR = 1.0
 
 
 def install(atlas):
@@ -39,6 +40,35 @@ def install(atlas):
                 return fallback, 'CLOUD_SR_FALLBACK'
         return None, 'NO_TRADABLE_LEVEL'
 
+    def geometry_assessment(direction, px, stop, target, rr):
+        """Execution-quality guard; never modifies the score or signal threshold."""
+        if direction not in ('LONG', 'SHORT'):
+            return {'status': 'NOT_APPLICABLE', 'qualified': False, 'reason': 'NO_DIRECTION'}
+        if stop is None or target is None or rr is None:
+            return {
+                'status': 'BLOCK', 'qualified': False,
+                'reason': 'GEOMETRY_INCOMPLETE', 'min_risk_reward': GEOMETRY_MIN_RR,
+            }
+        directional = ((direction == 'LONG' and stop < px < target) or
+                       (direction == 'SHORT' and target < px < stop))
+        if not directional:
+            return {
+                'status': 'BLOCK', 'qualified': False,
+                'reason': 'INVALID_ENTRY_SL_TP_ORDER', 'min_risk_reward': GEOMETRY_MIN_RR,
+                'risk_reward': round(rr, 6),
+            }
+        if rr < GEOMETRY_MIN_RR:
+            return {
+                'status': 'BLOCK', 'qualified': False,
+                'reason': 'RR_BELOW_ONE_TO_ONE', 'min_risk_reward': GEOMETRY_MIN_RR,
+                'risk_reward': round(rr, 6),
+            }
+        return {
+            'status': 'PASS', 'qualified': True,
+            'reason': 'RR_ONE_TO_ONE_OR_BETTER', 'min_risk_reward': GEOMETRY_MIN_RR,
+            'risk_reward': round(rr, 6),
+        }
+
     def build_decision(symbol):
         symbol = str(symbol or '').upper().replace('BINANCE:', '')
         if symbol not in atlas.ON_DEMAND_SYMBOLS:
@@ -62,7 +92,10 @@ def install(atlas):
         row=atlas.cloud_score_symbol(symbol,btc); threshold=float(atlas.CLOUD_FORWARD_MIN_SCORE)
         candidate_direction=row.get('direction') if isinstance(row,dict) else None
         score=atlas.fnum(row.get('final_score')) if isinstance(row,dict) else None
-        qualified=bool(candidate_direction in ('LONG','SHORT') and score is not None and score>=threshold)
+        if isinstance(row,dict) and 'production_signal_qualified' in row:
+            qualified=bool(row.get('production_signal_qualified'))
+        else:
+            qualified=bool(candidate_direction in ('LONG','SHORT') and score is not None and score>=threshold)
         decision=candidate_direction if qualified else 'WAIT'
         if row is None: reason='NO_DIRECTIONAL_CONSENSUS' if max(long_votes,short_votes)<3 or long_votes==short_votes else 'SCORER_RETURNED_NO_CANDIDATE'
         elif not qualified: reason='SCORE_BELOW_SIGNAL_THRESHOLD'
@@ -73,6 +106,16 @@ def install(atlas):
             rr=atlas.fnum(row.get('rr_tp2'))
             if candidate_direction=='LONG' and atr: stop,target=px-atr*1.2,res
             elif candidate_direction=='SHORT' and atr: stop,target=px+atr*1.2,sup
+
+        geometry=geometry_assessment(candidate_direction, px, stop, target, rr)
+        execution_ready=bool(qualified and geometry.get('qualified'))
+        actionable_decision=candidate_direction if execution_ready else 'WAIT'
+        if not qualified:
+            actionable_reason=reason
+        elif not geometry.get('qualified'):
+            actionable_reason=geometry.get('reason')
+        else:
+            actionable_reason='EXECUTION_READY'
 
         tactical={'status':'NO_SETUP','direction':None,'horizon':'1-3H','entry':px,'target':None,'stop_loss':None,'risk_reward':None,'room_to_obstacle_pct':None,'confidence':0,'reason':'NO_DIRECTIONAL_CONSENSUS','research_only':True}
         tdir=None
@@ -119,7 +162,15 @@ def install(atlas):
         elif tdir and not geometry_ok:
             quick.update({'direction':tdir,'reason':'SHORT_TERM_GEOMETRY_NOT_GOOD_ENOUGH'})
 
-        return {'ok':True,'source':VERSION,'scoring_version':(row or {}).get('scoring_version') if isinstance(row,dict) else None,'symbol':symbol,'decision':decision,'candidate_direction':candidate_direction,'signal_qualified':qualified,'wait_reason':None if qualified else reason,'score':score,'signal_threshold':threshold,'score_gap_to_signal':round(threshold-score,3) if score is not None and score<threshold else 0,'score_attribution':(row or {}).get('score_attribution') if isinstance(row,dict) else None,'entry':px,'stop_loss':stop,'take_profit':target,'risk_reward':rr,'direction_votes':(row or {}).get('direction_votes') if isinstance(row,dict) else max(long_votes,short_votes),'direction_votes_long':(row or {}).get('direction_votes_long') if isinstance(row,dict) else long_votes,'direction_votes_short':(row or {}).get('direction_votes_short') if isinstance(row,dict) else short_votes,'execution_decision':(row or {}).get('execution_decision') if isinstance(row,dict) else None,'trade_plan_status':(row or {}).get('trade_plan_status') if isinstance(row,dict) else None,'playbook':(row or {}).get('playbook_primary') if isinstance(row,dict) else None,'futures_available':(row or {}).get('futures_available') if isinstance(row,dict) else None,'futures_provider':(row or {}).get('futures_provider') if isinstance(row,dict) else None,'futures_score':(row or {}).get('futures_score') if isinstance(row,dict) else None,'relative_strength_score':(row or {}).get('relative_strength_score') if isinstance(row,dict) else None,'volume_quality':(row or {}).get('volume_quality') if isinstance(row,dict) else None,'relative_volume':(row or {}).get('relative_volume') if isinstance(row,dict) else round(rv,3),'regime':(row or {}).get('regime') if isinstance(row,dict) else None,'tactical_opportunity':tactical,'quick_trade_shadow':quick,'timeframe_matrix':{'quick_1_2h':quick,'tactical_1_3h':tactical,'swing':{'status':decision,'direction':candidate_direction,'score':score,'threshold':threshold,'risk_reward':rr},'macro':{'status':'CONTEXT_ONLY','note':'Daily/weekly independent scorer remains context-only; short-term research never overrides swing safeguards.'}},'indicators':{'ema20':ema20,'ema50':ema50,'rsi14':rsi,'atr14':atr,'volume_ratio':rv,'momentum_24h_pct':mom24},'generated_at':atlas.now_iso(),'research_only':True,'live_execution':False}
+        original_trade_plan=(row or {}).get('trade_plan_status') if isinstance(row,dict) else None
+        if qualified and not execution_ready:
+            trade_plan_status='SCORE_QUALIFIED_GEOMETRY_BLOCKED'
+        elif execution_ready:
+            trade_plan_status='EXECUTION_READY'
+        else:
+            trade_plan_status=original_trade_plan
+
+        return {'ok':True,'source':VERSION,'scoring_version':(row or {}).get('scoring_version') if isinstance(row,dict) else None,'symbol':symbol,'decision':decision,'candidate_direction':candidate_direction,'signal_qualified':qualified,'production_signal_qualified':qualified,'wait_reason':None if qualified else reason,'score':score,'signal_threshold':threshold,'score_gap_to_signal':round(threshold-score,3) if score is not None and score<threshold else 0,'score_attribution':(row or {}).get('score_attribution') if isinstance(row,dict) else None,'entry':px,'stop_loss':stop,'take_profit':target,'risk_reward':rr,'geometry_gate':geometry,'execution_ready':execution_ready,'actionable_decision':actionable_decision,'actionable_reason':actionable_reason,'direction_votes':(row or {}).get('direction_votes') if isinstance(row,dict) else max(long_votes,short_votes),'direction_votes_long':(row or {}).get('direction_votes_long') if isinstance(row,dict) else long_votes,'direction_votes_short':(row or {}).get('direction_votes_short') if isinstance(row,dict) else short_votes,'execution_decision':(row or {}).get('execution_decision') if isinstance(row,dict) else None,'trade_plan_status':trade_plan_status,'playbook':(row or {}).get('playbook_primary') if isinstance(row,dict) else None,'futures_available':(row or {}).get('futures_available') if isinstance(row,dict) else None,'futures_provider':(row or {}).get('futures_provider') if isinstance(row,dict) else None,'futures_score':(row or {}).get('futures_score') if isinstance(row,dict) else None,'relative_strength_score':(row or {}).get('relative_strength_score') if isinstance(row,dict) else None,'volume_quality':(row or {}).get('volume_quality') if isinstance(row,dict) else None,'relative_volume':(row or {}).get('relative_volume') if isinstance(row,dict) else round(rv,3),'regime':(row or {}).get('regime') if isinstance(row,dict) else None,'tactical_opportunity':tactical,'quick_trade_shadow':quick,'timeframe_matrix':{'quick_1_2h':quick,'tactical_1_3h':tactical,'swing':{'status':decision,'direction':candidate_direction,'score':score,'threshold':threshold,'risk_reward':rr,'execution_ready':execution_ready,'actionable_decision':actionable_decision},'macro':{'status':'CONTEXT_ONLY','note':'Daily/weekly independent scorer remains context-only; short-term research never overrides swing safeguards.'}},'indicators':{'ema20':ema20,'ema50':ema50,'rsi14':rsi,'atr14':atr,'volume_ratio':rv,'momentum_24h_pct':mom24},'generated_at':atlas.now_iso(),'research_only':True,'live_execution':False}
 
     atlas.production_decision=build_decision
     def do_GET(self):
@@ -133,4 +184,4 @@ def install(atlas):
                 return self._json({'ok':False,'error':f'{type(exc).__name__}: {exc}','source':VERSION,'research_only':True,'live_execution':False},500)
         return original_get(self)
     atlas.Handler.do_GET=do_GET
-    return {'enabled':True,'version':VERSION,'endpoint':'/api/decision/current','quick_lane':'1-2H_SHADOW_ONLY','tactical_lane':'1-3H_RESEARCH_ONLY'}
+    return {'enabled':True,'version':VERSION,'endpoint':'/api/decision/current','geometry_gate_min_rr':GEOMETRY_MIN_RR,'quick_lane':'1-2H_SHADOW_ONLY','tactical_lane':'1-3H_RESEARCH_ONLY'}
