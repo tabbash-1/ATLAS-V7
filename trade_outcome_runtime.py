@@ -55,7 +55,7 @@ def install(collector):
                 linked_signals = sum(1 for x in signal_rows if str(x.get('id') or '') in geometry_map)
                 research_champions = [x for x in rows if trade_outcome_ledger.is_research_champion(x)]
                 payload = {
-                    'schema': 'ATLAS_TRADE_GEOMETRY_STATUS_V2',
+                    'schema': 'ATLAS_TRADE_GEOMETRY_STATUS_V1',
                     'archive_rows': len(geometry_rows),
                     'production_signal_forward_rows': len(signal_rows),
                     'research_champion_forward_rows': len(research_champions),
@@ -78,7 +78,7 @@ def install(collector):
                 items = trade_path_settlement.build_path_ledger(selected_rows, geometry_map, scope='all', symbol=symbol, limit=limit)
                 if u.path == '/api/outcomes/path-summary':
                     payload = {
-                        'schema': 'ATLAS_TRADE_PATH_SUMMARY_V2',
+                        'schema': 'ATLAS_TRADE_PATH_SUMMARY_V1',
                         'scope': scope,
                         'symbol': symbol,
                         'signal_scope_semantics': 'PRODUCTION_QUALIFIED_ONLY' if scope == 'signals' else None,
@@ -89,7 +89,7 @@ def install(collector):
                     }
                 else:
                     payload = {
-                        'schema': 'ATLAS_TRADE_PATH_LEDGER_V2',
+                        'schema': 'ATLAS_TRADE_PATH_LEDGER_V1',
                         'scope': scope,
                         'symbol': symbol,
                         'signal_scope_semantics': 'PRODUCTION_QUALIFIED_ONLY' if scope == 'signals' else None,
@@ -104,7 +104,7 @@ def install(collector):
                 else:
                     limit = int(q.get('limit', ['200'])[0])
                     payload = {
-                        'schema': 'ATLAS_TRADE_OUTCOME_LEDGER_V2',
+                        'schema': 'ATLAS_TRADE_OUTCOME_LEDGER_V1',
                         'horizon_h': horizon,
                         'scope': scope,
                         'symbol': symbol,
