@@ -1,0 +1,107 @@
+name: ATLAS Quick Trade Outcomes
+
+on:
+  schedule:
+    - cron: '27 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atlas-quick-trade-outcomes
+  cancel-in-progress: true
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Quick Trade outcome tracker
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, pathlib, datetime
+          history=pathlib.Path('status/history/production-snapshots.jsonl')
+          out=pathlib.Path('status/quick-trade-outcomes.json')
+          rows=[]
+          if history.exists():
+              for line in history.read_text().splitlines():
+                  if not line.strip(): continue
+                  try: rows.append(json.loads(line))
+                  except Exception: pass
+          parsed=[]
+          for r in rows:
+              try:t=datetime.datetime.fromisoformat(r['captured_at'].replace('Z','+00:00'))
+              except Exception:continue
+              parsed.append((t,r))
+          parsed.sort(key=lambda x:x[0])
+          def px(d):
+              for k in ('entry','price','current_price','market_price','last_price','close'):
+                  try:
+                      v=float(d.get(k))
+                      if v>0:return v
+                  except Exception:pass
+              return None
+          horizons=(1,2,3)
+          records=[]
+          seen=set()
+          for i,(t0,r0) in enumerate(parsed):
+              for symbol,d0 in (r0.get('decisions') or {}).items():
+                  q=(d0 or {}).get('quick_trade_shadow') or ((d0 or {}).get('timeframe_matrix') or {}).get('quick_1_2h') or {}
+                  if q.get('status')!='QUICK_TRADE_SHADOW': continue
+                  entry=px(q) or px(d0); direction=q.get('direction'); stop=q.get('stop_loss'); target=q.get('target')
+                  try: stop=float(stop); target=float(target)
+                  except Exception: continue
+                  if not entry or direction not in ('LONG','SHORT'): continue
+                  key=(symbol,t0.isoformat(),round(float(entry),10),direction)
+                  if key in seen: continue
+                  seen.add(key)
+                  risk=abs(float(entry)-stop)
+                  rec={'symbol':symbol,'signal_at':t0.isoformat(),'direction':direction,'entry':round(float(entry),10),'stop_loss':round(stop,10),'target':round(target,10),'initial_rr':q.get('risk_reward'),'confidence':q.get('confidence'),'status':'OPEN','horizons':{},'method':'SNAPSHOT_PATH_APPROXIMATION'}
+                  future=[(t,r) for t,r in parsed[i+1:] if t>t0]
+                  observed=[]
+                  for h in horizons:
+                      due=t0+datetime.timedelta(hours=h); candidates=[(t,r) for t,r in future if t>=due]
+                      if not candidates: continue
+                      t1,r1=min(candidates,key=lambda x:x[0]); p1=px(((r1.get('decisions') or {}).get(symbol) or {}))
+                      if not p1: continue
+                      window=[]
+                      for tw,rw in future:
+                          if tw>t1: break
+                          pw=px(((rw.get('decisions') or {}).get(symbol) or {}))
+                          if pw: window.append((tw,pw))
+                      vals=[p for _,p in window] or [p1]
+                      if direction=='LONG':
+                          mfe=(max(vals)/entry-1)*100; mae=(min(vals)/entry-1)*100; dret=(p1/entry-1)*100
+                          tp_hit=max(vals)>=target; sl_hit=min(vals)<=stop
+                      else:
+                          mfe=(entry/min(vals)-1)*100; mae=(entry/max(vals)-1)*100; dret=(entry/p1-1)*100
+                          tp_hit=min(vals)<=target; sl_hit=max(vals)>=stop
+                      realized_r=None
+                      if risk>0:
+                          realized_r=((p1-entry)/risk) if direction=='LONG' else ((entry-p1)/risk)
+                      rec['horizons'][f'{h}h']={'observed_at':t1.isoformat(),'price':round(p1,10),'directional_return_pct':round(dret,4),'MFE_pct':round(mfe,4),'MAE_pct':round(mae,4),'target_hit_observed':bool(tp_hit),'stop_hit_observed':bool(sl_hit),'mark_to_market_R':round(realized_r,3) if realized_r is not None else None}
+                      observed.append((tp_hit,sl_hit,h))
+                  if observed:
+                      if any(tp and not sl for tp,sl,_ in observed): rec['status']='TARGET_OBSERVED'
+                      elif any(sl and not tp for tp,sl,_ in observed): rec['status']='STOP_OBSERVED'
+                      elif any(tp and sl for tp,sl,_ in observed): rec['status']='AMBIGUOUS_PATH'
+                      elif '3h' in rec['horizons']: rec['status']='EXPIRED_NO_HIT'
+                  records.append(rec)
+          closed=[r for r in records if r['status']!='OPEN']
+          winners=sum(r['status']=='TARGET_OBSERVED' for r in closed); losers=sum(r['status']=='STOP_OBSERVED' for r in closed)
+          payload={'schema':'ATLAS_QUICK_TRADE_OUTCOME_TRACKER_V1','generated_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'horizons_hours':list(horizons),'records':records,'summary':{'total_signals':len(records),'closed_or_expired':len(closed),'target_observed':winners,'stop_observed':losers,'open':sum(r['status']=='OPEN' for r in records)},'note':'Research-only evaluation of frozen QUICK_TRADE_SHADOW signals from production snapshot history. TP/SL path is approximated from available snapshots, so exact intrahour hit ordering is not claimed.'}
+          out.write_text(json.dumps(payload,indent=2,sort_keys=True))
+          PY
+      - name: Commit Quick Trade outcomes
+        shell: bash
+        run: |
+          git config user.name "atlas-quick-trade-monitor"
+          git config user.email "atlas-monitor@users.noreply.github.com"
+          git add status/quick-trade-outcomes.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "chore: update Quick Trade outcomes [skip ci]"
+          git pull --rebase origin main
+          git push
