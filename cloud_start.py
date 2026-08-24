@@ -50,6 +50,10 @@ if app_path.exists():
 import collector_server as _collector
 if 'HYPEUSDT' not in _collector.ON_DEMAND_SYMBOLS: _collector.ON_DEMAND_SYMBOLS=tuple(_collector.ON_DEMAND_SYMBOLS)+('HYPEUSDT',)
 from hype_market_data import install as _install_hype_market_data; _install_hype_market_data(_collector)
+# Keep a fresh provider-specific futures context for every research asset. This
+# feeds research/shadow evidence only; Production validation semantics remain
+# unchanged in production_signal_scoring.py.
+_collector.SYMBOLS=tuple(_collector.ON_DEMAND_SYMBOLS)
 _original_end_headers=_collector.Handler.end_headers
 def _production_no_cache_headers(self):
     self.send_header("Cache-Control","no-store, no-cache, must-revalidate, max-age=0"); self.send_header("Pragma","no-cache"); self.send_header("Expires","0"); _original_end_headers(self)
