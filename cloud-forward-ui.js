@@ -7,11 +7,11 @@ async function refresh(){
   grid.innerHTML=[
    ['Enabled',j.enabled?'YES':'NO'],['Running now',j.running?'YES':'NO'],['Cycles',j.cycles||0],['Stored',j.stored||0],
    ['Deduped',j.deduped||0],['Errors',j.errors||0],['Interval',`${Math.round((j.interval_seconds||3600)/60)} min`],
-   ['Min score',fmt(j.min_score,0)],['Max / cycle',j.max_per_cycle||0]
+   ['Research min score (/100)',fmt(j.min_score,0)],['Max / cycle',j.max_per_cycle||0]
   ].map(([k,v])=>`<div><span>${k}</span><b>${v}</b></div>`).join('');
-  const cs=(j.last_candidates||[]).map(x=>`${x.symbol} ${x.direction} ${x.score} · ${x.playbook||'NO_PLAYBOOK'}`).join('<br>')||'No stored candidate in the last cycle.';
-  note.innerHTML=`<div><b>Last finish:</b> ${j.last_finished_at||'—'}</div><div><b>Last candidates:</b><br>${cs}</div><div><b>Last error:</b> ${j.last_error||'None'}</div><div class="muted tiny">Server-side research loop; no browser is required after cloud deployment.</div>`;
-  badge.textContent=j.running?'RUNNING':j.enabled?'24/7 ENABLED':'DISABLED';
+  const cs=(j.last_candidates||[]).map(x=>`${x.symbol} ${x.direction} ${x.score}/100 · ${x.playbook||'NO_PLAYBOOK'}`).join('<br>')||'No stored candidate in the last cycle.';
+  note.innerHTML=`<div><b>Last finish:</b> ${j.last_finished_at||'—'}</div><div><b>Last research candidates:</b><br>${cs}</div><div><b>Last error:</b> ${j.last_error||'None'}</div><div class="muted tiny"><b>Lane:</b> Cloud Forward is a Research /100 archive worker. Its score is not the Production 68-point score and cannot qualify a Production trade.</div><div class="muted tiny">Server-side research loop; no browser is required after cloud deployment.</div>`;
+  badge.textContent=j.running?'RUNNING':j.enabled?'24/7 RESEARCH':'DISABLED';
   badge.className=`pill ${j.enabled?'buy':'neutral'}`;
   window.ATLAS_CLOUD_FORWARD_STATUS=j;
  }catch(e){badge.textContent='OFFLINE';badge.className='pill sell';note.textContent=e.message;}

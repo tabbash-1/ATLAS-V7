@@ -41,7 +41,7 @@ async function enrich(r){
 }
 async function run(){
  const btn=$('opportunityScanBtn'),badge=$('opportunityBadge'),body=$('opportunityBody'),meta=$('opportunityMeta');if(!btn||!body)return;
- btn.disabled=true;badge.textContent='SCANNING';badge.className='pill working';body.innerHTML='<tr><td colspan="15">Stage 1: scanning market structure, volume and relative strength…</td></tr>';
+ btn.disabled=true;badge.textContent='SCANNING RESEARCH';badge.className='pill working';body.innerHTML='<tr><td colspan="15">Stage 1: scanning legacy Research /100 market structure, volume and relative strength…</td></tr>';
  try{
   const interval=window.ATLAS_APP_STATE?.interval||'D';
   const pairs=await Promise.all(universe.map(async a=>{try{return [a,await getCandles(a,interval),null]}catch(e){return [a,null,e.message]}}));
@@ -54,19 +54,19 @@ async function run(){
    rows.push({...a,base,confluence,regime,relative,opp,anomaly});
   }
   rows.sort((a,b)=>(b.opp?.score??-999)-(a.opp?.score??-999));
-  badge.textContent='ENRICHING TOP 3';body.innerHTML='<tr><td colspan="15">Stage 2: enriching the top 3 with Futures + Liquidity + Pattern Memory…</td></tr>';
+  badge.textContent='ENRICHING TOP 3';body.innerHTML='<tr><td colspan="15">Stage 2: enriching the top 3 research candidates with Futures + Liquidity + Pattern Memory…</td></tr>';
   const candidates=rows.filter(x=>x.opp&&!x.error).sort((a,b)=>((b.opp?.score||0)+(b.anomaly?.score>=55?6:0))-((a.opp?.score||0)+(a.anomaly?.score>=55?6:0))).slice(0,3);
   const enriched=await Promise.all(candidates.map(enrich));const map=new Map(enriched.map(x=>[x.symbol,x]));rows=rows.map(x=>map.get(x.symbol)||x);
   rows.sort((a,b)=>(b.final?.score??b.opp?.score??-999)-(a.final?.score??a.opp?.score??-999));
   body.innerHTML=rows.map((r,i)=>r.error?`<tr><td>${i+1}</td><td>${r.name}<small>${r.symbol}</small></td><td colspan="10">ERROR: ${r.error}</td></tr>`:
    `<tr><td>${i+1}</td><td>${r.name}<small>${r.symbol}</small></td><td>${r.base.signal}</td><td>${regimeLabel(r.regime)}</td><td>${fmt(r.relative.weighted_relative_pct,2)}%</td><td>${fmt(r.confluence.volume?.quality_score)}</td><td>${r.anomaly?.score>=55?`🔥 ${fmt(r.anomaly.score)}`:fmt(r.anomaly?.score)}</td><td>${fmt(r.opp.score)}</td><td>${r.enriched?fmt(r.futures?.score):'—'}</td><td>${r.enriched?fmt(r.liquidity?.score):'—'}</td><td>${r.enriched?fmt(r.final?.historical?.hit_rate_pct,1)+'%':'—'}</td><td>${fmt(r.final?.score??r.opp.score)}</td><td>${r.enriched?fmt(r.plan?.rr_tp2,2):'—'}</td><td>${r.enriched?(r.playbook?.primary?`${r.playbook.primary.id}<small>${r.playbook.primary.score}/100</small>`:'—'):'—'}</td><td>${r.execution_decision??r.final?.decision??r.opp.action}</td></tr>`).join('');
-  const valid=rows.filter(x=>x.opp),best=valid[0];badge.textContent=best?`#1 ${best.symbol} ${best.final?.score??best.opp.score}/100`:'NO DATA';badge.className=`pill ${(best.final?.score??best?.opp?.score)>=80?'buy':(best.final?.score??best?.opp?.score)>=68?'working':'neutral'}`;
-  meta.textContent=`${valid.length} assets · ${interval} · broad scan first, then top-3 Futures + observed liquidity + sample-weighted Pattern Memory. Research-only; ranking is not a probability.`;
+  const valid=rows.filter(x=>x.opp),best=valid[0];badge.textContent=best?`RESEARCH #1 ${best.symbol} ${best.final?.score??best.opp.score}/100`:'NO DATA';badge.className=`pill ${(best.final?.score??best?.opp?.score)>=80?'buy':(best.final?.score??best?.opp?.score)>=68?'working':'neutral'}`;
+  meta.textContent=`${valid.length} legacy research assets · ${interval} · Research /100 only. HYPE is intentionally excluded from this browser/Binance scanner because its canonical ATLAS market-data adapter is server-side (OKX → Bybit). Use the Production decision lane for HYPE. The Execution column is a research trade-plan state, not Production execution.`;
   window.ATLAS_OPPORTUNITY_ROWS=rows;
   window.dispatchEvent(new CustomEvent('atlas:opportunity-scan-complete',{detail:{rows}}));
  }catch(e){badge.textContent='ERROR';badge.className='pill sell';body.innerHTML=`<tr><td colspan="15">${e.message}</td></tr>`;}finally{btn.disabled=false;}
 }
 window.runAtlasOpportunityScan=run;
 $('opportunityScanBtn')?.addEventListener('click',run);
-$('opportunityExportBtn')?.addEventListener('click',()=>{const payload={project:'ATLAS',stage:'V5_FINAL_OPPORTUNITY_RANKING_ALPHA6',generated_at:new Date().toISOString(),research_only:true,live_execution:false,rows:window.ATLAS_OPPORTUNITY_ROWS||[]};const b=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download='ATLAS_FINAL_OPPORTUNITY_ALPHA6.json';a.click();URL.revokeObjectURL(u);});
+$('opportunityExportBtn')?.addEventListener('click',()=>{const payload={project:'ATLAS',stage:'V5_FINAL_OPPORTUNITY_RANKING_ALPHA6',generated_at:new Date().toISOString(),research_only:true,live_execution:false,score_scale:'RESEARCH_0_100',universe_note:'Legacy browser scanner excludes HYPE; HYPE uses the server-side Production adapter.',rows:window.ATLAS_OPPORTUNITY_ROWS||[]};const b=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download='ATLAS_FINAL_OPPORTUNITY_ALPHA6.json';a.click();URL.revokeObjectURL(u);});
 })();

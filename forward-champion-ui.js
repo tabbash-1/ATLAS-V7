@@ -20,7 +20,7 @@ async function stats(){
   await fetch('/api/forward/update',{method:'POST'}).then(r=>r.json()).catch(()=>null);
   const j=await fetch(`/api/forward/stats?symbol=${encodeURIComponent(sym())}&horizon=24`).then(r=>r.json());
   grid.innerHTML=[
-   ['Matured',j.matured_observations||0],['Champion N',j.champion?.n||0],['Challenger N',j.challenger?.n||0],
+   ['Matured',j.matured_observations||0],['Research Champion N',j.champion?.n||0],['Research Challenger N',j.challenger?.n||0],
    ['Champion avg',j.champion?.avg_return_pct==null?'—':`${fmt(j.champion.avg_return_pct)}%`],
    ['Challenger avg',j.challenger?.avg_return_pct==null?'—':`${fmt(j.challenger.avg_return_pct)}%`],
    ['Δ expectancy',j.delta_avg_return_pct==null?'—':`${fmt(j.delta_avg_return_pct)}%`],
@@ -28,14 +28,14 @@ async function stats(){
    ['Avoided setups avg',j.avoided_by_challenger?.avg_return_pct==null?'—':`${fmt(j.avoided_by_challenger.avg_return_pct)}%`]
   ].map(([k,v])=>`<div><span>${k}</span><b>${v}</b></div>`).join('');
   badge.textContent=j.verdict;badge.className=`pill ${j.verdict==='CHALLENGER_LEADING'?'buy':j.verdict==='CHAMPION_LEADING'?'sell':'neutral'}`;
-  note.innerHTML=`<div><b>Verdict:</b> ${j.verdict}</div><div class="muted tiny">Forward observations only. Challenger never changes the Champion's live/research decision in Alpha 15.</div>`;
+  note.innerHTML=`<div><b>Research verdict:</b> ${j.verdict}</div><div class="muted tiny">Forward research observations only. Champion/Challenger uses the legacy Research /100 lane and never changes Production qualification (68-point Production score + Geometry Gate).</div>`;
   window.ATLAS_FORWARD_STATS=j;
  }catch(e){badge.textContent='OFFLINE';badge.className='pill sell';note.textContent=e.message;}
 }
 async function record(){
- const x=payload(),note=$('forwardNotes');if(!x){note.textContent='No valid current trade plan to freeze.';return;}
+ const x=payload(),note=$('forwardNotes');if(!x){note.textContent='No valid current research trade plan to freeze.';return;}
  const r=await fetch('/api/forward/observe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(x)}).then(r=>r.json());
- note.innerHTML=`Frozen ${r.symbol} ${r.direction}: Champion ${r.champion_score} → Challenger ${r.challenger_score}; matched rules: ${(r.matched_promoted_tags||[]).join(' · ')||'none'}.`;
+ note.innerHTML=`Frozen research observation ${r.symbol} ${r.direction}: Champion ${r.champion_score}/100 → Challenger ${r.challenger_score}/100; matched rules: ${(r.matched_promoted_tags||[]).join(' · ')||'none'}. Production qualification is separate.`;
  await stats();
 }
 $('forwardRecordBtn')?.addEventListener('click',record);

@@ -1,6 +1,5 @@
 (() => {
 const $=id=>document.getElementById(id);
-const UNIVERSE=['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT'];
 const SETTINGS_KEY='atlas.continuousForwardSettings';
 let timer=null,lastRun=0;
 function getSettings(){
@@ -49,14 +48,14 @@ async function recordRows(rows){
 async function runCycle(){
  const s=getSettings();if(!s.enabled)return;
  const badge=$('continuousBadge'),note=$('continuousNotes');lastRun=Date.now();
- if(badge){badge.textContent='SCANNING';badge.className='pill working';}
+ if(badge){badge.textContent='SCANNING RESEARCH';badge.className='pill working';}
  try{
-  if(!window.runAtlasOpportunityScan)throw new Error('Opportunity scanner is not ready.');
+  if(!window.runAtlasOpportunityScan)throw new Error('Research Opportunity Scanner is not ready.');
   await window.runAtlasOpportunityScan();
   const result=await recordRows(window.ATLAS_OPPORTUNITY_ROWS||[]);
   await fetch('/api/forward/update',{method:'POST'}).catch(()=>null);
-  if(note)note.innerHTML=`Last cycle: ${new Date().toLocaleString()} · ${result.stored} stored · ${result.dedup} deduped · ${result.errors} errors · ${result.candidates} qualifying candidates.`;
-  if(badge){badge.textContent='ACTIVE';badge.className='pill buy';}
+  if(note)note.innerHTML=`Last research cycle: ${new Date().toLocaleString()} · ${result.stored} stored · ${result.dedup} deduped · ${result.errors} errors · ${result.candidates} qualifying Research /100 candidates.<div class="muted tiny">This browser lab does not use the Production 68-point qualification and cannot open a Production trade.</div>`;
+  if(badge){badge.textContent='RESEARCH ACTIVE';badge.className='pill buy';}
   if(window.refreshPerformanceDashboard)window.refreshPerformanceDashboard();
  }catch(e){
   if(note)note.textContent=e.message;if(badge){badge.textContent='ERROR';badge.className='pill sell';}
@@ -74,7 +73,8 @@ function loadUI(){
  if($('continuousInterval'))$('continuousInterval').value=s.intervalMinutes;
  if($('continuousMinScore'))$('continuousMinScore').value=s.minScore;
  if($('continuousMaxPerScan'))$('continuousMaxPerScan').value=s.maxPerScan;
- const badge=$('continuousBadge');if(badge){badge.textContent=s.enabled?'ACTIVE':'OFF';badge.className=`pill ${s.enabled?'buy':'neutral'}`;}
+ const badge=$('continuousBadge');if(badge){badge.textContent=s.enabled?'RESEARCH ACTIVE':'OFF';badge.className=`pill ${s.enabled?'buy':'neutral'}`;}
+ const note=$('continuousNotes');if(note&&!s.enabled)note.innerHTML='Browser Research /100 lane is off. Production qualification is separate and continues server-side.';
 }
 $('continuousSaveBtn')?.addEventListener('click',()=>{
  const s={enabled:!!$('continuousEnabled')?.checked,intervalMinutes:Number($('continuousInterval')?.value||60),
