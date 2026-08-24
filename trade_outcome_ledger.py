@@ -2,12 +2,20 @@
 
 This module never changes scores, thresholds, signals, archives, or execution.
 It classifies already-matured directional observations as WIN / LOSS / FLAT
-using the canonical forward_return_pct captured by ATLAS. By default the ledger
-shows signal-qualified observations only (champion_take=True); research-only
-samples are available explicitly with scope=all.
+using the canonical forward_return_pct captured by ATLAS.
+
+Scope semantics:
+- signals: strict Production-qualified observations only.
+- champions: broader research champion lane (legacy champion_take=True).
+- all: every directional forward observation.
+
+Legacy rows that predate explicit production_signal_qualified are classified
+using their frozen score and threshold when available, falling back to the
+current historical Production threshold of 68.
 """
 
 HORIZONS = (1, 4, 12, 24)
+LEGACY_PRODUCTION_THRESHOLD = 68.0
 
 
 def _fnum(value):
@@ -15,6 +23,26 @@ def _fnum(value):
         return float(value) if value is not None else None
     except (TypeError, ValueError):
         return None
+
+
+def _score(row):
+    return _fnum(row.get('final_score')) if row.get('final_score') is not None else _fnum(row.get('champion_score'))
+
+
+def is_production_signal(row):
+    if 'production_signal_qualified' in row:
+        return bool(row.get('production_signal_qualified'))
+    score = _score(row)
+    threshold = _fnum(row.get('signal_threshold'))
+    if threshold is None:
+        threshold = LEGACY_PRODUCTION_THRESHOLD
+    return bool(score is not None and score >= threshold)
+
+
+def is_research_champion(row):
+    if 'research_champion_take' in row:
+        return bool(row.get('research_champion_take'))
+    return bool(row.get('champion_take'))
 
 
 def _directional_return(row, horizon):
@@ -44,6 +72,8 @@ def classify_row(row, horizon=24):
     else:
         outcome = 'FLAT'
 
+    production_qualified = is_production_signal(row)
+    research_champion = is_research_champion(row)
     return {
         'id': row.get('id'),
         'captured_at': row.get('captured_at'),
@@ -51,10 +81,13 @@ def classify_row(row, horizon=24):
         'symbol': row.get('symbol'),
         'direction': row.get('direction'),
         'entry': _fnum(row.get('entry')),
-        'score': _fnum(row.get('final_score')) if row.get('final_score') is not None else _fnum(row.get('champion_score')),
+        'score': _score(row),
+        'signal_threshold': _fnum(row.get('signal_threshold')) or LEGACY_PRODUCTION_THRESHOLD,
         'playbook': row.get('playbook_primary'),
         'source': row.get('auto_source'),
-        'signal_qualified': bool(row.get('champion_take')),
+        'signal_qualified': production_qualified,
+        'production_signal_qualified': production_qualified,
+        'research_champion': research_champion,
         'research_sampling_lane': bool(row.get('research_sampling_lane')),
         'horizon_h': horizon,
         'market_return_pct': raw_return,
@@ -71,14 +104,16 @@ def classify_row(row, horizon=24):
 
 def build_ledger(rows, horizon=24, scope='signals', symbol=None, limit=200):
     scope = str(scope or 'signals').lower()
-    if scope not in ('signals', 'all'):
-        raise ValueError('scope must be signals or all')
+    if scope not in ('signals', 'champions', 'all'):
+        raise ValueError('scope must be signals, champions or all')
     symbol = str(symbol or '').upper() or None
     selected = []
     for row in rows or []:
         if str(row.get('direction') or '').upper() not in ('LONG', 'SHORT'):
             continue
-        if scope == 'signals' and not bool(row.get('champion_take')):
+        if scope == 'signals' and not is_production_signal(row):
+            continue
+        if scope == 'champions' and not is_research_champion(row):
             continue
         if symbol and str(row.get('symbol') or '').upper() != symbol:
             continue
@@ -117,9 +152,14 @@ def summarize(rows, horizon=24, scope='signals'):
         by_symbol.setdefault(item.get('symbol') or 'UNKNOWN', []).append(item)
         by_direction.setdefault(item.get('direction') or 'UNKNOWN', []).append(item)
     return {
-        'schema': 'ATLAS_TRADE_OUTCOME_SUMMARY_V1',
+        'schema': 'ATLAS_TRADE_OUTCOME_SUMMARY_V2',
         'horizon_h': int(horizon),
         'scope': scope,
+        'scope_semantics': {
+            'signals': 'Production-qualified only',
+            'champions': 'Broader research champion lane',
+            'all': 'All directional forward observations',
+        },
         'overall': _bucket(ledger),
         'by_symbol': {k: _bucket(v) for k, v in sorted(by_symbol.items())},
         'by_direction': {k: _bucket(v) for k, v in sorted(by_direction.items())},
