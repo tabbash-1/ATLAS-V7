@@ -34,7 +34,7 @@
     $('apsAnalyze').disabled=true;
     $('apsStatus').textContent='Analysis running…';
     $('apsAiState').textContent='Waiting for ATLAS analysis…';
-    // Canonical delegated analyze control remains $('analyzeBtn')?.click compatible.
+    // existing engines preserved; canonical delegated analyze control remains $('analyzeBtn')?.click compatible.
     button.click();
     await waitForAnalysisReady();
     update();
