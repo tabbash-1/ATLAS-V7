@@ -1,0 +1,36 @@
+name: ATLAS Outcome Settlement
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'trade_outcome_runtime.py'
+      - 'trade_outcome_ledger.py'
+      - 'trade_path_settlement.py'
+      - 'tests/test_trade_outcome_runtime.py'
+      - '.github/workflows/atlas-outcome-settlement.yml'
+
+jobs:
+  outcome-settlement:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax
+        run: python -m py_compile trade_outcome_runtime.py trade_outcome_ledger.py trade_path_settlement.py tests/test_trade_outcome_runtime.py
+      - name: Outcome runtime regression
+        run: PYTHONPATH=. python tests/test_trade_outcome_runtime.py
+      - name: Existing outcome regressions
+        run: |
+          PYTHONPATH=. python tests/test_trade_outcome_ledger.py
+          PYTHONPATH=. python tests/test_trade_path_settlement.py
+      - name: Safety invariants
+        run: |
+          grep -q "default_scope': 'signals'" trade_outcome_runtime.py
+          grep -q 'SETTLEMENT_INTERVAL_SECONDS = 900' trade_outcome_runtime.py
+          grep -q '/api/outcomes/settlement-status' trade_outcome_runtime.py
+          grep -q 'live_execution.*False' trade_outcome_runtime.py
+          grep -q 'production_signal_qualified' trade_outcome_ledger.py
