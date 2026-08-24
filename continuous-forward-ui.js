@@ -67,8 +67,18 @@ function schedule(){
  const ms=Math.max(15,Number(s.intervalMinutes||60))*60*1000;
  timer=setInterval(()=>runCycle(),ms);
 }
+function clarifyScoreControl(){
+ const input=$('continuousMinScore'),label=input?.closest?.('label');
+ if(!input||!label||label.dataset.researchScoreLabel==='1')return;
+ const nodes=[...label.childNodes];
+ const textNode=nodes.find(n=>n.nodeType===3);
+ if(textNode)textNode.textContent='Research minimum Final Score (/100)';
+ label.dataset.researchScoreLabel='1';
+ input.title='Research /100 score only — separate from Production 68-point qualification';
+}
 function loadUI(){
  const s=getSettings();
+ clarifyScoreControl();
  if($('continuousEnabled'))$('continuousEnabled').checked=!!s.enabled;
  if($('continuousInterval'))$('continuousInterval').value=s.intervalMinutes;
  if($('continuousMinScore'))$('continuousMinScore').value=s.minScore;
