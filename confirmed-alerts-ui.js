@@ -10,14 +10,22 @@ function save(){localStorage.setItem(KEY,JSON.stringify(settings));}
 function saveSeen(){localStorage.setItem(SEEN,JSON.stringify([...seen].slice(-200)));}
 function fmt(v,d=2){return v==null?'—':Number(v).toFixed(d);}
 function tone(direction){return direction==='LONG'?'buy':'sell';}
+function markResearchLane(){
+  const badge=$('confirmedAlertBadge');
+  const card=badge?.closest('.card');
+  const title=card?.querySelector('.card-head strong');
+  const sub=card?.querySelector('.card-head .muted.small');
+  if(title)title.textContent='ATLAS RESEARCH OPPORTUNITY ALERTS — ALPHA 25';
+  if(sub)sub.textContent='Legacy /100 research lane · not Production qualification · does not override Production 68 + Geometry Gate.';
+}
 
 function toast(a){
   const host=$('atlasAlertToastHost');if(!host)return;
   const el=document.createElement('div');
   el.className=`atlas-alert-toast ${tone(a.direction)}`;
-  el.innerHTML=`<div class="alert-toast-top"><strong>ATLAS CONFIRMED ${a.direction}</strong><span>${a.score}/100</span></div>
+  el.innerHTML=`<div class="alert-toast-top"><strong>ATLAS RESEARCH ${a.direction}</strong><span>${a.score}/100 research</span></div>
     <div class="alert-toast-symbol">${a.symbol}</div>
-    <div class="alert-toast-meta">Entry ${fmt(a.entry)} · R:R ${fmt(a.rr_tp2)} · ${a.playbook||'Confirmed setup'}</div>`;
+    <div class="alert-toast-meta">Entry ${fmt(a.entry)} · R:R ${fmt(a.rr_tp2)} · ${a.playbook||'Research setup'} · NOT Production-qualified</div>`;
   host.prepend(el);setTimeout(()=>el.classList.add('show'),20);setTimeout(()=>{el.classList.remove('show');setTimeout(()=>el.remove(),300)},9000);
 }
 function beep(){
@@ -31,7 +39,7 @@ function beep(){
 }
 function browserNotify(a){
   if(!settings.browser || !('Notification' in window) || Notification.permission!=='granted')return;
-  try{new Notification(`ATLAS CONFIRMED ${a.direction} · ${a.symbol}`,{body:`Score ${a.score}/100 · Entry ${fmt(a.entry)} · R:R ${fmt(a.rr_tp2)} · ${a.playbook||''}`,tag:`atlas-${a.symbol}-${a.direction}`});}catch{}
+  try{new Notification(`ATLAS RESEARCH ${a.direction} · ${a.symbol}`,{body:`Research score ${a.score}/100 · Entry ${fmt(a.entry)} · R:R ${fmt(a.rr_tp2)} · Not Production-qualified`,tag:`atlas-research-${a.symbol}-${a.direction}`});}catch{}
 }
 function announce(a){
   if(!a?.id||seen.has(a.id))return;
@@ -53,7 +61,7 @@ function rowPayload(r){
     playbook_primary:r.playbook?.primary?.id,
     regime:r.regime?.regime,
     portfolio_allowed:portfolioAllowed,
-    store:true,source:'BROWSER_ALPHA25'
+    store:true,source:'BROWSER_ALPHA25_RESEARCH'
   };
 }
 async function evaluateRows(rows){
@@ -68,23 +76,24 @@ async function evaluateRows(rows){
   refresh();
 }
 async function refresh(){
+  markResearchLane();
   const badge=$('confirmedAlertBadge'),grid=$('confirmedAlertMetrics'),body=$('confirmedAlertBody'),note=$('confirmedAlertNotes');
   if(!grid||!body)return;
   try{
     const j=await fetch('/api/alerts/status').then(r=>r.json()),p=j.policy||{},rows=j.recent||[];
     grid.innerHTML=[
-      ['Confirmed alerts',j.total_alerts||0],['Min score',p.min_score??'—'],['Min R:R',p.min_rr_tp2??'—'],
+      ['Research alerts',j.total_alerts||0],['Research min score',p.min_score??'—'],['Min R:R',p.min_rr_tp2??'—'],
       ['Min Volume',p.min_volume_quality??'—'],['Cooldown',p.cooldown_minutes?`${p.cooldown_minutes} min`:'—'],
-      ['Browser alerts',settings.browser?'ON':'OFF']
+      ['Browser research alerts',settings.browser?'ON':'OFF']
     ].map(([k,v])=>`<div><span>${k}</span><b>${v}</b></div>`).join('');
-    body.innerHTML=rows.length?rows.slice(0,10).map(a=>`<tr><td>${a.created_at?.replace('T',' ').slice(0,16)||'—'}</td><td>${a.symbol}</td><td><span class="pill ${tone(a.direction)}">${a.direction}</span></td><td>${fmt(a.score,0)}</td><td>${fmt(a.entry)}</td><td>${fmt(a.rr_tp2)}</td><td>${a.playbook||'—'}</td></tr>`).join(''):'<tr><td colspan="7">No confirmed opportunity has fired yet.</td></tr>';
-    note.innerHTML=`<div><b>Alert rule:</b> high score + valid plan + R:R + volume confirmation + no strong Futures conflict + no risk/data/drift block.</div><div class="muted tiny">Confirmed means ATLAS conditions are satisfied, not guaranteed profit. Same symbol + direction is suppressed during cooldown.</div>`;
-    badge.textContent='ARMED';badge.className='pill buy';
+    body.innerHTML=rows.length?rows.slice(0,10).map(a=>`<tr><td>${a.created_at?.replace('T',' ').slice(0,16)||'—'}</td><td>${a.symbol}</td><td><span class="pill ${tone(a.direction)}">${a.direction}</span></td><td>${fmt(a.score,0)}</td><td>${fmt(a.entry)}</td><td>${fmt(a.rr_tp2)}</td><td>${a.playbook||'—'}</td></tr>`).join(''):'<tr><td colspan="7">No research opportunity alert has fired yet.</td></tr>';
+    note.innerHTML=`<div><b>Research alert rule:</b> legacy /100 opportunity score + valid research plan + R:R + volume confirmation + no strong Futures conflict + no research risk/data/drift block.</div><div class="muted tiny"><b>Important:</b> this lane is research-only. It is not a Production 68 signal and cannot override Production qualification or the Geometry Gate.</div>`;
+    badge.textContent='RESEARCH ARMED';badge.className='pill working';
     rows.slice().reverse().forEach(a=>announce(a));
   }catch(e){badge.textContent='OFFLINE';badge.className='pill sell';note.textContent=e.message;}
 }
 async function enableBrowser(){
-  if(!('Notification' in window)){alert('Browser notifications are not supported here. In-app alerts will still work.');return;}
+  if(!('Notification' in window)){alert('Browser notifications are not supported here. In-app research alerts will still work.');return;}
   const p=await Notification.requestPermission();
   settings.browser=p==='granted';save();refresh();
 }
@@ -92,6 +101,7 @@ $('alertEnableBrowserBtn')?.addEventListener('click',enableBrowser);
 $('alertSoundBtn')?.addEventListener('click',()=>{settings.sound=!settings.sound;save();$('alertSoundBtn').textContent=settings.sound?'Sound: ON':'Sound: OFF';});
 $('alertRefreshBtn')?.addEventListener('click',refresh);
 if($('alertSoundBtn'))$('alertSoundBtn').textContent=settings.sound?'Sound: ON':'Sound: OFF';
+markResearchLane();
 window.addEventListener('atlas:opportunity-scan-complete',e=>evaluateRows(e.detail?.rows||[]));
 window.refreshConfirmedAlerts=refresh;
 setTimeout(refresh,8200);setInterval(refresh,60000);
