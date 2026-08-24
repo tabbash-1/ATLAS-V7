@@ -152,7 +152,7 @@ def summarize(rows, horizon=24, scope='signals'):
         by_symbol.setdefault(item.get('symbol') or 'UNKNOWN', []).append(item)
         by_direction.setdefault(item.get('direction') or 'UNKNOWN', []).append(item)
     return {
-        'schema': 'ATLAS_TRADE_OUTCOME_SUMMARY_V2',
+        'schema': 'ATLAS_TRADE_OUTCOME_SUMMARY_V1',
         'horizon_h': int(horizon),
         'scope': scope,
         'scope_semantics': {
