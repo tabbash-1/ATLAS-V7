@@ -30,15 +30,12 @@ if index_path.exists():
     versioned=f'<script src="theme-toggle.js?v={release_token}"></script>\n  <script src="atlas-product-shell.js?v={release_token}"></script>'
     if old_theme in html: html=html.replace(old_theme,versioned,1)
 
-    # Make today's AI upgrade a first-class, always-visible Production panel.
-    # JS only populates it; it no longer has to create the UI dynamically.
     if 'id="atlasAiCouncilCard"' not in html:
         panel='''\n      <section id="atlasAiCouncilCard" class="card metrics-card ai-council-card">\n        <div class="card-head"><div><strong>ATLAS AI TRADE COUNCIL</strong><div class="muted small">Production + Tactical 1–3H + Bull/Bear + Counterfactual + Hybrid Judge</div></div><span id="aiCouncilBadge" class="pill neutral">WAITING</span></div>\n        <div class="ai-council-grid">\n          <div class="ai-kpi"><span>Production</span><b id="aiProdDecision">—</b><small id="aiProdScore">—</small></div>\n          <div class="ai-kpi"><span>Tactical 1–3H</span><b id="aiTactical">—</b><small id="aiTacticalRR">—</small></div>\n          <div class="ai-kpi"><span>AI Judge</span><b id="aiJudge">—</b><small id="aiConfidence">—</small></div>\n          <div class="ai-kpi"><span>Hybrid</span><b id="aiHybrid">—</b><small id="aiHybridSub">—</small></div>\n        </div>\n        <div class="ai-council-split">\n          <div class="ai-case"><div class="panel-title">BULL CASE</div><div id="aiBullCase" class="muted small">Waiting for analysis.</div></div>\n          <div class="ai-case"><div class="panel-title">BEAR CASE</div><div id="aiBearCase" class="muted small">Waiting for analysis.</div></div>\n        </div>\n        <div class="ai-counterfactual"><div class="panel-title">BEST ACTION / COUNTERFACTUAL</div><div id="aiBestAction" class="ai-best-action">—</div><div id="aiGeometry" class="muted small">—</div><div id="aiTrigger" class="muted tiny">—</div></div>\n        <div id="aiEvidence" class="comparison-box muted small">Evidence will appear after Analyze Live.</div>\n      </section>\n'''
         anchor='<section class="grid lower-grid">'
         if anchor in html: html=html.replace(anchor,panel+'\n      '+anchor,1)
         else: html=html.replace('</main>',panel+'\n    </main>',1)
 
-    # Always rewrite the decision UI script to the exact deployed commit token.
     decision_script=f'<script src="atlas-production-decision.js?v={release_token}"></script>'
     html=re.sub(r'<script[^>]+src=["\']atlas-production-decision\.js(?:\?[^"\']*)?["\'][^>]*></script>','',html)
     html=html.replace('</body>',f'  {decision_script}\n</body>',1) if '</body>' in html else html+'\n'+decision_script+'\n'
@@ -50,9 +47,6 @@ if app_path.exists():
 import collector_server as _collector
 if 'HYPEUSDT' not in _collector.ON_DEMAND_SYMBOLS: _collector.ON_DEMAND_SYMBOLS=tuple(_collector.ON_DEMAND_SYMBOLS)+('HYPEUSDT',)
 from hype_market_data import install as _install_hype_market_data; _install_hype_market_data(_collector)
-# Keep a fresh provider-specific futures context for every research asset. This
-# feeds research/shadow evidence only; Production validation semantics remain
-# unchanged in production_signal_scoring.py.
 _collector.SYMBOLS=tuple(_collector.ON_DEMAND_SYMBOLS)
 _original_end_headers=_collector.Handler.end_headers
 def _production_no_cache_headers(self):
@@ -61,6 +55,7 @@ _collector.Handler.end_headers=_production_no_cache_headers
 from storage_hardening import install as _install_storage_hardening; _install_storage_hardening(_collector)
 from production_signal_scoring import install as _install_production_signal_scoring; _install_production_signal_scoring(_collector)
 from production_decision_api import install as _install_production_decision_api; _install_production_decision_api(_collector)
+from decision_engine_v7 import install as _install_decision_engine_v7; _install_decision_engine_v7(_collector)
 from ai_trade_council import install as _install_ai_trade_council; _install_ai_trade_council(_collector)
 from research_memory_bridge import install as _install_research_memory_bridge; _install_research_memory_bridge(_collector)
 from trade_path_settlement import install_geometry_freezer as _install_trade_geometry_freezer; _install_trade_geometry_freezer(_collector)
