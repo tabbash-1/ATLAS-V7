@@ -39,14 +39,13 @@ jobs:
           fetch_json() {
             name="$1"
             path="$2"
+            max_time="${3:-90}"
             url="${BASE_URL}${path}"
             out="status/raw/${name}.json"
-            code="$(curl -L --retry 3 --retry-all-errors --connect-timeout 20 --max-time 90 -sS -w '%{http_code}' -o "${out}.tmp" "$url" || true)"
-            if [[ "$code" =~ ^2 ]]; then
-              if jq -e . "${out}.tmp" >/dev/null 2>&1; then
-                mv "${out}.tmp" "$out"
-                return 0
-              fi
+            code="$(curl -L --retry 4 --retry-delay 3 --retry-all-errors --connect-timeout 20 --max-time "$max_time" -sS -w '%{http_code}' -o "${out}.tmp" "$url" || true)"
+            if [[ "$code" =~ ^2 ]] && jq -e . "${out}.tmp" >/dev/null 2>&1; then
+              mv "${out}.tmp" "$out"
+              return 0
             fi
             python3 - "$url" "$code" "${out}.tmp" "$out" <<'PY'
           import json, pathlib, sys
@@ -54,14 +53,11 @@ jobs:
           body = ''
           p = pathlib.Path(tmp)
           if p.exists():
-              body = p.read_text(errors='replace')[:2000]
+              body = p.read_text(errors='replace')[:1200]
               p.unlink(missing_ok=True)
           pathlib.Path(out).write_text(json.dumps({
-              'ok': False,
-              'url': url,
-              'http_code': code,
-              'error': 'fetch_failed_or_non_json',
-              'body_preview': body,
+              'ok': False, 'url': url, 'http_code': code,
+              'error': 'fetch_failed_or_non_json', 'body_preview': body,
           }, indent=2))
           PY
             return 1
@@ -72,13 +68,43 @@ jobs:
           fetch_json outcomes /api/outcomes/summary || true
           fetch_json geometry /api/outcomes/geometry-status || true
 
-          for s in BTCUSDT ETHUSDT SOLUSDT XRPUSDT BNBUSDT DOGEUSDT ZECUSDT; do
-            fetch_json "decision_${s}" "/api/decision/current?symbol=${s}" || true
-          done
+          # One server-side snapshot replaces seven independent Render requests.
+          fetch_json decisions_all /api/decision/all 150 || true
+
+          python3 - <<'PY'
+          import json, pathlib, subprocess, time
+          root=pathlib.Path('status/raw')
+          symbols=['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT']
+          bulk={}
+          p=root/'decisions_all.json'
+          try:
+              obj=json.loads(p.read_text())
+              if obj.get('ok') and isinstance(obj.get('decisions'),dict):
+                  bulk=obj['decisions']
+          except Exception:
+              pass
+          for s in symbols:
+              d=bulk.get(s)
+              if isinstance(d,dict) and d.get('ok'):
+                  (root/f'decision_{s}.json').write_text(json.dumps(d,indent=2,sort_keys=True))
+                  continue
+              # Fallback only for the missing/failed symbol, with spacing to avoid bursts.
+              time.sleep(2)
+              url=f'https://atlas-v7.onrender.com/api/decision/current?symbol={s}'
+              out=root/f'decision_{s}.json'
+              cp=subprocess.run(['curl','-L','--retry','4','--retry-delay','3','--retry-all-errors','--connect-timeout','20','--max-time','90','-sS','-w','\n%{http_code}',url],capture_output=True,text=True)
+              body,_,code=cp.stdout.rpartition('\n')
+              try:
+                  val=json.loads(body)
+                  if code.startswith('2') and isinstance(val,dict):
+                      out.write_text(json.dumps(val,indent=2,sort_keys=True)); continue
+              except Exception:
+                  pass
+              out.write_text(json.dumps({'ok':False,'url':url,'http_code':code,'error':'fetch_failed_or_non_json','body_preview':body[:1200]},indent=2))
+          PY
 
           python3 - <<'PY'
           import json, pathlib, datetime
-
           root = pathlib.Path('status/raw')
           def load(name):
               p = root / f'{name}.json'
@@ -88,48 +114,30 @@ jobs:
 
           symbols=['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT']
           decisions={s:load('decision_'+s) for s in symbols}
-          qualified=[]
-          waits=[]
-          failures=[]
+          qualified=[]; waits=[]; failures=[]
           for s,d in decisions.items():
               if not d.get('ok'):
                   failures.append({'symbol':s,'error':d.get('error'),'http_code':d.get('http_code')})
               elif d.get('signal_qualified'):
-                  qualified.append({
-                      'symbol':s,'decision':d.get('decision'),'score':d.get('score'),
-                      'threshold':d.get('signal_threshold'),'rr':d.get('risk_reward'),
-                      'playbook':d.get('playbook'),'generated_at':d.get('generated_at')
-                  })
+                  qualified.append({'symbol':s,'decision':d.get('decision'),'score':d.get('score'),'threshold':d.get('signal_threshold'),'rr':d.get('risk_reward'),'playbook':d.get('playbook'),'generated_at':d.get('generated_at')})
               else:
-                  waits.append({
-                      'symbol':s,'candidate':d.get('candidate_direction'),'score':d.get('score'),
-                      'threshold':d.get('signal_threshold'),'reason':d.get('wait_reason'),
-                      'score_gap_to_signal':d.get('score_gap_to_signal'),
-                      'score_attribution':d.get('score_attribution')
-                  })
+                  waits.append({'symbol':s,'candidate':d.get('candidate_direction'),'score':d.get('score'),'threshold':d.get('signal_threshold'),'reason':d.get('wait_reason'),'score_gap_to_signal':d.get('score_gap_to_signal'),'score_attribution':d.get('score_attribution')})
 
-          runtime=load('runtime')
-          readiness=load('readiness')
-          outcomes=load('outcomes')
-          geometry=load('geometry')
-          now=datetime.datetime.now(datetime.timezone.utc).isoformat()
           summary={
-              'schema':'ATLAS_PRODUCTION_SNAPSHOT_V1',
-              'captured_at':now,
+              'schema':'ATLAS_PRODUCTION_SNAPSHOT_V2',
+              'captured_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),
               'source':'https://atlas-v7.onrender.com',
-              'runtime':runtime,
-              'readiness':readiness,
-              'outcomes':outcomes,
-              'geometry_status':geometry,
+              'runtime':load('runtime'),
+              'readiness':load('readiness'),
+              'outcomes':load('outcomes'),
+              'geometry_status':load('geometry'),
+              'bulk_decisions':load('decisions_all'),
               'decisions':decisions,
               'decision_summary':{
                   'supported_assets':symbols,
-                  'qualified_count':len(qualified),
-                  'qualified':qualified,
-                  'wait_count':len(waits),
-                  'waits':waits,
-                  'failed_count':len(failures),
-                  'failures':failures,
+                  'qualified_count':len(qualified),'qualified':qualified,
+                  'wait_count':len(waits),'waits':waits,
+                  'failed_count':len(failures),'failures':failures,
               }
           }
           pathlib.Path('status/atlas-production-latest.json').write_text(json.dumps(summary,indent=2,sort_keys=True))
