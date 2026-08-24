@@ -45,9 +45,14 @@
     });
   }
 
-  const PRODUCT_SHELL_VERSION='rr-clarity-v2';
+  const PRODUCT_SHELL_VERSION='production-score-label-lock-v1';
   loadScript(`atlas-product-shell.js?v=${PRODUCT_SHELL_VERSION}`,'atlas-product-shell')
     .then(async()=>{
+      try{
+        await loadScript('atlas-production-label-lock.js?v=1','atlas-production-label-lock');
+      }catch(err){
+        console.error('ATLAS Production label lock failed:',err);
+      }
       window.dispatchEvent(new CustomEvent('atlas:product-shell-ready'));
       try{
         await loadScript('atlas-decision-explanation.js?v=3','atlas-decision-explanation');
