@@ -1,0 +1,28 @@
+name: ATLAS Production Reliability
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  reliability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax
+        run: python -m py_compile production_reliability.py tests/test_production_reliability.py cloud_start.py
+      - name: Reliability regressions
+        run: PYTHONPATH=. python tests/test_production_reliability.py
+      - name: Preserve Production safety contract
+        run: |
+          grep -q 'ATLAS_CLOUD_FORWARD_MIN_SCORE.*68' cloud_start.py
+          grep -q 'production_unchanged' production_reliability.py
+          grep -q 'requires_requalification' production_reliability.py
+          grep -q 'futures_evidence_validated.*False' production_reliability.py
+          grep -q '_install_production_reliability' cloud_start.py
