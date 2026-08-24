@@ -63,8 +63,23 @@ if index_path.exists():
             html += '\n' + decision_script + '\n'
     index_path.write_text(html, encoding="utf-8")
 
+# Keep HYPE visible in the default browser watchlist without disturbing saved user lists.
+app_path = BASE / "app.js"
+if app_path.exists():
+    app_js = app_path.read_text(encoding="utf-8")
+    hype_asset = "  { name: 'Hyperliquid / USDT', symbol: 'BINANCE:HYPEUSDT', cls: 'Crypto' },\n"
+    if "BINANCE:HYPEUSDT" not in app_js:
+        anchor = "  { name: 'Zcash / USDT', symbol: 'BINANCE:ZECUSDT', cls: 'Crypto' },\n"
+        if anchor in app_js:
+            app_js = app_js.replace(anchor, anchor + hype_asset, 1)
+            app_path.write_text(app_js, encoding="utf-8")
+
 # Force browsers to revalidate the UI after each production deploy.
 import collector_server as _collector
+# Extend the supported Production/research universe before installing scorers and runtimes.
+if 'HYPEUSDT' not in _collector.ON_DEMAND_SYMBOLS:
+    _collector.ON_DEMAND_SYMBOLS = tuple(_collector.ON_DEMAND_SYMBOLS) + ('HYPEUSDT',)
+
 _original_end_headers = _collector.Handler.end_headers
 
 def _production_no_cache_headers(self):
