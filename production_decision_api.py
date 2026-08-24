@@ -1,11 +1,13 @@
 """Single source of truth for the ATLAS browser decision card.
 
-Adds a research-only tactical 1-3h lane alongside the unchanged production
-swing decision. Tactical targets use tradable recent swing levels rather than
-microscopic nearest support/resistance noise.
+Adds research-only tactical and quick-trade lanes alongside the unchanged
+production swing decision. The production threshold is never weakened here.
+Quick Trade is a shadow classifier for short 1-2h opportunities: it requires
+real directional evidence and treats a nearby swing obstacle as an exit boundary
+rather than automatically promoting the setup into a swing trade.
 """
 
-VERSION = "PRODUCTION_DECISION_API_V4_TACTICAL_SWING_LEVELS"
+VERSION = "PRODUCTION_DECISION_API_V5_QUICK_TRADE_SHADOW"
 
 
 def install(atlas):
@@ -96,7 +98,28 @@ def install(atlas):
             else:
                 tactical.update({'direction':tdir,'reason':'NO_TRADABLE_SWING_LEVEL'})
 
-        return {'ok':True,'source':VERSION,'scoring_version':(row or {}).get('scoring_version') if isinstance(row,dict) else None,'symbol':symbol,'decision':decision,'candidate_direction':candidate_direction,'signal_qualified':qualified,'wait_reason':None if qualified else reason,'score':score,'signal_threshold':threshold,'score_gap_to_signal':round(threshold-score,3) if score is not None and score<threshold else 0,'score_attribution':(row or {}).get('score_attribution') if isinstance(row,dict) else None,'entry':px,'stop_loss':stop,'take_profit':target,'risk_reward':rr,'direction_votes':(row or {}).get('direction_votes') if isinstance(row,dict) else max(long_votes,short_votes),'direction_votes_long':(row or {}).get('direction_votes_long') if isinstance(row,dict) else long_votes,'direction_votes_short':(row or {}).get('direction_votes_short') if isinstance(row,dict) else short_votes,'execution_decision':(row or {}).get('execution_decision') if isinstance(row,dict) else None,'trade_plan_status':(row or {}).get('trade_plan_status') if isinstance(row,dict) else None,'playbook':(row or {}).get('playbook_primary') if isinstance(row,dict) else None,'futures_available':(row or {}).get('futures_available') if isinstance(row,dict) else None,'futures_provider':(row or {}).get('futures_provider') if isinstance(row,dict) else None,'futures_score':(row or {}).get('futures_score') if isinstance(row,dict) else None,'relative_strength_score':(row or {}).get('relative_strength_score') if isinstance(row,dict) else None,'volume_quality':(row or {}).get('volume_quality') if isinstance(row,dict) else None,'relative_volume':(row or {}).get('relative_volume') if isinstance(row,dict) else round(rv,3),'regime':(row or {}).get('regime') if isinstance(row,dict) else None,'tactical_opportunity':tactical,'timeframe_matrix':{'tactical_1_3h':tactical,'swing':{'status':decision,'direction':candidate_direction,'score':score,'threshold':threshold,'risk_reward':rr},'macro':{'status':'CONTEXT_ONLY','note':'Daily/weekly independent scorer is the next lane; tactical does not override swing production safeguards.'}},'indicators':{'ema20':ema20,'ema50':ema50,'rsi14':rsi,'atr14':atr,'volume_ratio':rv,'momentum_24h_pct':mom24},'generated_at':atlas.now_iso(),'research_only':True,'live_execution':False}
+        # QUICK TRADE never overrides Production. It only classifies whether a
+        # rejected/WAIT setup deserves a 1-2h shadow test. We deliberately keep
+        # the rule conservative until enough forward outcomes exist.
+        quick={'status':'WAIT','direction':tdir,'horizon':'1-2H','entry':None,'target':None,'stop_loss':None,'risk_reward':None,'confidence':0,'reason':'NO_QUICK_SETUP','shadow_only':True,'can_override_production':False}
+        trr=tactical.get('risk_reward')
+        aligned_candidate=bool(tdir and candidate_direction==tdir)
+        score_near=bool(score is not None and score >= threshold-12)  # research band, not a production threshold
+        strong_votes=max(long_votes,short_votes)>=4 and tdir is not None
+        geometry_ok=bool(trr is not None and trr>=0.8 and tactical.get('target') is not None and tactical.get('stop_loss') is not None)
+        if decision=='WAIT' and tdir and geometry_ok:
+            if aligned_candidate and score_near:
+                quick={'status':'QUICK_TRADE_SHADOW','direction':tdir,'horizon':'1-2H','entry':px,'target':tactical.get('target'),'stop_loss':tactical.get('stop_loss'),'risk_reward':trr,'confidence':min(88,int(tactical.get('confidence') or 0)+6),'reason':'DIRECTIONAL_CANDIDATE_NEAR_THRESHOLD_WITH_SHORT_TERM_GEOMETRY','exit_rule':'EXIT_AT_OR_BEFORE_NEARBY_SWING_OBSTACLE','shadow_only':True,'can_override_production':False}
+            elif strong_votes:
+                quick={'status':'WATCH_ONLY','direction':tdir,'horizon':'1-2H','entry':px,'target':tactical.get('target'),'stop_loss':tactical.get('stop_loss'),'risk_reward':trr,'confidence':int(tactical.get('confidence') or 0),'reason':'STRONG_VOTES_BUT_NO_PRODUCTION_CANDIDATE_CONFIRMATION','exit_rule':'WAIT_FOR_BREAKOUT_OR_CANDIDATE_CONFIRMATION','shadow_only':True,'can_override_production':False}
+            else:
+                quick.update({'direction':tdir,'reason':'INSUFFICIENT_DIRECTIONAL_CONFIRMATION'})
+        elif decision!='WAIT':
+            quick.update({'direction':candidate_direction,'reason':'PRODUCTION_ALREADY_QUALIFIED'})
+        elif tdir and not geometry_ok:
+            quick.update({'direction':tdir,'reason':'SHORT_TERM_GEOMETRY_NOT_GOOD_ENOUGH'})
+
+        return {'ok':True,'source':VERSION,'scoring_version':(row or {}).get('scoring_version') if isinstance(row,dict) else None,'symbol':symbol,'decision':decision,'candidate_direction':candidate_direction,'signal_qualified':qualified,'wait_reason':None if qualified else reason,'score':score,'signal_threshold':threshold,'score_gap_to_signal':round(threshold-score,3) if score is not None and score<threshold else 0,'score_attribution':(row or {}).get('score_attribution') if isinstance(row,dict) else None,'entry':px,'stop_loss':stop,'take_profit':target,'risk_reward':rr,'direction_votes':(row or {}).get('direction_votes') if isinstance(row,dict) else max(long_votes,short_votes),'direction_votes_long':(row or {}).get('direction_votes_long') if isinstance(row,dict) else long_votes,'direction_votes_short':(row or {}).get('direction_votes_short') if isinstance(row,dict) else short_votes,'execution_decision':(row or {}).get('execution_decision') if isinstance(row,dict) else None,'trade_plan_status':(row or {}).get('trade_plan_status') if isinstance(row,dict) else None,'playbook':(row or {}).get('playbook_primary') if isinstance(row,dict) else None,'futures_available':(row or {}).get('futures_available') if isinstance(row,dict) else None,'futures_provider':(row or {}).get('futures_provider') if isinstance(row,dict) else None,'futures_score':(row or {}).get('futures_score') if isinstance(row,dict) else None,'relative_strength_score':(row or {}).get('relative_strength_score') if isinstance(row,dict) else None,'volume_quality':(row or {}).get('volume_quality') if isinstance(row,dict) else None,'relative_volume':(row or {}).get('relative_volume') if isinstance(row,dict) else round(rv,3),'regime':(row or {}).get('regime') if isinstance(row,dict) else None,'tactical_opportunity':tactical,'quick_trade_shadow':quick,'timeframe_matrix':{'quick_1_2h':quick,'tactical_1_3h':tactical,'swing':{'status':decision,'direction':candidate_direction,'score':score,'threshold':threshold,'risk_reward':rr},'macro':{'status':'CONTEXT_ONLY','note':'Daily/weekly independent scorer remains context-only; short-term research never overrides swing safeguards.'}},'indicators':{'ema20':ema20,'ema50':ema50,'rsi14':rsi,'atr14':atr,'volume_ratio':rv,'momentum_24h_pct':mom24},'generated_at':atlas.now_iso(),'research_only':True,'live_execution':False}
 
     atlas.production_decision=build_decision
     def do_GET(self):
@@ -110,4 +133,4 @@ def install(atlas):
                 return self._json({'ok':False,'error':f'{type(exc).__name__}: {exc}','source':VERSION,'research_only':True,'live_execution':False},500)
         return original_get(self)
     atlas.Handler.do_GET=do_GET
-    return {'enabled':True,'version':VERSION,'endpoint':'/api/decision/current','tactical_lane':'1-3H_RESEARCH_ONLY'}
+    return {'enabled':True,'version':VERSION,'endpoint':'/api/decision/current','quick_lane':'1-2H_SHADOW_ONLY','tactical_lane':'1-3H_RESEARCH_ONLY'}
