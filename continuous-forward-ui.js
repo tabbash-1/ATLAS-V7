@@ -22,7 +22,7 @@ function rowPayload(r){
   base_signal:r.confluence?.base_signal,signal:r.confluence?.signal,
   resistance_strength:r.confluence?.nearest_resistance?.strength,resistance_distance_pct:r.confluence?.nearest_resistance?.distance_pct,
   support_strength:r.confluence?.nearest_support?.strength,support_distance_pct:r.confluence?.nearest_support?.distance_pct,
-  breakout_score:r.confluence?.breakout_up?.score,breakdown_score:r.confluence?.breakdown_down?.score,
+  breakout_score:r.confluence?.breakout_up?.score,breakdown_score:r.confluence?.breakout_down?.score,
   funding_rate:r.futures?.funding_rate,oi_change_pct:r.futures?.oi_change_pct,taker_ratio:r.futures?.taker_ratio,
   orderbook_imbalance:r.futures?.orderbook_imbalance,futures_crowding:r.futures?.crowding,futures_squeeze:r.futures?.squeeze,
   relative_strength_score:r.relative?.score,regime:r.regime?.regime,
