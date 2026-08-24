@@ -55,8 +55,8 @@ def test_false_breakout_without_confirmation_gets_no_bonus():
 def test_partial_hour_volume_is_paced_not_compared_as_full_hour():
     raw=0.10
     paced=scoring.paced_relative_volume(raw, 0.10)
-    assert paced == 1.0
-    assert scoring.paced_relative_volume(0.02, 0.10) == 0.2
+    assert abs(paced - 1.0) < 1e-12
+    assert abs(scoring.paced_relative_volume(0.02, 0.10) - 0.2) < 1e-12
 
 
 if __name__ == '__main__':
