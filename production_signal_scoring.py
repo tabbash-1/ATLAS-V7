@@ -1,17 +1,17 @@
-"""ATLAS production signal scoring v4.
+"""ATLAS production signal scoring v5.
 
 Keeps the graded four-vote production decision model and exact score
-attribution. Production score qualification is now emitted explicitly and is
-kept separate from the broader research champion lane. The cloud-forward
-threshold, alert thresholds, research lane and live-execution safeguards remain
-unchanged.
+attribution. Production score qualification is emitted explicitly and remains
+separate from the broader research champion lane. Provider-specific derivatives
+fallbacks may be surfaced as shadow context, but they never affect Production
+unless futures_evidence_validated is true.
 """
 
-VERSION = "PROD_SIGNAL_SCORING_V4_QUALIFICATION_SEMANTICS"
+VERSION = "PROD_SIGNAL_SCORING_V5_FUTURES_SHADOW_CONTEXT"
 
 
 def install(atlas):
-    def cloud_score_symbol_v4(symbol, btc_ks):
+    def cloud_score_symbol_v5(symbol, btc_ks):
         ks = atlas._spot_klines(symbol)
         if len(ks) < 100:
             return None
@@ -39,10 +39,10 @@ def install(atlas):
         direction = 'LONG' if long_votes > short_votes else 'SHORT'
         votes = long_votes if direction == 'LONG' else short_votes
 
-        snap = None
+        snap = {}
         futures_available = False
         try:
-            snap = atlas.capture(symbol)
+            snap = atlas.capture(symbol) or {}
             futures_available = bool(
                 snap.get('futures_evidence_validated',
                          (snap.get('futures_provider') or 'BINANCE_USDM_PUBLIC') == 'BINANCE_USDM_PUBLIC')
@@ -50,11 +50,19 @@ def install(atlas):
         except Exception:
             snap = {}
 
-        fscore = atlas.fnum(snap.get('experimental_score'), 0) if futures_available else 0
-        funding = atlas.fnum(snap.get('funding_rate'), 0) if futures_available else 0
-        oi = atlas.fnum(snap.get('oi_change_pct'), 0) if futures_available else 0
-        taker = atlas.fnum(snap.get('taker_ratio'), 1) if futures_available else 1
-        book = atlas.fnum(snap.get('orderbook_imbalance'), 0) if futures_available else 0
+        # Preserve provider-specific derivatives context for Research even when
+        # it is not validated for Production. Only validated data can contribute
+        # to Production's futures adjustment.
+        raw_fscore = atlas.fnum(snap.get('experimental_score'))
+        raw_funding = atlas.fnum(snap.get('funding_rate'))
+        raw_oi = atlas.fnum(snap.get('oi_change_pct'))
+        raw_taker = atlas.fnum(snap.get('taker_ratio'))
+        raw_book = atlas.fnum(snap.get('orderbook_imbalance'))
+        fscore = raw_fscore if futures_available and raw_fscore is not None else 0
+        funding = raw_funding if futures_available and raw_funding is not None else 0
+        oi = raw_oi if futures_available and raw_oi is not None else 0
+        taker = raw_taker if futures_available and raw_taker is not None else 1
+        book = raw_book if futures_available and raw_book is not None else 0
 
         # Exact additive score attribution. Weak volume is not a penalty in this
         # model; it simply earns no positive volume bonus.
@@ -77,6 +85,8 @@ def install(atlas):
             magnitude = min(8, abs(fscore) * .10)
             futures_adjustment = magnitude if aligned else -magnitude
             futures_reason = 'ALIGNED' if aligned else 'OPPOSED'
+        elif raw_fscore is not None:
+            futures_reason = 'SHADOW_ONLY_UNVALIDATED_PROVIDER'
 
         obstacle = rd if direction == 'LONG' else sd
         obstacle_adjustment = 0
@@ -141,8 +151,6 @@ def install(atlas):
         return {
             'symbol': symbol, 'direction': direction, 'entry': px,
             'champion_score': score,
-            # Legacy research champion lane is intentionally preserved. It is
-            # not synonymous with Production signal qualification.
             'champion_take': research_champion_take,
             'research_champion_take': research_champion_take,
             'production_signal_qualified': production_signal_qualified,
@@ -155,11 +163,19 @@ def install(atlas):
             'futures_available': futures_available,
             'futures_provider': snap.get('futures_provider'),
             'futures_score': fscore if futures_available else None,
+            'futures_shadow_score': raw_fscore,
+            'futures_shadow_provider': snap.get('futures_provider'),
+            'futures_shadow_validated': futures_available,
+            'futures_shadow_only': bool(raw_fscore is not None and not futures_available),
             'liquidity_score': None,
             'volume_quality': round(max(0, min(100, 45 + (rv - 1) * 35)), 2),
             'relative_volume': round(rv, 3),
             'funding_rate': funding, 'oi_change_pct': oi,
             'taker_ratio': taker, 'orderbook_imbalance': book,
+            'futures_shadow_funding_rate': raw_funding,
+            'futures_shadow_oi_change_pct': raw_oi,
+            'futures_shadow_taker_ratio': raw_taker,
+            'futures_shadow_orderbook_imbalance': raw_book,
             'relative_strength_score': round(rel, 2),
             'regime': 'TREND_UP' if direction == 'LONG' else 'TREND_DOWN',
             'support_strength': 60,
@@ -176,5 +192,5 @@ def install(atlas):
             'auto_source': 'CLOUD_FORWARD_ALPHA18', 'dedup_minutes': 50,
         }
 
-    atlas.cloud_score_symbol = cloud_score_symbol_v4
+    atlas.cloud_score_symbol = cloud_score_symbol_v5
     return atlas.cloud_score_symbol
