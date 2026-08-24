@@ -1,16 +1,17 @@
-"""ATLAS production signal scoring v3.
+"""ATLAS production signal scoring v4.
 
-Keeps the graded four-vote production decision model and adds exact score
-attribution so every candidate can explain why it qualified or remained WAIT.
-The cloud-forward threshold, alert thresholds, research lane and live-execution
-safeguards remain unchanged.
+Keeps the graded four-vote production decision model and exact score
+attribution. Production score qualification is now emitted explicitly and is
+kept separate from the broader research champion lane. The cloud-forward
+threshold, alert thresholds, research lane and live-execution safeguards remain
+unchanged.
 """
 
-VERSION = "PROD_SIGNAL_SCORING_V3"
+VERSION = "PROD_SIGNAL_SCORING_V4_QUALIFICATION_SEMANTICS"
 
 
 def install(atlas):
-    def cloud_score_symbol_v3(symbol, btc_ks):
+    def cloud_score_symbol_v4(symbol, btc_ks):
         ks = atlas._spot_klines(symbol)
         if len(ks) < 100:
             return None
@@ -101,6 +102,9 @@ def install(atlas):
             + obstacle_adjustment
         )
         score = round(max(0, min(100, raw_score)))
+        signal_threshold = float(atlas.CLOUD_FORWARD_MIN_SCORE)
+        production_signal_qualified = bool(score >= signal_threshold)
+        research_champion_take = bool(score >= 60)
 
         attribution = {
             'trend_base': round(trend_base, 3),
@@ -136,9 +140,15 @@ def install(atlas):
 
         return {
             'symbol': symbol, 'direction': direction, 'entry': px,
-            'champion_score': score, 'champion_take': score >= 60,
+            'champion_score': score,
+            # Legacy research champion lane is intentionally preserved. It is
+            # not synonymous with Production signal qualification.
+            'champion_take': research_champion_take,
+            'research_champion_take': research_champion_take,
+            'production_signal_qualified': production_signal_qualified,
+            'signal_threshold': signal_threshold,
             'final_score': score, 'opportunity_score': score,
-            'execution_decision': f'{direction}_CANDIDATE' if score >= atlas.CLOUD_FORWARD_MIN_SCORE else f'{direction}_WATCH',
+            'execution_decision': f'{direction}_CANDIDATE' if production_signal_qualified else f'{direction}_WATCH',
             'trade_plan_status': 'PLAN_READY' if rr is not None else 'INCOMPLETE',
             'rr_tp1': None, 'rr_tp2': round(rr, 3) if rr is not None else None,
             'anomaly_score': None, 'portfolio_allowed': None,
@@ -166,5 +176,5 @@ def install(atlas):
             'auto_source': 'CLOUD_FORWARD_ALPHA18', 'dedup_minutes': 50,
         }
 
-    atlas.cloud_score_symbol = cloud_score_symbol_v3
+    atlas.cloud_score_symbol = cloud_score_symbol_v4
     return atlas.cloud_score_symbol
