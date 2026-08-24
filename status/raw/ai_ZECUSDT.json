@@ -1,0 +1,167 @@
+{
+  "version": "ATLAS_AI_TRADE_COUNCIL_V2_COUNTERFACTUAL",
+  "mode": "SHADOW_RESEARCH_ONLY",
+  "symbol": "ZECUSDT",
+  "horizon": "1-3H",
+  "generated_at": "2026-08-24T08:35:58.743854+00:00",
+  "entry": 831.5,
+  "direction": "LONG",
+  "verdict": "WAIT",
+  "confidence": 60,
+  "reason": "CONFLICTING_EVIDENCE",
+  "bull_analyst": {
+    "score": 0.227,
+    "best_case": [
+      "Price/EMA20/EMA50 structure 831.5/836.676/807.042",
+      "24h momentum 2.77%"
+    ]
+  },
+  "bear_analyst": {
+    "score": -0.227,
+    "best_case": [
+      "RSI14 32.7",
+      "RV 0.70x"
+    ]
+  },
+  "judge": {
+    "net_strength": 0.227,
+    "tactical_rr": null,
+    "target": null,
+    "stop_loss": null,
+    "invalidation": "Frozen stop/structure; no post-outcome rewriting."
+  },
+  "counterfactuals": [
+    {
+      "scenario": "ENTER_NOW",
+      "direction": "LONG",
+      "entry": 831.5,
+      "stop_loss": 819.3315357143,
+      "target": 853.9648571429,
+      "risk_reward": 1.846,
+      "trigger": "Immediate only if current evidence remains valid",
+      "thesis": "Capture current move without waiting for a better price.",
+      "shadow_only": true
+    },
+    {
+      "scenario": "WAIT_PULLBACK",
+      "direction": "LONG",
+      "entry": 824.94775,
+      "stop_loss": 810.9072142857,
+      "target": 853.0288214286,
+      "risk_reward": 2.0,
+      "trigger": "Price retraces ~0.35 ATR without structure failure",
+      "thesis": "Trade better entry quality if trend survives the pullback.",
+      "shadow_only": true
+    },
+    {
+      "scenario": "WAIT_BREAKOUT",
+      "direction": "LONG",
+      "entry": 839.9243214286,
+      "stop_loss": 825.8837857143,
+      "target": 869.8774642857,
+      "risk_reward": 2.133,
+      "trigger": "Price confirms expansion beyond near-term structure",
+      "thesis": "Pay a worse entry for stronger confirmation.",
+      "shadow_only": true
+    },
+    {
+      "scenario": "REJECT",
+      "direction": null,
+      "entry": null,
+      "stop_loss": null,
+      "target": null,
+      "risk_reward": null,
+      "trigger": "No setup reaches acceptable evidence + geometry",
+      "thesis": "Preserve capital when alternatives are weak.",
+      "shadow_only": true
+    }
+  ],
+  "best_counterfactual": {
+    "scenario": "WAIT_BREAKOUT",
+    "direction": "LONG",
+    "entry": 839.9243214286,
+    "stop_loss": 825.8837857143,
+    "target": 869.8774642857,
+    "risk_reward": 2.133,
+    "trigger": "Price confirms expansion beyond near-term structure",
+    "thesis": "Pay a worse entry for stronger confirmation.",
+    "shadow_only": true
+  },
+  "hybrid_judge": {
+    "decision": "WAIT",
+    "production_direction": null,
+    "production_score": null,
+    "production_qualified": false,
+    "ai_direction": "LONG",
+    "ai_verdict": "WAIT",
+    "agreement": false
+  },
+  "evidence": [
+    {
+      "name": "direction_votes",
+      "value": 0.0,
+      "weight": 2.1,
+      "detail": "LONG 2 vs SHORT 2",
+      "source": "production_decision"
+    },
+    {
+      "name": "ema_structure",
+      "value": 1.0,
+      "weight": 1.2,
+      "detail": "Price/EMA20/EMA50 structure 831.5/836.676/807.042",
+      "source": "production_decision"
+    },
+    {
+      "name": "rsi",
+      "value": -0.692,
+      "weight": 0.7,
+      "detail": "RSI14 32.7",
+      "source": "production_decision"
+    },
+    {
+      "name": "momentum",
+      "value": 0.924,
+      "weight": 0.9,
+      "detail": "24h momentum 2.77%",
+      "source": "production_decision"
+    },
+    {
+      "name": "relative_volume",
+      "value": -0.355,
+      "weight": 0.75,
+      "detail": "RV 0.70x",
+      "source": "production_decision"
+    }
+  ],
+  "missing_data": [
+    "futures_score",
+    "relative_strength_score"
+  ],
+  "production_decision": "WAIT",
+  "production_score": null,
+  "production_qualified": false,
+  "outcome_contract": {
+    "evaluate_after_hours": [
+      1,
+      3,
+      6
+    ],
+    "metrics": [
+      "directional_return_pct",
+      "MFE_pct",
+      "MAE_pct",
+      "target_hit",
+      "stop_hit",
+      "realized_R",
+      "time_to_target_minutes"
+    ],
+    "frozen": true
+  },
+  "safety": {
+    "can_execute": false,
+    "can_change_threshold": false,
+    "can_override_production": false,
+    "freeze_before_outcome": true
+  },
+  "stored": true
+}
