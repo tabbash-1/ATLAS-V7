@@ -52,7 +52,6 @@ jobs:
             return 1
           }
 
-          # Read-only health endpoints first. Space requests to avoid loading Render.
           fetch_json runtime /api/runtime/status || true
           sleep 5
           fetch_json readiness /api/production/readiness || true
@@ -61,8 +60,7 @@ jobs:
           sleep 5
           fetch_json geometry /api/outcomes/geometry-status || true
 
-          # Do not use a bulk Production endpoint. One symbol at a time is slower but safer.
-          for s in BTCUSDT ETHUSDT SOLUSDT XRPUSDT BNBUSDT DOGEUSDT ZECUSDT; do
+          for s in BTCUSDT ETHUSDT SOLUSDT XRPUSDT BNBUSDT DOGEUSDT ZECUSDT HYPEUSDT; do
             sleep 6
             fetch_json "decision_${s}" "/api/decision/current?symbol=${s}" || true
           done
@@ -75,7 +73,7 @@ jobs:
               if not p.exists(): return {'ok':False,'error':'missing_snapshot'}
               try: return json.loads(p.read_text())
               except Exception as e: return {'ok':False,'error':f'invalid_json:{e}'}
-          symbols=['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT']
+          symbols=['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT','HYPEUSDT']
           decisions={s:load('decision_'+s) for s in symbols}
           qualified=[]; waits=[]; failures=[]
           for s,d in decisions.items():
@@ -86,7 +84,7 @@ jobs:
               else:
                   waits.append({'symbol':s,'candidate':d.get('candidate_direction'),'score':d.get('score'),'threshold':d.get('signal_threshold'),'reason':d.get('wait_reason'),'score_gap_to_signal':d.get('score_gap_to_signal'),'score_attribution':d.get('score_attribution')})
           summary={
-              'schema':'ATLAS_PRODUCTION_SNAPSHOT_V3',
+              'schema':'ATLAS_PRODUCTION_SNAPSHOT_V4',
               'captured_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),
               'source':'https://atlas-v7.onrender.com',
               'monitor_mode':'PACED_PER_SYMBOL_READ_ONLY',
