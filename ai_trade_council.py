@@ -1,18 +1,15 @@
-"""ATLAS Evidence-Bound Trade Council V2.
+"""ATLAS Evidence-Bound Trade Council V3.
 
 Research-only shadow analyst. It never executes trades and never weakens the
-production gate. V2 adds:
-- richer structured evidence extraction from the Production decision packet,
-- explicit Bull / Bear / Judge debate,
-- counterfactual scenarios (enter now / wait pullback / wait breakout / reject),
-- a Hybrid Judge comparing Production and AI views,
-- frozen outcome-ready records for future 1h/3h/6h evaluation.
+production gate. V3 adds safe use of provider-specific derivatives shadow
+context when Production futures evidence is unavailable. Unvalidated futures
+context is explicitly labeled and down-weighted; it cannot alter Production.
 """
 from __future__ import annotations
 import json, math, urllib.parse
 from pathlib import Path
 
-VERSION = 'ATLAS_AI_TRADE_COUNCIL_V2_COUNTERFACTUAL'
+VERSION = 'ATLAS_AI_TRADE_COUNCIL_V3_FUTURES_SHADOW_SAFE'
 HORIZON = '1-3H'
 
 
@@ -29,7 +26,7 @@ def _evidence(decision):
     ind=decision.get('indicators') or {}; tac=decision.get('tactical_opportunity') or {}; attr=decision.get('score_attribution') or {}
     rsi=_num(ind.get('rsi14')); mom=_num(ind.get('momentum_24h_pct')); rv=_num(ind.get('volume_ratio') or decision.get('relative_volume'))
     lv=_num(decision.get('direction_votes_long')) or 0; sv=_num(decision.get('direction_votes_short')) or 0
-    rs=_num(decision.get('relative_strength_score')); fut=_num(decision.get('futures_score')); rr=_num(tac.get('risk_reward'))
+    rs=_num(decision.get('relative_strength_score')); fut=_num(decision.get('futures_score')); shadow_fut=_num(decision.get('futures_shadow_score')); rr=_num(tac.get('risk_reward'))
     room=_num(tac.get('usable_room_pct') or tac.get('room_to_obstacle_pct'))
     ema20=_num(ind.get('ema20')); ema50=_num(ind.get('ema50')); px=_num(decision.get('entry'))
     pieces=[]
@@ -43,7 +40,11 @@ def _evidence(decision):
     if mom is not None:add('momentum',mom/3.0,.9,f'24h momentum {mom:.2f}%')
     if rv is not None:add('relative_volume',(rv-1)*1.2,.75,f'RV {rv:.2f}x')
     if rs is not None:add('relative_strength',(rs-50)/25,1.0,f'RS {rs:.1f}')
-    if fut is not None:add('futures',fut/100,1.05,f'Futures score {fut:.1f}')
+    if fut is not None:
+        add('futures',fut/100,1.05,f'Validated futures score {fut:.1f}','production_decision')
+    elif shadow_fut is not None:
+        provider=decision.get('futures_shadow_provider') or decision.get('futures_provider') or 'UNKNOWN_PROVIDER'
+        add('futures_shadow',shadow_fut/100,.55,f'Unvalidated provider-specific futures shadow {shadow_fut:.1f} via {provider}','research_futures_shadow')
     if rr is not None:
         d=1 if tac.get('direction')=='LONG' else -1 if tac.get('direction')=='SHORT' else 0
         add('tactical_geometry',d*_clip((rr-.8)/1.5),1.5,f'Tactical RR {rr:.2f}')
@@ -86,7 +87,9 @@ def analyze(decision):
     ev=_evidence(decision); bull=_side_score(ev,'LONG'); bear=_side_score(ev,'SHORT'); net=bull-bear
     direction='LONG' if net>=0 else 'SHORT'; strength=abs(net)/2; tac=decision.get('tactical_opportunity') or {}; rr=_num(tac.get('risk_reward'))
     bull_top=sorted(ev,key=lambda x:x['value']*x['weight'],reverse=True)[:5]; bear_top=sorted(ev,key=lambda x:-x['value']*x['weight'],reverse=True)[:5]
-    missing=[k for k in ('futures_score','relative_strength_score') if decision.get(k) is None]
+    missing=[]
+    if decision.get('relative_strength_score') is None: missing.append('relative_strength_score')
+    if decision.get('futures_score') is None and decision.get('futures_shadow_score') is None: missing.append('futures_context')
     if not ev: verdict='WAIT'; reason='NO_STRUCTURED_EVIDENCE'
     elif rr is not None and rr<.8: verdict='REJECT'; reason='RISK_GEOMETRY_FAIL'
     elif strength>=.42 and tac.get('direction') in (direction,None): verdict='TAKE_SHADOW'; reason='EVIDENCE_CONVERGENCE'
@@ -104,7 +107,15 @@ def analyze(decision):
     elif not prod_ok and verdict=='TAKE_SHADOW' and best and best.get('scenario')!='REJECT': hybrid='AI_SHADOW_OPPORTUNITY'
     elif verdict=='REJECT': hybrid='REJECT'
     else: hybrid='WAIT'
-    return {'version':VERSION,'mode':'SHADOW_RESEARCH_ONLY','symbol':decision.get('symbol'),'horizon':HORIZON,'generated_at':decision.get('generated_at'),'entry':decision.get('entry'),'direction':direction,'verdict':verdict,'confidence':confidence,'reason':reason,'bull_analyst':{'score':round(bull,3),'best_case':[x['detail'] for x in bull_top if x['value']>0]},'bear_analyst':{'score':round(bear,3),'best_case':[x['detail'] for x in bear_top if x['value']<0]},'judge':{'net_strength':round(strength,3),'tactical_rr':rr,'target':tac.get('target'),'stop_loss':tac.get('stop_loss'),'invalidation':'Frozen stop/structure; no post-outcome rewriting.'},'counterfactuals':scenarios,'best_counterfactual':best,'hybrid_judge':{'decision':hybrid,'production_direction':prod_dir,'production_score':prod_score,'production_qualified':prod_ok,'ai_direction':direction,'ai_verdict':verdict,'agreement':agree},'evidence':ev,'missing_data':missing,'production_decision':decision.get('decision'),'production_score':decision.get('score'),'production_qualified':prod_ok,'outcome_contract':{'evaluate_after_hours':[1,3,6],'metrics':['directional_return_pct','MFE_pct','MAE_pct','target_hit','stop_hit','realized_R','time_to_target_minutes'],'frozen':True},'safety':{'can_execute':False,'can_change_threshold':False,'can_override_production':False,'freeze_before_outcome':True}}
+    futures_context={
+        'production_validated':decision.get('futures_score') is not None,
+        'production_score':decision.get('futures_score'),
+        'shadow_score':decision.get('futures_shadow_score'),
+        'shadow_provider':decision.get('futures_shadow_provider') or decision.get('futures_provider'),
+        'shadow_only':bool(decision.get('futures_shadow_score') is not None and decision.get('futures_score') is None),
+        'can_affect_production':False if decision.get('futures_score') is None else True,
+    }
+    return {'version':VERSION,'mode':'SHADOW_RESEARCH_ONLY','symbol':decision.get('symbol'),'horizon':HORIZON,'generated_at':decision.get('generated_at'),'entry':decision.get('entry'),'direction':direction,'verdict':verdict,'confidence':confidence,'reason':reason,'bull_analyst':{'score':round(bull,3),'best_case':[x['detail'] for x in bull_top if x['value']>0]},'bear_analyst':{'score':round(bear,3),'best_case':[x['detail'] for x in bear_top if x['value']<0]},'judge':{'net_strength':round(strength,3),'tactical_rr':rr,'target':tac.get('target'),'stop_loss':tac.get('stop_loss'),'invalidation':'Frozen stop/structure; no post-outcome rewriting.'},'counterfactuals':scenarios,'best_counterfactual':best,'hybrid_judge':{'decision':hybrid,'production_direction':prod_dir,'production_score':prod_score,'production_qualified':prod_ok,'ai_direction':direction,'ai_verdict':verdict,'agreement':agree},'evidence':ev,'futures_context':futures_context,'missing_data':missing,'production_decision':decision.get('decision'),'production_score':decision.get('score'),'production_qualified':prod_ok,'outcome_contract':{'evaluate_after_hours':[1,3,6],'metrics':['directional_return_pct','MFE_pct','MAE_pct','target_hit','stop_hit','realized_R','time_to_target_minutes'],'frozen':True},'safety':{'can_execute':False,'can_change_threshold':False,'can_override_production':False,'freeze_before_outcome':True,'unvalidated_futures_can_affect_production':False}}
 
 
 def install(atlas):
@@ -134,7 +145,7 @@ def install(atlas):
             rows=0
             try:rows=sum(1 for x in ledger.open() if x.strip()) if ledger.exists() else 0
             except Exception:pass
-            return self._json({'ok':True,'version':VERSION,'mode':'SHADOW_RESEARCH_ONLY','ledger_rows':rows,'ledger':str(ledger),'can_execute':False,'counterfactuals':True,'hybrid_judge':True},200)
+            return self._json({'ok':True,'version':VERSION,'mode':'SHADOW_RESEARCH_ONLY','ledger_rows':rows,'ledger':str(ledger),'can_execute':False,'counterfactuals':True,'hybrid_judge':True,'futures_shadow_safe':True},200)
         return original(self)
     atlas.Handler.do_GET=do_GET
-    return {'enabled':True,'version':VERSION,'endpoint':'/api/ai/council','mode':'SHADOW_RESEARCH_ONLY','counterfactuals':True,'hybrid_judge':True}
+    return {'enabled':True,'version':VERSION,'endpoint':'/api/ai/council','mode':'SHADOW_RESEARCH_ONLY','counterfactuals':True,'hybrid_judge':True,'futures_shadow_safe':True}
