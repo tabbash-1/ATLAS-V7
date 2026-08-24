@@ -80,6 +80,11 @@ import collector_server as _collector
 if 'HYPEUSDT' not in _collector.ON_DEMAND_SYMBOLS:
     _collector.ON_DEMAND_SYMBOLS = tuple(_collector.ON_DEMAND_SYMBOLS) + ('HYPEUSDT',)
 
+# HYPE is not available on the Binance spot path used by the legacy collector.
+# Intercept HYPE only; every existing asset keeps its original data source unchanged.
+from hype_market_data import install as _install_hype_market_data
+_install_hype_market_data(_collector)
+
 _original_end_headers = _collector.Handler.end_headers
 
 def _production_no_cache_headers(self):
