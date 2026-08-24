@@ -3,41 +3,46 @@
   "mode": "SHADOW_RESEARCH_ONLY",
   "symbol": "SOLUSDT",
   "horizon": "1-3H",
-  "generated_at": "2026-08-24T17:23:42.991190+00:00",
-  "entry": 95.07,
+  "generated_at": "2026-08-24T17:42:47.710339+00:00",
+  "entry": 95.26,
   "direction": "LONG",
-  "verdict": "WAIT",
-  "confidence": 55,
-  "reason": "CONFLICTING_EVIDENCE",
+  "verdict": "REJECT",
+  "confidence": 61,
+  "reason": "RISK_GEOMETRY_FAIL",
   "bull_analyst": {
-    "score": 0.115,
+    "score": 0.246,
     "best_case": [
-      "Price/EMA20/EMA50 structure 95.07/95.1682/94.4112",
-      "RSI14 58.9"
+      "LONG 4 vs SHORT 0",
+      "Price/EMA20/EMA50 structure 95.26/95.1863/94.4187",
+      "trend_base +68.00",
+      "RSI14 60.3",
+      "RV 1.15x"
     ]
   },
   "bear_analyst": {
-    "score": -0.115,
+    "score": -0.246,
     "best_case": [
-      "RV 0.77x",
-      "24h momentum -0.04%"
+      "obstacle_adjustment -8.00",
+      "Tactical RR 0.27",
+      "Obstacle distance 0.168%",
+      "RS 46.9"
     ]
   },
   "judge": {
-    "net_strength": 0.115,
-    "tactical_rr": null,
-    "target": null,
-    "stop_loss": null,
+    "net_strength": 0.246,
+    "tactical_rr": 0.271,
+    "target": 95.515,
+    "stop_loss": 94.3188928571,
     "invalidation": "Frozen stop/structure; no post-outcome rewriting."
   },
   "counterfactuals": [
     {
       "scenario": "ENTER_NOW",
       "direction": "LONG",
-      "entry": 95.07,
-      "stop_loss": 94.1335357143,
-      "target": 96.7988571429,
-      "risk_reward": 1.846,
+      "entry": 95.26,
+      "stop_loss": 94.3188928571,
+      "target": 95.515,
+      "risk_reward": 0.271,
       "trigger": "Immediate only if current evidence remains valid",
       "thesis": "Capture current move without waiting for a better price.",
       "shadow_only": true
@@ -45,10 +50,10 @@
     {
       "scenario": "WAIT_PULLBACK",
       "direction": "LONG",
-      "entry": 94.56575,
-      "stop_loss": 93.4852142857,
-      "target": 96.7268214286,
-      "risk_reward": 2.0,
+      "entry": 94.75325,
+      "stop_loss": 93.6673571429,
+      "target": 95.515,
+      "risk_reward": 0.701,
       "trigger": "Price retraces ~0.35 ATR without structure failure",
       "thesis": "Trade better entry quality if trend survives the pullback.",
       "shadow_only": true
@@ -56,9 +61,9 @@
     {
       "scenario": "WAIT_BREAKOUT",
       "direction": "LONG",
-      "entry": 95.7183214286,
-      "stop_loss": 94.6377857143,
-      "target": 98.0234642857,
+      "entry": 95.9115357143,
+      "stop_loss": 94.8256428571,
+      "target": 98.2281071429,
       "risk_reward": 2.133,
       "trigger": "Price confirms expansion beyond near-term structure",
       "thesis": "Pay a worse entry for stronger confirmation.",
@@ -79,66 +84,114 @@
   "best_counterfactual": {
     "scenario": "WAIT_BREAKOUT",
     "direction": "LONG",
-    "entry": 95.7183214286,
-    "stop_loss": 94.6377857143,
-    "target": 98.0234642857,
+    "entry": 95.9115357143,
+    "stop_loss": 94.8256428571,
+    "target": 98.2281071429,
     "risk_reward": 2.133,
     "trigger": "Price confirms expansion beyond near-term structure",
     "thesis": "Pay a worse entry for stronger confirmation.",
     "shadow_only": true
   },
   "hybrid_judge": {
-    "decision": "WAIT",
-    "production_direction": null,
-    "production_score": null,
+    "decision": "REJECT",
+    "production_direction": "LONG",
+    "production_score": 62.0,
     "production_qualified": false,
     "ai_direction": "LONG",
-    "ai_verdict": "WAIT",
-    "agreement": false
+    "ai_verdict": "REJECT",
+    "agreement": true
   },
   "evidence": [
     {
       "name": "direction_votes",
-      "value": 0.0,
+      "value": 1.0,
       "weight": 2.1,
-      "detail": "LONG 2 vs SHORT 2",
+      "detail": "LONG 4 vs SHORT 0",
       "source": "production_decision"
     },
     {
       "name": "ema_structure",
-      "value": 0.518,
+      "value": 0.743,
       "weight": 1.2,
-      "detail": "Price/EMA20/EMA50 structure 95.07/95.1682/94.4112",
+      "detail": "Price/EMA20/EMA50 structure 95.26/95.1863/94.4187",
       "source": "production_decision"
     },
     {
       "name": "rsi",
-      "value": 0.355,
+      "value": 0.412,
       "weight": 0.7,
-      "detail": "RSI14 58.9",
+      "detail": "RSI14 60.3",
       "source": "production_decision"
     },
     {
       "name": "momentum",
-      "value": -0.014,
+      "value": 0.053,
       "weight": 0.9,
-      "detail": "24h momentum -0.04%",
+      "detail": "24h momentum 0.16%",
       "source": "production_decision"
     },
     {
       "name": "relative_volume",
-      "value": -0.277,
+      "value": 0.181,
       "weight": 0.75,
-      "detail": "RV 0.77x",
+      "detail": "RV 1.15x",
       "source": "production_decision"
+    },
+    {
+      "name": "relative_strength",
+      "value": -0.123,
+      "weight": 1.0,
+      "detail": "RS 46.9",
+      "source": "production_decision"
+    },
+    {
+      "name": "tactical_geometry",
+      "value": -0.353,
+      "weight": 1.5,
+      "detail": "Tactical RR 0.27",
+      "source": "production_decision"
+    },
+    {
+      "name": "room_to_obstacle",
+      "value": 0.134,
+      "weight": 0.95,
+      "detail": "Usable room 0.27%",
+      "source": "production_decision"
+    },
+    {
+      "name": "scorer_trend_base",
+      "value": 1.0,
+      "weight": 0.5,
+      "detail": "trend_base +68.00",
+      "source": "production_scorer"
+    },
+    {
+      "name": "scorer_volume_bonus",
+      "value": 0.151,
+      "weight": 0.45,
+      "detail": "volume_bonus +1.51",
+      "source": "production_scorer"
+    },
+    {
+      "name": "scorer_obstacle_adjustment",
+      "value": -0.8,
+      "weight": 0.7,
+      "detail": "obstacle_adjustment -8.00",
+      "source": "production_scorer"
+    },
+    {
+      "name": "obstacle_distance",
+      "value": -0.36,
+      "weight": 0.5,
+      "detail": "Obstacle distance 0.168%",
+      "source": "production_scorer"
     }
   ],
   "missing_data": [
-    "futures_score",
-    "relative_strength_score"
+    "futures_score"
   ],
   "production_decision": "WAIT",
-  "production_score": null,
+  "production_score": 62.0,
   "production_qualified": false,
   "outcome_contract": {
     "evaluate_after_hours": [
