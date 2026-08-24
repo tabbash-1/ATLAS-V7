@@ -16,5 +16,29 @@
   function renderAi(ai,prod){const tac=prod?.tactical_opportunity||{},best=ai?.best_counterfactual||{};$('apsAiProd').textContent=prod?.decision==='WAIT'?`WAIT${prod.score!=null?` · ${prod.score}/${prod.signal_threshold}`:''}`:simpleDir(prod?.decision);$('apsAiJudge').textContent=`${simpleDir(ai?.direction)}${ai?.confidence!=null?` · ${ai.confidence}% confidence`:''}`;$('apsAiTactical').textContent=tac?.direction?`${simpleDir(tac.direction)} · 1–3H`:'No clear short-term setup';$('apsAiBest').textContent=simpleAction(best,ai,prod);$('apsAiGeometry').textContent=best.entry==null?'No trade levels yet':`Entry ${fmt(best.entry)} · Stop ${fmt(best.stop_loss)} · Target ${fmt(best.target)} · R:R ${fmt(best.risk_reward,2)}`;let trigger=String(best.trigger||best.thesis||'').replace(/Price confirms expansion beyond near-term structure/i,'Enter only after price clearly breaks the nearby resistance/support level.').replace(/_/g,' ');$('apsAiTrigger').textContent=trigger||'Wait for confirmation before entering.';const bull=(ai?.bull_analyst?.best_case||[])[0],bear=(ai?.bear_analyst?.best_case||[])[0];$('apsAiReason').textContent=`Why: ${bull?humanize(bull)+'. ':''}${bear?'Main risk: '+humanize(bear)+'.':''}`||'AI evidence is still limited.';$('apsAiState').textContent='AI analysis ready'}
   async function refreshAi(){const symbol=currentSymbol();if(!symbol)return;$('apsAiState').textContent='Analyzing…';try{const [pd,ai]=await Promise.all([fetch(`/api/decision/current?symbol=${encodeURIComponent(symbol)}&t=${Date.now()}`,{cache:'no-store'}).then(r=>r.json()),fetch(`/api/ai/council?symbol=${encodeURIComponent(symbol)}&t=${Date.now()}`,{cache:'no-store'}).then(r=>r.json())]);if(ai?.error)throw new Error(ai.error);renderAi(ai,pd)}catch(e){$('apsAiState').textContent='AI analysis unavailable';$('apsAiBest').textContent='WAIT'} }
   function update(){const d=decision(),de=$('apsDecision');de.textContent=d;de.className='aps-value '+d.toLowerCase();$('apsAsset').textContent=text('activeTitle','Current asset');$('apsConfidence').textContent=setupScore();const w=d==='WAIT';$('apsEntry').textContent=w?'—':text('entry');$('apsStop').textContent=w?'—':text('stop');$('apsTarget').textContent=w?'—':text('target');$('apsRegime').textContent=text('cmdRegimeValue','—');$('apsTrend').textContent=text('trendState','—');$('apsMomentum').textContent=text('momentumState','—');$('apsVolume').textContent=text('volumeState','—');$('apsStructure').textContent=text('structureState','—');$('apsLiquidity').textContent=text('liquidityNotes','No special liquidity condition.');$('apsWhy').textContent=text('masterNotes',d==='WAIT'?'Waiting for stronger confirmation.':'Trade conditions aligned.');$('apsRisks').textContent=text('cmdRiskValue','Risk OK.');$('apsChanges').textContent=d==='WAIT'?'Wait for stronger direction, structure and risk/reward confirmation.':'Exit if the trade structure is invalidated.';$('apsStatus').textContent=$('analyzeBtn')?.disabled?'Analysis running…':w?'WAIT = no trade now':'Trade plan ready';const s=$('intervalSelect'),tf=$('apsTimeframe');if(s&&tf&&!tf.options.length){[...s.options].forEach(o=>tf.add(new Option(o.textContent,o.value)));tf.onchange=()=>{s.value=tf.value;s.dispatchEvent(new Event('change',{bubbles:true}))}}if(s&&tf)tf.value=s.value}
-  $('apsAnalyze').onclick=()=>{$('analyzeBtn')?.click();setTimeout(()=>{update();refreshAi()},1800)};$('apsAdvanced').onclick=()=>{document.body.classList.toggle('atlas-advanced-open')};new MutationObserver(()=>requestAnimationFrame(update)).observe(document.body,{subtree:true,childList:true,characterData:true});update();setTimeout(refreshAi,1200);window.ATLAS_PRODUCT_SHELL={refresh:update,refreshAi};
+  async function waitForAnalysisReady(){
+    $('apsAiState').textContent='Waiting for ATLAS analysis…';
+    for(let i=0;i<48;i++){
+      await new Promise(r=>setTimeout(r,250));
+      const badge=text('engineBadge','').toUpperCase();
+      const button=$('analyzeBtn');
+      const ready=badge==='ANALYZED'||(!button?.disabled&&i>4);
+      if(ready)return true;
+    }
+    return false;
+  }
+  async function runAnalysisAndCouncil(){
+    const button=$('analyzeBtn');
+    if(!button)return;
+    window.ATLAS_MASTER=null;
+    $('apsAnalyze').disabled=true;
+    $('apsStatus').textContent='Analysis running…';
+    $('apsAiState').textContent='Waiting for ATLAS analysis…';
+    button.click();
+    await waitForAnalysisReady();
+    update();
+    await refreshAi();
+    $('apsAnalyze').disabled=false;
+  }
+  $('apsAnalyze').onclick=runAnalysisAndCouncil;$('apsAdvanced').onclick=()=>{document.body.classList.toggle('atlas-advanced-open')};new MutationObserver(()=>requestAnimationFrame(update)).observe(document.body,{subtree:true,childList:true,characterData:true});update();setTimeout(refreshAi,1200);window.ATLAS_PRODUCT_SHELL={refresh:update,refreshAi};
 })();
