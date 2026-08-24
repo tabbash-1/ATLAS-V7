@@ -106,15 +106,16 @@ jobs:
           except Exception: rows=[]
           horizons=(1,3,6,12,24)
           def price(d):
-              for k in ('price','current_price','market_price','last_price','close'):
+              # Current Production decision snapshots expose the observed market price as `entry`.
+              for k in ('entry','price','current_price','market_price','last_price','close'):
                   try:
-                      v=float(d.get(k));
+                      v=float(d.get(k))
                       if v>0:return v
                   except: pass
               md=d.get('market_data') or {}
               for k in ('price','current_price','last_price','close'):
                   try:
-                      v=float(md.get(k));
+                      v=float(md.get(k))
                       if v>0:return v
                   except: pass
               return None
@@ -130,7 +131,7 @@ jobs:
                   p0=price(d0)
                   if not p0:continue
                   direction=d0.get('candidate_direction') or 'NONE'
-                  item={'symbol':s,'wait_at':t0.isoformat(),'wait_price':p0,'candidate_direction':direction,'score':d0.get('score'),'threshold':d0.get('signal_threshold'),'reason':d0.get('wait_reason'),'horizons':{}}
+                  item={'symbol':s,'wait_at':t0.isoformat(),'wait_price':p0,'candidate_direction':direction,'score':d0.get('score'),'threshold':d0.get('signal_threshold'),'reason':d0.get('wait_reason'),'playbook':d0.get('playbook'),'score_attribution':d0.get('score_attribution'),'horizons':{}}
                   future=[(t,r) for t,r in parsed[i+1:] if t>t0]
                   for h in horizons:
                       target=t0+datetime.timedelta(hours=h)
@@ -147,10 +148,10 @@ jobs:
                       change=(p1/p0-1)*100
                       max_up=(max(window)/p0-1)*100 if window else change
                       max_down=(min(window)/p0-1)*100 if window else change
-                      favorable=change if direction=='LONG' else -change if direction=='SHORT' else abs(change)
-                      item['horizons'][f'{h}h']={'observed_at':t1.isoformat(),'price':round(p1,10),'change_pct':round(change,4),'max_up_pct':round(max_up,4),'max_down_pct':round(max_down,4),'directional_return_pct':round(favorable,4)}
+                      favorable=change if direction=='LONG' else -change if direction=='SHORT' else None
+                      item['horizons'][f'{h}h']={'observed_at':t1.isoformat(),'price':round(p1,10),'change_pct':round(change,4),'max_up_pct':round(max_up,4),'max_down_pct':round(max_down,4),'directional_return_pct':round(favorable,4) if favorable is not None else None}
                   if item['horizons']:tracker.append(item)
-          out={'schema':'ATLAS_WAIT_OUTCOME_TRACKER_V1','generated_at':captured.isoformat(),'horizons_hours':list(horizons),'note':'Measures opportunity cost of WAIT decisions from production snapshots; does not alter trading thresholds.','records':tracker}
+          out={'schema':'ATLAS_WAIT_OUTCOME_TRACKER_V2','generated_at':captured.isoformat(),'horizons_hours':list(horizons),'note':'Measures opportunity cost of WAIT decisions from production snapshots; uses decision entry as observed price; does not alter trading thresholds.','records':tracker}
           pathlib.Path('status/wait-outcomes.json').write_text(json.dumps(out,indent=2,sort_keys=True))
           PY
 
