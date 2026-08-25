@@ -8,10 +8,12 @@ on:
       - 'microstructure_walkforward.py'
       - 'microstructure_runtime.py'
       - 'volatility_forecast_engine.py'
+      - 'volatility_runtime.py'
       - 'tests/test_microstructure_memory.py'
       - 'tests/test_microstructure_walkforward.py'
       - 'tests/test_microstructure_runtime.py'
       - 'tests/test_volatility_forecast_engine.py'
+      - 'tests/test_volatility_runtime.py'
       - '.github/workflows/atlas-shadow-engines-ci.yml'
       - 'cloud_start.py'
   pull_request:
@@ -21,10 +23,12 @@ on:
       - 'microstructure_walkforward.py'
       - 'microstructure_runtime.py'
       - 'volatility_forecast_engine.py'
+      - 'volatility_runtime.py'
       - 'tests/test_microstructure_memory.py'
       - 'tests/test_microstructure_walkforward.py'
       - 'tests/test_microstructure_runtime.py'
       - 'tests/test_volatility_forecast_engine.py'
+      - 'tests/test_volatility_runtime.py'
       - '.github/workflows/atlas-shadow-engines-ci.yml'
       - 'cloud_start.py'
 
@@ -41,22 +45,28 @@ jobs:
         run: python -m pip install --disable-pip-version-check pytest
       - name: Syntax
         run: |
-          python -m py_compile microstructure_memory.py microstructure_walkforward.py microstructure_runtime.py volatility_forecast_engine.py
+          python -m py_compile microstructure_memory.py microstructure_walkforward.py microstructure_runtime.py volatility_forecast_engine.py volatility_runtime.py
       - name: Shadow engine regression tests
         run: |
           PYTHONPATH=. python -m pytest -q \
             tests/test_microstructure_memory.py \
             tests/test_microstructure_walkforward.py \
             tests/test_microstructure_runtime.py \
-            tests/test_volatility_forecast_engine.py
+            tests/test_volatility_forecast_engine.py \
+            tests/test_volatility_runtime.py
       - name: Preserve shadow-only contract
         run: |
           grep -q "can_override_production.*False" microstructure_runtime.py
           grep -q "gate_mode.*OBSERVE_ONLY" microstructure_runtime.py
           grep -q "probability_calibrated.*False" volatility_forecast_engine.py
           grep -q "can_override_production.*False" volatility_forecast_engine.py
+          grep -q "can_override_production.*False" volatility_runtime.py
+          grep -q "network_calls_in_decision_path.*False" volatility_runtime.py
           grep -q '_install_profit_engine_runtime' cloud_start.py
           grep -q '_install_microstructure_runtime' cloud_start.py
+          grep -q '_install_volatility_runtime' cloud_start.py
           profit_line=$(grep -n '_install_profit_engine_runtime(_collector)' cloud_start.py | head -1 | cut -d: -f1)
           micro_line=$(grep -n '_install_microstructure_runtime(_collector)' cloud_start.py | head -1 | cut -d: -f1)
+          volatility_line=$(grep -n '_install_volatility_runtime(_collector)' cloud_start.py | head -1 | cut -d: -f1)
           test "$micro_line" -gt "$profit_line"
+          test "$volatility_line" -gt "$micro_line"
