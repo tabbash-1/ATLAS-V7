@@ -22,6 +22,35 @@ def _state_manifest(collector, name):
     return state, value
 
 
+def _joint_progress(joint):
+    matched = int(joint.get('matched_forward_ids') or 0)
+    minimum = int(joint.get('minimum_matched_observations') or 0)
+    progress_pct = round(min(100.0, matched / minimum * 100.0), 2) if minimum > 0 else None
+    horizons = {}
+    for horizon, report in (joint.get('horizon_coverage') or {}).items():
+        if not isinstance(report, dict):
+            continue
+        horizons[str(horizon)] = {
+            'matched_forward_ids': int(report.get('matched_forward_ids') or 0),
+            'well_populated_cells': int(report.get('well_populated_cells') or 0),
+            'minimum_well_populated_cells': int(joint.get('minimum_well_populated_cells') or 0),
+            'top_cell_share_pct': report.get('top_cell_share_pct'),
+            'volatility_insufficient_rows': int(report.get('volatility_insufficient_rows') or 0),
+            'coverage_sufficient': bool(report.get('coverage_sufficient_for_future_interaction_test')),
+        }
+    return {
+        'matched_forward_ids': matched,
+        'minimum_matched_observations': minimum,
+        'matched_progress_pct': progress_pct,
+        'aligned_cohort_status': joint.get('aligned_cohort_status'),
+        'aligned_cohort_comparable': bool(joint.get('aligned_cohort_comparable')),
+        'aligned_start_ms': joint.get('aligned_start_ms'),
+        'pre_alignment_rows_excluded_by_layer': deepcopy(joint.get('pre_alignment_rows_excluded_by_layer') or {}),
+        'aligned_unique_forward_ids_by_layer': deepcopy(joint.get('aligned_unique_forward_ids_by_layer') or {}),
+        'horizon_progress': horizons,
+    }
+
+
 def _cached_governance(collector):
     joint_state = getattr(collector, 'EDGE_EVIDENCE_JOINT_COVERAGE_STATE', None)
     joint = joint_state.get('report') if isinstance(joint_state, dict) and isinstance(joint_state.get('report'), dict) else (joint_state if isinstance(joint_state, dict) else {})
@@ -37,6 +66,7 @@ def _cached_governance(collector):
             'future_interaction_validation_supported': joint.get('future_interaction_validation_supported'),
             'eligible_horizons_h': deepcopy(joint.get('horizons_with_sufficient_joint_coverage_h') or []),
             'blockers': deepcopy(joint.get('blockers') or []),
+            **_joint_progress(joint),
         },
         'protocol': {
             'status': (p or {}).get('status'),
