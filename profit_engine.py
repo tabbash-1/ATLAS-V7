@@ -1,14 +1,18 @@
-"""ATLAS Profit Decision Engine v2.
+"""ATLAS Profit Decision Engine v3.
 
 Conservative profit-readiness gate layered on top of Production scoring. It never
-weakens or replaces Production qualification. Profit readiness requires regime
-alignment, valid geometry, calibrated TP/SL probability and a validated execution
-cost model. Missing calibration or cost evidence fails closed to WAIT.
+weakens or replaces Production qualification. Profit readiness requires an
+independent asset regime aligned with the candidate, no strongly-opposed BTC
+regime, valid geometry, calibrated TP/SL probability and a validated execution
+cost model. Missing evidence fails closed to WAIT.
 """
 
-VERSION = "ATLAS_PROFIT_ENGINE_V2_FAIL_CLOSED_COSTS"
+VERSION = "ATLAS_PROFIT_ENGINE_V3_INDEPENDENT_REGIME"
 MIN_NET_EV_R = 0.10
 MIN_CALIBRATION_SAMPLES = 100
+
+BULLISH_REGIMES = ('TREND_UP', 'BREAKOUT_UP', 'VOLATILITY_EXPANSION_UP')
+BEARISH_REGIMES = ('TREND_DOWN', 'BREAKDOWN_DOWN', 'VOLATILITY_EXPANSION_DOWN')
 
 
 def _f(v, default=None):
@@ -19,18 +23,34 @@ def _f(v, default=None):
 
 
 def regime_gate(row):
-    direction = (row or {}).get('direction')
-    regime = (row or {}).get('regime')
-    aligned = (
-        direction == 'LONG' and regime in ('TREND_UP', 'BREAKOUT_UP')
+    row = row or {}
+    direction = row.get('direction')
+    regime = row.get('regime')
+    btc_regime = row.get('btc_regime')
+    asset_aligned = (
+        direction == 'LONG' and regime in BULLISH_REGIMES
     ) or (
-        direction == 'SHORT' and regime in ('TREND_DOWN', 'BREAKDOWN_DOWN')
+        direction == 'SHORT' and regime in BEARISH_REGIMES
     )
+    btc_opposed = bool(
+        (direction == 'LONG' and btc_regime in BEARISH_REGIMES) or
+        (direction == 'SHORT' and btc_regime in BULLISH_REGIMES)
+    )
+    passed = bool(asset_aligned and not btc_opposed)
+    if not asset_aligned:
+        reason = 'ASSET_REGIME_NOT_ALIGNED'
+    elif btc_opposed:
+        reason = 'BTC_REGIME_OPPOSED'
+    else:
+        reason = 'REGIME_ALIGNED'
     return {
-        'pass': bool(aligned),
+        'pass': passed,
+        'asset_aligned': bool(asset_aligned),
+        'btc_opposed': btc_opposed,
         'regime': regime,
+        'btc_regime': btc_regime,
         'direction': direction,
-        'reason': 'REGIME_ALIGNED' if aligned else 'REGIME_NOT_ALIGNED',
+        'reason': reason,
     }
 
 
@@ -72,7 +92,8 @@ def assess(row, *, stop_loss=None, calibration=None, execution=None):
 
     blockers = []
     if not qualified: blockers.append('NOT_PRODUCTION_QUALIFIED')
-    if not regime['pass']: blockers.append('REGIME_NOT_ALIGNED')
+    if not regime['asset_aligned']: blockers.append('REGIME_NOT_ALIGNED')
+    if regime['btc_opposed']: blockers.append('BTC_REGIME_OPPOSED')
     if rr is None or rr < 1.0: blockers.append('GEOMETRY_RR_BELOW_ONE')
     if not calibrated: blockers.append('CALIBRATION_WARMUP')
     if not execution_validated or cost_r is None: blockers.append('EXECUTION_COST_MODEL_UNAVAILABLE')
@@ -104,5 +125,5 @@ def assess(row, *, stop_loss=None, calibration=None, execution=None):
         'gross_rr': rr,
         'net_expected_r': round(net_ev, 6) if net_ev is not None else None,
         'min_net_expected_r': MIN_NET_EV_R,
-        'safety': 'FAIL_CLOSED_UNTIL_CALIBRATION_AND_COSTS_VALIDATED',
+        'safety': 'FAIL_CLOSED_UNTIL_REGIME_CALIBRATION_AND_COSTS_VALIDATED',
     }
