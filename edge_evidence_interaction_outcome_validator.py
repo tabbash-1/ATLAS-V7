@@ -18,7 +18,7 @@ from statistics import median
 import edge_evidence_interaction_protocol as protocol
 import edge_evidence_interaction_rules as rules
 
-VERSION = 'EDGE_EVIDENCE_INTERACTION_OUTCOME_VALIDATOR_V1_PREREGISTERED_H1'
+VERSION = 'EDGE_EVIDENCE_INTERACTION_OUTCOME_VALIDATOR_V2_HASH_BOUND_H1'
 
 
 def _fid(row):
@@ -154,6 +154,7 @@ def _authorized(protocol_manifest, guard_report, rules_manifest):
     p = protocol_manifest if isinstance(protocol_manifest, dict) else {}
     g = guard_report if isinstance(guard_report, dict) else {}
     rm = rules_manifest if isinstance(rules_manifest, dict) else {}
+    protocol_hash = p.get('protocol_hash')
 
     if not protocol.verify_manifest(p):
         blockers.append('PROTOCOL_HASH_INVALID')
@@ -161,6 +162,8 @@ def _authorized(protocol_manifest, guard_report, rules_manifest):
         blockers.append('PROTOCOL_NOT_PREREGISTERED')
     if g.get('status') != 'VALIDATOR_ARMED':
         blockers.append('VALIDATOR_GUARD_NOT_ARMED')
+    if g.get('armed_protocol_hash') != protocol_hash:
+        blockers.append('GUARD_PROTOCOL_HASH_MISMATCH')
     if rm.get('status') != 'PREREGISTERED':
         blockers.append('RULES_NOT_PREREGISTERED')
     if not rules.verify_manifest(rm, p):
@@ -285,8 +288,6 @@ def validate(protocol_manifest, guard_report, rules_manifest, profit_rows, micro
             h_blockers.append('MIN_TOTAL_SETTLED_PER_RULE_CELL_NOT_REACHED')
 
         baseline_folds = _folds(baseline, fold_count) if fold_count > 0 else []
-        # Candidate membership is evaluated within each baseline chronological fold,
-        # not split independently, preserving identical time boundaries.
         fold_reports = []
         all_fold_pass = True
         for i, base_fold in enumerate(baseline_folds):
