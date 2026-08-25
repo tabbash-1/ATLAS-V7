@@ -47,3 +47,12 @@ def test_open_rows_do_not_count_as_decisive():
     out = c.calibrate([row(70, None, qualified=True)], 24, 68)
     assert out['overall']['decisive'] == 0
     assert out['matured_observations'] == 0
+
+
+if __name__ == '__main__':
+    test_short_return_is_direction_normalized()
+    test_score_bands_respect_threshold()
+    test_opportunity_state_separates_watch_armed_actionable()
+    test_calibration_never_auto_applies_threshold()
+    test_open_rows_do_not_count_as_decisive()
+    print('outcome calibration tests: ok')
