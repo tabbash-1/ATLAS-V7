@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import math
+import time
 import production_reliability as reliability
 
 
@@ -42,7 +43,9 @@ class FakeAtlas:
 
 def test_integrity_quality_separates_maturity_and_coverage():
     atlas = FakeAtlas()
-    now_ms = 1787605200000
+    # Freshness is a wall-clock property. Use the runtime clock so this
+    # regression cannot expire merely because the calendar advances.
+    now_ms = int(time.time() * 1000)
     forward = [
         {'symbol':'BTCUSDT','direction':'LONG','entry':100+i,'captured_at_ms':now_ms-(i+1)*3600000}
         for i in range(19)

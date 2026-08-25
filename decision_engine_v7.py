@@ -6,11 +6,16 @@ available lane instead of collapsing every non-Swing setup into a generic WAIT.
 """
 
 import production_signal_scoring as scoring
+import futures_provider_chain
 
 VERSION = 'DECISION_ENGINE_V7_BREAKOUT_AWARE'
 
 
 def install(atlas):
+    # Install the resilient futures chain before Production Reliability wraps
+    # capture(). This keeps Binance/Kraken first, then OKX/Bybit, while HYPE can
+    # still fall through to the existing Hyperliquid adapter in the outer layer.
+    futures_provider_chain.install(atlas)
     original = atlas.production_decision
 
     def build(symbol):
@@ -87,8 +92,6 @@ def install(atlas):
             matrix['swing'] = swing
             result['timeframe_matrix'] = matrix
 
-        # Product-facing lane selection. Production remains the only executable
-        # lane; tactical/quick remain explicitly research-only until validated.
         if result.get('execution_ready') and result.get('actionable_decision') in ('LONG', 'SHORT'):
             result['best_available_action'] = {
                 'action': 'BUY' if result['actionable_decision'] == 'LONG' else 'SELL',
@@ -130,5 +133,10 @@ def install(atlas):
         return result
 
     atlas.production_decision = build
-    atlas.DECISION_ENGINE_V7_STATE = {'enabled': True, 'version': VERSION, 'production_threshold_unchanged': True}
+    atlas.DECISION_ENGINE_V7_STATE = {
+        'enabled': True,
+        'version': VERSION,
+        'production_threshold_unchanged': True,
+        'futures_provider_chain': futures_provider_chain.VERSION,
+    }
     return atlas.DECISION_ENGINE_V7_STATE
