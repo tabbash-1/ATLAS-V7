@@ -11,6 +11,7 @@ on:
       - 'volatility_walkforward.py'
       - 'volatility_runtime.py'
       - 'volatility_walkforward_runtime.py'
+      - 'edge_evidence_overlap.py'
       - 'edge_evidence_report.py'
       - 'tests/test_microstructure_memory.py'
       - 'tests/test_microstructure_walkforward.py'
@@ -19,6 +20,7 @@ on:
       - 'tests/test_volatility_walkforward.py'
       - 'tests/test_volatility_runtime.py'
       - 'tests/test_volatility_walkforward_runtime.py'
+      - 'tests/test_edge_evidence_overlap.py'
       - 'tests/test_edge_evidence_report.py'
       - '.github/workflows/atlas-shadow-engines-ci.yml'
       - 'cloud_start.py'
@@ -32,6 +34,7 @@ on:
       - 'volatility_walkforward.py'
       - 'volatility_runtime.py'
       - 'volatility_walkforward_runtime.py'
+      - 'edge_evidence_overlap.py'
       - 'edge_evidence_report.py'
       - 'tests/test_microstructure_memory.py'
       - 'tests/test_microstructure_walkforward.py'
@@ -40,6 +43,7 @@ on:
       - 'tests/test_volatility_walkforward.py'
       - 'tests/test_volatility_runtime.py'
       - 'tests/test_volatility_walkforward_runtime.py'
+      - 'tests/test_edge_evidence_overlap.py'
       - 'tests/test_edge_evidence_report.py'
       - '.github/workflows/atlas-shadow-engines-ci.yml'
       - 'cloud_start.py'
@@ -57,7 +61,7 @@ jobs:
         run: python -m pip install --disable-pip-version-check pytest
       - name: Syntax
         run: |
-          python -m py_compile microstructure_memory.py microstructure_walkforward.py microstructure_runtime.py volatility_forecast_engine.py volatility_walkforward.py volatility_runtime.py volatility_walkforward_runtime.py edge_evidence_report.py
+          python -m py_compile microstructure_memory.py microstructure_walkforward.py microstructure_runtime.py volatility_forecast_engine.py volatility_walkforward.py volatility_runtime.py volatility_walkforward_runtime.py edge_evidence_overlap.py edge_evidence_report.py
       - name: Shadow engine regression tests
         run: |
           PYTHONPATH=. python -m pytest -q \
@@ -68,6 +72,7 @@ jobs:
             tests/test_volatility_walkforward.py \
             tests/test_volatility_runtime.py \
             tests/test_volatility_walkforward_runtime.py \
+            tests/test_edge_evidence_overlap.py \
             tests/test_edge_evidence_report.py
       - name: Preserve shadow-only contract
         run: |
@@ -83,6 +88,17 @@ jobs:
           grep -q "wraps_production_decision.*False" volatility_walkforward_runtime.py
           grep -q "wraps_forward_observe.*False" volatility_walkforward_runtime.py
           grep -q "can_override_production.*False" volatility_walkforward_runtime.py
+          grep -q "outcomes_read.*False" edge_evidence_overlap.py
+          grep -q "historical_features_recomputed.*False" edge_evidence_overlap.py
+          grep -q "weights_assigned.*False" edge_evidence_overlap.py
+          grep -q "composite_trade_score_created.*False" edge_evidence_overlap.py
+          grep -q "cross_layer_interaction_filtering_enabled.*False" edge_evidence_overlap.py
+          grep -q "gate_promoted.*False" edge_evidence_overlap.py
+          grep -q "can_override_production.*False" edge_evidence_overlap.py
+          grep -q "production_ready_claimed.*False" edge_evidence_overlap.py
+          grep -q "live_trading_ready_claimed.*False" edge_evidence_overlap.py
+          grep -q "wraps_production_decision.*False" edge_evidence_overlap.py
+          grep -q "wraps_forward_observe.*False" edge_evidence_overlap.py
           grep -q "weights_assigned.*False" edge_evidence_report.py
           grep -q "composite_trade_score_created.*False" edge_evidence_report.py
           grep -q "cross_layer_interaction_filtering_enabled.*False" edge_evidence_report.py
@@ -91,6 +107,8 @@ jobs:
           grep -q "wraps_production_decision.*False" edge_evidence_report.py
           grep -q "wraps_forward_observe.*False" edge_evidence_report.py
           grep -q "can_override_production.*False" edge_evidence_report.py
+          grep -q "edge_evidence_overlap.install(collector)" edge_evidence_report.py
+          grep -q "frozen_signal_cohorts_comparable" edge_evidence_report.py
           grep -q 'edge_evidence_report.install(collector)' volatility_walkforward_runtime.py
           grep -q '_install_profit_engine_runtime' cloud_start.py
           grep -q '_install_microstructure_runtime' cloud_start.py
