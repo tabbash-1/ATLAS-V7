@@ -36,13 +36,16 @@ def test_long_accumulation_detected_from_same_provider_history():
 def test_provider_change_never_compares_open_interest_units():
     rows = []
     # Old provider has huge OI units that must never be compared to OKX units.
-    for i in range(1, 9):
+    # Keep six latest OKX rows so the 12h same-provider minimum is satisfied and
+    # we can verify the actual OI delta is computed only within that lineage.
+    for i in range(1, 7):
         rows.append(row(i, provider='BYBIT_LINEAR_PUBLIC', price=100+i*.1, oi=1_000_000+i*1000))
-    for i in range(9, 13):
+    for i in range(7, 13):
         rows.append(row(i, provider='OKX_USDT_SWAP_PUBLIC', price=101+i*.1, oi=1000+i*10))
     out = mm.summarize_window(rows, 12, now_ms=NOW)
+    assert out['status'] == 'READY'
     assert out['provider'] == 'OKX_USDT_SWAP_PUBLIC'
-    assert out['rows'] == 4
+    assert out['rows'] == 6
     assert out['validated_rows_all_providers'] > out['rows']
     assert abs(out['open_interest_change_pct']) < 10
 
