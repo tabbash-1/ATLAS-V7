@@ -1,0 +1,53 @@
+name: ATLAS Production Loss Autopsy
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'production_loss_autopsy.py'
+      - 'tests/test_production_loss_autopsy.py'
+      - '.github/workflows/production-loss-autopsy.yml'
+  schedule:
+    - cron: '37 */3 * * *'
+
+permissions:
+  contents: write
+
+jobs:
+  autopsy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Test autopsy engine
+        run: |
+          python3 -m py_compile production_loss_autopsy.py tests/test_production_loss_autopsy.py
+          PYTHONPATH=. python3 tests/test_production_loss_autopsy.py
+      - name: Fetch execution-qualified live path ledger
+        run: |
+          curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 10 --max-time 90 'https://atlas-v7.onrender.com/api/outcomes/path-ledger?scope=execution&limit=200' -o /tmp/execution-ledger.json
+          python3 -m json.tool /tmp/execution-ledger.json >/dev/null
+      - name: Build autopsy report
+        run: |
+          python3 production_loss_autopsy.py --input /tmp/execution-ledger.json --output status/production-loss-autopsy.json
+          python3 - <<'PY'
+          import json
+          x=json.load(open('status/production-loss-autopsy.json'))
+          assert x['schema']=='ATLAS_PRODUCTION_LOSS_AUTOPSY_V1'
+          assert x['production_threshold']==68
+          assert x['production_threshold_changed'] is False
+          assert x['production_score_adjustment']==0
+          print('AUTOPSY',json.dumps(x,sort_keys=True))
+          PY
+      - name: Commit report
+        run: |
+          if [ -z "$(git status --porcelain -- status/production-loss-autopsy.json)" ]; then exit 0; fi
+          git config user.name 'atlas-autopsy-bot'
+          git config user.email 'atlas-autopsy-bot@users.noreply.github.com'
+          git add status/production-loss-autopsy.json
+          git commit -m 'chore: update production loss autopsy [skip ci]'
+          git pull --rebase origin main
+          git push
