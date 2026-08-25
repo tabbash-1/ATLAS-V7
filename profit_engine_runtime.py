@@ -1,0 +1,154 @@
+"""Shadow runtime integration for ATLAS Profit Engine.
+
+This layer never changes Production score qualification, thresholds, geometry or
+live execution. It attaches a profit_engine_shadow payload to each decision.
+Probability calibration is derived only from canonical Production-qualified
+Frozen TP/SL path settlements (TP2 before SL vs SL before TP2), never from
+research samples or directional 24h returns.
+
+Calibration refresh is background/cached so the decision API never blocks on
+historical market-data settlement.
+"""
+
+from __future__ import annotations
+
+import math
+import threading
+import time
+
+import execution_outcome_scope
+import profit_engine
+import trade_path_settlement
+
+VERSION = 'PROFIT_ENGINE_RUNTIME_V1_SHADOW_PATH_CALIBRATION'
+CALIBRATION_REFRESH_SECONDS = 900
+
+
+def _wilson_interval(wins, total, z=1.96):
+    if total <= 0:
+        return None, None
+    p = wins / total
+    denom = 1 + z * z / total
+    center = (p + z * z / (2 * total)) / denom
+    margin = z * math.sqrt((p * (1 - p) + z * z / (4 * total)) / total) / denom
+    return max(0.0, center - margin), min(1.0, center + margin)
+
+
+def build_path_calibration(collector):
+    rows = collector.read_forward()
+    geometry_map = trade_path_settlement.geometry_by_forward_id(collector)
+    execution_rows, rejected = execution_outcome_scope.filter_execution_rows(rows, geometry_map)
+    items = trade_path_settlement.build_path_ledger(
+        execution_rows, geometry_map, scope='all', limit=500
+    )
+    decisive = [x for x in items if x.get('path_outcome') in ('WIN_TP2', 'LOSS')]
+    wins = sum(1 for x in decisive if x.get('path_outcome') == 'WIN_TP2')
+    losses = sum(1 for x in decisive if x.get('path_outcome') == 'LOSS')
+    samples = wins + losses
+    p_win = (wins / samples) if samples else None
+    low, high = _wilson_interval(wins, samples)
+    calibrated = bool(samples >= profit_engine.MIN_CALIBRATION_SAMPLES and p_win is not None)
+    return {
+        'calibrated': calibrated,
+        'samples': samples,
+        'wins': wins,
+        'losses': losses,
+        'p_win': p_win,
+        'p_win_ci95_low': low,
+        'p_win_ci95_high': high,
+        'basis': 'PRODUCTION_EXECUTION_SCOPE_TP2_BEFORE_SL_PATH_SETTLEMENT',
+        'minimum_samples': profit_engine.MIN_CALIBRATION_SAMPLES,
+        'execution_rows': len(execution_rows),
+        'execution_rejected_rows': len(rejected),
+        'research_samples_included': False,
+        'directional_24h_returns_used': False,
+    }
+
+
+def install(collector):
+    if getattr(collector, '_PROFIT_ENGINE_RUNTIME_INSTALLED', False):
+        return getattr(collector, 'PROFIT_ENGINE_RUNTIME_STATE', {})
+
+    original_decision = collector.production_decision
+    state = {
+        'enabled': True,
+        'version': VERSION,
+        'shadow_only': True,
+        'can_override_production': False,
+        'calibration': {
+            'calibrated': False,
+            'samples': 0,
+            'p_win': None,
+            'basis': 'PRODUCTION_EXECUTION_SCOPE_TP2_BEFORE_SL_PATH_SETTLEMENT',
+            'minimum_samples': profit_engine.MIN_CALIBRATION_SAMPLES,
+        },
+        'execution_cost_model': {
+            'validated': False,
+            'basis': 'NOT_CONNECTED_YET',
+        },
+        'refreshes': 0,
+        'last_refresh_started_at': None,
+        'last_refresh_finished_at': None,
+        'last_error': None,
+    }
+    lock = threading.RLock()
+
+    def refresh_calibration():
+        state['last_refresh_started_at'] = collector.now_iso() if hasattr(collector, 'now_iso') else None
+        try:
+            result = build_path_calibration(collector)
+            with lock:
+                state['calibration'] = result
+                state['refreshes'] += 1
+                state['last_error'] = None
+            return result
+        except Exception as exc:
+            with lock:
+                state['last_error'] = f'{type(exc).__name__}: {exc}'
+            return None
+        finally:
+            state['last_refresh_finished_at'] = collector.now_iso() if hasattr(collector, 'now_iso') else None
+
+    def calibration_loop():
+        # Allow the rest of the runtime to boot before path-settlement I/O.
+        time.sleep(20)
+        while True:
+            refresh_calibration()
+            time.sleep(CALIBRATION_REFRESH_SECONDS)
+
+    def production_decision_with_profit_shadow(symbol):
+        decision = original_decision(symbol)
+        if not isinstance(decision, dict) or not decision.get('ok'):
+            return decision
+        with lock:
+            calibration = dict(state.get('calibration') or {})
+            execution = dict(state.get('execution_cost_model') or {})
+        row = {
+            'production_signal_qualified': bool(decision.get('production_signal_qualified')),
+            'direction': decision.get('candidate_direction'),
+            'regime': decision.get('regime'),
+            'entry': decision.get('entry'),
+            'rr_tp2': decision.get('risk_reward'),
+        }
+        shadow = profit_engine.assess(
+            row,
+            stop_loss=decision.get('stop_loss'),
+            calibration=calibration,
+            execution=execution,
+        )
+        shadow.update({
+            'shadow_only': True,
+            'can_override_production': False,
+            'production_decision_unchanged': True,
+            'production_actionable_decision': decision.get('actionable_decision'),
+        })
+        decision['profit_engine_shadow'] = shadow
+        decision['profit_engine_version'] = profit_engine.VERSION
+        return decision
+
+    collector.production_decision = production_decision_with_profit_shadow
+    collector.PROFIT_ENGINE_RUNTIME_STATE = state
+    collector.profit_engine_refresh_calibration = refresh_calibration
+    collector._PROFIT_ENGINE_RUNTIME_INSTALLED = True
+    threading.Thread(target=calibration_loop, daemon=True, name='atlas-profit-calibration').start()
+    return state
