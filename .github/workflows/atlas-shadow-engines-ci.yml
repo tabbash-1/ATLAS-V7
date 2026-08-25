@@ -10,12 +10,14 @@ on:
       - 'volatility_forecast_engine.py'
       - 'volatility_walkforward.py'
       - 'volatility_runtime.py'
+      - 'volatility_walkforward_runtime.py'
       - 'tests/test_microstructure_memory.py'
       - 'tests/test_microstructure_walkforward.py'
       - 'tests/test_microstructure_runtime.py'
       - 'tests/test_volatility_forecast_engine.py'
       - 'tests/test_volatility_walkforward.py'
       - 'tests/test_volatility_runtime.py'
+      - 'tests/test_volatility_walkforward_runtime.py'
       - '.github/workflows/atlas-shadow-engines-ci.yml'
       - 'cloud_start.py'
   pull_request:
@@ -27,12 +29,14 @@ on:
       - 'volatility_forecast_engine.py'
       - 'volatility_walkforward.py'
       - 'volatility_runtime.py'
+      - 'volatility_walkforward_runtime.py'
       - 'tests/test_microstructure_memory.py'
       - 'tests/test_microstructure_walkforward.py'
       - 'tests/test_microstructure_runtime.py'
       - 'tests/test_volatility_forecast_engine.py'
       - 'tests/test_volatility_walkforward.py'
       - 'tests/test_volatility_runtime.py'
+      - 'tests/test_volatility_walkforward_runtime.py'
       - '.github/workflows/atlas-shadow-engines-ci.yml'
       - 'cloud_start.py'
 
@@ -49,7 +53,7 @@ jobs:
         run: python -m pip install --disable-pip-version-check pytest
       - name: Syntax
         run: |
-          python -m py_compile microstructure_memory.py microstructure_walkforward.py microstructure_runtime.py volatility_forecast_engine.py volatility_walkforward.py volatility_runtime.py
+          python -m py_compile microstructure_memory.py microstructure_walkforward.py microstructure_runtime.py volatility_forecast_engine.py volatility_walkforward.py volatility_runtime.py volatility_walkforward_runtime.py
       - name: Shadow engine regression tests
         run: |
           PYTHONPATH=. python -m pytest -q \
@@ -58,7 +62,8 @@ jobs:
             tests/test_microstructure_runtime.py \
             tests/test_volatility_forecast_engine.py \
             tests/test_volatility_walkforward.py \
-            tests/test_volatility_runtime.py
+            tests/test_volatility_runtime.py \
+            tests/test_volatility_walkforward_runtime.py
       - name: Preserve shadow-only contract
         run: |
           grep -q "can_override_production.*False" microstructure_runtime.py
@@ -69,11 +74,18 @@ jobs:
           grep -q "gate_promoted.*False" volatility_walkforward.py
           grep -q "can_override_production.*False" volatility_runtime.py
           grep -q "network_calls_in_decision_path.*False" volatility_runtime.py
+          grep -q "background_only.*True" volatility_walkforward_runtime.py
+          grep -q "wraps_production_decision.*False" volatility_walkforward_runtime.py
+          grep -q "wraps_forward_observe.*False" volatility_walkforward_runtime.py
+          grep -q "can_override_production.*False" volatility_walkforward_runtime.py
           grep -q '_install_profit_engine_runtime' cloud_start.py
           grep -q '_install_microstructure_runtime' cloud_start.py
           grep -q '_install_volatility_runtime' cloud_start.py
+          grep -q '_install_volatility_walkforward_runtime' cloud_start.py
           profit_line=$(grep -n '_install_profit_engine_runtime(_collector)' cloud_start.py | head -1 | cut -d: -f1)
           micro_line=$(grep -n '_install_microstructure_runtime(_collector)' cloud_start.py | head -1 | cut -d: -f1)
           volatility_line=$(grep -n '_install_volatility_runtime(_collector)' cloud_start.py | head -1 | cut -d: -f1)
+          volatility_wf_line=$(grep -n '_install_volatility_walkforward_runtime(_collector)' cloud_start.py | head -1 | cut -d: -f1)
           test "$micro_line" -gt "$profit_line"
           test "$volatility_line" -gt "$micro_line"
+          test "$volatility_wf_line" -gt "$volatility_line"
