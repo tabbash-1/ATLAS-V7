@@ -25,6 +25,7 @@ def _cached_payload(collector):
             'canonical_outcome_loader_called_by_request': False,
             'outcomes_read_by_request': False,
             'research_only': True,
+            'live_execution': False,
             'can_override_production': False,
             'gate_promoted': False,
             'blockers': ['INTERACTION_OUTCOME_RUNTIME_NOT_INSTALLED'],
@@ -55,6 +56,7 @@ def _cached_payload(collector):
         'outcomes_read_in_background': bool(report.get('outcomes_read')),
         'outcome_validation': deepcopy(report.get('outcome_validation')) if isinstance(report.get('outcome_validation'), dict) else None,
         'research_only': True,
+        'live_execution': False,
         'can_override_production': False,
         'gate_promoted': False,
         'blockers': list(report.get('blockers') or []),
@@ -64,7 +66,7 @@ def _cached_payload(collector):
 def install(collector):
     """Install a single cached GET endpoint without mutating decision functions."""
     if getattr(collector, '_INTERACTION_STATUS_API_INSTALLED', False):
-        return {'enabled': True, 'version': VERSION, 'path': PATH, 'cached_only': True}
+        return {'enabled': True, 'version': VERSION, 'path': PATH, 'cached_only': True, 'live_execution': False}
 
     handler = getattr(collector, 'Handler', None)
     if handler is None or not hasattr(handler, 'do_GET'):
@@ -97,6 +99,7 @@ def install(collector):
         'background_refresh_triggered_by_request': False,
         'canonical_outcome_loader_called_by_request': False,
         'outcomes_read_by_request': False,
+        'live_execution': False,
         'can_override_production': False,
         'gate_promoted': False,
     }
