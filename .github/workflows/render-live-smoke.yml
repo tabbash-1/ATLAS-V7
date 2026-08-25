@@ -1,0 +1,48 @@
+name: ATLAS Render Live Smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/render-live-smoke.yml'
+      - 'trade_path_settlement.py'
+      - 'trade_outcome_runtime.py'
+      - 'production_decision_api.py'
+      - 'quick_reentry_guard.py'
+  workflow_dispatch:
+
+jobs:
+  live-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Wait for Render deploy
+        run: sleep 90
+      - name: Verify health and runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://atlas-v7.onrender.com'
+          curl -fsSL --retry 8 --retry-delay 10 --retry-all-errors --connect-timeout 10 --max-time 30 "$base/health" | tee /tmp/health.json
+          python3 -m json.tool /tmp/health.json >/dev/null
+          curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --connect-timeout 10 --max-time 30 "$base/api/runtime/status" | tee /tmp/runtime.json
+          python3 -m json.tool /tmp/runtime.json >/dev/null
+      - name: Verify path summary returns JSON not gateway error
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://atlas-v7.onrender.com/api/outcomes/path-summary?scope=signals&limit=40'
+          code="$(curl -L --retry 3 --retry-delay 10 --retry-all-errors --connect-timeout 10 --max-time 45 -sS -w '%{http_code}' -o /tmp/path.json "$url")"
+          echo "HTTP=$code"
+          cat /tmp/path.json
+          test "$code" -ge 200 -a "$code" -lt 300
+          python3 -m json.tool /tmp/path.json >/dev/null
+          python3 - <<'PY'
+          import json
+          x=json.load(open('/tmp/path.json'))
+          assert x.get('schema') == 'ATLAS_TRADE_PATH_SUMMARY_V1', x
+          overall=x.get('overall') or {}
+          assert 'market_data_errors' in overall, overall
+          assert 'market_data_circuit' in overall, overall
+          print('path-summary-live-ok', json.dumps(overall, sort_keys=True))
+          PY
