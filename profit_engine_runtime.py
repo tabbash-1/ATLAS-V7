@@ -2,12 +2,10 @@
 
 This layer never changes Production score qualification, thresholds, geometry or
 live execution. It attaches a profit_engine_shadow payload to each decision.
-Probability calibration is derived only from canonical Production-qualified
-Frozen TP/SL path settlements (TP2 before SL vs SL before TP2), never from
-research samples or directional 24h returns.
-
-Calibration and execution-cost refreshes are background/cached so the decision
-API never performs historical settlement or market-data I/O synchronously.
+Probability calibration comes only from canonical Production-qualified Frozen
+TP/SL path settlements. Execution costs come from a cached live L2 model. Market
+regime is classified independently from the signal direction and cached in the
+background. No research sample or 24h directional return can qualify a trade.
 """
 
 from __future__ import annotations
@@ -18,12 +16,14 @@ import time
 
 import execution_cost_model
 import execution_outcome_scope
+import market_regime_engine
 import profit_engine
 import trade_path_settlement
 
-VERSION = 'PROFIT_ENGINE_RUNTIME_V2_PATH_CALIBRATION_LIVE_COSTS'
+VERSION = 'PROFIT_ENGINE_RUNTIME_V3_INDEPENDENT_REGIME_LIVE_COSTS'
 CALIBRATION_REFRESH_SECONDS = 900
 COST_REFRESH_SECONDS = 120
+REGIME_REFRESH_SECONDS = 300
 
 
 def _wilson_interval(wins, total, z=1.96):
@@ -40,9 +40,7 @@ def build_path_calibration(collector):
     rows = collector.read_forward()
     geometry_map = trade_path_settlement.geometry_by_forward_id(collector)
     execution_rows, rejected = execution_outcome_scope.filter_execution_rows(rows, geometry_map)
-    items = trade_path_settlement.build_path_ledger(
-        execution_rows, geometry_map, scope='all', limit=500
-    )
+    items = trade_path_settlement.build_path_ledger(execution_rows, geometry_map, scope='all', limit=500)
     decisive = [x for x in items if x.get('path_outcome') in ('WIN_TP2', 'LOSS')]
     wins = sum(1 for x in decisive if x.get('path_outcome') == 'WIN_TP2')
     losses = sum(1 for x in decisive if x.get('path_outcome') == 'LOSS')
@@ -86,14 +84,19 @@ def install(collector):
             'minimum_samples': profit_engine.MIN_CALIBRATION_SAMPLES,
         },
         'execution_cost_by_symbol': {},
+        'market_regime_by_symbol': {},
         'calibration_refreshes': 0,
         'cost_refreshes': 0,
+        'regime_refreshes': 0,
         'last_calibration_started_at': None,
         'last_calibration_finished_at': None,
         'last_cost_started_at': None,
         'last_cost_finished_at': None,
+        'last_regime_started_at': None,
+        'last_regime_finished_at': None,
         'last_error': None,
         'last_cost_errors': {},
+        'last_regime_errors': {},
     }
     lock = threading.RLock()
 
@@ -115,8 +118,7 @@ def install(collector):
 
     def refresh_execution_costs():
         state['last_cost_started_at'] = collector.now_iso() if hasattr(collector, 'now_iso') else None
-        results = {}
-        errors = {}
+        results = {}; errors = {}
         ua = getattr(collector, 'UA', 'ATLAS-Research/1.0')
         for symbol in symbols:
             normalized = str(symbol).upper().replace('BINANCE:', '')
@@ -145,6 +147,41 @@ def install(collector):
         state['last_cost_finished_at'] = collector.now_iso() if hasattr(collector, 'now_iso') else None
         return results
 
+    def refresh_market_regimes():
+        state['last_regime_started_at'] = collector.now_iso() if hasattr(collector, 'now_iso') else None
+        results = {}; errors = {}
+        try:
+            btc_ks = collector._spot_klines('BTCUSDT')
+        except Exception as exc:
+            btc_ks = []
+            errors['BTCUSDT'] = f'{type(exc).__name__}: {exc}'
+        for symbol in symbols:
+            normalized = str(symbol).upper().replace('BINANCE:', '')
+            try:
+                asset_ks = btc_ks if normalized == 'BTCUSDT' else collector._spot_klines(normalized)
+                results[normalized] = market_regime_engine.analyze(normalized, asset_ks, btc_ks)
+            except Exception as exc:
+                errors[normalized] = f'{type(exc).__name__}: {exc}'
+                results[normalized] = {
+                    'symbol': normalized,
+                    'asset_regime': 'UNKNOWN',
+                    'btc_regime': 'UNKNOWN',
+                    'version': market_regime_engine.VERSION,
+                    'error': errors[normalized],
+                    'shadow_only': True,
+                    'can_override_production': False,
+                }
+        with lock:
+            state['market_regime_by_symbol'] = results
+            state['last_regime_errors'] = errors
+            state['regime_refreshes'] += 1
+            if errors:
+                state['last_error'] = 'regime: ' + ' | '.join(f'{k}: {v}' for k, v in sorted(errors.items()))
+            elif str(state.get('last_error') or '').startswith('regime:'):
+                state['last_error'] = None
+        state['last_regime_finished_at'] = collector.now_iso() if hasattr(collector, 'now_iso') else None
+        return results
+
     def calibration_loop():
         time.sleep(20)
         while True:
@@ -157,6 +194,12 @@ def install(collector):
             refresh_execution_costs()
             time.sleep(COST_REFRESH_SECONDS)
 
+    def regime_loop():
+        time.sleep(7)
+        while True:
+            refresh_market_regimes()
+            time.sleep(REGIME_REFRESH_SECONDS)
+
     def production_decision_with_profit_shadow(symbol):
         decision = original_decision(symbol)
         if not isinstance(decision, dict) or not decision.get('ok'):
@@ -168,19 +211,21 @@ def install(collector):
                 'validated': False,
                 'basis': 'WAITING_FOR_BACKGROUND_EXECUTION_COST_REFRESH',
             })
+            regime_context = dict((state.get('market_regime_by_symbol') or {}).get(normalized) or {
+                'asset_regime': 'UNKNOWN',
+                'btc_regime': 'UNKNOWN',
+                'version': market_regime_engine.VERSION,
+                'shadow_only': True,
+            })
         row = {
             'production_signal_qualified': bool(decision.get('production_signal_qualified')),
             'direction': decision.get('candidate_direction'),
-            'regime': decision.get('regime'),
+            'regime': regime_context.get('asset_regime') or 'UNKNOWN',
+            'btc_regime': regime_context.get('btc_regime') or 'UNKNOWN',
             'entry': decision.get('entry'),
             'rr_tp2': decision.get('risk_reward'),
         }
-        shadow = profit_engine.assess(
-            row,
-            stop_loss=decision.get('stop_loss'),
-            calibration=calibration,
-            execution=execution,
-        )
+        shadow = profit_engine.assess(row, stop_loss=decision.get('stop_loss'), calibration=calibration, execution=execution)
         shadow.update({
             'shadow_only': True,
             'can_override_production': False,
@@ -188,6 +233,8 @@ def install(collector):
             'production_actionable_decision': decision.get('actionable_decision'),
             'execution_cost_source_version': execution.get('version'),
             'execution_cost_blockers': execution.get('blockers') or [],
+            'market_regime': regime_context,
+            'production_legacy_regime': decision.get('regime'),
         })
         decision['profit_engine_shadow'] = shadow
         decision['profit_engine_version'] = profit_engine.VERSION
@@ -197,7 +244,9 @@ def install(collector):
     collector.PROFIT_ENGINE_RUNTIME_STATE = state
     collector.profit_engine_refresh_calibration = refresh_calibration
     collector.profit_engine_refresh_execution_costs = refresh_execution_costs
+    collector.profit_engine_refresh_market_regimes = refresh_market_regimes
     collector._PROFIT_ENGINE_RUNTIME_INSTALLED = True
     threading.Thread(target=calibration_loop, daemon=True, name='atlas-profit-calibration').start()
     threading.Thread(target=cost_loop, daemon=True, name='atlas-profit-costs').start()
+    threading.Thread(target=regime_loop, daemon=True, name='atlas-market-regime').start()
     return state
