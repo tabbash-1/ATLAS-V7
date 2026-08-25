@@ -1,13 +1,13 @@
-"""HYPE/USDT spot candle adapter for ATLAS Production.
+"""ATLAS spot candle adapter with resilient public fallback.
 
-This module is intentionally narrow: it only intercepts HYPEUSDT candle reads.
-All other symbols continue through ATLAS' existing Binance spot path unchanged.
-
-Provider order:
+HYPEUSDT keeps its dedicated provider order:
 1) OKX HYPE-USDT spot 1h candles
 2) Bybit HYPEUSDT spot 1h candles
 
-No scoring, thresholds, forward logic, or trade rules are modified here.
+All other ATLAS assets keep the existing Binance path as primary. If that
+primary path fails (for example regional HTTP 451 responses), ATLAS falls back
+to OKX spot candles for the same symbol. This module never changes scoring,
+thresholds, forward logic, geometry, or execution rules.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ import json
 import urllib.parse
 import urllib.request
 
-VERSION = "HYPE_SPOT_ADAPTER_V1"
+VERSION = "ATLAS_SPOT_RESILIENCE_V2"
 
 
 def _f(value):
@@ -29,14 +29,22 @@ def _get_json(url, ua):
         return json.loads(response.read().decode("utf-8"))
 
 
-def _okx(limit, ua):
-    query = urllib.parse.urlencode({"instId": "HYPE-USDT", "bar": "1H", "limit": int(limit)})
+def _okx_symbol(symbol):
+    normalized = str(symbol or "").upper().replace("BINANCE:", "")
+    if not normalized.endswith("USDT"):
+        raise RuntimeError(f"Unsupported OKX spot symbol: {normalized}")
+    return normalized[:-4] + "-USDT"
+
+
+def _okx(symbol, limit, ua):
+    inst = _okx_symbol(symbol)
+    query = urllib.parse.urlencode({"instId": inst, "bar": "1H", "limit": int(limit)})
     obj = _get_json("https://www.okx.com/api/v5/market/candles?" + query, ua)
     if str(obj.get("code")) != "0":
         raise RuntimeError(f"OKX code={obj.get('code')} msg={obj.get('msg')}")
     rows = obj.get("data") or []
     out = []
-    for row in reversed(rows):  # OKX returns newest first; ATLAS expects chronological order.
+    for row in reversed(rows):
         if not isinstance(row, list) or len(row) < 6:
             continue
         out.append({
@@ -47,12 +55,13 @@ def _okx(limit, ua):
             "close": _f(row[4]),
             "volume": _f(row[5]),
         })
-    if len(out) < min(100, int(limit)):
-        raise RuntimeError(f"OKX insufficient HYPE candles: {len(out)}")
+    required = min(100, int(limit))
+    if len(out) < required:
+        raise RuntimeError(f"OKX insufficient {inst} candles: {len(out)} < {required}")
     return out[-int(limit):], "www.okx.com"
 
 
-def _bybit(limit, ua):
+def _bybit_hype(limit, ua):
     query = urllib.parse.urlencode({
         "category": "spot",
         "symbol": "HYPEUSDT",
@@ -64,7 +73,7 @@ def _bybit(limit, ua):
         raise RuntimeError(f"Bybit retCode={obj.get('retCode')} msg={obj.get('retMsg')}")
     rows = ((obj.get("result") or {}).get("list") or [])
     out = []
-    for row in reversed(rows):  # Bybit returns newest first.
+    for row in reversed(rows):
         if not isinstance(row, list) or len(row) < 6:
             continue
         out.append({
@@ -75,9 +84,24 @@ def _bybit(limit, ua):
             "close": _f(row[4]),
             "volume": _f(row[5]),
         })
-    if len(out) < min(100, int(limit)):
-        raise RuntimeError(f"Bybit insufficient HYPE candles: {len(out)}")
+    required = min(100, int(limit))
+    if len(out) < required:
+        raise RuntimeError(f"Bybit insufficient HYPE candles: {len(out)} < {required}")
     return out[-int(limit):], "api.bybit.com"
+
+
+def _mark_success(atlas, provider):
+    state = getattr(atlas, "MARKET_DATA_STATE", {}).get("spot")
+    if state is not None:
+        state["last_provider"] = provider
+        state["last_success_at"] = atlas.now_iso()
+        state["last_error"] = None
+
+
+def _mark_error(atlas, message):
+    state = getattr(atlas, "MARKET_DATA_STATE", {}).get("spot")
+    if state is not None:
+        state["last_error"] = message
 
 
 def install(atlas):
@@ -85,26 +109,47 @@ def install(atlas):
 
     def spot_klines(symbol, limit=220):
         normalized = str(symbol or "").upper().replace("BINANCE:", "")
-        if normalized != "HYPEUSDT":
-            return original_spot_klines(symbol, limit)
 
-        errors = []
-        for fetcher in (_okx, _bybit):
+        if normalized == "HYPEUSDT":
+            errors = []
+            for fetcher in (
+                lambda: _okx(normalized, limit, atlas.UA),
+                lambda: _bybit_hype(limit, atlas.UA),
+            ):
+                try:
+                    rows, provider = fetcher()
+                    _mark_success(atlas, provider)
+                    return rows
+                except Exception as exc:
+                    errors.append(f"{type(exc).__name__}: {exc}")
+            message = "HYPEUSDT spot providers failed: " + " | ".join(errors)
+            _mark_error(atlas, message)
+            raise RuntimeError(message)
+
+        try:
+            return original_spot_klines(normalized, limit)
+        except Exception as primary:
             try:
-                rows, provider = fetcher(limit, atlas.UA)
-                if "spot" in atlas.MARKET_DATA_STATE:
-                    atlas.MARKET_DATA_STATE["spot"]["last_provider"] = provider
-                    atlas.MARKET_DATA_STATE["spot"]["last_success_at"] = atlas.now_iso()
-                    atlas.MARKET_DATA_STATE["spot"]["last_error"] = None
+                rows, provider = _okx(normalized, limit, atlas.UA)
+                _mark_success(atlas, provider)
                 return rows
-            except Exception as exc:
-                errors.append(f"{fetcher.__name__}: {type(exc).__name__}: {exc}")
-
-        message = "HYPEUSDT spot providers failed: " + " | ".join(errors)
-        if "spot" in atlas.MARKET_DATA_STATE:
-            atlas.MARKET_DATA_STATE["spot"]["last_error"] = message
-        raise RuntimeError(message)
+            except Exception as fallback:
+                message = (
+                    f"{normalized} spot provider chain failed; "
+                    f"primary={type(primary).__name__}: {primary}; "
+                    f"OKX={type(fallback).__name__}: {fallback}"
+                )
+                _mark_error(atlas, message)
+                raise RuntimeError(message) from fallback
 
     atlas._spot_klines = spot_klines
     atlas.HYPE_MARKET_DATA_VERSION = VERSION
-    return {"enabled": True, "version": VERSION, "symbol": "HYPEUSDT", "providers": ["OKX", "Bybit"]}
+    atlas.SPOT_MARKET_DATA_VERSION = VERSION
+    return {
+        "enabled": True,
+        "version": VERSION,
+        "hype_symbol": "HYPEUSDT",
+        "primary": "existing Binance chain",
+        "fallback": "OKX spot",
+        "hype_providers": ["OKX", "Bybit"],
+    }
