@@ -1,0 +1,27 @@
+name: ATLAS AI Breakout Structure
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax
+        run: python -m py_compile ai_trade_council.py tests/test_ai_breakout_structure.py
+      - name: Structure anchored breakout regressions
+        run: PYTHONPATH=. python tests/test_ai_breakout_structure.py
+      - name: Safety invariants
+        run: |
+          grep -q "ATLAS_AI_TRADE_COUNCIL_V4_STRUCTURE_ANCHORED" ai_trade_council.py
+          grep -q "structure_anchored" ai_trade_council.py
+          grep -q "can_execute':False" ai_trade_council.py
+          grep -q "can_change_threshold':False" ai_trade_council.py
