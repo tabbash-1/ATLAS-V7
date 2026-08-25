@@ -6,13 +6,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import historical_shadow_replay as hsr
 
 
-def _row(direction='LONG', score=65, reason='SCORE_BELOW_SIGNAL_THRESHOLD', ret24=1.2):
+def _row(direction='LONG', score=65, reason='SCORE_BELOW_SIGNAL_THRESHOLD', ret24=1.2, obstacle='VERY_CLOSE', symbol='BTCUSDT'):
     return {
         'candidate_direction': direction,
         'score': score,
         'threshold': 68,
         'reason': reason,
-        'score_attribution': {'obstacle_reason': 'VERY_CLOSE'},
+        'symbol': symbol,
+        'score_attribution': {'obstacle_reason': obstacle},
         'horizons': {
             '1h': {'directional_return_pct': 0.2 if direction in ('LONG','SHORT') else None, 'change_pct': 0.2},
             '3h': {'directional_return_pct': 0.4 if direction in ('LONG','SHORT') else None, 'change_pct': 0.4},
@@ -26,7 +27,7 @@ def _row(direction='LONG', score=65, reason='SCORE_BELOW_SIGNAL_THRESHOLD', ret2
 def test_replay_counts_directional_and_target_progress():
     payload = {'records': [_row(), _row(score=70, ret24=-0.5), _row(direction='NONE', score=None, ret24=2.0)]}
     r = hsr.build_report(payload, target_cases=2)
-    assert r['schema'] == 'ATLAS_HISTORICAL_SHADOW_REPLAY_V2_HORIZON_FIT'
+    assert r['schema'] == 'ATLAS_HISTORICAL_SHADOW_REPLAY_V3_OBSTACLE_CALIBRATION'
     assert r['progress']['directional_shadow_records'] == 2
     assert r['progress']['directional_12h_matured'] == 2
     assert r['progress']['directional_24h_matured'] == 2
@@ -37,6 +38,7 @@ def test_replay_counts_directional_and_target_progress():
     assert r['horizon_fit']['recommended_research_horizon'] == '12-24H'
     assert r['production_threshold_changed'] is False
     assert r['production_threshold'] == 68
+    assert r['auto_calibration_enabled'] is False
 
 
 def test_score_bands_and_states_are_separated_across_horizons():
@@ -52,6 +54,19 @@ def test_score_bands_and_states_are_separated_across_horizons():
     assert r['by_opportunity_state_by_horizon']['QUALIFIED_BUT_BLOCKED']['records'] == 2
 
 
+def test_obstacle_symbol_and_direction_are_calibrated_without_auto_mutation():
+    rows = [_row(obstacle='VERY_CLOSE', symbol='ETHUSDT') for _ in range(20)]
+    rows += [_row(obstacle='CLOSE', symbol='BNBUSDT', direction='SHORT') for _ in range(3)]
+    r = hsr.build_report({'records': rows})
+    assert r['by_obstacle_reason_by_horizon']['VERY_CLOSE']['horizons']['12h']['n'] == 20
+    assert r['by_symbol_by_horizon']['ETHUSDT']['records'] == 20
+    assert r['by_direction_by_horizon']['SHORT']['records'] == 3
+    candidate = next(x for x in r['calibration_candidates'] if x['obstacle_reason'] == 'VERY_CLOSE')
+    assert candidate['verdict'] == 'REVIEW_FOR_PENALTY_RELIEF_IN_SWING_RESEARCH'
+    assert candidate['production_change_allowed'] is False
+    assert r['auto_calibration_enabled'] is False
+
+
 def test_no_setup_is_not_counted_as_directional_success():
     payload = {'records': [_row(direction='NONE', score=None, ret24=5.0)]}
     r = hsr.build_report(payload)
@@ -63,5 +78,6 @@ def test_no_setup_is_not_counted_as_directional_success():
 if __name__ == '__main__':
     test_replay_counts_directional_and_target_progress()
     test_score_bands_and_states_are_separated_across_horizons()
+    test_obstacle_symbol_and_direction_are_calibrated_without_auto_mutation()
     test_no_setup_is_not_counted_as_directional_success()
     print('historical shadow replay tests: ok')
