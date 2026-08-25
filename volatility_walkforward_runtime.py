@@ -12,12 +12,13 @@ import time
 from pathlib import Path
 
 import edge_evidence_interaction_protocol
+import edge_evidence_interaction_validator_guard
 import edge_evidence_report
 import execution_outcome_scope
 import trade_path_settlement
 import volatility_walkforward
 
-VERSION = 'VOLATILITY_WALKFORWARD_RUNTIME_V3_WITH_PREREGISTERED_INTERACTION_PROTOCOL'
+VERSION = 'VOLATILITY_WALKFORWARD_RUNTIME_V4_WITH_INTERACTION_VALIDATOR_GUARD'
 REFRESH_SECONDS = 900
 
 
@@ -78,22 +79,26 @@ def install(collector):
         return collector.now_iso() if hasattr(collector, 'now_iso') else None
 
     def _refresh_governance():
-        # Order matters: Edge Evidence refreshes the outcome-free joint coverage
-        # audit first; the preregistered protocol then hashes that current design
-        # state. Neither layer is permitted to alter Production or Forward capture.
+        # Order matters: Edge Evidence refreshes current outcome-free design;
+        # Protocol hashes that design; Guard then checks the exact preregistration
+        # still matches. None may alter Production or Forward capture.
         refresh_edge = getattr(collector, 'edge_evidence_refresh', None)
         if callable(refresh_edge):
             try:
                 refresh_edge()
             except Exception:
-                # Governance reporting must never make the volatility validator fail.
                 pass
         refresh_protocol = getattr(collector, 'edge_evidence_interaction_protocol_refresh', None)
         if callable(refresh_protocol):
             try:
                 refresh_protocol()
             except Exception:
-                # Protocol reporting is advisory research governance only.
+                pass
+        refresh_guard = getattr(collector, 'edge_evidence_interaction_validator_guard_refresh', None)
+        if callable(refresh_guard):
+            try:
+                refresh_guard()
+            except Exception:
                 pass
 
     def refresh():
@@ -136,10 +141,11 @@ def install(collector):
     collector.volatility_refresh_walkforward = refresh
     collector._VOLATILITY_WALKFORWARD_RUNTIME_INSTALLED = True
 
-    # Install only after all three independent layer runtimes exist. These
+    # Install only after all independent layer runtimes exist. These governance
     # installers are read-only and explicitly verify they did not wrap Production.
     edge_evidence_report.install(collector)
     edge_evidence_interaction_protocol.install(collector)
+    edge_evidence_interaction_validator_guard.install(collector)
 
     threading.Thread(
         target=loop, daemon=True, name='atlas-volatility-walkforward'
