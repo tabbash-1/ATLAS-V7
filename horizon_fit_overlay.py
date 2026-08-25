@@ -6,7 +6,7 @@ the Quick shadow lane and adds an explicit 12-24h Swing research lane.
 
 import horizon_fit_policy
 
-VERSION = 'HORIZON_FIT_OVERLAY_V3_LEGACY_STATE_MIGRATION'
+VERSION = 'HORIZON_FIT_OVERLAY_V4_CLEAN_QUICK_STATE'
 
 
 def install(atlas):
@@ -79,9 +79,17 @@ def install(atlas):
             strict_quick = dict(existing_quick)
             strict_quick['policy_version'] = horizon_fit_policy.VERSION
             strict_quick['evaluation_horizons'] = ['1h', '3h']
-        else:
+        elif strict_quick_allowed and existing_quick.get('status') == 'QUICK_TRADE_SHADOW':
+            # A newly strict-approved Quick signal keeps its actual research
+            # geometry so it can be evaluated at 1h/3h.
             strict_quick = dict(existing_quick)
             strict_quick.update(fit['quick'])
+            strict_quick['policy_version'] = horizon_fit_policy.VERSION
+        else:
+            # WATCH/NO_SETUP must be a clean classification, not a cancelled
+            # trade-shaped object. Do not leak stale entry/SL/TP/TTL fields from
+            # a legacy ACTIVE signal into the final decision or UI.
+            strict_quick = dict(fit['quick'])
             strict_quick['policy_version'] = horizon_fit_policy.VERSION
 
         if guard_cleanup is not None:
@@ -121,5 +129,6 @@ def install(atlas):
         'production_override_allowed': False,
         'legacy_quick_guard_cleanup': True,
         'legacy_active_state_migration': True,
+        'clean_watch_state': True,
     }
     return atlas.HORIZON_FIT_STATE
