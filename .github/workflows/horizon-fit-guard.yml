@@ -11,6 +11,7 @@ on:
       - 'production_decision_api.py'
       - 'tests/test_horizon_fit_policy.py'
       - 'tests/test_quick_reentry_guard_policy_cancel.py'
+      - 'tests/test_horizon_fit_overlay_migration.py'
       - '.github/workflows/horizon-fit-guard.yml'
   pull_request:
     branches: [main]
@@ -22,6 +23,7 @@ on:
       - 'production_decision_api.py'
       - 'tests/test_horizon_fit_policy.py'
       - 'tests/test_quick_reentry_guard_policy_cancel.py'
+      - 'tests/test_horizon_fit_overlay_migration.py'
       - '.github/workflows/horizon-fit-guard.yml'
   workflow_dispatch:
 
@@ -36,11 +38,12 @@ jobs:
           python-version: '3.12'
       - name: Compile horizon modules
         run: |
-          python -m py_compile horizon_fit_policy.py horizon_fit_overlay.py quick_reentry_guard.py tests/test_horizon_fit_policy.py tests/test_quick_reentry_guard_policy_cancel.py
+          python -m py_compile horizon_fit_policy.py horizon_fit_overlay.py quick_reentry_guard.py tests/test_horizon_fit_policy.py tests/test_quick_reentry_guard_policy_cancel.py tests/test_horizon_fit_overlay_migration.py
       - name: Run horizon policy tests
         run: |
           PYTHONPATH=. python tests/test_horizon_fit_policy.py
           PYTHONPATH=. python tests/test_quick_reentry_guard_policy_cancel.py
+          PYTHONPATH=. python tests/test_horizon_fit_overlay_migration.py
       - name: Lock production invariants
         run: |
           set -euo pipefail
@@ -53,6 +56,9 @@ jobs:
           grep -q "SWING_RESEARCH_SCORE_GAP_MAX = 8.0" horizon_fit_policy.py
           grep -q "evaluation_horizons.*12h.*24h" horizon_fit_policy.py
           grep -q "cancel_active" quick_reentry_guard.py
+          grep -q "approve_active_policy" quick_reentry_guard.py
+          grep -q "reject_legacy_active" quick_reentry_guard.py
+          grep -q "HORIZON_FIT_OVERLAY_V3_LEGACY_STATE_MIGRATION" horizon_fit_overlay.py
       - name: Guard against production promotion from research lane
         run: |
           python - <<'PY'
