@@ -1,20 +1,23 @@
 """ATLAS independent shadow-edge evidence aggregator.
 
 Summarizes already-produced prequential walk-forward reports from Profit Engine,
-Microstructure and Volatility and the frozen-signal cohort overlap audit. It does
-not combine predictions, assign weights, score trades, recompute historical
-evidence, or alter Production.
+Microstructure and Volatility, the frozen-signal cohort overlap audit, and a
+read-only descriptive layer-redundancy diagnostic. It does not combine
+predictions, assign weights, score trades, recompute historical evidence, or
+alter Production.
 
-MULTI_LAYER_EVIDENCE_AVAILABLE requires both independent layer support and a
-comparable frozen forward_id cohort. It is still only a research/governance
-statement: never a live-trading approval and never a gate promotion.
+MULTI_LAYER_EVIDENCE_AVAILABLE requires independent layer support and a comparable
+frozen forward_id cohort. Redundancy diagnostics are informational only and do
+not promote or demote that status. This remains research/governance evidence,
+never a live-trading approval and never a gate promotion.
 """
 
 from __future__ import annotations
 
 import edge_evidence_overlap
+import edge_evidence_redundancy
 
-VERSION = 'EDGE_EVIDENCE_REPORT_V2_WITH_COHORT_COMPARABILITY'
+VERSION = 'EDGE_EVIDENCE_REPORT_V3_WITH_REDUNDANCY_DIAGNOSTIC'
 LAYERS = ('profit_engine', 'microstructure', 'volatility')
 
 
@@ -136,13 +139,50 @@ def _overlap_report(overlap_state):
     }
 
 
-def aggregate(profit_state=None, microstructure_state=None, volatility_walkforward_state=None, overlap_state=None):
+def _redundancy_report(redundancy_state):
+    if not redundancy_state:
+        return {
+            'available': False,
+            'status': 'UNAVAILABLE',
+            'descriptive_read_available': False,
+            'informational_only': True,
+            'affects_multilayer_status': False,
+            'blockers': ['EDGE_EVIDENCE_REDUNDANCY_AUDIT_UNAVAILABLE'],
+        }
+    report = _dict(_dict(redundancy_state).get('report'))
+    status = report.get('status') or 'COLLECTING'
+    return {
+        'available': True,
+        'status': status,
+        'descriptive_read_available': status == 'DESCRIPTIVE_READ_AVAILABLE',
+        'matched_forward_ids': report.get('matched_forward_ids'),
+        'minimum_matched_observations': report.get('minimum_matched_observations'),
+        'high_observed_association_pairs': report.get('high_observed_association_pairs') or [],
+        'associations': report.get('associations') or {},
+        'shared_production_fields_excluded': report.get('shared_production_fields_excluded') or [],
+        'chosen_trade_horizon_assumed': bool(report.get('chosen_trade_horizon_assumed')),
+        'statistical_independence_claimed': False,
+        'informational_only': True,
+        'affects_multilayer_status': False,
+        'blockers': list(report.get('blockers') or []),
+        'source_version': report.get('version'),
+    }
+
+
+def aggregate(
+    profit_state=None,
+    microstructure_state=None,
+    volatility_walkforward_state=None,
+    overlap_state=None,
+    redundancy_state=None,
+):
     layers = {
         'profit_engine': _profit_layer(profit_state),
         'microstructure': _microstructure_layer(microstructure_state),
         'volatility': _volatility_layer(volatility_walkforward_state),
     }
     overlap = _overlap_report(overlap_state)
+    redundancy = _redundancy_report(redundancy_state)
     supported = [name for name, row in layers.items() if row['evidence_supported']]
     unavailable = [name for name, row in layers.items() if not row['available']]
 
@@ -176,6 +216,7 @@ def aggregate(profit_state=None, microstructure_state=None, volatility_walkforwa
         'status': status,
         'layers': layers,
         'cohort_overlap': overlap,
+        'layer_redundancy': redundancy,
         'supported_layers': supported,
         'supported_layer_count': len(supported),
         'total_layer_count': len(LAYERS),
@@ -183,6 +224,7 @@ def aggregate(profit_state=None, microstructure_state=None, volatility_walkforwa
         'canonical_execution_rows_by_layer': canonical_counts,
         'canonical_execution_count_consistent': canonical_consistent,
         'frozen_signal_cohorts_comparable': overlap['cohorts_comparable'],
+        'redundancy_diagnostic_affects_status': False,
         'blockers': blockers,
         'weights_assigned': False,
         'composite_trade_score_created': False,
@@ -192,7 +234,7 @@ def aggregate(profit_state=None, microstructure_state=None, volatility_walkforwa
         'production_ready_claimed': False,
         'live_trading_ready_claimed': False,
         'research_only': True,
-        'method': 'INDEPENDENT_PREQUENTIAL_LAYER_READINESS_PLUS_FROZEN_COHORT_COMPARABILITY_WITHOUT_COMPOSITE_WEIGHTING',
+        'method': 'INDEPENDENT_PREQUENTIAL_LAYER_READINESS_PLUS_FROZEN_COHORT_COMPARABILITY_WITH_INFORMATIONAL_REDUNDANCY_DIAGNOSTIC',
     }
 
 
@@ -202,6 +244,7 @@ def from_collector(collector):
         getattr(collector, 'MICROSTRUCTURE_RUNTIME_STATE', None),
         getattr(collector, 'VOLATILITY_WALKFORWARD_RUNTIME_STATE', None),
         getattr(collector, 'EDGE_EVIDENCE_OVERLAP_STATE', None),
+        getattr(collector, 'EDGE_EVIDENCE_REDUNDANCY_STATE', None),
     )
 
 
@@ -213,6 +256,7 @@ def install(collector):
     original_decision = getattr(collector, 'production_decision', None)
     original_forward = getattr(collector, 'forward_observe', None)
     edge_evidence_overlap.install(collector)
+    edge_evidence_redundancy.install(collector)
     state = {
         'enabled': True,
         'version': VERSION,
@@ -227,6 +271,9 @@ def install(collector):
         overlap_refresh = getattr(collector, 'edge_evidence_overlap_refresh', None)
         if callable(overlap_refresh):
             overlap_refresh()
+        redundancy_refresh = getattr(collector, 'edge_evidence_redundancy_refresh', None)
+        if callable(redundancy_refresh):
+            redundancy_refresh()
         state['report'] = from_collector(collector)
         return state['report']
 
