@@ -1,8 +1,18 @@
+import json
+from pathlib import Path
+
 import profit_engine_runtime as runtime
 
 
 class Collector:
-    def __init__(self):
+    CLOUD_FORWARD_MIN_SCORE = 68
+    ON_DEMAND_SYMBOLS = ('BTCUSDT',)
+    UA = 'test'
+
+    def __init__(self, data_dir=None):
+        self.DATA = Path(data_dir or '.')
+        self._forward_calls = 0
+        self._dedup = False
         self.production_decision = lambda symbol: {
             'ok': True,
             'symbol': symbol,
@@ -14,6 +24,18 @@ class Collector:
             'stop_loss': 98.0,
             'risk_reward': 1.8,
         }
+        self.forward_observe = self._forward_observe
+
+    def _forward_observe(self, payload):
+        self._forward_calls += 1
+        if self._dedup:
+            return {'stored': False, 'reason': 'DEDUP_WINDOW', 'existing_id': 'old-id'}
+        return {
+            'id': f'fwd-{self._forward_calls}',
+            'captured_at_ms': 123456789,
+            'symbol': payload.get('symbol'),
+            'direction': payload.get('direction'),
+        }
 
     @staticmethod
     def now_iso():
@@ -24,10 +46,28 @@ class Collector:
         return []
 
 
-def test_shadow_does_not_override_production(monkeypatch):
-    collector = Collector()
+def _install_without_threads(monkeypatch, tmp_path):
+    collector = Collector(tmp_path)
     monkeypatch.setattr(runtime.threading.Thread, 'start', lambda self: None)
     state = runtime.install(collector)
+    return collector, state
+
+
+def _signal_payload():
+    return {
+        'symbol': 'BTCUSDT',
+        'direction': 'LONG',
+        'entry': 100.0,
+        'final_score': 72,
+        'signal_threshold': 68,
+        'production_signal_qualified': True,
+        'structural_target': 103.6,
+        'rr_tp2': 1.8,
+    }
+
+
+def test_shadow_does_not_override_production(monkeypatch, tmp_path):
+    collector, state = _install_without_threads(monkeypatch, tmp_path)
     out = collector.production_decision('BTCUSDT')
     assert out['actionable_decision'] == 'LONG'
     assert out['production_signal_qualified'] is True
@@ -39,6 +79,49 @@ def test_shadow_does_not_override_production(monkeypatch):
     assert 'CALIBRATION_WARMUP' in shadow['blockers']
     assert 'EXECUTION_COST_MODEL_UNAVAILABLE' in shadow['blockers']
     assert state['shadow_only'] is True
+
+
+def test_production_signal_freezes_pre_outcome_evidence(monkeypatch, tmp_path):
+    collector, state = _install_without_threads(monkeypatch, tmp_path)
+    result = collector.forward_observe(_signal_payload())
+    assert result['id'] == 'fwd-1'
+
+    archive = tmp_path / 'profit_engine_observations.jsonl'
+    lines = archive.read_text(encoding='utf-8').strip().splitlines()
+    assert len(lines) == 1
+    row = json.loads(lines[0])
+    assert row['forward_id'] == 'fwd-1'
+    assert row['production_signal_qualified'] is True
+    assert row['research_sample'] is False
+    assert row['research_samples_included'] is False
+    assert row['outcome_known_at_capture'] is False
+    assert row['derived_stop_loss'] == 98.0
+    assert row['profit_engine']['shadow_only'] is not False if 'shadow_only' in row['profit_engine'] else True
+    assert state['frozen_signal_observations'] == 1
+    assert state['research_observations_included'] == 0
+
+
+def test_research_row_never_enters_profit_observation_archive(monkeypatch, tmp_path):
+    collector, state = _install_without_threads(monkeypatch, tmp_path)
+    payload = _signal_payload()
+    payload['production_signal_qualified'] = False
+    payload['research_sampling_lane'] = True
+    result = collector.forward_observe(payload)
+    assert result['id'] == 'fwd-1'
+    archive = tmp_path / 'profit_engine_observations.jsonl'
+    assert not archive.exists()
+    assert state['frozen_signal_observations'] == 0
+    assert state['research_observations_included'] == 0
+
+
+def test_dedup_does_not_duplicate_profit_observation(monkeypatch, tmp_path):
+    collector, state = _install_without_threads(monkeypatch, tmp_path)
+    collector._dedup = True
+    result = collector.forward_observe(_signal_payload())
+    assert result['stored'] is False
+    archive = tmp_path / 'profit_engine_observations.jsonl'
+    assert not archive.exists()
+    assert state['frozen_signal_observations'] == 0
 
 
 def test_wilson_interval_is_bounded():
