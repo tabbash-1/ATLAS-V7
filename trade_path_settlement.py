@@ -23,6 +23,7 @@ MAX_HORIZON_H = 24
 CACHE_SECONDS = 300
 PROVIDER_TIMEOUT_SECONDS = 6
 MARKET_DATA_CIRCUIT_SECONDS = 60
+GEOMETRY_VERSION = 'ATLAS_GEOMETRY_V3_STRUCTURAL_TP2_FROZEN_RR'
 _CACHE = {}
 _CACHE_LOCK = threading.RLock()
 _MARKET_DATA_CIRCUIT = {'open_until': 0.0, 'last_error': None, 'failures': 0, 'opened_at': None}
@@ -83,6 +84,7 @@ def derive_geometry(payload):
         'rr_tp1': 1.0,
         'rr_tp2': round(rr2, 6),
         'direction': direction,
+        'geometry_version': GEOMETRY_VERSION,
         'method': 'STRUCTURAL_TP2_PLUS_FROZEN_RR',
         'tp1_method': 'ONE_R_CHECKPOINT',
         'tp1_is_terminal_exit': False,
@@ -122,7 +124,8 @@ def _persist_geometry(collector, forward_row, geometry):
         if any(str(x.get('forward_observation_id') or '') == forward_id for x in existing):
             return {'stored': False, 'reason': 'DEDUP_FORWARD_ID'}
         rec = {
-            'schema': 'ATLAS_FROZEN_TRADE_GEOMETRY_V2_SIGNAL_SCOPE',
+            'schema': 'ATLAS_FROZEN_TRADE_GEOMETRY_V3_VERSIONED_COHORT',
+            'geometry_generation': geometry.get('geometry_version'),
             'forward_observation_id': forward_id,
             'captured_at': forward_row.get('captured_at'),
             'captured_at_ms': forward_row.get('captured_at_ms'),
@@ -247,6 +250,7 @@ def settle_row(row, geometry_record=None, now_ms=None, candle_loader=None):
         'signal_qualified': _is_production_signal(row),
         'production_signal_qualified': _is_production_signal(row),
         'research_champion': _is_research_champion(row),
+        'geometry_generation': (geometry or {}).get('geometry_version') or (geometry_record or {}).get('geometry_generation'),
         'geometry': geometry, 'geometry_status': 'FROZEN' if geometry else 'UNAVAILABLE',
         'research_only': True, 'live_execution': False,
     }
