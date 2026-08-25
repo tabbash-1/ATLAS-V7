@@ -46,7 +46,7 @@ jobs:
           python3 - <<'PY'
           import json
           x=json.load(open('status/historical-shadow-replay.json'))
-          assert x['schema'] == 'ATLAS_HISTORICAL_SHADOW_REPLAY_V3_OBSTACLE_CALIBRATION'
+          assert x['schema'] == 'ATLAS_HISTORICAL_SHADOW_REPLAY_V4_COMBO_CALIBRATION'
           assert x['production_threshold_changed'] is False
           assert x['production_threshold'] == 68
           assert x['auto_calibration_enabled'] is False
@@ -54,13 +54,17 @@ jobs:
           assert x['horizon_fit']['recommended_research_horizon'] == '12-24H'
           assert 'by_obstacle_reason_by_horizon' in x
           assert 'by_symbol_by_horizon' in x
+          assert 'by_symbol_direction_obstacle' in x
           assert 'calibration_candidates' in x
+          assert 'combo_calibration_candidates' in x
+          assert all(c['production_change_allowed'] is False for c in x['combo_calibration_candidates'])
           print('PROGRESS', json.dumps(x['progress'], sort_keys=True))
           print('HORIZON_FIT', json.dumps(x['horizon_fit'], sort_keys=True))
           for h in ('1h','3h','6h','12h','24h'):
               print(h.upper(), json.dumps(x['directional_forward_performance'][h], sort_keys=True))
           print('SCORE_60_67', json.dumps(x['by_score_band_by_horizon']['60_67'], sort_keys=True))
           print('OBSTACLE_CALIBRATION', json.dumps(x['calibration_candidates'], sort_keys=True))
+          print('COMBO_CALIBRATION', json.dumps(x['combo_calibration_candidates'], sort_keys=True))
           print('SYMBOL_12H', json.dumps({k:v['horizons']['12h'] for k,v in x['by_symbol_by_horizon'].items()}, sort_keys=True))
           print('TOP_BLOCKERS', json.dumps(x['directional_blocker_counts'], sort_keys=True))
           live=(x.get('live_execution_comparison') or {}).get('overall') or {}
@@ -79,4 +83,4 @@ jobs:
           git pull --rebase origin main
           git push
 
-# V3 publication must not depend on Render availability.
+# V4 publication must not depend on Render availability.
