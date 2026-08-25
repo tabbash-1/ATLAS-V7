@@ -9,8 +9,10 @@ on:
       - 'edge_evidence_joint_coverage.py'
       - 'edge_evidence_overlap.py'
       - 'edge_evidence_redundancy.py'
+      - 'volatility_walkforward_runtime.py'
       - 'tests/test_edge_evidence_interaction_protocol.py'
       - 'tests/test_edge_evidence_interaction_validator_guard.py'
+      - 'tests/test_volatility_walkforward_runtime.py'
       - '.github/workflows/atlas-interaction-protocol-ci.yml'
   pull_request:
     branches: [main]
@@ -20,8 +22,10 @@ on:
       - 'edge_evidence_joint_coverage.py'
       - 'edge_evidence_overlap.py'
       - 'edge_evidence_redundancy.py'
+      - 'volatility_walkforward_runtime.py'
       - 'tests/test_edge_evidence_interaction_protocol.py'
       - 'tests/test_edge_evidence_interaction_validator_guard.py'
+      - 'tests/test_volatility_walkforward_runtime.py'
       - '.github/workflows/atlas-interaction-protocol-ci.yml'
 
 jobs:
@@ -36,9 +40,9 @@ jobs:
       - name: Install test runner
         run: python -m pip install --disable-pip-version-check pytest
       - name: Syntax
-        run: python -m py_compile edge_evidence_interaction_protocol.py edge_evidence_interaction_validator_guard.py edge_evidence_joint_coverage.py edge_evidence_overlap.py edge_evidence_redundancy.py
-      - name: Protocol regression tests
-        run: PYTHONPATH=. python -m pytest -q tests/test_edge_evidence_interaction_protocol.py tests/test_edge_evidence_interaction_validator_guard.py tests/test_edge_evidence_joint_coverage.py
+        run: python -m py_compile edge_evidence_interaction_protocol.py edge_evidence_interaction_validator_guard.py edge_evidence_joint_coverage.py edge_evidence_overlap.py edge_evidence_redundancy.py volatility_walkforward_runtime.py
+      - name: Protocol and runtime regression tests
+        run: PYTHONPATH=. python -m pytest -q tests/test_edge_evidence_interaction_protocol.py tests/test_edge_evidence_interaction_validator_guard.py tests/test_edge_evidence_joint_coverage.py tests/test_volatility_walkforward_runtime.py
       - name: Preserve preregistration contract
         run: |
           grep -q "CHRONOLOGICAL_FOLDS = 3" edge_evidence_interaction_protocol.py
@@ -91,3 +95,13 @@ jobs:
           grep -q "live_trading_ready_claimed.*False" edge_evidence_interaction_validator_guard.py
           grep -q "wraps_production_decision.*False" edge_evidence_interaction_validator_guard.py
           grep -q "wraps_forward_observe.*False" edge_evidence_interaction_validator_guard.py
+          grep -q "edge_evidence_report.install(collector)" volatility_walkforward_runtime.py
+          grep -q "edge_evidence_interaction_protocol.install(collector)" volatility_walkforward_runtime.py
+          grep -q "edge_evidence_interaction_validator_guard.install(collector)" volatility_walkforward_runtime.py
+          grep -q "refresh_edge" volatility_walkforward_runtime.py
+          grep -q "refresh_protocol" volatility_walkforward_runtime.py
+          grep -q "refresh_guard" volatility_walkforward_runtime.py
+          grep -q "background_only.*True" volatility_walkforward_runtime.py
+          grep -q "wraps_production_decision.*False" volatility_walkforward_runtime.py
+          grep -q "wraps_forward_observe.*False" volatility_walkforward_runtime.py
+          grep -q "can_override_production.*False" volatility_walkforward_runtime.py
