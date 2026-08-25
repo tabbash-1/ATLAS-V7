@@ -26,23 +26,30 @@ def _row(direction='LONG', score=65, reason='SCORE_BELOW_SIGNAL_THRESHOLD', ret2
 def test_replay_counts_directional_and_target_progress():
     payload = {'records': [_row(), _row(score=70, ret24=-0.5), _row(direction='NONE', score=None, ret24=2.0)]}
     r = hsr.build_report(payload, target_cases=2)
+    assert r['schema'] == 'ATLAS_HISTORICAL_SHADOW_REPLAY_V2_HORIZON_FIT'
     assert r['progress']['directional_shadow_records'] == 2
+    assert r['progress']['directional_12h_matured'] == 2
     assert r['progress']['directional_24h_matured'] == 2
+    assert r['progress']['target_reached_12h'] is True
     assert r['progress']['target_reached_24h'] is True
     assert r['progress']['target_reached_any_horizon'] is True
     assert r['horizon_fit']['target_by_horizon']['12h']['target_reached'] is True
+    assert r['horizon_fit']['recommended_research_horizon'] == '12-24H'
     assert r['production_threshold_changed'] is False
+    assert r['production_threshold'] == 68
 
 
-def test_score_bands_and_states_are_separated():
+def test_score_bands_and_states_are_separated_across_horizons():
     payload = {'records': [_row(score=59), _row(score=64), _row(score=70), _row(score=78)]}
     r = hsr.build_report(payload)
-    assert r['by_score_band_24h']['LT_60']['records'] == 1
-    assert r['by_score_band_24h']['60_67']['records'] == 1
-    assert r['by_score_band_24h']['68_74']['records'] == 1
-    assert r['by_score_band_24h']['75_PLUS']['records'] == 1
-    assert r['by_opportunity_state_24h']['WATCH']['records'] == 2
-    assert r['by_opportunity_state_24h']['QUALIFIED_BUT_BLOCKED']['records'] == 2
+    assert r['by_score_band_by_horizon']['LT_60']['records'] == 1
+    assert r['by_score_band_by_horizon']['60_67']['records'] == 1
+    assert r['by_score_band_by_horizon']['68_74']['records'] == 1
+    assert r['by_score_band_by_horizon']['75_PLUS']['records'] == 1
+    assert r['by_score_band_by_horizon']['60_67']['horizons']['12h']['n'] == 1
+    assert r['by_score_band_24h']['60_67']['at_24h']['n'] == 1
+    assert r['by_opportunity_state_by_horizon']['WATCH']['records'] == 2
+    assert r['by_opportunity_state_by_horizon']['QUALIFIED_BUT_BLOCKED']['records'] == 2
 
 
 def test_no_setup_is_not_counted_as_directional_success():
@@ -55,6 +62,6 @@ def test_no_setup_is_not_counted_as_directional_success():
 
 if __name__ == '__main__':
     test_replay_counts_directional_and_target_progress()
-    test_score_bands_and_states_are_separated()
+    test_score_bands_and_states_are_separated_across_horizons()
     test_no_setup_is_not_counted_as_directional_success()
     print('historical shadow replay tests: ok')
