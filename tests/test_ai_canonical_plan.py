@@ -15,12 +15,23 @@ def prod_ready():
     }
 
 
-def test_execution_ready_production_plan_wins_over_shadow_counterfactual():
+def test_actionable_scenario_is_production_now():
     x=a.analyze(prod_ready())
-    b=x['best_counterfactual']
-    assert b['scenario']=='PRODUCTION_NOW'
+    assert x['best_counterfactual']['scenario']=='PRODUCTION_NOW'
+
+
+def test_actionable_levels_match_canonical_plan():
+    b=a.analyze(prod_ready())['best_counterfactual']
     assert b['entry']==80477.4 and b['stop_loss']==79604.41 and b['target']==82291.1
+
+
+def test_actionable_hybrid_confirms():
+    x=a.analyze(prod_ready())
     assert x['hybrid_judge']['decision']=='CONFIRM'
+
+
+def test_actionable_canonical_action_is_buy():
+    x=a.analyze(prod_ready())
     assert x['canonical_action']['action']=='BUY'
 
 
