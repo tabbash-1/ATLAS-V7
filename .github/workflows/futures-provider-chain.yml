@@ -1,0 +1,28 @@
+name: ATLAS Futures Provider Chain
+
+on:
+  pull_request:
+    paths:
+      - 'futures_provider_chain.py'
+      - 'decision_engine_v7.py'
+      - 'tests/test_futures_provider_chain.py'
+      - '.github/workflows/futures-provider-chain.yml'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax
+        run: python -m py_compile futures_provider_chain.py decision_engine_v7.py tests/test_futures_provider_chain.py
+      - name: Futures provider regression tests
+        run: PYTHONPATH=. python tests/test_futures_provider_chain.py
+      - name: Safety invariants
+        run: |
+          grep -q "CLOUD_FORWARD_MIN_SCORE.*68" cloud_start.py
+          grep -q "futures_evidence_validated" futures_provider_chain.py
+          grep -q "MARK_FUNDING_OI_BOOK_TAKER_FLOW_REQUIRED" futures_provider_chain.py
