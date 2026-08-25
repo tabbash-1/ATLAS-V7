@@ -197,7 +197,12 @@ def production_readiness_snapshot():
     if not bridge.get('enabled'): blockers.append('MEMORY_BRIDGE_OFF')
     if int(bridge.get('mirror_errors') or 0) > 0: blockers.append('MEMORY_BRIDGE_ERRORS')
     integrity=bridge.get('integrity') or {}
-    if not integrity.get('enabled'): blockers.append('INTEGRITY_GUARD_OFF')
+    if not integrity.get('enabled'):
+        blockers.append('INTEGRITY_GUARD_OFF')
+    elif int(integrity.get('hard_integrity_errors') or 0) > 0:
+        # Sparse maturity chains are safely suppressed by the bridge and are not
+        # a readiness blocker. Exact-id lineage conflicts are hard faults.
+        blockers.append('MEMORY_HARD_INTEGRITY_ERRORS')
     if coverage and not coverage.get('complete'): blockers.append('ASSET_COVERAGE_INCOMPLETE')
     if coverage.get('stale_assets'): blockers.append('ASSET_COVERAGE_STALE')
     if lane.get('last_failed_symbols'): blockers.append('SCORING_FAILURES_LAST_CYCLE')
