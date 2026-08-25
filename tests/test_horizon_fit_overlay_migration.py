@@ -27,6 +27,11 @@ def _decision():
             'status': 'QUICK_TRADE_ACTIVE',
             'direction': 'LONG',
             'reason': 'ACTIVE_SAME_DIRECTION_SIGNAL_NOT_REISSUED',
+            'entry': 100,
+            'stop_loss': 99,
+            'target': 102,
+            'risk_reward': 2.0,
+            'active_remaining_seconds': 5000,
             'shadow_only': True,
             'can_override_production': False,
         },
@@ -34,16 +39,19 @@ def _decision():
     }
 
 
-def test_overlay_rejects_unversioned_legacy_active():
+def test_overlay_rejects_unversioned_legacy_active_and_cleans_geometry():
     with tempfile.TemporaryDirectory() as td:
         guard = QuickReentryGuard(Path(td) / 'guard.json')
         guard.register('BTCUSDT', 'LONG', 100, 99, 102, score=64, now=1000)
         atlas = SimpleNamespace(production_decision=lambda symbol: _decision(), QUICK_REENTRY_GUARD=guard)
         horizon_fit_overlay.install(atlas)
         out = atlas.production_decision('BTCUSDT')
-        assert out['horizon_fit_overlay_version'] == 'HORIZON_FIT_OVERLAY_V3_LEGACY_STATE_MIGRATION'
-        assert out['quick_trade_shadow']['status'] == 'WATCH_ONLY'
-        assert out['quick_trade_shadow']['legacy_guard_cleanup']['cancelled'] is True
+        q = out['quick_trade_shadow']
+        assert out['horizon_fit_overlay_version'] == 'HORIZON_FIT_OVERLAY_V4_CLEAN_QUICK_STATE'
+        assert q['status'] == 'WATCH_ONLY'
+        assert q['legacy_guard_cleanup']['cancelled'] is True
+        for stale in ('entry', 'stop_loss', 'target', 'risk_reward', 'active_remaining_seconds'):
+            assert stale not in q
         assert out['production_threshold_changed_by_horizon_policy'] is False
         inspected = guard.inspect('BTCUSDT', 'LONG', 100, now=1001)
         assert inspected['state'] == 'POLICY_REJECTED'
@@ -57,14 +65,18 @@ def test_overlay_preserves_current_policy_active():
         atlas = SimpleNamespace(production_decision=lambda symbol: _decision(), QUICK_REENTRY_GUARD=guard)
         horizon_fit_overlay.install(atlas)
         out = atlas.production_decision('BTCUSDT')
-        assert out['quick_trade_shadow']['status'] == 'QUICK_TRADE_ACTIVE'
-        assert out['quick_trade_shadow']['policy_version'] == horizon_fit_policy.VERSION
-        cleanup = out['quick_trade_shadow']['legacy_guard_cleanup']
+        q = out['quick_trade_shadow']
+        assert q['status'] == 'QUICK_TRADE_ACTIVE'
+        assert q['policy_version'] == horizon_fit_policy.VERSION
+        assert q['entry'] == 100
+        assert q['stop_loss'] == 99
+        assert q['target'] == 102
+        cleanup = q['legacy_guard_cleanup']
         assert cleanup['cancelled'] is False
         assert cleanup['reason'] == 'POLICY_VERSION_CURRENT'
 
 
 if __name__ == '__main__':
-    test_overlay_rejects_unversioned_legacy_active()
+    test_overlay_rejects_unversioned_legacy_active_and_cleans_geometry()
     test_overlay_preserves_current_policy_active()
     print('horizon fit overlay migration tests: ok')
