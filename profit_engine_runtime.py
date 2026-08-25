@@ -4,15 +4,22 @@ This layer never changes Production score qualification, thresholds, geometry or
 live execution. It attaches a profit_engine_shadow payload to each decision.
 Probability calibration comes only from canonical Production-qualified Frozen
 TP/SL path settlements. Execution costs come from a cached live L2 model. Market
-regime is classified independently from the signal direction and cached in the
-background. No research sample or 24h directional return can qualify a trade.
+regime is classified independently from signal direction and cached in the
+background.
+
+For every newly stored Production-qualified Forward row, the exact Profit Engine
+evidence available at observation time is frozen into a separate sidecar audit
+archive. Research rows are never written to this archive. This prevents hindsight
+bias when the Profit Engine is evaluated later.
 """
 
 from __future__ import annotations
 
+import json
 import math
 import threading
 import time
+from pathlib import Path
 
 import execution_cost_model
 import execution_outcome_scope
@@ -20,10 +27,17 @@ import market_regime_engine
 import profit_engine
 import trade_path_settlement
 
-VERSION = 'PROFIT_ENGINE_RUNTIME_V3_INDEPENDENT_REGIME_LIVE_COSTS'
+VERSION = 'PROFIT_ENGINE_RUNTIME_V4_FROZEN_SIGNAL_EVIDENCE'
 CALIBRATION_REFRESH_SECONDS = 900
 COST_REFRESH_SECONDS = 120
 REGIME_REFRESH_SECONDS = 300
+
+
+def _f(v, default=None):
+    try:
+        return float(v)
+    except Exception:
+        return default
 
 
 def _wilson_interval(wins, total, z=1.96):
@@ -34,6 +48,20 @@ def _wilson_interval(wins, total, z=1.96):
     center = (p + z * z / (2 * total)) / denom
     margin = z * math.sqrt((p * (1 - p) + z * z / (4 * total)) / total) / denom
     return max(0.0, center - margin), min(1.0, center + margin)
+
+
+def _derived_stop(payload):
+    entry = _f((payload or {}).get('entry'))
+    target = _f((payload or {}).get('structural_target'))
+    rr = _f((payload or {}).get('rr_tp2'))
+    direction = str((payload or {}).get('direction') or '').upper()
+    if entry is None or target is None or rr is None or rr <= 0 or direction not in ('LONG', 'SHORT'):
+        return None
+    reward = (target - entry) if direction == 'LONG' else (entry - target)
+    if reward <= 0:
+        return None
+    risk = reward / rr
+    return entry - risk if direction == 'LONG' else entry + risk
 
 
 def build_path_calibration(collector):
@@ -70,12 +98,18 @@ def install(collector):
         return getattr(collector, 'PROFIT_ENGINE_RUNTIME_STATE', {})
 
     original_decision = collector.production_decision
+    original_forward_observe = getattr(collector, 'forward_observe', None)
     symbols = tuple(getattr(collector, 'ON_DEMAND_SYMBOLS', ()) or ())
+    data_dir = Path(getattr(collector, 'DATA', Path('.')))
+    observation_file = data_dir / 'profit_engine_observations.jsonl'
     state = {
         'enabled': True,
         'version': VERSION,
         'shadow_only': True,
         'can_override_production': False,
+        'observation_archive': str(observation_file),
+        'frozen_signal_observations': 0,
+        'research_observations_included': 0,
         'calibration': {
             'calibrated': False,
             'samples': 0,
@@ -99,6 +133,7 @@ def install(collector):
         'last_regime_errors': {},
     }
     lock = threading.RLock()
+    observation_lock = threading.RLock()
 
     def refresh_calibration():
         state['last_calibration_started_at'] = collector.now_iso() if hasattr(collector, 'now_iso') else None
@@ -182,6 +217,34 @@ def install(collector):
         state['last_regime_finished_at'] = collector.now_iso() if hasattr(collector, 'now_iso') else None
         return results
 
+    def cached_evidence(normalized):
+        with lock:
+            calibration = dict(state.get('calibration') or {})
+            execution = dict((state.get('execution_cost_by_symbol') or {}).get(normalized) or {
+                'validated': False,
+                'basis': 'WAITING_FOR_BACKGROUND_EXECUTION_COST_REFRESH',
+            })
+            regime_context = dict((state.get('market_regime_by_symbol') or {}).get(normalized) or {
+                'asset_regime': 'UNKNOWN',
+                'btc_regime': 'UNKNOWN',
+                'version': market_regime_engine.VERSION,
+                'shadow_only': True,
+            })
+        return calibration, execution, regime_context
+
+    def assess_payload(payload, normalized, stop_loss=None):
+        calibration, execution, regime_context = cached_evidence(normalized)
+        row = {
+            'production_signal_qualified': bool((payload or {}).get('production_signal_qualified')),
+            'direction': (payload or {}).get('direction'),
+            'regime': regime_context.get('asset_regime') or 'UNKNOWN',
+            'btc_regime': regime_context.get('btc_regime') or 'UNKNOWN',
+            'entry': (payload or {}).get('entry'),
+            'rr_tp2': (payload or {}).get('rr_tp2'),
+        }
+        shadow = profit_engine.assess(row, stop_loss=stop_loss, calibration=calibration, execution=execution)
+        return shadow, calibration, execution, regime_context
+
     def calibration_loop():
         time.sleep(20)
         while True:
@@ -205,27 +268,13 @@ def install(collector):
         if not isinstance(decision, dict) or not decision.get('ok'):
             return decision
         normalized = str(decision.get('symbol') or symbol or '').upper().replace('BINANCE:', '')
-        with lock:
-            calibration = dict(state.get('calibration') or {})
-            execution = dict((state.get('execution_cost_by_symbol') or {}).get(normalized) or {
-                'validated': False,
-                'basis': 'WAITING_FOR_BACKGROUND_EXECUTION_COST_REFRESH',
-            })
-            regime_context = dict((state.get('market_regime_by_symbol') or {}).get(normalized) or {
-                'asset_regime': 'UNKNOWN',
-                'btc_regime': 'UNKNOWN',
-                'version': market_regime_engine.VERSION,
-                'shadow_only': True,
-            })
-        row = {
+        payload = {
             'production_signal_qualified': bool(decision.get('production_signal_qualified')),
             'direction': decision.get('candidate_direction'),
-            'regime': regime_context.get('asset_regime') or 'UNKNOWN',
-            'btc_regime': regime_context.get('btc_regime') or 'UNKNOWN',
             'entry': decision.get('entry'),
             'rr_tp2': decision.get('risk_reward'),
         }
-        shadow = profit_engine.assess(row, stop_loss=decision.get('stop_loss'), calibration=calibration, execution=execution)
+        shadow, _calibration, execution, regime_context = assess_payload(payload, normalized, decision.get('stop_loss'))
         shadow.update({
             'shadow_only': True,
             'can_override_production': False,
@@ -240,7 +289,53 @@ def install(collector):
         decision['profit_engine_version'] = profit_engine.VERSION
         return decision
 
+    def forward_observe_with_frozen_profit_evidence(payload):
+        # Strictly require the explicit Production qualification flag. Never infer
+        # qualification from a research score or champion flag.
+        qualified = bool(isinstance(payload, dict) and payload.get('production_signal_qualified') is True)
+        frozen = None
+        if qualified:
+            normalized = str(payload.get('symbol') or '').upper().replace('BINANCE:', '')
+            stop = _derived_stop(payload)
+            shadow, calibration, execution, regime_context = assess_payload(payload, normalized, stop)
+            frozen = {
+                'schema': 'ATLAS_PROFIT_ENGINE_OBSERVATION_V1',
+                'captured_at': collector.now_iso() if hasattr(collector, 'now_iso') else None,
+                'symbol': normalized,
+                'direction': payload.get('direction'),
+                'entry': _f(payload.get('entry')),
+                'score': _f(payload.get('final_score')),
+                'signal_threshold': _f(payload.get('signal_threshold'), _f(getattr(collector, 'CLOUD_FORWARD_MIN_SCORE', None))),
+                'derived_stop_loss': stop,
+                'structural_target': _f(payload.get('structural_target')),
+                'gross_rr': _f(payload.get('rr_tp2')),
+                'profit_engine': shadow,
+                'market_regime': regime_context,
+                'execution_cost': execution,
+                'calibration': calibration,
+                'production_signal_qualified': True,
+                'research_sample': False,
+                'research_samples_included': False,
+                'outcome_known_at_capture': False,
+                'shadow_only': True,
+                'can_override_production': False,
+                'runtime_version': VERSION,
+            }
+        result = original_forward_observe(payload)
+        if frozen is not None and isinstance(result, dict) and result.get('id'):
+            frozen['forward_id'] = result.get('id')
+            frozen['forward_captured_at_ms'] = result.get('captured_at_ms')
+            with observation_lock:
+                observation_file.parent.mkdir(parents=True, exist_ok=True)
+                with observation_file.open('a', encoding='utf-8') as handle:
+                    handle.write(json.dumps(frozen, separators=(',', ':')) + '\n')
+            with lock:
+                state['frozen_signal_observations'] += 1
+        return result
+
     collector.production_decision = production_decision_with_profit_shadow
+    if callable(original_forward_observe):
+        collector.forward_observe = forward_observe_with_frozen_profit_evidence
     collector.PROFIT_ENGINE_RUNTIME_STATE = state
     collector.profit_engine_refresh_calibration = refresh_calibration
     collector.profit_engine_refresh_execution_costs = refresh_execution_costs
