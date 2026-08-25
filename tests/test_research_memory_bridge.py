@@ -170,6 +170,14 @@ def test_strict_chain_rejects_later_horizon_after_gap():
     clean, rejected = bridge._strict_chain({'1': 1.0, '4': 2.0, '12': None, '24': 4.0})
     assert clean == {'1': 1.0, '4': 2.0, '12': None, '24': None}
     assert rejected == ['24']
+    assert bridge._chain_state(clean, rejected) == 'SPARSE_SAMPLING_GAP'
+
+
+def test_incomplete_prefix_is_waiting_not_integrity_error():
+    clean, rejected = bridge._strict_chain({'1': 1.0, '4': 2.0})
+    assert rejected == []
+    assert clean == {'1': 1.0, '4': 2.0, '12': None, '24': None}
+    assert bridge._chain_state(clean, rejected) == 'AWAITING_LATER_MATURITY'
 
 
 def test_reconcile_prefers_exact_canonical_forward_lineage():
@@ -186,9 +194,12 @@ def test_reconcile_prefers_exact_canonical_forward_lineage():
     assert rows[0]['forward_evidence_source'] == 'CANONICAL_FORWARD_ARCHIVE'
     assert rows[0]['forward_link_method'] == 'EXACT_ID'
     assert rows[0]['forward_return_pct'] == {'1': 0.5, '4': 1.0, '12': 1.5, '24': 2.0}
+    assert rows[0]['maturity_integrity']['state'] == 'COMPLETE_24H'
     assert metrics['linked_to_forward'] == 1
     assert metrics['exact_lineage_links'] == 1
+    assert metrics['complete_24h_rows'] == 1
     assert metrics['gap_rows'] == 0
+    assert metrics['hard_integrity_errors'] == 0
 
 
 def test_legacy_fuzzy_match_requires_same_direction():
@@ -201,9 +212,33 @@ def test_legacy_fuzzy_match_requires_same_direction():
     rows, metrics = bridge.reconcile_confluence_rows(memory, [wrong])
     assert rows[0]['forward_evidence_source'] == 'CONFLUENCE_FALLBACK'
     assert metrics['linked_to_forward'] == 0
+    assert metrics['unlinked_rows'] == 1
 
 
-def test_reconcile_fallback_never_allows_24h_without_12h():
+def test_exact_id_lineage_conflict_is_hard_error_and_never_fuzzy_matches():
+    memory = [{
+        'symbol': 'BTCUSDT', 'captured_at_ms': 1_000_000, 'price': 100.0,
+        'base_signal': 'BUY', 'forward_observation_id': 'exact-1',
+        'forward_return_pct': {'1': 0.1},
+    }]
+    conflicting = sample_row(
+        id='exact-1', symbol='ETHUSDT', direction='LONG', captured_at_ms=1_000_010,
+        forward_return_pct={'1': 1, '4': 1, '12': 1, '24': 1},
+    )
+    fuzzy_candidate = sample_row(
+        id='other', symbol='BTCUSDT', direction='LONG', captured_at_ms=1_000_020,
+        forward_return_pct={'1': 2, '4': 2, '12': 2, '24': 2},
+    )
+    rows, metrics = bridge.reconcile_confluence_rows(memory, [conflicting, fuzzy_candidate])
+    assert rows[0]['forward_evidence_source'] == 'LINEAGE_CONFLICT'
+    assert rows[0]['forward_link_method'] is None
+    assert rows[0]['maturity_integrity']['hard_integrity_error'] is True
+    assert metrics['lineage_conflicts'] == 1
+    assert metrics['hard_integrity_errors'] == 1
+    assert metrics['linked_to_forward'] == 0
+
+
+def test_reconcile_sparse_sampling_never_allows_24h_without_12h():
     memory = [{
         'symbol': 'BTCUSDT', 'captured_at_ms': 1_000_000, 'price': 100.0,
         'forward_return_pct': {'1': 0.5, '4': 1.0, '12': None, '24': 2.0},
@@ -211,8 +246,13 @@ def test_reconcile_fallback_never_allows_24h_without_12h():
     rows, metrics = bridge.reconcile_confluence_rows(memory, [])
     assert rows[0]['forward_return_pct']['24'] is None
     assert rows[0]['maturity_integrity']['rejected_horizons'] == ['24']
+    assert rows[0]['maturity_integrity']['state'] == 'SPARSE_SAMPLING_GAP'
+    assert rows[0]['maturity_integrity']['suppressed_for_safety'] is True
+    assert metrics['sparse_sampling_rows'] == 1
+    assert metrics['suppressed_later_horizons'] == 1
     assert metrics['gap_rows'] == 1
     assert metrics['rejected_horizons'] == 1
+    assert metrics['hard_integrity_errors'] == 0
 
 
 if __name__ == '__main__':
@@ -224,7 +264,9 @@ if __name__ == '__main__':
     test_deduped_forward_row_is_not_mirrored()
     test_memory_dedupe_does_not_inflate_mirrored_counter()
     test_strict_chain_rejects_later_horizon_after_gap()
+    test_incomplete_prefix_is_waiting_not_integrity_error()
     test_reconcile_prefers_exact_canonical_forward_lineage()
     test_legacy_fuzzy_match_requires_same_direction()
-    test_reconcile_fallback_never_allows_24h_without_12h()
+    test_exact_id_lineage_conflict_is_hard_error_and_never_fuzzy_matches()
+    test_reconcile_sparse_sampling_never_allows_24h_without_12h()
     print('research memory bridge tests: ok')
