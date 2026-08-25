@@ -16,10 +16,11 @@ from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
-SCHEMA = "ATLAS_HISTORICAL_SHADOW_REPLAY_V3_OBSTACLE_CALIBRATION"
+SCHEMA = "ATLAS_HISTORICAL_SHADOW_REPLAY_V4_COMBO_CALIBRATION"
 HORIZONS = ("1h", "3h", "6h", "12h", "24h")
 TARGET_CASES = 100
 MIN_CALIBRATION_CASES_12H = 20
+MIN_COMBO_CASES_12H = 10
 
 
 def _f(v):
@@ -116,6 +117,13 @@ def _group_rows(rows, key_fn):
     }
 
 
+def _combo_key(row):
+    symbol = str(row.get("symbol") or "UNKNOWN").upper()
+    direction = str(row.get("candidate_direction") or "NONE").upper()
+    obstacle = str(((row.get("score_attribution") or {}).get("obstacle_reason") or "NONE")).upper()
+    return f"{symbol}|{direction}|{obstacle}"
+
+
 def _calibration_candidates(by_obstacle):
     """Research recommendations only; never mutate Production scoring."""
     out = []
@@ -141,6 +149,44 @@ def _calibration_candidates(by_obstacle):
             "production_change_allowed": False,
         })
     return sorted(out, key=lambda x: (-x["sample_12h"], x["obstacle_reason"]))
+
+
+def _combo_candidates(by_combo):
+    """Rank sufficiently sampled symbol/direction/obstacle research slices."""
+    out = []
+    for key, data in by_combo.items():
+        h12 = (data.get("horizons") or {}).get("12h") or {}
+        h24 = (data.get("horizons") or {}).get("24h") or {}
+        n12 = int(h12.get("n") or 0)
+        pos12 = _f(h12.get("positive_rate_pct"))
+        mean12 = _f(h12.get("mean_pct"))
+        symbol, direction, obstacle = (key.split("|", 2) + ["UNKNOWN", "NONE", "NONE"])[:3]
+        if n12 < MIN_COMBO_CASES_12H:
+            verdict = "INSUFFICIENT_SAMPLE"
+        elif mean12 is not None and pos12 is not None and mean12 > 0 and pos12 >= 60:
+            verdict = "HIGH_PRIORITY_SWING_RESEARCH"
+        elif mean12 is not None and mean12 < 0:
+            verdict = "LOW_PRIORITY_OR_AVOID_RESEARCH"
+        else:
+            verdict = "NEUTRAL_SWING_RESEARCH"
+        out.append({
+            "combo": key,
+            "symbol": symbol,
+            "direction": direction,
+            "obstacle_reason": obstacle,
+            "sample_12h": n12,
+            "positive_rate_12h_pct": pos12,
+            "mean_12h_pct": mean12,
+            "sample_24h": int(h24.get("n") or 0),
+            "positive_rate_24h_pct": _f(h24.get("positive_rate_pct")),
+            "mean_24h_pct": _f(h24.get("mean_pct")),
+            "verdict": verdict,
+            "research_only": True,
+            "production_change_allowed": False,
+        })
+    priority = {"HIGH_PRIORITY_SWING_RESEARCH": 0, "NEUTRAL_SWING_RESEARCH": 1,
+                "LOW_PRIORITY_OR_AVOID_RESEARCH": 2, "INSUFFICIENT_SAMPLE": 3}
+    return sorted(out, key=lambda x: (priority.get(x["verdict"], 9), -x["sample_12h"], x["combo"]))
 
 
 def build_report(payload, execution_summary=None, target_cases=TARGET_CASES):
@@ -180,6 +226,7 @@ def build_report(payload, execution_summary=None, target_cases=TARGET_CASES):
     )
     by_symbol_by_horizon = _group_rows(directional, lambda r: r.get("symbol") or "UNKNOWN")
     by_direction_by_horizon = _group_rows(directional, lambda r: r.get("candidate_direction") or "NONE")
+    by_symbol_direction_obstacle = _group_rows(directional, _combo_key)
 
     blocker_counts = Counter(str(r.get("reason") or "UNKNOWN") for r in directional)
     obstacle_counts = Counter()
@@ -224,7 +271,9 @@ def build_report(payload, execution_summary=None, target_cases=TARGET_CASES):
         "by_obstacle_reason_by_horizon": by_obstacle_reason_by_horizon,
         "by_symbol_by_horizon": by_symbol_by_horizon,
         "by_direction_by_horizon": by_direction_by_horizon,
+        "by_symbol_direction_obstacle": by_symbol_direction_obstacle,
         "calibration_candidates": _calibration_candidates(by_obstacle_reason_by_horizon),
+        "combo_calibration_candidates": _combo_candidates(by_symbol_direction_obstacle),
         # Compatibility keys retained for existing consumers.
         "by_wait_reason_24h": {k: {"records": v["records"], "at_24h": v["horizons"]["24h"]} for k, v in by_reason_by_horizon.items()},
         "by_score_band_24h": {k: {"records": v["records"], "at_24h": v["horizons"]["24h"]} for k, v in by_score_band_by_horizon.items()},
