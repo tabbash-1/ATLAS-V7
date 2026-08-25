@@ -1,0 +1,67 @@
+name: ATLAS Horizon Fit Guard
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'horizon_fit_policy.py'
+      - 'horizon_fit_overlay.py'
+      - 'quick_reentry_guard.py'
+      - 'cloud_start.py'
+      - 'production_decision_api.py'
+      - 'tests/test_horizon_fit_policy.py'
+      - 'tests/test_quick_reentry_guard_policy_cancel.py'
+      - '.github/workflows/horizon-fit-guard.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'horizon_fit_policy.py'
+      - 'horizon_fit_overlay.py'
+      - 'quick_reentry_guard.py'
+      - 'cloud_start.py'
+      - 'production_decision_api.py'
+      - 'tests/test_horizon_fit_policy.py'
+      - 'tests/test_quick_reentry_guard_policy_cancel.py'
+      - '.github/workflows/horizon-fit-guard.yml'
+  workflow_dispatch:
+
+jobs:
+  horizon-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile horizon modules
+        run: |
+          python -m py_compile horizon_fit_policy.py horizon_fit_overlay.py quick_reentry_guard.py tests/test_horizon_fit_policy.py tests/test_quick_reentry_guard_policy_cancel.py
+      - name: Run horizon policy tests
+        run: |
+          PYTHONPATH=. python tests/test_horizon_fit_policy.py
+          PYTHONPATH=. python tests/test_quick_reentry_guard_policy_cancel.py
+      - name: Lock production invariants
+        run: |
+          set -euo pipefail
+          grep -q "ATLAS_CLOUD_FORWARD_MIN_SCORE.*68" cloud_start.py
+          grep -q "production_threshold_changed.*False" horizon_fit_policy.py
+          grep -q "production_override_allowed.*False" horizon_fit_policy.py
+          grep -q "production_threshold_changed_by_horizon_policy.*False" horizon_fit_overlay.py
+          grep -q "_install_horizon_fit_overlay" cloud_start.py
+          grep -q "QUICK_SCORE_GAP_MAX = 4.0" horizon_fit_policy.py
+          grep -q "SWING_RESEARCH_SCORE_GAP_MAX = 8.0" horizon_fit_policy.py
+          grep -q "evaluation_horizons.*12h.*24h" horizon_fit_policy.py
+          grep -q "cancel_active" quick_reentry_guard.py
+      - name: Guard against production promotion from research lane
+        run: |
+          python - <<'PY'
+          import horizon_fit_policy as h
+          for score in range(60, 68):
+              x=h.classify(direction='LONG',score=score,threshold=68,votes=4,relative_volume=2,tactical_rr=3,breakout_confirmed=True,production_qualified=False,execution_ready=False)
+              assert x['production_threshold_changed'] is False
+              assert x['production_override_allowed'] is False
+              assert x['swing']['production_qualified'] is False
+              assert x['swing']['can_override_production'] is False
+          print('production promotion guard: ok')
+          PY
