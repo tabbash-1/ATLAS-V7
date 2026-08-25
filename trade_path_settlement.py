@@ -21,8 +21,12 @@ import trade_outcome_ledger
 
 MAX_HORIZON_H = 24
 CACHE_SECONDS = 300
+PROVIDER_TIMEOUT_SECONDS = 6
+MARKET_DATA_CIRCUIT_SECONDS = 60
 _CACHE = {}
 _CACHE_LOCK = threading.RLock()
+_MARKET_DATA_CIRCUIT = {'open_until': 0.0, 'last_error': None, 'failures': 0, 'opened_at': None}
+_MARKET_DATA_CIRCUIT_LOCK = threading.RLock()
 
 
 def _fnum(value):
@@ -136,20 +140,64 @@ def _persist_geometry(collector, forward_row, geometry):
         return {'stored': True, 'record': rec}
 
 
+def market_data_circuit_state():
+    with _MARKET_DATA_CIRCUIT_LOCK:
+        now = time.time()
+        return {
+            'open': bool(_MARKET_DATA_CIRCUIT['open_until'] > now),
+            'open_until': _MARKET_DATA_CIRCUIT['open_until'],
+            'last_error': _MARKET_DATA_CIRCUIT['last_error'],
+            'failures': _MARKET_DATA_CIRCUIT['failures'],
+            'opened_at': _MARKET_DATA_CIRCUIT['opened_at'],
+        }
+
+
+def _circuit_check():
+    with _MARKET_DATA_CIRCUIT_LOCK:
+        now = time.time()
+        if _MARKET_DATA_CIRCUIT['open_until'] > now:
+            remaining = max(0.0, _MARKET_DATA_CIRCUIT['open_until'] - now)
+            raise RuntimeError(f'market data circuit open; retry after {remaining:.1f}s; last_error={_MARKET_DATA_CIRCUIT["last_error"]}')
+        if _MARKET_DATA_CIRCUIT['open_until']:
+            _MARKET_DATA_CIRCUIT['open_until'] = 0.0
+
+
+def _circuit_success():
+    with _MARKET_DATA_CIRCUIT_LOCK:
+        _MARKET_DATA_CIRCUIT['open_until'] = 0.0
+        _MARKET_DATA_CIRCUIT['last_error'] = None
+        _MARKET_DATA_CIRCUIT['failures'] = 0
+        _MARKET_DATA_CIRCUIT['opened_at'] = None
+
+
+def _circuit_fail(error):
+    with _MARKET_DATA_CIRCUIT_LOCK:
+        now = time.time()
+        _MARKET_DATA_CIRCUIT['failures'] += 1
+        _MARKET_DATA_CIRCUIT['last_error'] = str(error)
+        _MARKET_DATA_CIRCUIT['opened_at'] = now
+        _MARKET_DATA_CIRCUIT['open_until'] = now + MARKET_DATA_CIRCUIT_SECONDS
+
+
 def _request_klines(symbol, interval, start_ms, end_ms, limit=1000):
+    _circuit_check()
     path = '/api/v3/klines?symbol=' + urllib.parse.quote(symbol) + '&interval=' + urllib.parse.quote(interval) + '&startTime=' + str(int(start_ms)) + '&endTime=' + str(int(end_ms)) + '&limit=' + str(int(limit))
     errors = []
     for base in ('https://data-api.binance.vision', 'https://api-gcp.binance.com', 'https://api1.binance.com'):
         try:
             req = urllib.request.Request(base + path, headers={'User-Agent': 'ATLAS-Outcome/1.0', 'Accept': 'application/json'})
-            with urllib.request.urlopen(req, timeout=15) as response:
+            with urllib.request.urlopen(req, timeout=PROVIDER_TIMEOUT_SECONDS) as response:
                 raw = json.loads(response.read().decode('utf-8'))
             if not isinstance(raw, list):
                 raise RuntimeError('invalid kline response')
-            return [{'open_time': int(k[0]), 'open': float(k[1]), 'high': float(k[2]), 'low': float(k[3]), 'close': float(k[4]), 'close_time': int(k[6])} for k in raw]
+            rows = [{'open_time': int(k[0]), 'open': float(k[1]), 'high': float(k[2]), 'low': float(k[3]), 'close': float(k[4]), 'close_time': int(k[6])} for k in raw]
+            _circuit_success()
+            return rows
         except Exception as exc:
-            errors.append(str(exc))
-    raise RuntimeError('all spot candle providers failed: ' + ' | '.join(errors))
+            errors.append(f'{base}: {exc}')
+    error = 'all spot candle providers failed: ' + ' | '.join(errors)
+    _circuit_fail(error)
+    raise RuntimeError(error)
 
 
 def _cached_5m(symbol, start_ms, end_ms):
@@ -273,6 +321,7 @@ def summarize_path(items):
     rs = [float(x['r_multiple']) for x in terminal if x.get('r_multiple') is not None]
     positive_r = sum(x for x in rs if x > 0)
     negative_r = abs(sum(x for x in rs if x < 0))
+    market_data_errors = [x for x in items if x.get('path_outcome') == 'MARKET_DATA_ERROR']
     return {
         'total': len(items), 'terminal': len(terminal), 'open': len(items) - len(terminal),
         'wins': len(wins), 'losses': len(losses), 'expired': len(expired),
@@ -284,6 +333,8 @@ def summarize_path(items):
         'geometry_unavailable': sum(1 for x in items if x.get('geometry_status') != 'FROZEN'),
         'tp1_reached': sum(1 for x in items if x.get('tp1_reached')),
         'ambiguous': sum(1 for x in items if x.get('path_outcome') == 'AMBIGUOUS'),
+        'market_data_errors': len(market_data_errors),
+        'market_data_circuit': market_data_circuit_state(),
         'scope_semantics': 'PRODUCTION_QUALIFIED_ONLY' if all(x.get('production_signal_qualified') for x in items) and items else None,
     }
 
