@@ -3,6 +3,7 @@ import copy
 import edge_evidence_interaction_outcome_validator as validator
 import edge_evidence_interaction_protocol as protocol
 import edge_evidence_interaction_rules as rules
+import edge_evidence_interaction_validator_guard as guard
 
 
 def joint():
@@ -19,7 +20,9 @@ def joint():
 def auth():
     p = protocol.build_manifest(joint())
     r = rules.build_manifest(p)
-    g = {'status': 'VALIDATOR_ARMED'}
+    g = guard.evaluate(p, joint())
+    assert g['status'] == 'VALIDATOR_ARMED'
+    assert g['armed_protocol_hash'] == p['protocol_hash']
     return p, g, r
 
 
