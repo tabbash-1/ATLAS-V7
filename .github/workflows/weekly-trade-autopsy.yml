@@ -1,0 +1,79 @@
+name: ATLAS Weekly Trade Autopsy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/weekly-trade-autopsy.yml'
+  workflow_dispatch:
+
+jobs:
+  autopsy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fetch live Production path ledger
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://atlas-v7.onrender.com/api/outcomes/path-ledger?scope=signals&limit=100'
+          curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 10 --max-time 60 "$url" -o /tmp/ledger.json
+          python3 -m json.tool /tmp/ledger.json >/dev/null
+      - name: Diagnose wins and losses
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, collections, datetime
+          x=json.load(open('/tmp/ledger.json'))
+          rows=x.get('rows') or []
+          terminal=[r for r in rows if r.get('terminal')]
+          wins=[r for r in terminal if r.get('path_outcome')=='WIN_TP2']
+          losses=[r for r in terminal if r.get('path_outcome')=='LOSS']
+          ambiguous=[r for r in rows if r.get('path_outcome')=='AMBIGUOUS']
+          def score(r):
+              try:return float(r.get('score'))
+              except:return None
+          def rr(r):
+              try:return float((r.get('geometry') or {}).get('rr_tp2'))
+              except:return None
+          def avg(vals):
+              vals=[v for v in vals if v is not None]
+              return round(sum(vals)/len(vals),4) if vals else None
+          def compact(r):
+              return {
+                  'id':r.get('id'),'symbol':r.get('symbol'),'direction':r.get('direction'),
+                  'captured_at':r.get('captured_at'),'score':score(r),'rr_tp2':rr(r),
+                  'tp1_reached':bool(r.get('tp1_reached')),'path_outcome':r.get('path_outcome'),
+                  'r_multiple':r.get('r_multiple'),'event_time_ms':r.get('event_time_ms'),
+                  'entry':r.get('entry'),'stop_loss':(r.get('geometry') or {}).get('stop_loss'),
+                  'tp1':(r.get('geometry') or {}).get('tp1'),'tp2':(r.get('geometry') or {}).get('tp2'),
+              }
+          by_symbol={}
+          for sym in sorted({r.get('symbol') for r in terminal if r.get('symbol')}):
+              sr=[r for r in terminal if r.get('symbol')==sym]
+              sw=[r for r in sr if r.get('path_outcome')=='WIN_TP2']
+              sl=[r for r in sr if r.get('path_outcome')=='LOSS']
+              by_symbol[sym]={'terminal':len(sr),'wins':len(sw),'losses':len(sl),'win_rate_pct':round(100*len(sw)/(len(sw)+len(sl)),2) if sw or sl else None,'net_r':round(sum(float(r.get('r_multiple') or 0) for r in sr),4)}
+          loss_tp1=sum(1 for r in losses if r.get('tp1_reached'))
+          # repeated same-symbol/direction terminal entries <= 3h apart
+          repeated=[]
+          ordered=sorted([r for r in rows if r.get('captured_at_ms')], key=lambda r:int(r['captured_at_ms']))
+          for a,b in zip(ordered,ordered[1:]):
+              if a.get('symbol')==b.get('symbol') and a.get('direction')==b.get('direction'):
+                  gap=(int(b['captured_at_ms'])-int(a['captured_at_ms']))/3600000
+                  if gap<=3:
+                      repeated.append({'symbol':b.get('symbol'),'direction':b.get('direction'),'gap_h':round(gap,3),'first_outcome':a.get('path_outcome'),'next_outcome':b.get('path_outcome'),'first_score':score(a),'next_score':score(b)})
+          report={
+              'total_rows':len(rows),'terminal':len(terminal),'wins':len(wins),'losses':len(losses),'ambiguous':len(ambiguous),
+              'win_rate_pct':round(100*len(wins)/(len(wins)+len(losses)),2) if wins or losses else None,
+              'avg_win_score':avg([score(r) for r in wins]),'avg_loss_score':avg([score(r) for r in losses]),
+              'avg_win_rr':avg([rr(r) for r in wins]),'avg_loss_rr':avg([rr(r) for r in losses]),
+              'losses_after_tp1':loss_tp1,'losses_without_tp1':len(losses)-loss_tp1,
+              'by_symbol':by_symbol,
+              'loss_rows':[compact(r) for r in losses],
+              'win_rows':[compact(r) for r in wins],
+              'same_direction_repeats_within_3h':repeated,
+          }
+          print('ATLAS_WEEKLY_TRADE_AUTOPSY_JSON')
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
