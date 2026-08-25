@@ -1,0 +1,51 @@
+name: ATLAS Swing Episode Calibration
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'swing_episode_calibration.py'
+      - 'tests/test_swing_episode_calibration.py'
+      - 'status/wait-outcomes.json'
+      - '.github/workflows/swing-episode-calibration.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  calibrate-episodes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate episode engine
+        run: |
+          python3 -m py_compile swing_episode_calibration.py tests/test_swing_episode_calibration.py
+          PYTHONPATH=. python3 tests/test_swing_episode_calibration.py
+      - name: Build de-correlated report
+        run: |
+          python3 swing_episode_calibration.py --wait-outcomes status/wait-outcomes.json --output status/swing-episode-calibration.json
+          python3 - <<'PY'
+          import json
+          x=json.load(open('status/swing-episode-calibration.json'))
+          assert x['schema']=='ATLAS_SWING_EPISODE_CALIBRATION_V1'
+          assert x['episode_gap_hours']==12
+          assert x['production_threshold']==68
+          assert x['production_threshold_changed'] is False
+          assert x['production_score_adjustment']==0
+          assert x['auto_promotion_enabled'] is False
+          assert all(v['production_change_allowed'] is False for v in x['combos'].values())
+          print('EPISODE_CALIBRATION',json.dumps(x,sort_keys=True))
+          PY
+      - name: Commit calibration report
+        run: |
+          if [ -z "$(git status --porcelain -- status/swing-episode-calibration.json)" ]; then exit 0; fi
+          git config user.name 'atlas-episode-calibration-bot'
+          git config user.email 'atlas-episode-calibration-bot@users.noreply.github.com'
+          git add status/swing-episode-calibration.json
+          git commit -m 'chore: update swing episode calibration [skip ci]'
+          git pull --rebase origin main
+          git push
