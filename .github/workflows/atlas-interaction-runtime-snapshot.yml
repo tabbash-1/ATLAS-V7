@@ -1,0 +1,69 @@
+name: ATLAS Interaction Validation Snapshot
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/atlas-interaction-runtime-snapshot.yml'
+      - 'interaction_status_api.py'
+      - 'interaction_outcome_runtime.py'
+      - 'interaction_preflight.py'
+      - 'interaction_outcome_validator.py'
+      - 'interaction_rule_registry.py'
+      - 'interaction_validator_guard.py'
+      - 'cloud_start.py'
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atlas-interaction-validation-snapshot
+  cancel-in-progress: true
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch cached interaction validation state
+        shell: bash
+        env:
+          BASE_URL: https://atlas-v7.onrender.com
+        run: |
+          set -euo pipefail
+          mkdir -p status/history
+          tmp="status/interaction-validation-latest.json.tmp"
+          code="$(curl -L --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 20 --max-time 120 -sS -w '%{http_code}' -o "$tmp" "${BASE_URL}/api/research/interaction-status")"
+          if [[ ! "$code" =~ ^2 ]]; then
+            echo "Interaction status endpoint HTTP $code" >&2
+            cat "$tmp" >&2 || true
+            exit 1
+          fi
+          jq -e . "$tmp" >/dev/null
+          # Safety contract: the endpoint must remain cached/read-only research state.
+          jq -e '.research_only == true and .live_execution == false and .cached_only == true' "$tmp" >/dev/null
+          mv "$tmp" status/interaction-validation-latest.json
+          python3 - <<'PY'
+          import json, pathlib, datetime
+          p=pathlib.Path('status/interaction-validation-latest.json')
+          row=json.loads(p.read_text())
+          row['_snapshot_captured_at']=datetime.datetime.now(datetime.timezone.utc).isoformat()
+          h=pathlib.Path('status/history/interaction-validation-snapshots.jsonl')
+          with h.open('a') as f:
+              f.write(json.dumps(row,separators=(',',':'))+'\n')
+          p.write_text(json.dumps(row,indent=2,sort_keys=True))
+          PY
+      - name: Commit interaction validation snapshot
+        shell: bash
+        run: |
+          git config user.name "atlas-interaction-monitor"
+          git config user.email "atlas-interaction-monitor@users.noreply.github.com"
+          git add status/interaction-validation-latest.json status/history/interaction-validation-snapshots.jsonl
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "chore: update interaction validation snapshot [skip ci]"
+          git pull --rebase origin main
+          git push
