@@ -24,16 +24,15 @@ def fake_getter(url, ua):
     raise AssertionError(url)
 
 
-def test_unconfigured_fee_fails_closed():
+def test_unconfigured_fee_fails_closed(monkeypatch):
+    monkeypatch.delenv('ATLAS_EXECUTION_TAKER_FEE_BPS', raising=False)
     out = ecm.estimate(
         'BTCUSDT', notional_usdt=50, venue='OKX_USDT_SWAP',
         taker_fee_bps=None, getter=fake_getter,
     )
-    # Explicitly remove env ambiguity in this test by checking that validation
-    # never succeeds unless a fee can be resolved.
-    if out['fee_bps'] is None:
-        assert out['validated'] is False
-        assert 'TAKER_FEE_NOT_CONFIGURED' in out['blockers']
+    assert out['fee_bps'] is None
+    assert out['validated'] is False
+    assert 'TAKER_FEE_NOT_CONFIGURED' in out['blockers']
 
 
 def test_complete_live_cost_contract_can_validate():
