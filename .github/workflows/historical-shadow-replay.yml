@@ -25,12 +25,17 @@ jobs:
         run: |
           python3 -m py_compile historical_shadow_replay.py tests/test_historical_shadow_replay.py
           python3 tests/test_historical_shadow_replay.py
-      - name: Fetch live execution comparison
+      - name: Fetch optional live execution comparison
         run: |
-          curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 10 --max-time 60 \
+          set -euo pipefail
+          if curl -fsSL --retry 3 --retry-delay 5 --retry-all-errors --connect-timeout 10 --max-time 45 \
             'https://atlas-v7.onrender.com/api/outcomes/path-summary?scope=execution&limit=100' \
-            -o /tmp/execution-summary.json
-          python3 -m json.tool /tmp/execution-summary.json >/dev/null
+            -o /tmp/execution-summary.json && python3 -m json.tool /tmp/execution-summary.json >/dev/null; then
+            echo 'Live execution comparison captured'
+          else
+            echo '{"unavailable":true,"reason":"live_execution_endpoint_unavailable_during_replay"}' > /tmp/execution-summary.json
+            echo 'Continuing with historical replay; live comparison is optional'
+          fi
       - name: Build 100-case shadow replay report
         run: |
           python3 historical_shadow_replay.py \
@@ -68,4 +73,4 @@ jobs:
           git pull --rebase origin main
           git push
 
-# V2 trigger marker: horizon-fit replay publication verification
+# V2 publication must not depend on Render availability.
