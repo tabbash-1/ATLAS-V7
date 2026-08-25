@@ -1,10 +1,27 @@
-"""ATLAS Decision Engine V9: continuation-aware geometry + complete trade plan."""
+"""ATLAS Decision Engine V10: continuation-aware geometry + explicit opportunity states."""
 
 import production_signal_scoring as scoring
 import futures_provider_chain
 import production_trade_plan
 
-VERSION = 'DECISION_ENGINE_V9_COMPLETE_TRADE_PLAN'
+VERSION = 'DECISION_ENGINE_V10_OPPORTUNITY_STATE'
+
+
+def opportunity_state(direction, qualified, execution_ready, plan_status=None):
+    """Classify setup maturity without weakening Production qualification.
+
+    ACTIONABLE = qualified and executable now.
+    ARMED      = qualified direction with a complete conditional Production plan.
+    WATCH      = directional candidate that has not cleared Production qualification.
+    NO_SETUP   = no directional candidate.
+    """
+    if direction not in ('LONG', 'SHORT'):
+        return 'NO_SETUP'
+    if execution_ready:
+        return 'ACTIONABLE'
+    if qualified and plan_status == 'CONDITIONAL':
+        return 'ARMED'
+    return 'WATCH'
 
 
 def install(atlas):
@@ -44,9 +61,20 @@ def install(atlas):
             matrix=result.get('timeframe_matrix') or {}; swing=matrix.get('swing') or {}; swing.update({'risk_reward':result['risk_reward'],'execution_ready':result['execution_ready'],'actionable_decision':result['actionable_decision'],'structural_target_source':target_source,'breakout_confirmed':bool(breakout.get('confirmed')),'continuation_strong':continuation_strong}); matrix['swing']=swing; result['timeframe_matrix']=matrix
         result['trade_plan']=production_trade_plan.build(result)
         plan=result['trade_plan']
-        result['best_available_action']={'action':plan.get('action'),'direction':plan.get('direction'),'lane':'PRODUCTION_SWING' if plan.get('status')=='ACTIONABLE' else 'CONDITIONAL_PRODUCTION','status':plan.get('status'),'entry_mode':plan.get('entry_mode'),'entry':plan.get('entry'),'entry_trigger':plan.get('entry_trigger'),'stop_loss':plan.get('stop_loss'),'tp1':plan.get('tp1'),'tp2':plan.get('tp2'),'rr_tp1':plan.get('rr_tp1'),'rr_tp2':plan.get('rr_tp2'),'can_execute':False,'research_only':True}
+        qualified=bool(result.get('production_signal_qualified'))
+        state=opportunity_state(result.get('candidate_direction'), qualified, bool(result.get('execution_ready')), plan.get('status'))
+        result['opportunity_state']=state
+        result['opportunity_state_reason']=(
+            'QUALIFIED_AND_EXECUTABLE_NOW' if state=='ACTIONABLE' else
+            'QUALIFIED_WITH_CONDITIONAL_ENTRY_PLAN' if state=='ARMED' else
+            'DIRECTIONAL_CANDIDATE_NOT_YET_PRODUCTION_QUALIFIED' if state=='WATCH' else
+            'NO_DIRECTIONAL_CANDIDATE'
+        )
+        matrix=result.get('timeframe_matrix') or {}; swing=matrix.get('swing') or {}; swing['opportunity_state']=state; matrix['swing']=swing; result['timeframe_matrix']=matrix
+        lane='PRODUCTION_SWING' if state=='ACTIONABLE' else 'ARMED_PRODUCTION' if state=='ARMED' else 'WATCH_PRODUCTION' if state=='WATCH' else 'NO_SETUP'
+        result['best_available_action']={'action':plan.get('action'),'direction':plan.get('direction'),'lane':lane,'status':plan.get('status'),'opportunity_state':state,'entry_mode':plan.get('entry_mode'),'entry':plan.get('entry'),'entry_trigger':plan.get('entry_trigger'),'stop_loss':plan.get('stop_loss'),'tp1':plan.get('tp1'),'tp2':plan.get('tp2'),'rr_tp1':plan.get('rr_tp1'),'rr_tp2':plan.get('rr_tp2'),'can_execute':False,'research_only':True}
         result['decision_engine_version']=VERSION
         return result
     atlas.production_decision=build
-    atlas.DECISION_ENGINE_V7_STATE={'enabled':True,'version':VERSION,'production_threshold_unchanged':True,'futures_provider_chain':futures_provider_chain.VERSION,'continuation_aware':True,'complete_trade_plan':True}
+    atlas.DECISION_ENGINE_V7_STATE={'enabled':True,'version':VERSION,'production_threshold_unchanged':True,'futures_provider_chain':futures_provider_chain.VERSION,'continuation_aware':True,'complete_trade_plan':True,'explicit_opportunity_states':['ACTIONABLE','ARMED','WATCH','NO_SETUP']}
     return atlas.DECISION_ENGINE_V7_STATE
