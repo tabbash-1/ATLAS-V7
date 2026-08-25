@@ -124,10 +124,20 @@ def _load(path, protocol_manifest):
     if not isinstance(value, dict):
         return None, 'RULE_REGISTRATION_NOT_JSON_OBJECT'
     if value.get('status') != 'PREREGISTERED':
-        return value, 'RULE_REGISTRATION_STATUS_NOT_PREREGISTERED'
+        return None, 'RULE_REGISTRATION_STATUS_NOT_PREREGISTERED'
     if not verify_manifest(value, protocol_manifest):
-        return value, 'RULE_REGISTRATION_HASH_OR_PARENT_INVALID'
+        return None, 'RULE_REGISTRATION_HASH_OR_PARENT_INVALID'
     return value, None
+
+
+def _corrupt_manifest(protocol_manifest):
+    return {
+        'status': 'REGISTRATION_CORRUPT',
+        'rules_hash': None,
+        'parent_protocol_hash': (protocol_manifest or {}).get('protocol_hash'),
+        'rules': [],
+        'blockers': ['PERSISTED_RULE_PREREGISTRATION_UNREADABLE'],
+    }
 
 
 def install(collector):
@@ -147,13 +157,7 @@ def install(collector):
         manifest, persistence_error = _load(path, protocol_manifest)
         locked = True
         if manifest is None:
-            manifest = {
-                'status': 'REGISTRATION_CORRUPT',
-                'rules_hash': None,
-                'parent_protocol_hash': (protocol_manifest or {}).get('protocol_hash'),
-                'rules': [],
-                'blockers': ['PERSISTED_RULE_PREREGISTRATION_UNREADABLE'],
-            }
+            manifest = _corrupt_manifest(protocol_manifest)
     else:
         manifest = build_manifest(protocol_manifest)
         if manifest.get('status') == 'PREREGISTERED':
@@ -188,16 +192,7 @@ def install(collector):
                 pmanifest = pstate.get('manifest') if isinstance(pstate, dict) else None
                 loaded, err = _load(path, pmanifest)
                 state['persistence_error'] = err
-                if loaded is not None:
-                    state['manifest'] = loaded
-                else:
-                    state['manifest'] = {
-                        'status': 'REGISTRATION_CORRUPT',
-                        'rules_hash': None,
-                        'parent_protocol_hash': (pmanifest or {}).get('protocol_hash'),
-                        'rules': [],
-                        'blockers': ['PERSISTED_RULE_PREREGISTRATION_UNREADABLE'],
-                    }
+                state['manifest'] = loaded if loaded is not None else _corrupt_manifest(pmanifest)
             return state['manifest']
 
         pstate = getattr(collector, 'EDGE_EVIDENCE_INTERACTION_PROTOCOL_STATE', None)
