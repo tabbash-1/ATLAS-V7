@@ -1,9 +1,8 @@
 """ATLAS execution risk-management overlay.
 
-This module is additive: it does not change score thresholds or directional
-scoring. It corrects execution geometry, exposes an explicit management plan,
-and evaluates the effect of protecting a position after TP1 while preserving
-an unmanaged baseline for auditability.
+Additive safety layer: score/direction logic remains untouched. New observations
+freeze structural geometry, outcome reports preserve an unmanaged baseline, and
+management plans are exposed only when their level order and actual R:R are valid.
 """
 
 MIN_EXECUTION_RR = 1.0
@@ -19,8 +18,24 @@ def _fnum(value):
         return None
 
 
+def _valid_level_order(direction, entry, stop, tp1, tp2):
+    if any(v is None or v <= 0 for v in (entry, stop, tp1, tp2)):
+        return False
+    if direction == 'LONG':
+        return stop < entry < tp1 <= tp2
+    if direction == 'SHORT':
+        return tp2 <= tp1 < entry < stop
+    return False
+
+
+def _actual_rr(entry, stop, tp2):
+    risk = abs(entry - stop) if entry is not None and stop is not None else 0.0
+    reward = abs(tp2 - entry) if entry is not None and tp2 is not None else 0.0
+    return reward / risk if risk > 0 else None
+
+
 def derive_structural_geometry(payload):
-    """Use actual support/resistance distances instead of back-solving SL from RR."""
+    """Freeze actual support/resistance geometry instead of back-solving SL from RR."""
     x = dict(payload or {})
     entry = _fnum(x.get('entry'))
     direction = str(x.get('direction') or '').upper()
@@ -36,24 +51,16 @@ def derive_structural_geometry(payload):
     if direction == 'LONG':
         risk = entry * support_distance / 100.0
         reward = entry * resistance_distance / 100.0
-        stop = entry - risk
-        tp1 = entry + risk
-        tp2 = entry + reward
+        stop, tp1, tp2 = entry - risk, entry + risk, entry + reward
     else:
         risk = entry * resistance_distance / 100.0
         reward = entry * support_distance / 100.0
-        stop = entry + risk
-        tp1 = entry - risk
-        tp2 = entry - reward
+        stop, tp1, tp2 = entry + risk, entry - risk, entry - reward
 
     rr2 = reward / risk if risk > 0 else None
     if rr2 is None or rr2 < MIN_EXECUTION_RR:
         return None
-    if min(stop, tp1, tp2) <= 0:
-        return None
-    directional = ((direction == 'LONG' and stop < entry < tp1 <= tp2) or
-                   (direction == 'SHORT' and tp2 <= tp1 < entry < stop))
-    if not directional:
+    if not _valid_level_order(direction, entry, stop, tp1, tp2):
         return None
 
     return {
@@ -77,7 +84,7 @@ def derive_structural_geometry(payload):
 
 
 def manage_settlement_result(raw):
-    """Apply 50% at TP1 + breakeven protection to an already ordered path result."""
+    """Counterfactual managed result: 50% at TP1, remainder protected at entry."""
     out = dict(raw or {})
     raw_outcome = out.get('path_outcome')
     raw_r = out.get('r_multiple')
@@ -93,8 +100,7 @@ def manage_settlement_result(raw):
         out['terminal'] = True
         out['management_exit'] = 'REMAINDER_STOPPED_AT_BREAKEVEN_AFTER_TP1'
     elif raw_outcome == 'WIN_TP2' and raw_r is not None:
-        blended = TP1_REALIZE_FRACTION * 1.0 + REMAINDER_FRACTION * float(raw_r)
-        out['r_multiple'] = round(blended, 6)
+        out['r_multiple'] = round(TP1_REALIZE_FRACTION + REMAINDER_FRACTION * float(raw_r), 6)
         out['management_exit'] = 'HALF_AT_TP1_REMAINDER_AT_TP2'
     elif raw_outcome == 'EXPIRED_AFTER_TP1':
         out['path_outcome'] = 'WIN_TP1_PROTECTED_EXPIRED'
@@ -144,8 +150,7 @@ def _execution_geometry_from_live(atlas, symbol, decision):
     try:
         ks = atlas._spot_klines(symbol)
         support, resistance, _, _ = atlas._cloud_sr(ks)
-        support = _fnum(support)
-        resistance = _fnum(resistance)
+        support, resistance = _fnum(support), _fnum(resistance)
     except Exception:
         return None
 
@@ -153,7 +158,7 @@ def _execution_geometry_from_live(atlas, symbol, decision):
         target = resistance if resistance is not None and resistance > entry else None
         atr_stop = entry - 1.2 * atr
         structural_stop = support if support is not None and support < entry else None
-        stops = [x for x in (atr_stop, structural_stop) if x is not None and x > 0 and x < entry]
+        stops = [x for x in (atr_stop, structural_stop) if x is not None and 0 < x < entry]
         stop = min(stops) if stops else None
     else:
         target = support if support is not None and support < entry else None
@@ -165,18 +170,51 @@ def _execution_geometry_from_live(atlas, symbol, decision):
     if stop is None or target is None:
         return None
     risk = abs(entry - stop)
-    reward = abs(target - entry)
-    rr = reward / risk if risk > 0 else None
+    rr = _actual_rr(entry, stop, target)
     if rr is None:
         return None
     tp1 = entry + risk if direction == 'LONG' else entry - risk
-    valid = ((direction == 'LONG' and stop < entry < tp1 <= target) or
-             (direction == 'SHORT' and target <= tp1 < entry < stop))
+    valid = _valid_level_order(direction, entry, stop, tp1, target) and rr >= MIN_EXECUTION_RR
     return {
         'entry': entry, 'stop_loss': stop, 'tp1': tp1, 'tp2': target,
-        'risk_reward': rr, 'valid': bool(valid and rr >= MIN_EXECUTION_RR),
+        'risk_reward': rr, 'valid': bool(valid), 'direction': direction,
         'support': support, 'resistance': resistance,
     }
+
+
+def _management_plan(direction, entry, stop, tp1, tp2, source, status=None):
+    direction = str(direction or '').upper()
+    entry, stop, tp1, tp2 = map(_fnum, (entry, stop, tp1, tp2))
+    rr = _actual_rr(entry, stop, tp2)
+    if not _valid_level_order(direction, entry, stop, tp1, tp2):
+        return None
+    if rr is None or rr < MIN_EXECUTION_RR:
+        return None
+    return {
+        'policy': POLICY_VERSION,
+        'source': source,
+        'status': status or 'READY',
+        'direction': direction,
+        'entry': round(entry, 10),
+        'initial_stop_loss': round(stop, 10),
+        'tp1': round(tp1, 10),
+        'tp1_close_fraction': TP1_REALIZE_FRACTION,
+        'after_tp1_stop': round(entry, 10),
+        'tp2': round(tp2, 10),
+        'rr_tp2_actual': round(rr, 6),
+        'remainder_fraction': REMAINDER_FRACTION,
+    }
+
+
+def _managed_plan_from_trade_plan(plan):
+    if not isinstance(plan, dict):
+        return None
+    status = str(plan.get('status') or '').upper()
+    return _management_plan(
+        plan.get('direction'), plan.get('entry'), plan.get('stop_loss'),
+        plan.get('tp1'), plan.get('tp2'), 'TRADE_PLAN',
+        'CONDITIONAL_ARMED' if status == 'CONDITIONAL' else 'READY',
+    )
 
 
 def install(atlas):
@@ -186,10 +224,7 @@ def install(atlas):
     if getattr(atlas, '_EXECUTION_RISK_MANAGEMENT_INSTALLED', False):
         return getattr(atlas, 'EXECUTION_RISK_MANAGEMENT_STATE', {})
 
-    # New observations freeze structural support/resistance geometry. Existing
-    # archived geometry is never rewritten.
     tps.derive_geometry = derive_structural_geometry
-
     original_settle = tps.settle_row
     original_summary = tps.summarize_path
 
@@ -223,47 +258,64 @@ def install(atlas):
             result = original_decision(symbol)
             if not isinstance(result, dict) or not result.get('ok'):
                 return result
-            geometry = _execution_geometry_from_live(atlas, str(symbol or '').upper().replace('BINANCE:', ''), result)
+
+            result['execution_policy_version'] = POLICY_VERSION
+
+            # Final decision-engine trade plans take precedence. Conditional
+            # entries must be managed from their own entry/SL/TP geometry, not
+            # from the current spot price.
+            final_plan = _managed_plan_from_trade_plan(result.get('trade_plan'))
+            if final_plan is not None:
+                result['management_plan'] = final_plan
+                result['management_plan_status'] = final_plan['status']
+                return result
+
+            geometry = _execution_geometry_from_live(
+                atlas, str(symbol or '').upper().replace('BINANCE:', ''), result
+            )
             qualified = bool(result.get('production_signal_qualified'))
+
             if geometry is None:
+                result['management_plan'] = None
+                result['management_plan_status'] = 'BLOCKED_GEOMETRY_UNAVAILABLE'
                 result['execution_ready'] = False
                 result['actionable_decision'] = 'WAIT'
                 result['actionable_reason'] = 'STRUCTURAL_GEOMETRY_UNAVAILABLE'
                 result['geometry_gate'] = {
-                    'status': 'BLOCK', 'qualified': False, 'reason': 'STRUCTURAL_GEOMETRY_UNAVAILABLE',
+                    'status': 'BLOCK', 'qualified': False,
+                    'reason': 'STRUCTURAL_GEOMETRY_UNAVAILABLE',
                     'min_risk_reward': MIN_EXECUTION_RR,
                 }
+                return result
+
+            rr = geometry['risk_reward']
+            result['stop_loss'] = round(geometry['stop_loss'], 10)
+            result['take_profit'] = round(geometry['tp2'], 10)
+            result['risk_reward'] = round(rr, 6)
+            ready = bool(qualified and geometry['valid'])
+            result['execution_ready'] = ready
+            result['actionable_decision'] = result.get('candidate_direction') if ready else 'WAIT'
+            result['actionable_reason'] = 'EXECUTION_READY_STRUCTURAL' if ready else 'STRUCTURAL_RR_BELOW_ONE_TO_ONE'
+            result['geometry_gate'] = {
+                'status': 'PASS' if geometry['valid'] else 'BLOCK',
+                'qualified': geometry['valid'],
+                'reason': 'STRUCTURE_PLUS_ATR_FLOOR_ACTUAL_RR' if geometry['valid'] else 'STRUCTURAL_RR_BELOW_ONE_TO_ONE',
+                'min_risk_reward': MIN_EXECUTION_RR,
+                'risk_reward': round(rr, 6),
+                'stop_method': 'FARTHER_OF_STRUCTURE_OR_1_2_ATR',
+                'target_method': 'NEXT_STRUCTURAL_SUPPORT_RESISTANCE',
+            }
+
+            if ready:
+                result['trade_plan_status'] = 'EXECUTION_READY_STRUCTURAL_MANAGED'
+                result['management_plan'] = _management_plan(
+                    geometry['direction'], geometry['entry'], geometry['stop_loss'],
+                    geometry['tp1'], geometry['tp2'], 'LIVE_STRUCTURAL_GEOMETRY', 'READY'
+                )
+                result['management_plan_status'] = 'READY'
             else:
-                rr = geometry['risk_reward']
-                result['stop_loss'] = round(geometry['stop_loss'], 10)
-                result['take_profit'] = round(geometry['tp2'], 10)
-                result['risk_reward'] = round(rr, 6)
-                ready = bool(qualified and geometry['valid'])
-                result['execution_ready'] = ready
-                result['actionable_decision'] = result.get('candidate_direction') if ready else 'WAIT'
-                result['actionable_reason'] = 'EXECUTION_READY_STRUCTURAL' if ready else 'STRUCTURAL_RR_BELOW_ONE_TO_ONE'
-                result['geometry_gate'] = {
-                    'status': 'PASS' if geometry['valid'] else 'BLOCK',
-                    'qualified': geometry['valid'],
-                    'reason': 'STRUCTURE_PLUS_ATR_FLOOR_ACTUAL_RR' if geometry['valid'] else 'STRUCTURAL_RR_BELOW_ONE_TO_ONE',
-                    'min_risk_reward': MIN_EXECUTION_RR,
-                    'risk_reward': round(rr, 6),
-                    'stop_method': 'FARTHER_OF_STRUCTURE_OR_1_2_ATR',
-                    'target_method': 'NEXT_STRUCTURAL_SUPPORT_RESISTANCE',
-                }
-                if ready:
-                    result['trade_plan_status'] = 'EXECUTION_READY_STRUCTURAL_MANAGED'
-            if geometry:
-                result['management_plan'] = {
-                    'policy': POLICY_VERSION,
-                    'initial_stop_loss': round(geometry['stop_loss'], 10),
-                    'tp1': round(geometry['tp1'], 10),
-                    'tp1_close_fraction': TP1_REALIZE_FRACTION,
-                    'after_tp1_stop': round(geometry['entry'], 10),
-                    'tp2': round(geometry['tp2'], 10),
-                    'remainder_fraction': REMAINDER_FRACTION,
-                }
-            result['execution_policy_version'] = POLICY_VERSION
+                result['management_plan'] = None
+                result['management_plan_status'] = 'BLOCKED_INVALID_GEOMETRY'
             return result
 
         atlas.production_decision = production_decision_with_risk
@@ -275,6 +327,8 @@ def install(atlas):
         'tp1_realize_fraction': TP1_REALIZE_FRACTION,
         'remainder_stop_after_tp1': 'BREAKEVEN_ENTRY',
         'new_geometry_method': 'STRUCTURAL_SUPPORT_RESISTANCE_ACTUAL_RR',
+        'management_plan_requires_valid_geometry': True,
+        'conditional_plan_source': 'TRADE_PLAN',
         'historical_geometry_rewritten': False,
     }
     atlas.EXECUTION_RISK_MANAGEMENT_STATE = state
