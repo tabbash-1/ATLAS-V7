@@ -1,0 +1,68 @@
+name: ATLAS Horizon Live Smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'horizon_fit_policy.py'
+      - 'horizon_fit_overlay.py'
+      - 'quick_reentry_guard.py'
+      - 'production_decision_api.py'
+      - 'cloud_start.py'
+      - '.github/workflows/horizon-live-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  live-horizon-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve expected versions
+        run: |
+          python3 - <<'PY' > /tmp/expected.env
+          import re
+          for path,key in [('horizon_fit_overlay.py','OVERLAY'),('horizon_fit_policy.py','POLICY')]:
+              text=open(path).read()
+              m=re.search(r"^VERSION\s*=\s*['\"]([^'\"]+)",text,re.M)
+              assert m, path
+              print(f'{key}={m.group(1)}')
+          PY
+          cat /tmp/expected.env
+      - name: Wait for Render and verify horizon state
+        env:
+          BASE_URL: https://atlas-v7.onrender.com
+        run: |
+          set -euo pipefail
+          source /tmp/expected.env
+          ok=0
+          for i in $(seq 1 24); do
+            echo "Attempt $i: expecting overlay=$OVERLAY policy=$POLICY"
+            if curl -fsSL --connect-timeout 10 --max-time 45 \
+              "${BASE_URL}/api/decision/current?symbol=BTCUSDT&t=$(date +%s)" -o /tmp/decision.json; then
+              if jq -e --arg ov "$OVERLAY" --arg pv "$POLICY" '
+                .ok == true and
+                .horizon_fit_overlay_version == $ov and
+                .horizon_policy_version == $pv and
+                .production_threshold_changed_by_horizon_policy == false and
+                .horizon_fit.production_override_allowed == false
+              ' /tmp/decision.json >/dev/null; then
+                ok=1
+                break
+              fi
+              jq '{horizon_fit_overlay_version,horizon_policy_version,quick_trade_shadow,horizon_fit,signal_threshold,production_signal_qualified}' /tmp/decision.json || true
+            fi
+            sleep 15
+          done
+          test "$ok" = 1
+      - name: Assert clean Quick WATCH state
+        run: |
+          jq -e '
+            if (.quick_trade_shadow.status == "WATCH_ONLY" or .quick_trade_shadow.status == "NO_SETUP") then
+              (.quick_trade_shadow | has("entry") | not) and
+              (.quick_trade_shadow | has("stop_loss") | not) and
+              (.quick_trade_shadow | has("target") | not) and
+              (.quick_trade_shadow | has("active_remaining_seconds") | not)
+            else true end
+          ' /tmp/decision.json >/dev/null
+          jq '{symbol,decision,score,signal_threshold,preferred_horizon,horizon_fit_overlay_version,quick_trade_shadow,swing_research}' /tmp/decision.json
