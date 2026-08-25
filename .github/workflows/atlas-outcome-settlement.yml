@@ -8,6 +8,7 @@ on:
       - 'trade_outcome_ledger.py'
       - 'trade_path_settlement.py'
       - 'tests/test_trade_outcome_runtime.py'
+      - 'tests/test_trade_path_settlement.py'
       - '.github/workflows/atlas-outcome-settlement.yml'
 
 jobs:
@@ -20,13 +21,27 @@ jobs:
         with:
           python-version: '3.12'
       - name: Syntax
-        run: python -m py_compile trade_outcome_runtime.py trade_outcome_ledger.py trade_path_settlement.py tests/test_trade_outcome_runtime.py
+        run: python -m py_compile trade_outcome_runtime.py trade_outcome_ledger.py trade_path_settlement.py tests/test_trade_outcome_runtime.py tests/test_trade_path_settlement.py
       - name: Outcome runtime regression
         run: PYTHONPATH=. python tests/test_trade_outcome_runtime.py
       - name: Existing outcome regressions
         run: |
           PYTHONPATH=. python tests/test_trade_outcome_ledger.py
           PYTHONPATH=. python tests/test_trade_path_settlement.py
+      - name: Geometry cohort invariant
+        run: |
+          PYTHONPATH=. python - <<'PY'
+          import trade_path_settlement as tps
+          payload = {
+              'symbol': 'BTCUSDT', 'entry': 100.0, 'direction': 'LONG',
+              'rr_tp2': 2.0, 'support_distance_pct': 1.0,
+              'resistance_distance_pct': 4.0,
+          }
+          geometry = tps.derive_geometry(payload)
+          assert geometry['geometry_version'] == tps.GEOMETRY_VERSION
+          assert geometry['frozen_at_observation'] is True
+          print('GEOMETRY_VERSION', geometry['geometry_version'])
+          PY
       - name: Safety invariants
         run: |
           grep -q "default_scope': 'signals'" trade_outcome_runtime.py
@@ -34,3 +49,4 @@ jobs:
           grep -q '/api/outcomes/settlement-status' trade_outcome_runtime.py
           grep -q 'live_execution.*False' trade_outcome_runtime.py
           grep -q 'production_signal_qualified' trade_outcome_ledger.py
+          grep -q 'ATLAS_GEOMETRY_V3_STRUCTURAL_TP2_FROZEN_RR' trade_path_settlement.py
