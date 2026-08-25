@@ -6,7 +6,7 @@ the Quick shadow lane and adds an explicit 12-24h Swing research lane.
 
 import horizon_fit_policy
 
-VERSION = 'HORIZON_FIT_OVERLAY_V4_CLEAN_QUICK_STATE'
+VERSION = 'HORIZON_FIT_OVERLAY_V5_OBSTACLE_PRIORITY'
 
 
 def install(atlas):
@@ -22,6 +22,7 @@ def install(atlas):
         tactical = row.get('tactical_opportunity') or matrix.get('tactical_1_3h') or {}
         structural = row.get('structural_geometry') or {}
         breakout = structural.get('breakout') or {}
+        score_attr = row.get('score_attribution') or {}
 
         fit = horizon_fit_policy.classify(
             direction=row.get('candidate_direction'),
@@ -33,6 +34,7 @@ def install(atlas):
             breakout_confirmed=bool(breakout.get('confirmed')),
             production_qualified=bool(row.get('production_signal_qualified')),
             execution_ready=bool(row.get('execution_ready')),
+            obstacle_reason=score_attr.get('obstacle_reason'),
         )
 
         existing_quick = row.get('quick_trade_shadow') or {}
@@ -41,9 +43,6 @@ def install(atlas):
         guard_cleanup = None
         guard_approval = None
 
-        # The legacy decision layer may register a permissive shadow before this
-        # overlay runs. Approve it only when the strict policy independently
-        # agrees; otherwise cancel it immediately.
         if existing_quick.get('status') == 'QUICK_TRADE_SHADOW' and guard is not None:
             if strict_quick_allowed and hasattr(guard, 'approve_active_policy'):
                 guard_approval = guard.approve_active_policy(
@@ -58,9 +57,6 @@ def install(atlas):
                     reason='HORIZON_FIT_STRICT_QUICK_REJECTED',
                 )
 
-        # Migration: an ACTIVE record without the current strict policy stamp was
-        # created before Horizon Fit became authoritative. Reject it once instead
-        # of preserving a contradictory legacy Quick state until TTL expiry.
         legacy_active_rejected = False
         if existing_quick.get('status') == 'QUICK_TRADE_ACTIVE' and guard is not None and hasattr(guard, 'reject_legacy_active'):
             guard_cleanup = guard.reject_legacy_active(
@@ -80,15 +76,10 @@ def install(atlas):
             strict_quick['policy_version'] = horizon_fit_policy.VERSION
             strict_quick['evaluation_horizons'] = ['1h', '3h']
         elif strict_quick_allowed and existing_quick.get('status') == 'QUICK_TRADE_SHADOW':
-            # A newly strict-approved Quick signal keeps its actual research
-            # geometry so it can be evaluated at 1h/3h.
             strict_quick = dict(existing_quick)
             strict_quick.update(fit['quick'])
             strict_quick['policy_version'] = horizon_fit_policy.VERSION
         else:
-            # WATCH/NO_SETUP must be a clean classification, not a cancelled
-            # trade-shaped object. Do not leak stale entry/SL/TP/TTL fields from
-            # a legacy ACTIVE signal into the final decision or UI.
             strict_quick = dict(fit['quick'])
             strict_quick['policy_version'] = horizon_fit_policy.VERSION
 
@@ -130,5 +121,6 @@ def install(atlas):
         'legacy_quick_guard_cleanup': True,
         'legacy_active_state_migration': True,
         'clean_watch_state': True,
+        'obstacle_calibrated_swing_priority': True,
     }
     return atlas.HORIZON_FIT_STATE
