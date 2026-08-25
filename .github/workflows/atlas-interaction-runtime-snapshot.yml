@@ -37,15 +37,23 @@ jobs:
           set -euo pipefail
           mkdir -p status/history
           tmp="status/interaction-validation-latest.json.tmp"
-          code="$(curl -L --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 20 --max-time 120 -sS -w '%{http_code}' -o "$tmp" "${BASE_URL}/api/research/interaction-status")"
-          if [[ ! "$code" =~ ^2 ]]; then
-            echo "Interaction status endpoint HTTP $code" >&2
+          ok=0
+          for attempt in $(seq 1 16); do
+            code="$(curl -L --connect-timeout 20 --max-time 60 -sS -w '%{http_code}' -o "$tmp" "${BASE_URL}/api/research/interaction-status" || true)"
+            if [[ "$code" =~ ^2 ]] && jq -e . "$tmp" >/dev/null 2>&1 && \
+               jq -e '.research_only == true and .live_execution == false and .cached_only == true and .version == "INTERACTION_STATUS_API_V1_CACHED_READ_ONLY"' "$tmp" >/dev/null 2>&1; then
+              ok=1
+              break
+            fi
+            echo "Waiting for deployed interaction status contract (attempt ${attempt}/16, HTTP ${code:-none})"
+            sleep 15
+          done
+          if [[ "$ok" != "1" ]]; then
+            echo "Interaction status endpoint did not reach the required cached/read-only contract within the deployment grace period." >&2
+            echo "Last HTTP code: ${code:-none}" >&2
             cat "$tmp" >&2 || true
             exit 1
           fi
-          jq -e . "$tmp" >/dev/null
-          # Safety contract: the endpoint must remain cached/read-only research state.
-          jq -e '.research_only == true and .live_execution == false and .cached_only == true' "$tmp" >/dev/null
           mv "$tmp" status/interaction-validation-latest.json
           python3 - <<'PY'
           import json, pathlib, datetime
