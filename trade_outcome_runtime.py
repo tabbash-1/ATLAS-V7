@@ -5,6 +5,7 @@ import threading
 import time
 import urllib.parse
 
+import execution_outcome_scope
 import trade_outcome_ledger
 import trade_path_settlement
 
@@ -85,7 +86,8 @@ def install(collector):
         'last_settlement_finished_at': None,
         'last_settlement_error': None,
         'last_error': None,
-        'signal_scope_semantics': 'PRODUCTION_QUALIFIED_ONLY',
+        'signal_scope_semantics': 'PRODUCTION_SCORE_QUALIFIED',
+        'execution_scope_semantics': 'PRODUCTION_SCORE_QUALIFIED_PLUS_VALID_GEOMETRY_RR_GTE_1',
     }
     settlement_lock = threading.Lock()
 
@@ -108,7 +110,6 @@ def install(collector):
             settlement_lock.release()
 
     def settlement_loop():
-        # Give boot/deploy a short head start, then independently mature outcomes.
         time.sleep(15)
         while True:
             settle_once()
@@ -136,16 +137,13 @@ def install(collector):
         state['requests'] += 1
         try:
             q = urllib.parse.parse_qs(u.query)
-            scope = q.get('scope', ['signals'])[0]
+            scope = str(q.get('scope', ['signals'])[0]).lower()
             symbol = q.get('symbol', [None])[0]
 
             if u.path == '/api/outcomes/settlement-status':
                 payload = {'schema': 'ATLAS_OUTCOME_SETTLEMENT_STATUS_V1', **state, 'research_only': True, 'live_execution': False}
                 return self._json(payload)
 
-            # Outcome reads are self-healing: before reporting OPEN rows, retry
-            # any matured forward labels. This removes the old dependency on the
-            # hourly cloud-forward cycle and prevents day-old signals staying OPEN.
             settle_once()
             rows = collector.read_forward()
 
@@ -154,16 +152,21 @@ def install(collector):
                 geometry_map = trade_path_settlement.geometry_by_forward_id(collector)
                 signal_rows = [x for x in rows if trade_outcome_ledger.is_production_signal(x)]
                 linked_signals = sum(1 for x in signal_rows if str(x.get('id') or '') in geometry_map)
+                execution_rows, rejected = execution_outcome_scope.filter_execution_rows(signal_rows, geometry_map)
                 research_champions = [x for x in rows if trade_outcome_ledger.is_research_champion(x)]
                 payload = {
-                    'schema': 'ATLAS_TRADE_GEOMETRY_STATUS_V1',
+                    'schema': 'ATLAS_TRADE_GEOMETRY_STATUS_V2_EXECUTION_SCOPE',
                     'archive_rows': len(geometry_rows),
                     'production_signal_forward_rows': len(signal_rows),
+                    'execution_qualified_forward_rows': len(execution_rows),
+                    'execution_rejected_forward_rows': len(rejected),
+                    'execution_rejection_summary': execution_outcome_scope.rejection_summary(rejected),
                     'research_champion_forward_rows': len(research_champions),
                     'signal_forward_rows': len(signal_rows),
                     'signal_rows_with_frozen_geometry': linked_signals,
                     'signal_geometry_coverage_pct': round(100 * linked_signals / len(signal_rows), 2) if signal_rows else None,
-                    'signal_scope_semantics': 'PRODUCTION_QUALIFIED_ONLY',
+                    'signal_scope_semantics': 'PRODUCTION_SCORE_QUALIFIED',
+                    'execution_scope_semantics': 'PRODUCTION_SCORE_QUALIFIED_PLUS_VALID_GEOMETRY_RR_GTE_1',
                     'freezer': getattr(collector, 'TRADE_GEOMETRY_FREEZER_STATE', {}),
                     'research_only': True,
                     'live_execution': False,
@@ -172,30 +175,42 @@ def install(collector):
                 state['path_requests'] += 1
                 limit = int(q.get('limit', ['100'])[0])
                 geometry_map = trade_path_settlement.geometry_by_forward_id(collector)
-                selected_rows = scoped_rows(rows, scope)
-                items = trade_path_settlement.build_path_ledger(selected_rows, geometry_map, scope='all', symbol=symbol, limit=limit)
+                rejected = []
+                if scope == 'execution':
+                    selected_rows, rejected = execution_outcome_scope.filter_execution_rows(rows, geometry_map, symbol=symbol)
+                    items = trade_path_settlement.build_path_ledger(selected_rows, geometry_map, scope='all', symbol=symbol, limit=limit)
+                    items = [execution_outcome_scope.annotate_settled_item(x) for x in items]
+                    scope_semantics = 'PRODUCTION_SCORE_QUALIFIED_PLUS_VALID_GEOMETRY_RR_GTE_1'
+                else:
+                    selected_rows = scoped_rows(rows, scope)
+                    items = trade_path_settlement.build_path_ledger(selected_rows, geometry_map, scope='all', symbol=symbol, limit=limit)
+                    scope_semantics = 'PRODUCTION_SCORE_QUALIFIED' if scope == 'signals' else None
                 if u.path == '/api/outcomes/path-summary':
                     payload = {
-                        'schema': 'ATLAS_TRADE_PATH_SUMMARY_V1',
+                        'schema': 'ATLAS_TRADE_PATH_SUMMARY_V2_EXECUTION_SCOPE',
                         'scope': scope,
                         'symbol': symbol,
-                        'signal_scope_semantics': 'PRODUCTION_QUALIFIED_ONLY' if scope == 'signals' else None,
+                        'signal_scope_semantics': scope_semantics,
                         'overall': trade_path_settlement.summarize_path(items),
-                        'methodology': 'Frozen SL/TP geometry settled from post-entry 5m candles; same-candle SL/TP conflicts are refined with 1m candles and remain ambiguous if order is still unknowable.',
+                        'execution_rejection_summary': execution_outcome_scope.rejection_summary(rejected) if scope == 'execution' else None,
+                        'methodology': 'Frozen SL/TP geometry settled from post-entry 5m candles; same-candle SL/TP conflicts are refined with 1m candles and remain ambiguous if order is still unknowable. execution scope requires score qualification plus valid directional geometry and R:R >= 1.0.',
                         'research_only': True,
                         'live_execution': False,
                     }
                 else:
                     payload = {
-                        'schema': 'ATLAS_TRADE_PATH_LEDGER_V1',
+                        'schema': 'ATLAS_TRADE_PATH_LEDGER_V2_EXECUTION_SCOPE',
                         'scope': scope,
                         'symbol': symbol,
-                        'signal_scope_semantics': 'PRODUCTION_QUALIFIED_ONLY' if scope == 'signals' else None,
+                        'signal_scope_semantics': scope_semantics,
                         'rows': items,
+                        'execution_rejection_summary': execution_outcome_scope.rejection_summary(rejected) if scope == 'execution' else None,
                         'research_only': True,
                         'live_execution': False,
                     }
             else:
+                if scope == 'execution':
+                    raise ValueError('execution scope is available on path-ledger, path-summary and geometry-status; forward-return ledger has no frozen geometry')
                 horizon = int(q.get('horizon', ['24'])[0])
                 if u.path == '/api/outcomes/summary':
                     payload = trade_outcome_ledger.summarize(rows, horizon=horizon, scope=scope)
