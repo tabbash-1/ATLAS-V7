@@ -6,7 +6,7 @@ the Quick shadow lane and adds an explicit 12-24h Swing research lane.
 
 import horizon_fit_policy
 
-VERSION = 'HORIZON_FIT_OVERLAY_V6_COMBO_SWING_QUALITY'
+VERSION = 'HORIZON_FIT_OVERLAY_V7_PROVISIONAL_EPISODE_QUALITY'
 
 
 def install(atlas):
@@ -125,5 +125,7 @@ def install(atlas):
         'legacy_active_state_migration': True,
         'clean_watch_state': True,
         'combo_calibrated_swing_quality': True,
+        'independent_episode_validation_required': True,
+        'quality_labels_provisional': True,
     }
     return atlas.HORIZON_FIT_STATE
