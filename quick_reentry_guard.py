@@ -130,3 +130,22 @@ class QuickReentryGuard:
             self.state.setdefault('signals', {})[key] = rec
             self._save()
         return dict(rec)
+
+    def cancel_active(self, symbol, direction, reason='POLICY_REJECTED', now=None):
+        """Cancel a just-registered research signal rejected by a stricter policy.
+
+        This is intentionally limited to ACTIVE records. It does not erase stop
+        history or cooldown state and never affects Production decisions.
+        """
+        now = float(now if now is not None else time.time())
+        direction = str(direction or '').upper()
+        key = self._key(symbol, direction)
+        with self.lock:
+            rec = (self.state.get('signals') or {}).get(key)
+            if not isinstance(rec, dict) or str(rec.get('status') or '').upper() != 'ACTIVE':
+                return {'cancelled': False, 'reason': 'NO_ACTIVE_SIGNAL'}
+            rec['status'] = 'POLICY_REJECTED'
+            rec['policy_rejected_at'] = now
+            rec['policy_rejection_reason'] = str(reason)
+            self._save()
+            return {'cancelled': True, 'record': dict(rec)}
