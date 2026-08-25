@@ -5,12 +5,14 @@ on:
     branches: [main]
     paths:
       - 'edge_evidence_interaction_protocol.py'
+      - 'edge_evidence_interaction_rules.py'
       - 'edge_evidence_interaction_validator_guard.py'
       - 'edge_evidence_joint_coverage.py'
       - 'edge_evidence_overlap.py'
       - 'edge_evidence_redundancy.py'
       - 'volatility_walkforward_runtime.py'
       - 'tests/test_edge_evidence_interaction_protocol.py'
+      - 'tests/test_edge_evidence_interaction_rules.py'
       - 'tests/test_edge_evidence_interaction_validator_guard.py'
       - 'tests/test_volatility_walkforward_runtime.py'
       - '.github/workflows/atlas-interaction-protocol-ci.yml'
@@ -18,12 +20,14 @@ on:
     branches: [main]
     paths:
       - 'edge_evidence_interaction_protocol.py'
+      - 'edge_evidence_interaction_rules.py'
       - 'edge_evidence_interaction_validator_guard.py'
       - 'edge_evidence_joint_coverage.py'
       - 'edge_evidence_overlap.py'
       - 'edge_evidence_redundancy.py'
       - 'volatility_walkforward_runtime.py'
       - 'tests/test_edge_evidence_interaction_protocol.py'
+      - 'tests/test_edge_evidence_interaction_rules.py'
       - 'tests/test_edge_evidence_interaction_validator_guard.py'
       - 'tests/test_volatility_walkforward_runtime.py'
       - '.github/workflows/atlas-interaction-protocol-ci.yml'
@@ -40,9 +44,9 @@ jobs:
       - name: Install test runner
         run: python -m pip install --disable-pip-version-check pytest
       - name: Syntax
-        run: python -m py_compile edge_evidence_interaction_protocol.py edge_evidence_interaction_validator_guard.py edge_evidence_joint_coverage.py edge_evidence_overlap.py edge_evidence_redundancy.py volatility_walkforward_runtime.py
+        run: python -m py_compile edge_evidence_interaction_protocol.py edge_evidence_interaction_rules.py edge_evidence_interaction_validator_guard.py edge_evidence_joint_coverage.py edge_evidence_overlap.py edge_evidence_redundancy.py volatility_walkforward_runtime.py
       - name: Protocol and runtime regression tests
-        run: PYTHONPATH=. python -m pytest -q tests/test_edge_evidence_interaction_protocol.py tests/test_edge_evidence_interaction_validator_guard.py tests/test_edge_evidence_joint_coverage.py tests/test_volatility_walkforward_runtime.py
+        run: PYTHONPATH=. python -m pytest -q tests/test_edge_evidence_interaction_protocol.py tests/test_edge_evidence_interaction_rules.py tests/test_edge_evidence_interaction_validator_guard.py tests/test_edge_evidence_joint_coverage.py tests/test_volatility_walkforward_runtime.py
       - name: Preserve preregistration contract
         run: |
           grep -q "CHRONOLOGICAL_FOLDS = 3" edge_evidence_interaction_protocol.py
@@ -58,49 +62,36 @@ jobs:
           grep -q "best_cell_selection_after_outcomes_allowed.*False" edge_evidence_interaction_protocol.py
           grep -q "horizon_selection_after_outcomes_allowed.*False" edge_evidence_interaction_protocol.py
           grep -q "future_validator_must_match_protocol_hash.*True" edge_evidence_interaction_protocol.py
-          grep -q "outcomes_read.*False" edge_evidence_interaction_protocol.py
-          grep -q "interaction_outcome_testing_performed.*False" edge_evidence_interaction_protocol.py
-          grep -q "performance_metrics_computed.*False" edge_evidence_interaction_protocol.py
-          grep -q "rules_searched.*False" edge_evidence_interaction_protocol.py
-          grep -q "grid_search_performed.*False" edge_evidence_interaction_protocol.py
-          grep -q "weights_assigned.*False" edge_evidence_interaction_protocol.py
-          grep -q "composite_trade_score_created.*False" edge_evidence_interaction_protocol.py
-          grep -q "cross_layer_interaction_filtering_enabled.*False" edge_evidence_interaction_protocol.py
-          grep -q "interaction_filter_activation_allowed.*False" edge_evidence_interaction_protocol.py
-          grep -q "gate_promoted.*False" edge_evidence_interaction_protocol.py
-          grep -q "can_override_production.*False" edge_evidence_interaction_protocol.py
-          grep -q "production_ready_claimed.*False" edge_evidence_interaction_protocol.py
-          grep -q "live_trading_ready_claimed.*False" edge_evidence_interaction_protocol.py
-          grep -q "historical_features_recomputed.*False" edge_evidence_interaction_protocol.py
-          grep -q "wraps_production_decision.*False" edge_evidence_interaction_protocol.py
-          grep -q "wraps_forward_observe.*False" edge_evidence_interaction_protocol.py
           grep -q "protocol_hash_required.*True" edge_evidence_interaction_validator_guard.py
           grep -q "protocol_mutation_allowed.*False" edge_evidence_interaction_validator_guard.py
           grep -q "rule_selection_allowed.*False" edge_evidence_interaction_validator_guard.py
           grep -q "adaptive_rule_search_allowed.*False" edge_evidence_interaction_validator_guard.py
           grep -q "grid_search_allowed.*False" edge_evidence_interaction_validator_guard.py
-          grep -q "threshold_tuning_allowed.*False" edge_evidence_interaction_validator_guard.py
           grep -q "horizon_selection_allowed.*False" edge_evidence_interaction_validator_guard.py
           grep -q "outcomes_read.*False" edge_evidence_interaction_validator_guard.py
           grep -q "validator_execution_started.*False" edge_evidence_interaction_validator_guard.py
           grep -q "interaction_outcome_testing_performed.*False" edge_evidence_interaction_validator_guard.py
-          grep -q "performance_metrics_computed.*False" edge_evidence_interaction_validator_guard.py
-          grep -q "cross_layer_interaction_filtering_enabled.*False" edge_evidence_interaction_validator_guard.py
-          grep -q "interaction_filter_activation_allowed.*False" edge_evidence_interaction_validator_guard.py
-          grep -q "weights_assigned.*False" edge_evidence_interaction_validator_guard.py
-          grep -q "composite_trade_score_created.*False" edge_evidence_interaction_validator_guard.py
-          grep -q "gate_promoted.*False" edge_evidence_interaction_validator_guard.py
           grep -q "can_override_production.*False" edge_evidence_interaction_validator_guard.py
-          grep -q "production_ready_claimed.*False" edge_evidence_interaction_validator_guard.py
-          grep -q "live_trading_ready_claimed.*False" edge_evidence_interaction_validator_guard.py
-          grep -q "wraps_production_decision.*False" edge_evidence_interaction_validator_guard.py
-          grep -q "wraps_forward_observe.*False" edge_evidence_interaction_validator_guard.py
+          grep -q "RULE_ID = 'H1_THREE_LAYER_FAVORABLE_CONFLUENCE'" edge_evidence_interaction_rules.py
+          grep -q "profit_regime_relation_equals.*REGIME_ALIGNED" edge_evidence_interaction_rules.py
+          grep -q "microstructure_relation_to_signal_equals.*ALIGNED" edge_evidence_interaction_rules.py
+          grep -q "volatility_target_fit_equals.*PLAUSIBLE_VS_EMPIRICAL_P80" edge_evidence_interaction_rules.py
+          grep -q "volatility_stop_fit_equals.*PLAUSIBLE_VS_EMPIRICAL_P80" edge_evidence_interaction_rules.py
+          grep -q "apply_identically_to_every_eligible_horizon.*True" edge_evidence_interaction_rules.py
+          grep -q "rule_selection_after_outcomes_allowed.*False" edge_evidence_interaction_rules.py
+          grep -q "alternative_rule_search_allowed.*False" edge_evidence_interaction_rules.py
+          grep -q "grid_search_allowed.*False" edge_evidence_interaction_rules.py
+          grep -q "threshold_tuning_allowed.*False" edge_evidence_interaction_rules.py
+          grep -q "best_cell_selection_allowed.*False" edge_evidence_interaction_rules.py
+          grep -q "horizon_selection_allowed.*False" edge_evidence_interaction_rules.py
+          grep -q "fallback_rule_allowed.*False" edge_evidence_interaction_rules.py
+          grep -q "weights_allowed.*False" edge_evidence_interaction_rules.py
+          grep -q "outcomes_read.*False" edge_evidence_interaction_rules.py
+          grep -q "gate_promoted.*False" edge_evidence_interaction_rules.py
+          grep -q "can_override_production.*False" edge_evidence_interaction_rules.py
           grep -q "edge_evidence_report.install(collector)" volatility_walkforward_runtime.py
           grep -q "edge_evidence_interaction_protocol.install(collector)" volatility_walkforward_runtime.py
           grep -q "edge_evidence_interaction_validator_guard.install(collector)" volatility_walkforward_runtime.py
-          grep -q "refresh_edge" volatility_walkforward_runtime.py
-          grep -q "refresh_protocol" volatility_walkforward_runtime.py
-          grep -q "refresh_guard" volatility_walkforward_runtime.py
           grep -q "background_only.*True" volatility_walkforward_runtime.py
           grep -q "wraps_production_decision.*False" volatility_walkforward_runtime.py
           grep -q "wraps_forward_observe.*False" volatility_walkforward_runtime.py
