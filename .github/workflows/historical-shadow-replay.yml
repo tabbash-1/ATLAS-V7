@@ -44,7 +44,8 @@ jobs:
           assert x['schema'] == 'ATLAS_HISTORICAL_SHADOW_REPLAY_V1'
           assert x['production_threshold_changed'] is False
           print('PROGRESS', json.dumps(x['progress'], sort_keys=True))
-          print('24H', json.dumps(x['directional_forward_performance']['24h'], sort_keys=True))
+          for h in ('1h','3h','6h','12h','24h'):
+              print(h.upper(), json.dumps(x['directional_forward_performance'][h], sort_keys=True))
           print('SCORE_BANDS', json.dumps(x['by_score_band_24h'], sort_keys=True))
           print('TOP_BLOCKERS', json.dumps(x['directional_blocker_counts'], sort_keys=True))
           live=(x.get('live_execution_comparison') or {}).get('overall') or {}
@@ -52,7 +53,7 @@ jobs:
           PY
       - name: Commit replay report
         run: |
-          if git diff --quiet -- status/historical-shadow-replay.json; then
+          if [ -z "$(git status --porcelain -- status/historical-shadow-replay.json)" ]; then
             echo 'Replay report unchanged'
             exit 0
           fi
@@ -60,4 +61,5 @@ jobs:
           git config user.email 'atlas-replay-bot@users.noreply.github.com'
           git add status/historical-shadow-replay.json
           git commit -m 'Update historical shadow replay report'
+          git pull --rebase origin main
           git push
