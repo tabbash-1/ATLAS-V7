@@ -11,6 +11,10 @@ For every newly stored Production-qualified Forward row, the exact Profit Engine
 evidence available at observation time is frozen into a separate sidecar audit
 archive. Research rows are never written to this archive. This prevents hindsight
 bias when the Profit Engine is evaluated later.
+
+A background prequential walk-forward report later joins those frozen-at-signal
+observations to canonical TP/SL settlements. Historical regime/cost/probability
+inputs are never recomputed with future information.
 """
 
 from __future__ import annotations
@@ -25,12 +29,14 @@ import execution_cost_model
 import execution_outcome_scope
 import market_regime_engine
 import profit_engine
+import profit_engine_walkforward
 import trade_path_settlement
 
-VERSION = 'PROFIT_ENGINE_RUNTIME_V4_FROZEN_SIGNAL_EVIDENCE'
+VERSION = 'PROFIT_ENGINE_RUNTIME_V5_BACKGROUND_WALKFORWARD'
 CALIBRATION_REFRESH_SECONDS = 900
 COST_REFRESH_SECONDS = 120
 REGIME_REFRESH_SECONDS = 300
+WALKFORWARD_REFRESH_SECONDS = 900
 
 
 def _f(v, default=None):
@@ -64,11 +70,17 @@ def _derived_stop(payload):
     return entry - risk if direction == 'LONG' else entry + risk
 
 
-def build_path_calibration(collector):
+def _execution_settlements(collector):
+    """Canonical Production execution scope only; Research rows are rejected."""
     rows = collector.read_forward()
     geometry_map = trade_path_settlement.geometry_by_forward_id(collector)
     execution_rows, rejected = execution_outcome_scope.filter_execution_rows(rows, geometry_map)
     items = trade_path_settlement.build_path_ledger(execution_rows, geometry_map, scope='all', limit=500)
+    return items, execution_rows, rejected
+
+
+def build_path_calibration(collector):
+    items, execution_rows, rejected = _execution_settlements(collector)
     decisive = [x for x in items if x.get('path_outcome') in ('WIN_TP2', 'LOSS')]
     wins = sum(1 for x in decisive if x.get('path_outcome') == 'WIN_TP2')
     losses = sum(1 for x in decisive if x.get('path_outcome') == 'LOSS')
@@ -93,6 +105,18 @@ def build_path_calibration(collector):
     }
 
 
+def build_walkforward_report(collector, observation_file):
+    """Evaluate only evidence frozen before outcomes were known."""
+    observations = profit_engine_walkforward.read_observations(observation_file)
+    settlements, execution_rows, rejected = _execution_settlements(collector)
+    report = profit_engine_walkforward.report(observations, settlements)
+    report['canonical_execution_rows'] = len(execution_rows)
+    report['canonical_execution_rejected_rows'] = len(rejected)
+    report['observation_archive'] = str(observation_file)
+    report['runtime_version'] = VERSION
+    return report
+
+
 def install(collector):
     if getattr(collector, '_PROFIT_ENGINE_RUNTIME_INSTALLED', False):
         return getattr(collector, 'PROFIT_ENGINE_RUNTIME_STATE', {})
@@ -102,13 +126,14 @@ def install(collector):
     symbols = tuple(getattr(collector, 'ON_DEMAND_SYMBOLS', ()) or ())
     data_dir = Path(getattr(collector, 'DATA', Path('.')))
     observation_file = data_dir / 'profit_engine_observations.jsonl'
+    existing_frozen = len(profit_engine_walkforward.read_observations(observation_file))
     state = {
         'enabled': True,
         'version': VERSION,
         'shadow_only': True,
         'can_override_production': False,
         'observation_archive': str(observation_file),
-        'frozen_signal_observations': 0,
+        'frozen_signal_observations': existing_frozen,
         'research_observations_included': 0,
         'calibration': {
             'calibrated': False,
@@ -119,18 +144,32 @@ def install(collector):
         },
         'execution_cost_by_symbol': {},
         'market_regime_by_symbol': {},
+        'walk_forward_report': {
+            'version': profit_engine_walkforward.VERSION,
+            'status': 'COLLECTING',
+            'improves_production_expectancy': False,
+            'blockers': ['WAITING_FOR_BACKGROUND_WALK_FORWARD_REFRESH'],
+            'frozen_observations': existing_frozen,
+            'research_samples_included': False,
+            'shadow_only': True,
+            'can_override_production': False,
+        },
         'calibration_refreshes': 0,
         'cost_refreshes': 0,
         'regime_refreshes': 0,
+        'walkforward_refreshes': 0,
         'last_calibration_started_at': None,
         'last_calibration_finished_at': None,
         'last_cost_started_at': None,
         'last_cost_finished_at': None,
         'last_regime_started_at': None,
         'last_regime_finished_at': None,
+        'last_walkforward_started_at': None,
+        'last_walkforward_finished_at': None,
         'last_error': None,
         'last_cost_errors': {},
         'last_regime_errors': {},
+        'last_walkforward_error': None,
     }
     lock = threading.RLock()
     observation_lock = threading.RLock()
@@ -217,6 +256,33 @@ def install(collector):
         state['last_regime_finished_at'] = collector.now_iso() if hasattr(collector, 'now_iso') else None
         return results
 
+    def refresh_walkforward():
+        state['last_walkforward_started_at'] = collector.now_iso() if hasattr(collector, 'now_iso') else None
+        try:
+            result = build_walkforward_report(collector, observation_file)
+            with lock:
+                state['walk_forward_report'] = result
+                state['walkforward_refreshes'] += 1
+                state['last_walkforward_error'] = None
+            return result
+        except Exception as exc:
+            error = f'{type(exc).__name__}: {exc}'
+            with lock:
+                state['last_walkforward_error'] = error
+                state['walk_forward_report'] = {
+                    'version': profit_engine_walkforward.VERSION,
+                    'status': 'UNAVAILABLE',
+                    'improves_production_expectancy': False,
+                    'blockers': ['WALK_FORWARD_REFRESH_ERROR'],
+                    'error': error,
+                    'research_samples_included': False,
+                    'shadow_only': True,
+                    'can_override_production': False,
+                }
+            return None
+        finally:
+            state['last_walkforward_finished_at'] = collector.now_iso() if hasattr(collector, 'now_iso') else None
+
     def cached_evidence(normalized):
         with lock:
             calibration = dict(state.get('calibration') or {})
@@ -262,6 +328,14 @@ def install(collector):
         while True:
             refresh_market_regimes()
             time.sleep(REGIME_REFRESH_SECONDS)
+
+    def walkforward_loop():
+        # Run after calibration and market-data warmup so path settlement can use
+        # normal caches/circuit breakers rather than competing with boot traffic.
+        time.sleep(35)
+        while True:
+            refresh_walkforward()
+            time.sleep(WALKFORWARD_REFRESH_SECONDS)
 
     def production_decision_with_profit_shadow(symbol):
         decision = original_decision(symbol)
@@ -340,8 +414,10 @@ def install(collector):
     collector.profit_engine_refresh_calibration = refresh_calibration
     collector.profit_engine_refresh_execution_costs = refresh_execution_costs
     collector.profit_engine_refresh_market_regimes = refresh_market_regimes
+    collector.profit_engine_refresh_walkforward = refresh_walkforward
     collector._PROFIT_ENGINE_RUNTIME_INSTALLED = True
     threading.Thread(target=calibration_loop, daemon=True, name='atlas-profit-calibration').start()
     threading.Thread(target=cost_loop, daemon=True, name='atlas-profit-costs').start()
     threading.Thread(target=regime_loop, daemon=True, name='atlas-market-regime').start()
+    threading.Thread(target=walkforward_loop, daemon=True, name='atlas-profit-walkforward').start()
     return state
