@@ -1,0 +1,68 @@
+name: ATLAS Interaction Protocol CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'edge_evidence_interaction_protocol.py'
+      - 'edge_evidence_joint_coverage.py'
+      - 'edge_evidence_overlap.py'
+      - 'edge_evidence_redundancy.py'
+      - 'tests/test_edge_evidence_interaction_protocol.py'
+      - '.github/workflows/atlas-interaction-protocol-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'edge_evidence_interaction_protocol.py'
+      - 'edge_evidence_joint_coverage.py'
+      - 'edge_evidence_overlap.py'
+      - 'edge_evidence_redundancy.py'
+      - 'tests/test_edge_evidence_interaction_protocol.py'
+      - '.github/workflows/atlas-interaction-protocol-ci.yml'
+
+jobs:
+  preregistration-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test runner
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Syntax
+        run: python -m py_compile edge_evidence_interaction_protocol.py edge_evidence_joint_coverage.py edge_evidence_overlap.py edge_evidence_redundancy.py
+      - name: Protocol regression tests
+        run: PYTHONPATH=. python -m pytest -q tests/test_edge_evidence_interaction_protocol.py tests/test_edge_evidence_joint_coverage.py
+      - name: Preserve preregistration contract
+        run: |
+          grep -q "CHRONOLOGICAL_FOLDS = 3" edge_evidence_interaction_protocol.py
+          grep -q "MIN_TOTAL_SETTLED = 60" edge_evidence_interaction_protocol.py
+          grep -q "MIN_CELL_SETTLED_PER_FOLD = 5" edge_evidence_interaction_protocol.py
+          grep -q "MIN_TOTAL_SETTLED_PER_CELL = 20" edge_evidence_interaction_protocol.py
+          grep -q "all_eligible_horizons_must_be_reported_separately.*True" edge_evidence_interaction_protocol.py
+          grep -q "single_horizon_selection_allowed.*False" edge_evidence_interaction_protocol.py
+          grep -q "chosen_trade_horizon_assumed.*False" edge_evidence_interaction_protocol.py
+          grep -q "adaptive_rule_search_allowed.*False" edge_evidence_interaction_protocol.py
+          grep -q "grid_search_allowed.*False" edge_evidence_interaction_protocol.py
+          grep -q "threshold_tuning_after_outcomes_allowed.*False" edge_evidence_interaction_protocol.py
+          grep -q "best_cell_selection_after_outcomes_allowed.*False" edge_evidence_interaction_protocol.py
+          grep -q "horizon_selection_after_outcomes_allowed.*False" edge_evidence_interaction_protocol.py
+          grep -q "future_validator_must_match_protocol_hash.*True" edge_evidence_interaction_protocol.py
+          grep -q "outcomes_read.*False" edge_evidence_interaction_protocol.py
+          grep -q "interaction_outcome_testing_performed.*False" edge_evidence_interaction_protocol.py
+          grep -q "performance_metrics_computed.*False" edge_evidence_interaction_protocol.py
+          grep -q "rules_searched.*False" edge_evidence_interaction_protocol.py
+          grep -q "grid_search_performed.*False" edge_evidence_interaction_protocol.py
+          grep -q "weights_assigned.*False" edge_evidence_interaction_protocol.py
+          grep -q "composite_trade_score_created.*False" edge_evidence_interaction_protocol.py
+          grep -q "cross_layer_interaction_filtering_enabled.*False" edge_evidence_interaction_protocol.py
+          grep -q "interaction_filter_activation_allowed.*False" edge_evidence_interaction_protocol.py
+          grep -q "gate_promoted.*False" edge_evidence_interaction_protocol.py
+          grep -q "can_override_production.*False" edge_evidence_interaction_protocol.py
+          grep -q "production_ready_claimed.*False" edge_evidence_interaction_protocol.py
+          grep -q "live_trading_ready_claimed.*False" edge_evidence_interaction_protocol.py
+          grep -q "historical_features_recomputed.*False" edge_evidence_interaction_protocol.py
+          grep -q "wraps_production_decision.*False" edge_evidence_interaction_protocol.py
+          grep -q "wraps_forward_observe.*False" edge_evidence_interaction_protocol.py
