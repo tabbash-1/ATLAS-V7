@@ -21,6 +21,7 @@ def _decision():
         'opportunity_state': 'WATCH',
         'risk_reward': 2.0,
         'actionable_decision': 'WAIT',
+        'score_attribution': {'obstacle_reason': 'VERY_CLOSE_PRIOR_STRUCTURE'},
         'tactical_opportunity': {'risk_reward': 2.0},
         'structural_geometry': {'breakout': {'confirmed': False}},
         'quick_trade_shadow': {
@@ -47,7 +48,7 @@ def test_overlay_rejects_unversioned_legacy_active_and_cleans_geometry():
         horizon_fit_overlay.install(atlas)
         out = atlas.production_decision('BTCUSDT')
         q = out['quick_trade_shadow']
-        assert out['horizon_fit_overlay_version'] == 'HORIZON_FIT_OVERLAY_V4_CLEAN_QUICK_STATE'
+        assert out['horizon_fit_overlay_version'] == 'HORIZON_FIT_OVERLAY_V5_OBSTACLE_PRIORITY'
         assert q['status'] == 'WATCH_ONLY'
         assert q['legacy_guard_cleanup']['cancelled'] is True
         for stale in ('entry', 'stop_loss', 'target', 'risk_reward', 'active_remaining_seconds'):
@@ -76,7 +77,21 @@ def test_overlay_preserves_current_policy_active():
         assert cleanup['reason'] == 'POLICY_VERSION_CURRENT'
 
 
+def test_overlay_marks_very_close_60_67_as_swing_research_priority_only():
+    d = _decision()
+    d['score_attribution'] = {'obstacle_reason': 'VERY_CLOSE'}
+    atlas = SimpleNamespace(production_decision=lambda symbol: d, QUICK_REENTRY_GUARD=None)
+    horizon_fit_overlay.install(atlas)
+    out = atlas.production_decision('BTCUSDT')
+    assert out['swing_research']['status'] == 'SWING_RESEARCH_PRIORITY'
+    assert out['swing_research']['research_priority'] is True
+    assert out['swing_research']['production_qualified'] is False
+    assert out['swing_research']['can_override_production'] is False
+    assert out['swing_research']['production_score_adjustment'] == 0
+
+
 if __name__ == '__main__':
     test_overlay_rejects_unversioned_legacy_active_and_cleans_geometry()
     test_overlay_preserves_current_policy_active()
+    test_overlay_marks_very_close_60_67_as_swing_research_priority_only()
     print('horizon fit overlay migration tests: ok')
