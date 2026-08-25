@@ -14,6 +14,8 @@ on:
       - 'edge_evidence_overlap.py'
       - 'edge_evidence_redundancy.py'
       - 'edge_evidence_joint_coverage.py'
+      - 'edge_evidence_interaction_protocol.py'
+      - 'edge_evidence_interaction_validator_guard.py'
       - 'edge_evidence_report.py'
       - 'tests/test_microstructure_memory.py'
       - 'tests/test_microstructure_walkforward.py'
@@ -26,8 +28,11 @@ on:
       - 'tests/test_edge_evidence_redundancy.py'
       - 'tests/test_edge_evidence_joint_coverage.py'
       - 'tests/test_edge_evidence_joint_governance.py'
+      - 'tests/test_edge_evidence_interaction_protocol.py'
+      - 'tests/test_edge_evidence_interaction_validator_guard.py'
       - 'tests/test_edge_evidence_report.py'
       - '.github/workflows/atlas-shadow-engines-ci.yml'
+      - '.github/workflows/atlas-interaction-protocol-ci.yml'
       - 'cloud_start.py'
   pull_request:
     branches: [main]
@@ -42,6 +47,8 @@ on:
       - 'edge_evidence_overlap.py'
       - 'edge_evidence_redundancy.py'
       - 'edge_evidence_joint_coverage.py'
+      - 'edge_evidence_interaction_protocol.py'
+      - 'edge_evidence_interaction_validator_guard.py'
       - 'edge_evidence_report.py'
       - 'tests/test_microstructure_memory.py'
       - 'tests/test_microstructure_walkforward.py'
@@ -54,8 +61,11 @@ on:
       - 'tests/test_edge_evidence_redundancy.py'
       - 'tests/test_edge_evidence_joint_coverage.py'
       - 'tests/test_edge_evidence_joint_governance.py'
+      - 'tests/test_edge_evidence_interaction_protocol.py'
+      - 'tests/test_edge_evidence_interaction_validator_guard.py'
       - 'tests/test_edge_evidence_report.py'
       - '.github/workflows/atlas-shadow-engines-ci.yml'
+      - '.github/workflows/atlas-interaction-protocol-ci.yml'
       - 'cloud_start.py'
 
 jobs:
@@ -71,7 +81,7 @@ jobs:
         run: python -m pip install --disable-pip-version-check pytest
       - name: Syntax
         run: |
-          python -m py_compile microstructure_memory.py microstructure_walkforward.py microstructure_runtime.py volatility_forecast_engine.py volatility_walkforward.py volatility_runtime.py volatility_walkforward_runtime.py edge_evidence_overlap.py edge_evidence_redundancy.py edge_evidence_joint_coverage.py edge_evidence_report.py
+          python -m py_compile microstructure_memory.py microstructure_walkforward.py microstructure_runtime.py volatility_forecast_engine.py volatility_walkforward.py volatility_runtime.py volatility_walkforward_runtime.py edge_evidence_overlap.py edge_evidence_redundancy.py edge_evidence_joint_coverage.py edge_evidence_interaction_protocol.py edge_evidence_interaction_validator_guard.py edge_evidence_report.py
       - name: Shadow engine regression tests
         run: |
           PYTHONPATH=. python -m pytest -q \
@@ -86,6 +96,8 @@ jobs:
             tests/test_edge_evidence_redundancy.py \
             tests/test_edge_evidence_joint_coverage.py \
             tests/test_edge_evidence_joint_governance.py \
+            tests/test_edge_evidence_interaction_protocol.py \
+            tests/test_edge_evidence_interaction_validator_guard.py \
             tests/test_edge_evidence_report.py
       - name: Preserve shadow-only contract
         run: |
@@ -141,6 +153,22 @@ jobs:
           grep -q "chosen_trade_horizon_assumed.*False" edge_evidence_joint_coverage.py
           grep -q "wraps_production_decision.*False" edge_evidence_joint_coverage.py
           grep -q "wraps_forward_observe.*False" edge_evidence_joint_coverage.py
+          grep -q "outcomes_read.*False" edge_evidence_interaction_protocol.py
+          grep -q "interaction_outcome_testing_performed.*False" edge_evidence_interaction_protocol.py
+          grep -q "grid_search_performed.*False" edge_evidence_interaction_protocol.py
+          grep -q "cross_layer_interaction_filtering_enabled.*False" edge_evidence_interaction_protocol.py
+          grep -q "interaction_filter_activation_allowed.*False" edge_evidence_interaction_protocol.py
+          grep -q "gate_promoted.*False" edge_evidence_interaction_protocol.py
+          grep -q "can_override_production.*False" edge_evidence_interaction_protocol.py
+          grep -q "protocol_hash_required.*True" edge_evidence_interaction_validator_guard.py
+          grep -q "outcomes_read.*False" edge_evidence_interaction_validator_guard.py
+          grep -q "validator_execution_started.*False" edge_evidence_interaction_validator_guard.py
+          grep -q "interaction_outcome_testing_performed.*False" edge_evidence_interaction_validator_guard.py
+          grep -q "grid_search_allowed.*False" edge_evidence_interaction_validator_guard.py
+          grep -q "cross_layer_interaction_filtering_enabled.*False" edge_evidence_interaction_validator_guard.py
+          grep -q "interaction_filter_activation_allowed.*False" edge_evidence_interaction_validator_guard.py
+          grep -q "gate_promoted.*False" edge_evidence_interaction_validator_guard.py
+          grep -q "can_override_production.*False" edge_evidence_interaction_validator_guard.py
           grep -q "weights_assigned.*False" edge_evidence_report.py
           grep -q "composite_trade_score_created.*False" edge_evidence_report.py
           grep -q "cross_layer_interaction_filtering_enabled.*False" edge_evidence_report.py
@@ -157,6 +185,8 @@ jobs:
           grep -q "joint_coverage_diagnostic_affects_status.*False" edge_evidence_report.py
           grep -q "interaction_validation_started.*False" edge_evidence_report.py
           grep -q 'edge_evidence_report.install(collector)' volatility_walkforward_runtime.py
+          grep -q 'edge_evidence_interaction_protocol.install(collector)' volatility_walkforward_runtime.py
+          grep -q 'edge_evidence_interaction_validator_guard.install(collector)' volatility_walkforward_runtime.py
           grep -q '_install_profit_engine_runtime' cloud_start.py
           grep -q '_install_microstructure_runtime' cloud_start.py
           grep -q '_install_volatility_runtime' cloud_start.py
