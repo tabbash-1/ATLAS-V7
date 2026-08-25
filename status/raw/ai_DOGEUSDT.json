@@ -3,52 +3,94 @@
   "mode": "SHADOW_RESEARCH_ONLY",
   "symbol": "DOGEUSDT",
   "horizon": "1-3H",
-  "generated_at": "2026-08-25T11:41:33.083748+00:00",
-  "entry": 0.09061,
+  "generated_at": "2026-08-25T13:12:47.265298+00:00",
+  "entry": 0.08956,
   "direction": "SHORT",
-  "verdict": "WATCH",
-  "confidence": 64,
-  "reason": "PARTIAL_CONVERGENCE",
+  "verdict": "REJECT",
+  "confidence": 68,
+  "reason": "RISK_GEOMETRY_FAIL",
   "canonical_action": {
-    "status": "WAIT",
-    "action": "WAIT",
-    "direction": null,
+    "status": "CONDITIONAL",
+    "action": "SELL_ONLY_IF",
+    "direction": "SHORT",
+    "entry_mode": "BREAKOUT",
+    "entry": 0.0890823571,
+    "stop_loss": 0.0901673214,
+    "tp1": 0.0879973929,
+    "tp2": 0.0867847857,
+    "rr_tp1": 1.0,
+    "rr_tp2": 2.118,
+    "entry_trigger": "Sell only after 1H close/hold below 0.08921.",
     "source": "production_trade_plan"
   },
   "bull_analyst": {
-    "score": -0.316,
+    "score": -0.406,
     "best_case": [
-      "RSI14 52.3"
+      "trend_base +68.00",
+      "Tactical RR 0.36",
+      "relative_strength_adjustment +6.00",
+      "Validated futures score 23.0"
     ]
   },
   "bear_analyst": {
-    "score": 0.316,
+    "score": 0.406,
     "best_case": [
-      "Price/EMA20/EMA50 structure 0.09061/0.0910639/0.0910131",
-      "RV 0.27x",
-      "24h momentum -1.76%"
+      "LONG 0 vs SHORT 4",
+      "Price/EMA20/EMA50 structure 0.08956/0.0908043/0.0909155",
+      "RS 30.5",
+      "RV 0.14x",
+      "obstacle_adjustment -8.00"
     ]
   },
   "judge": {
-    "net_strength": 0.316,
-    "tactical_rr": null,
+    "net_strength": 0.406,
+    "tactical_rr": 0.359,
     "canonical_trade_plan": {
-      "status": "WAIT",
-      "direction": null,
-      "entry_mode": "NONE",
-      "reason": "NO_DIRECTIONAL_CONSENSUS",
-      "version": "PRODUCTION_TRADE_PLAN_V1"
+      "version": "PRODUCTION_TRADE_PLAN_V1",
+      "status": "CONDITIONAL",
+      "action": "SELL_ONLY_IF",
+      "direction": "SHORT",
+      "entry_mode": "BREAKOUT",
+      "entry": 0.0890823571,
+      "entry_trigger": "Sell only after 1H close/hold below 0.08921.",
+      "stop_loss": 0.0901673214,
+      "tp1": 0.0879973929,
+      "tp2": 0.0867847857,
+      "rr_tp1": 1.0,
+      "rr_tp2": 2.118,
+      "reference_structure": 0.08921,
+      "continuation_strong": false,
+      "breakout_confirmed": false,
+      "qualification_required": 68,
+      "production_qualified": false,
+      "execution_ready": false,
+      "invalidation": "Cancel/re-evaluate if stop/structure fails or verified direction changes.",
+      "can_execute": false,
+      "research_only": true
     },
     "invalidation": "Production trade_plan is canonical while actionable."
   },
   "counterfactuals": [
     {
+      "scenario": "PRODUCTION_CONDITIONAL",
+      "direction": "SHORT",
+      "entry": 0.0890823571,
+      "stop_loss": 0.0901673214,
+      "target": 0.0867847857,
+      "tp1": 0.0879973929,
+      "risk_reward": 2.118,
+      "trigger": "Sell only after 1H close/hold below 0.08921.",
+      "thesis": "Canonical Production trade plan.",
+      "shadow_only": false,
+      "canonical": true
+    },
+    {
       "scenario": "ENTER_NOW",
       "direction": "SHORT",
-      "entry": 0.09061,
-      "stop_loss": 0.0914401429,
-      "target": 0.0890774286,
-      "risk_reward": 1.846,
+      "entry": 0.08956,
+      "stop_loss": 0.0903896786,
+      "target": 0.0892625,
+      "risk_reward": 0.359,
       "trigger": "Immediate only if current evidence remains valid",
       "thesis": "Shadow comparison only.",
       "shadow_only": true,
@@ -57,14 +99,30 @@
     {
       "scenario": "WAIT_PULLBACK",
       "direction": "SHORT",
-      "entry": 0.091057,
-      "stop_loss": 0.0920148571,
-      "target": 0.0891412857,
-      "risk_reward": 2.0,
+      "entry": 0.09000675,
+      "stop_loss": 0.0909640714,
+      "target": 0.0892625,
+      "risk_reward": 0.777,
       "trigger": "Price retraces ~0.35 ATR without structure failure",
       "thesis": "Requalify after a better entry.",
       "shadow_only": true,
       "canonical": false
+    },
+    {
+      "scenario": "WAIT_BREAKOUT",
+      "direction": "SHORT",
+      "entry": 0.0878723571,
+      "stop_loss": 0.0888296786,
+      "target": 0.0858300714,
+      "risk_reward": 2.133,
+      "trigger": "1H price closes/holds below 0.088 (PRIOR_24H_LOW) with confirmation",
+      "thesis": "Enter only after actual blocking structure is cleared.",
+      "shadow_only": true,
+      "canonical": false,
+      "reference_level": 0.088,
+      "reference_source": "PRIOR_24H_LOW",
+      "structure_anchored": true,
+      "confirmation_buffer": 0.0001276429
     },
     {
       "scenario": "REJECT",
@@ -80,67 +138,117 @@
     }
   ],
   "best_counterfactual": {
-    "scenario": "WAIT_PULLBACK",
+    "scenario": "PRODUCTION_CONDITIONAL",
     "direction": "SHORT",
-    "entry": 0.091057,
-    "stop_loss": 0.0920148571,
-    "target": 0.0891412857,
-    "risk_reward": 2.0,
-    "trigger": "Price retraces ~0.35 ATR without structure failure",
-    "thesis": "Requalify after a better entry.",
-    "shadow_only": true,
-    "canonical": false
+    "entry": 0.0890823571,
+    "stop_loss": 0.0901673214,
+    "target": 0.0867847857,
+    "tp1": 0.0879973929,
+    "risk_reward": 2.118,
+    "trigger": "Sell only after 1H close/hold below 0.08921.",
+    "thesis": "Canonical Production trade plan.",
+    "shadow_only": false,
+    "canonical": true
   },
   "hybrid_judge": {
-    "decision": "WAIT",
-    "production_direction": null,
-    "production_score": null,
+    "decision": "REJECT",
+    "production_direction": "SHORT",
+    "production_score": 64.0,
     "production_qualified": false,
     "execution_ready": false,
     "ai_direction": "SHORT",
-    "ai_verdict": "WATCH",
-    "agreement": false,
+    "ai_verdict": "REJECT",
+    "agreement": true,
     "production_priority": false
   },
   "evidence": [
     {
       "name": "direction_votes",
-      "value": 0.0,
+      "value": -1.0,
       "weight": 2.1,
-      "detail": "LONG 2 vs SHORT 2",
+      "detail": "LONG 0 vs SHORT 4",
       "source": "production_decision"
     },
     {
       "name": "ema_structure",
-      "value": -0.553,
+      "value": -1.0,
       "weight": 1.2,
-      "detail": "Price/EMA20/EMA50 structure 0.09061/0.0910639/0.0910131",
+      "detail": "Price/EMA20/EMA50 structure 0.08956/0.0908043/0.0909155",
       "source": "production_decision"
     },
     {
       "name": "rsi",
-      "value": 0.092,
+      "value": -0.148,
       "weight": 0.7,
-      "detail": "RSI14 52.3",
+      "detail": "RSI14 46.3",
       "source": "production_decision"
     },
     {
       "name": "momentum",
-      "value": -0.585,
+      "value": -0.488,
       "weight": 0.9,
-      "detail": "24h momentum -1.76%",
+      "detail": "24h momentum -1.46%",
       "source": "production_decision"
     },
     {
       "name": "relative_volume",
-      "value": -0.877,
+      "value": -1.0,
       "weight": 0.75,
-      "detail": "RV 0.27x",
+      "detail": "RV 0.14x",
       "source": "production_decision"
+    },
+    {
+      "name": "relative_strength",
+      "value": -0.78,
+      "weight": 1.0,
+      "detail": "RS 30.5",
+      "source": "production_decision"
+    },
+    {
+      "name": "futures",
+      "value": 0.23,
+      "weight": 1.05,
+      "detail": "Validated futures score 23.0",
+      "source": "production_decision"
+    },
+    {
+      "name": "tactical_geometry",
+      "value": 0.294,
+      "weight": 1.5,
+      "detail": "Tactical RR 0.36",
+      "source": "production_decision"
+    },
+    {
+      "name": "scorer_trend_base",
+      "value": 1.0,
+      "weight": 0.5,
+      "detail": "trend_base +68.00",
+      "source": "production_scorer"
+    },
+    {
+      "name": "scorer_relative_strength_adjustment",
+      "value": 0.6,
+      "weight": 0.45,
+      "detail": "relative_strength_adjustment +6.00",
+      "source": "production_scorer"
+    },
+    {
+      "name": "scorer_futures_adjustment",
+      "value": -0.23,
+      "weight": 0.45,
+      "detail": "futures_adjustment -2.30",
+      "source": "production_scorer"
+    },
+    {
+      "name": "scorer_obstacle_adjustment",
+      "value": -0.8,
+      "weight": 0.7,
+      "detail": "obstacle_adjustment -8.00",
+      "source": "production_scorer"
     }
   ],
   "production_decision": "WAIT",
-  "production_score": null,
+  "production_score": 64.0,
   "production_qualified": false,
   "safety": {
     "can_execute": false,
