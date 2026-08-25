@@ -55,13 +55,14 @@ jobs:
           grep -q "_install_horizon_fit_overlay" cloud_start.py
           grep -q "QUICK_SCORE_GAP_MAX = 4.0" horizon_fit_policy.py
           grep -q "SWING_RESEARCH_SCORE_GAP_MAX = 8.0" horizon_fit_policy.py
-          grep -q "SWING_HIGH_PRIORITY_COMBOS" horizon_fit_policy.py
-          grep -q "SWING_LOW_PRIORITY_COMBOS" horizon_fit_policy.py
+          grep -q "MIN_INDEPENDENT_EPISODES_FOR_VALIDATED_TIER = 5" horizon_fit_policy.py
+          grep -q "SWING_PROVISIONAL_POSITIVE_COMBOS" horizon_fit_policy.py
+          grep -q "SWING_PROVISIONAL_NEGATIVE_COMBOS" horizon_fit_policy.py
           grep -q "evaluation_horizons.*12h.*24h" horizon_fit_policy.py
           grep -q "cancel_active" quick_reentry_guard.py
           grep -q "approve_active_policy" quick_reentry_guard.py
           grep -q "reject_legacy_active" quick_reentry_guard.py
-          grep -q "HORIZON_FIT_OVERLAY_V6_COMBO_SWING_QUALITY" horizon_fit_overlay.py
+          grep -q "HORIZON_FIT_OVERLAY_V7_PROVISIONAL_EPISODE_QUALITY" horizon_fit_overlay.py
       - name: Guard against production promotion from research lane
         run: |
           python - <<'PY'
@@ -78,5 +79,7 @@ jobs:
                           assert x['swing']['production_qualified'] is False
                           assert x['swing']['can_override_production'] is False
                           assert x['swing']['production_score_adjustment'] == 0
+                          if x['swing']['swing_quality_tier'].startswith('PROVISIONAL_'):
+                              assert x['swing']['independent_validation_complete'] is False
           print('production promotion guard: ok')
           PY
