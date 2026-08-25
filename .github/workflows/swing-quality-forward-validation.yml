@@ -25,7 +25,7 @@ jobs:
         run: |
           python3 -m py_compile swing_quality_forward_validation.py tests/test_swing_quality_forward_validation.py
           PYTHONPATH=. python3 tests/test_swing_quality_forward_validation.py
-      - name: Build out-of-sample report
+      - name: Build independent out-of-sample report
         run: |
           python3 swing_quality_forward_validation.py \
             --wait-outcomes status/wait-outcomes.json \
@@ -33,12 +33,14 @@ jobs:
           python3 - <<'PY'
           import json
           x=json.load(open('status/swing-quality-forward-validation.json'))
-          assert x['schema']=='ATLAS_SWING_QUALITY_FORWARD_VALIDATION_V1'
+          assert x['schema']=='ATLAS_SWING_QUALITY_FORWARD_VALIDATION_V2_INDEPENDENT_EPISODES'
+          assert x['episode_gap_hours']==12
           assert x['production_threshold']==68
           assert x['production_threshold_changed'] is False
           assert x['production_score_adjustment']==0
           assert x['auto_promotion_enabled'] is False
           assert x['promotion_gate']['production_change_allowed'] is False
+          assert x['independent_episodes_after_cutoff'] <= x['raw_eligible_records_after_cutoff']
           print('FORWARD_VALIDATION',json.dumps(x,sort_keys=True))
           PY
       - name: Commit forward validation report
