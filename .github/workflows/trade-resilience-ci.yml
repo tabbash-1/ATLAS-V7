@@ -1,0 +1,43 @@
+name: ATLAS Trade Resilience CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'trade_path_settlement.py'
+      - 'production_decision_api.py'
+      - 'quick_reentry_guard.py'
+      - 'tests/test_path_settlement_resilience.py'
+      - 'tests/test_quick_reentry_guard.py'
+      - '.github/workflows/trade-resilience-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'trade_path_settlement.py'
+      - 'production_decision_api.py'
+      - 'quick_reentry_guard.py'
+      - 'tests/test_path_settlement_resilience.py'
+      - 'tests/test_quick_reentry_guard.py'
+      - '.github/workflows/trade-resilience-ci.yml'
+
+jobs:
+  resilience:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax
+        run: python -m py_compile trade_path_settlement.py production_decision_api.py quick_reentry_guard.py tests/test_path_settlement_resilience.py tests/test_quick_reentry_guard.py
+      - name: Path settlement resilience
+        run: PYTHONPATH=. python tests/test_path_settlement_resilience.py
+      - name: Quick reentry guard
+        run: PYTHONPATH=. python tests/test_quick_reentry_guard.py
+      - name: Safety invariants
+        run: |
+          grep -q 'MARKET_DATA_CIRCUIT_SECONDS' trade_path_settlement.py
+          grep -q 'POST_STOP_REENTRY_COOLDOWN' production_decision_api.py
+          grep -q 'can_override_production.*False' production_decision_api.py
+          grep -q 'GEOMETRY_MIN_RR = 1.0' production_decision_api.py
