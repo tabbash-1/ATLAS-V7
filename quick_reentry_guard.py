@@ -131,6 +131,44 @@ class QuickReentryGuard:
             self._save()
         return dict(rec)
 
+    def approve_active_policy(self, symbol, direction, policy_version, now=None):
+        """Stamp an ACTIVE quick record after the strict horizon policy approves it."""
+        now = float(now if now is not None else time.time())
+        direction = str(direction or '').upper()
+        key = self._key(symbol, direction)
+        with self.lock:
+            rec = (self.state.get('signals') or {}).get(key)
+            if not isinstance(rec, dict) or str(rec.get('status') or '').upper() != 'ACTIVE':
+                return {'approved': False, 'reason': 'NO_ACTIVE_SIGNAL'}
+            rec['policy_version'] = str(policy_version)
+            rec['policy_approved_at'] = now
+            self._save()
+            return {'approved': True, 'record': dict(rec)}
+
+    def reject_legacy_active(self, symbol, direction, required_policy_version,
+                             reason='LEGACY_POLICY_STATE', now=None):
+        """Cancel ACTIVE records that predate the required strict horizon policy.
+
+        Newly approved strict Quick records are stamped with policy_version by
+        approve_active_policy(). This migration only rejects unversioned or stale
+        ACTIVE records; stopped/cooldown history is preserved.
+        """
+        now = float(now if now is not None else time.time())
+        direction = str(direction or '').upper()
+        key = self._key(symbol, direction)
+        with self.lock:
+            rec = (self.state.get('signals') or {}).get(key)
+            if not isinstance(rec, dict) or str(rec.get('status') or '').upper() != 'ACTIVE':
+                return {'cancelled': False, 'reason': 'NO_ACTIVE_SIGNAL'}
+            if str(rec.get('policy_version') or '') == str(required_policy_version):
+                return {'cancelled': False, 'reason': 'POLICY_VERSION_CURRENT', 'record': dict(rec)}
+            rec['status'] = 'POLICY_REJECTED'
+            rec['policy_rejected_at'] = now
+            rec['policy_rejection_reason'] = str(reason)
+            rec['required_policy_version'] = str(required_policy_version)
+            self._save()
+            return {'cancelled': True, 'record': dict(rec)}
+
     def cancel_active(self, symbol, direction, reason='POLICY_REJECTED', now=None):
         """Cancel a just-registered research signal rejected by a stricter policy.
 
