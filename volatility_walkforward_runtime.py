@@ -11,11 +11,12 @@ import threading
 import time
 from pathlib import Path
 
+import edge_evidence_report
 import execution_outcome_scope
 import trade_path_settlement
 import volatility_walkforward
 
-VERSION = 'VOLATILITY_WALKFORWARD_RUNTIME_V1_BACKGROUND_ONLY'
+VERSION = 'VOLATILITY_WALKFORWARD_RUNTIME_V2_WITH_READ_ONLY_EDGE_REPORT'
 REFRESH_SECONDS = 900
 
 
@@ -75,6 +76,15 @@ def install(collector):
     def _now_iso():
         return collector.now_iso() if hasattr(collector, 'now_iso') else None
 
+    def _refresh_edge_report():
+        refresh_edge = getattr(collector, 'edge_evidence_refresh', None)
+        if callable(refresh_edge):
+            try:
+                refresh_edge()
+            except Exception:
+                # Governance reporting must never make the volatility validator fail.
+                pass
+
     def refresh():
         state['last_started_at'] = _now_iso()
         try:
@@ -83,6 +93,7 @@ def install(collector):
                 state['report'] = result
                 state['refreshes'] += 1
                 state['last_error'] = None
+            _refresh_edge_report()
             return result
         except Exception as exc:
             error = f'{type(exc).__name__}: {exc}'
@@ -99,6 +110,7 @@ def install(collector):
                     'blockers': ['VOLATILITY_WALK_FORWARD_REFRESH_ERROR'],
                     'error': error,
                 }
+            _refresh_edge_report()
             return None
         finally:
             state['last_finished_at'] = _now_iso()
@@ -112,6 +124,11 @@ def install(collector):
     collector.VOLATILITY_WALKFORWARD_RUNTIME_STATE = state
     collector.volatility_refresh_walkforward = refresh
     collector._VOLATILITY_WALKFORWARD_RUNTIME_INSTALLED = True
+
+    # Install only after all three independent layer runtimes exist. This installer
+    # is read-only and explicitly verifies it did not wrap Production callables.
+    edge_evidence_report.install(collector)
+
     threading.Thread(
         target=loop, daemon=True, name='atlas-volatility-walkforward'
     ).start()
