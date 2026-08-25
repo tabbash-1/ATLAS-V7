@@ -72,6 +72,24 @@ def _summary(values):
     }
 
 
+def _horizon_fit(by_horizon, target_cases):
+    target = int(target_cases)
+    progress = {h: {
+        "matured": int(by_horizon[h]["n"]),
+        "target_reached": int(by_horizon[h]["n"]) >= target,
+        "remaining": max(0, target - int(by_horizon[h]["n"])),
+    } for h in HORIZONS}
+    reached = [h for h in HORIZONS if progress[h]["target_reached"]]
+    first = reached[-1] if reached else None  # longest mature horizon is the stronger validation horizon
+    positive_mature = [h for h in HORIZONS if by_horizon[h]["n"] >= target and (_f(by_horizon[h]["mean_pct"]) or 0) > 0]
+    return {
+        "target_by_horizon": progress,
+        "longest_horizon_with_100_cases": first,
+        "positive_mean_horizons_with_100_cases": positive_mature,
+        "interpretation": "Evaluate swing-direction edge on the longest sufficiently matured horizon; keep quick/tactical evaluation separate.",
+    }
+
+
 def build_report(payload, execution_summary=None, target_cases=TARGET_CASES):
     records = list((payload or {}).get("records") or [])
     directional = [r for r in records if str(r.get("candidate_direction") or "NONE").upper() in ("LONG", "SHORT")]
@@ -121,6 +139,7 @@ def build_report(payload, execution_summary=None, target_cases=TARGET_CASES):
             "move_ge_1pct_rate_pct": round(100.0 * sum(v >= 1.0 for v in changes) / len(changes), 2) if changes else None,
         }
 
+    fit = _horizon_fit(by_horizon, target_cases)
     matured_24h = by_horizon["24h"]["n"]
     report = {
         "schema": SCHEMA,
@@ -133,9 +152,11 @@ def build_report(payload, execution_summary=None, target_cases=TARGET_CASES):
             "directional_shadow_records": len(directional),
             "no_setup_records": len(no_setup),
             "directional_24h_matured": matured_24h,
-            "target_reached": matured_24h >= int(target_cases),
-            "remaining_to_target": max(0, int(target_cases) - matured_24h),
+            "target_reached_24h": matured_24h >= int(target_cases),
+            "remaining_to_target_24h": max(0, int(target_cases) - matured_24h),
+            "target_reached_any_horizon": any(x["target_reached"] for x in fit["target_by_horizon"].values()),
         },
+        "horizon_fit": fit,
         "directional_forward_performance": by_horizon,
         "by_wait_reason_24h": by_reason,
         "by_score_band_24h": by_score_band,
