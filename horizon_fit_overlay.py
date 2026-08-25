@@ -6,7 +6,7 @@ the Quick shadow lane and adds an explicit 12-24h Swing research lane.
 
 import horizon_fit_policy
 
-VERSION = 'HORIZON_FIT_OVERLAY_V5_OBSTACLE_PRIORITY'
+VERSION = 'HORIZON_FIT_OVERLAY_V6_COMBO_SWING_QUALITY'
 
 
 def install(atlas):
@@ -25,6 +25,7 @@ def install(atlas):
         score_attr = row.get('score_attribution') or {}
 
         fit = horizon_fit_policy.classify(
+            symbol=row.get('symbol') or symbol,
             direction=row.get('candidate_direction'),
             score=row.get('score'),
             threshold=row.get('signal_threshold'),
@@ -101,6 +102,8 @@ def install(atlas):
 
         row['quick_trade_shadow'] = strict_quick
         row['swing_research'] = swing
+        row['swing_quality_tier'] = swing.get('swing_quality_tier')
+        row['swing_quality_evidence'] = swing.get('swing_quality_evidence')
         row['horizon_fit'] = fit
         row['preferred_horizon'] = fit['preferred_horizon']
         row['timeframe_matrix'] = matrix
@@ -121,6 +124,6 @@ def install(atlas):
         'legacy_quick_guard_cleanup': True,
         'legacy_active_state_migration': True,
         'clean_watch_state': True,
-        'obstacle_calibrated_swing_priority': True,
+        'combo_calibrated_swing_quality': True,
     }
     return atlas.HORIZON_FIT_STATE
