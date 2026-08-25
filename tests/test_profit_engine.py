@@ -6,6 +6,7 @@ def base_row():
         'production_signal_qualified': True,
         'direction': 'LONG',
         'regime': 'TREND_UP',
+        'btc_regime': 'TREND_UP',
         'entry': 100.0,
         'rr_tp2': 1.8,
     }
@@ -35,11 +36,18 @@ def test_fails_closed_without_validated_costs():
     assert out['execution_cost_r'] is None
 
 
-def test_rejects_wrong_regime_even_with_positive_ev():
+def test_rejects_wrong_asset_regime_even_with_positive_ev():
     row = base_row(); row['regime'] = 'TREND_DOWN'
     out = pe.assess(row, stop_loss=98.0, calibration=calibrated(), execution=costs())
     assert out['profit_ready'] is False
     assert 'REGIME_NOT_ALIGNED' in out['blockers']
+
+
+def test_rejects_long_when_btc_regime_is_strongly_bearish():
+    row = base_row(); row['btc_regime'] = 'VOLATILITY_EXPANSION_DOWN'
+    out = pe.assess(row, stop_loss=98.0, calibration=calibrated(), execution=costs())
+    assert out['profit_ready'] is False
+    assert 'BTC_REGIME_OPPOSED' in out['blockers']
 
 
 def test_positive_calibrated_ev_can_pass():
@@ -47,6 +55,12 @@ def test_positive_calibrated_ev_can_pass():
     assert out['profit_ready'] is True
     assert out['decision'] == 'LONG'
     assert out['net_expected_r'] > pe.MIN_NET_EV_R
+
+
+def test_volatility_expansion_can_be_valid_directional_regime():
+    row = base_row(); row['regime'] = 'VOLATILITY_EXPANSION_UP'
+    out = pe.assess(row, stop_loss=98.0, calibration=calibrated(), execution=costs())
+    assert out['profit_ready'] is True
 
 
 def test_costs_can_kill_edge():
