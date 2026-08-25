@@ -10,7 +10,7 @@ from __future__ import annotations
 from copy import deepcopy
 import urllib.parse
 
-VERSION = 'INTERACTION_STATUS_API_V1_CACHED_READ_ONLY'
+VERSION = 'INTERACTION_STATUS_API_V2_GOVERNANCE_DIAGNOSTICS_CACHED_ONLY'
 PATH = '/api/research/interaction-status'
 
 
