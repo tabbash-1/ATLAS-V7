@@ -3,7 +3,15 @@
 Cloud rows are stored with exact forward-observation lineage. Historical rows
 created before lineage support can still reconcile by direction + timestamp +
 price. All returned maturity is forced through a strict 1h -> 4h -> 12h -> 24h
-chain so sparse data can never masquerade as mature evidence.
+chain so sparse sampling can never masquerade as mature evidence.
+
+Integrity semantics:
+- awaiting_maturity_rows: valid prefix only; later horizons are not available yet.
+- sparse_sampling_rows: a later horizon exists after an earlier missing horizon;
+  the later value is suppressed from Pattern Memory, but this is not by itself a
+  hard corruption signal because market snapshots may be sparse.
+- lineage_conflicts: an exact forward id exists but its symbol/direction conflicts
+  with the memory row. This is a hard integrity fault and is never fuzzy-matched.
 """
 
 import json
@@ -33,7 +41,6 @@ def _canonical_forward_result(result, submitted):
         record = result.get("record")
         if isinstance(record, dict):
             return record
-        # collector_server.forward_observe returns ATLAS_FORWARD_V1 directly.
         if result.get("schema") == "ATLAS_FORWARD_V1" and result.get("id"):
             return result
     return submitted
@@ -115,6 +122,17 @@ def _strict_chain(fr):
     return clean, rejected
 
 
+def _chain_state(clean, rejected):
+    """Classify maturity state without treating sparse snapshots as corruption."""
+    if rejected:
+        return "SPARSE_SAMPLING_GAP"
+    if all(clean.get(str(h)) is not None for h in HORIZONS):
+        return "COMPLETE_24H"
+    if any(clean.get(str(h)) is not None for h in HORIZONS):
+        return "AWAITING_LATER_MATURITY"
+    return "UNMATURED"
+
+
 def _memory_direction(row):
     signal = str((row or {}).get("base_signal") or (row or {}).get("signal") or "").upper()
     if signal == "BUY":
@@ -130,14 +148,14 @@ def _match_forward(memory_row, forward_rows):
     exact_id = str(memory_row.get("forward_observation_id") or "")
 
     if exact_id:
-        for row in forward_rows or []:
-            if str(row.get("id") or "") != exact_id:
-                continue
-            if str(row.get("symbol") or "").upper() != symbol:
-                continue
-            if expected_direction and str(row.get("direction") or "").upper() != expected_direction:
-                continue
-            return row, "EXACT_ID"
+        exact_candidates = [row for row in (forward_rows or []) if str(row.get("id") or "") == exact_id]
+        if exact_candidates:
+            row = exact_candidates[0]
+            same_symbol = str(row.get("symbol") or "").upper() == symbol
+            same_direction = not expected_direction or str(row.get("direction") or "").upper() == expected_direction
+            if same_symbol and same_direction:
+                return row, "EXACT_ID", None
+            return None, None, "EXACT_ID_LINEAGE_CONFLICT"
 
     mts = int(memory_row.get("forward_captured_at_ms") or memory_row.get("captured_at_ms") or 0)
     mprice = _fnum(memory_row.get("price"))
@@ -162,7 +180,7 @@ def _match_forward(memory_row, forward_rows):
         if best is None or dt < best_dt:
             best = row
             best_dt = dt
-    return (best, "FUZZY_LEGACY") if best is not None else (None, None)
+    return (best, "FUZZY_LEGACY", None) if best is not None else (None, None, None)
 
 
 def reconcile_confluence_rows(confluence_rows, forward_rows):
@@ -172,6 +190,15 @@ def reconcile_confluence_rows(confluence_rows, forward_rows):
         "linked_to_forward": 0,
         "exact_lineage_links": 0,
         "legacy_fuzzy_links": 0,
+        "unlinked_rows": 0,
+        "awaiting_maturity_rows": 0,
+        "complete_24h_rows": 0,
+        "sparse_sampling_rows": 0,
+        "suppressed_later_horizons": 0,
+        "lineage_conflicts": 0,
+        "hard_integrity_errors": 0,
+        # Backward-compatible names. A 'gap' here means a sparse maturity chain,
+        # not automatically corrupted data.
         "gap_rows": 0,
         "rejected_horizons": 0,
     }
@@ -179,8 +206,13 @@ def reconcile_confluence_rows(confluence_rows, forward_rows):
         x = dict(row)
         metrics["rows"] += 1
         source_fr = x.get("forward_return_pct") or {}
-        match, method = _match_forward(x, forward_rows)
-        if match is not None and (match.get("forward_return_pct") or {}):
+        match, method, match_error = _match_forward(x, forward_rows)
+        if match_error:
+            metrics["lineage_conflicts"] += 1
+            metrics["hard_integrity_errors"] += 1
+            x["forward_evidence_source"] = "LINEAGE_CONFLICT"
+            x["forward_link_method"] = None
+        elif match is not None:
             source_fr = match.get("forward_return_pct") or {}
             metrics["linked_to_forward"] += 1
             if method == "EXACT_ID":
@@ -190,16 +222,29 @@ def reconcile_confluence_rows(confluence_rows, forward_rows):
             x["forward_evidence_source"] = "CANONICAL_FORWARD_ARCHIVE"
             x["forward_link_method"] = method
         else:
+            metrics["unlinked_rows"] += 1
             x["forward_evidence_source"] = "CONFLUENCE_FALLBACK"
             x["forward_link_method"] = None
+
         clean, rejected = _strict_chain(source_fr)
-        if rejected:
+        chain_state = _chain_state(clean, rejected)
+        if chain_state == "SPARSE_SAMPLING_GAP":
+            metrics["sparse_sampling_rows"] += 1
+            metrics["suppressed_later_horizons"] += len(rejected)
             metrics["gap_rows"] += 1
             metrics["rejected_horizons"] += len(rejected)
+        elif chain_state == "COMPLETE_24H":
+            metrics["complete_24h_rows"] += 1
+        else:
+            metrics["awaiting_maturity_rows"] += 1
+
         x["forward_return_pct"] = clean
         x["maturity_integrity"] = {
             "strict_chain": True,
+            "state": chain_state,
             "rejected_horizons": rejected,
+            "suppressed_for_safety": bool(rejected),
+            "hard_integrity_error": bool(match_error),
             "valid_through": max((h for h in HORIZONS if clean[str(h)] is not None), default=0),
         }
         out.append(x)
@@ -271,6 +316,13 @@ def install(collector):
             "linked_to_forward": 0,
             "exact_lineage_links": 0,
             "legacy_fuzzy_links": 0,
+            "unlinked_rows": 0,
+            "awaiting_maturity_rows": 0,
+            "complete_24h_rows": 0,
+            "sparse_sampling_rows": 0,
+            "suppressed_later_horizons": 0,
+            "lineage_conflicts": 0,
+            "hard_integrity_errors": 0,
             "gap_rows": 0,
             "rejected_horizons": 0,
         },
@@ -305,7 +357,7 @@ def install(collector):
                 if payload.get("forward_observation_id"):
                     state["exact_lineage_mirrors"] += 1
             state["last_error"] = None
-        except Exception as exc:  # fail-open: never damage forward collection
+        except Exception as exc:
             state["mirror_errors"] += 1
             state["last_error"] = f"{type(exc).__name__}: {exc}"
         return result
