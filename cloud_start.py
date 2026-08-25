@@ -79,6 +79,13 @@ try:
     _install_interaction_outcome_runtime(_collector)
 except Exception as _interaction_runtime_exc:
     print(f"ATLAS interaction outcome runtime unavailable: {type(_interaction_runtime_exc).__name__}: {_interaction_runtime_exc}")
+# Cached status endpoint only. It exposes the latest background report and never
+# triggers refresh, settlement or validation from the HTTP request path.
+try:
+    from interaction_status_api import install as _install_interaction_status_api
+    _install_interaction_status_api(_collector)
+except Exception as _interaction_status_api_exc:
+    print(f"ATLAS interaction status API unavailable: {type(_interaction_status_api_exc).__name__}: {_interaction_status_api_exc}")
 entrypoint="atlas_research_runtime_server.py"
 print(f"ATLAS production boot: data={DATA_DIR} runtime=resilient-free-research release={release_token}")
 runpy.run_path(str(BASE/entrypoint),run_name="__main__")
