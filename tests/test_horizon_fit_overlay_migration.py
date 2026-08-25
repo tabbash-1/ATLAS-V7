@@ -48,7 +48,7 @@ def test_overlay_rejects_unversioned_legacy_active_and_cleans_geometry():
         horizon_fit_overlay.install(atlas)
         out = atlas.production_decision('BTCUSDT')
         q = out['quick_trade_shadow']
-        assert out['horizon_fit_overlay_version'] == 'HORIZON_FIT_OVERLAY_V6_COMBO_SWING_QUALITY'
+        assert out['horizon_fit_overlay_version'] == 'HORIZON_FIT_OVERLAY_V7_PROVISIONAL_EPISODE_QUALITY'
         assert q['status'] == 'WATCH_ONLY'
         assert q['legacy_guard_cleanup']['cancelled'] is True
         for stale in ('entry', 'stop_loss', 'target', 'risk_reward', 'active_remaining_seconds'):
@@ -77,26 +77,29 @@ def test_overlay_preserves_current_policy_active():
         assert cleanup['reason'] == 'POLICY_VERSION_CURRENT'
 
 
-def test_overlay_marks_positive_combo_high_quality_research_only():
+def test_overlay_marks_positive_combo_provisional_research_only():
     d = _decision(symbol='BTCUSDT', direction='LONG', obstacle='VERY_CLOSE')
     atlas = SimpleNamespace(production_decision=lambda symbol: d, QUICK_REENTRY_GUARD=None)
     horizon_fit_overlay.install(atlas)
     out = atlas.production_decision('BTCUSDT')
-    assert out['swing_research']['status'] == 'SWING_RESEARCH_PRIORITY_HIGH'
-    assert out['swing_quality_tier'] == 'HIGH'
-    assert out['swing_quality_evidence']['sample_12h'] == 17
+    assert out['swing_research']['status'] == 'SWING_RESEARCH_PROVISIONAL_POSITIVE'
+    assert out['swing_quality_tier'] == 'PROVISIONAL_POSITIVE'
+    assert out['swing_quality_evidence']['independent_12h_n'] == 2
+    assert out['swing_research']['independent_validation_complete'] is False
     assert out['swing_research']['production_qualified'] is False
     assert out['swing_research']['can_override_production'] is False
     assert out['swing_research']['production_score_adjustment'] == 0
 
 
-def test_overlay_marks_negative_combo_low_quality_research_only():
+def test_overlay_marks_negative_combo_provisional_research_only():
     d = _decision(symbol='HYPEUSDT', direction='SHORT', obstacle='VERY_CLOSE')
     atlas = SimpleNamespace(production_decision=lambda symbol: d, QUICK_REENTRY_GUARD=None)
     horizon_fit_overlay.install(atlas)
     out = atlas.production_decision('HYPEUSDT')
-    assert out['swing_research']['status'] == 'SWING_RESEARCH_DEPRIORITIZED'
-    assert out['swing_quality_tier'] == 'LOW'
+    assert out['swing_research']['status'] == 'SWING_RESEARCH_PROVISIONAL_NEGATIVE'
+    assert out['swing_quality_tier'] == 'PROVISIONAL_NEGATIVE'
+    assert out['swing_quality_evidence']['independent_12h_n'] == 2
+    assert out['swing_research']['independent_validation_complete'] is False
     assert out['swing_quality_evidence']['mean_12h_pct'] < 0
     assert out['swing_research']['production_score_adjustment'] == 0
 
@@ -104,6 +107,6 @@ def test_overlay_marks_negative_combo_low_quality_research_only():
 if __name__ == '__main__':
     test_overlay_rejects_unversioned_legacy_active_and_cleans_geometry()
     test_overlay_preserves_current_policy_active()
-    test_overlay_marks_positive_combo_high_quality_research_only()
-    test_overlay_marks_negative_combo_low_quality_research_only()
+    test_overlay_marks_positive_combo_provisional_research_only()
+    test_overlay_marks_negative_combo_provisional_research_only()
     print('horizon fit overlay migration tests: ok')
