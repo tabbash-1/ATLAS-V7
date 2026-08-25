@@ -4,6 +4,10 @@ This module is intentionally isolated from the decision engine. It never changes
 scores, thresholds, LONG/SHORT decisions, Pattern Memory, alerts, or execution.
 It only freezes geometry for newly stored observations when the existing ATLAS
 row contains enough information, then evaluates that frozen geometry later.
+
+Signal scope follows the canonical Production-qualified semantics from
+trade_outcome_ledger. Legacy research champion_take is never used as a synonym
+for a Production signal.
 """
 
 import json
@@ -12,6 +16,8 @@ import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
+
+import trade_outcome_ledger
 
 MAX_HORIZON_H = 24
 CACHE_SECONDS = 300
@@ -24,6 +30,14 @@ def _fnum(value):
         return float(value) if value is not None else None
     except (TypeError, ValueError):
         return None
+
+
+def _is_production_signal(row):
+    return trade_outcome_ledger.is_production_signal(row or {})
+
+
+def _is_research_champion(row):
+    return trade_outcome_ledger.is_research_champion(row or {})
 
 
 def derive_geometry(payload):
@@ -104,13 +118,15 @@ def _persist_geometry(collector, forward_row, geometry):
         if any(str(x.get('forward_observation_id') or '') == forward_id for x in existing):
             return {'stored': False, 'reason': 'DEDUP_FORWARD_ID'}
         rec = {
-            'schema': 'ATLAS_FROZEN_TRADE_GEOMETRY_V1',
+            'schema': 'ATLAS_FROZEN_TRADE_GEOMETRY_V2_SIGNAL_SCOPE',
             'forward_observation_id': forward_id,
             'captured_at': forward_row.get('captured_at'),
             'captured_at_ms': forward_row.get('captured_at_ms'),
             'symbol': forward_row.get('symbol'),
             'direction': forward_row.get('direction'),
-            'signal_qualified': bool(forward_row.get('champion_take')),
+            'signal_qualified': _is_production_signal(forward_row),
+            'production_signal_qualified': _is_production_signal(forward_row),
+            'research_champion': _is_research_champion(forward_row),
             'geometry': geometry,
             'research_only': True,
             'live_execution': False,
@@ -175,7 +191,17 @@ def _resolve_same_candle(symbol, candle, geometry):
 
 def settle_row(row, geometry_record=None, now_ms=None, candle_loader=None):
     geometry = (geometry_record or {}).get('geometry') if geometry_record else None
-    base = {'id': row.get('id'), 'symbol': row.get('symbol'), 'direction': row.get('direction'), 'captured_at': row.get('captured_at'), 'captured_at_ms': row.get('captured_at_ms'), 'score': _fnum(row.get('final_score')) if row.get('final_score') is not None else _fnum(row.get('champion_score')), 'entry': _fnum(row.get('entry')), 'source': row.get('auto_source'), 'signal_qualified': bool(row.get('champion_take')), 'geometry': geometry, 'geometry_status': 'FROZEN' if geometry else 'UNAVAILABLE', 'research_only': True, 'live_execution': False}
+    base = {
+        'id': row.get('id'), 'symbol': row.get('symbol'), 'direction': row.get('direction'),
+        'captured_at': row.get('captured_at'), 'captured_at_ms': row.get('captured_at_ms'),
+        'score': _fnum(row.get('final_score')) if row.get('final_score') is not None else _fnum(row.get('champion_score')),
+        'entry': _fnum(row.get('entry')), 'source': row.get('auto_source'),
+        'signal_qualified': _is_production_signal(row),
+        'production_signal_qualified': _is_production_signal(row),
+        'research_champion': _is_research_champion(row),
+        'geometry': geometry, 'geometry_status': 'FROZEN' if geometry else 'UNAVAILABLE',
+        'research_only': True, 'live_execution': False,
+    }
     if not geometry:
         return {**base, 'path_outcome': 'GEOMETRY_UNAVAILABLE', 'terminal': False, 'r_multiple': None}
     start_ms = int(row.get('captured_at_ms') or 0)
@@ -208,17 +234,28 @@ def settle_row(row, geometry_record=None, now_ms=None, candle_loader=None):
     else:
         outcome, r, terminal = ('EXPIRED', 0.0, True) if elapsed_h >= MAX_HORIZON_H else ('OPEN', None, False)
     candle = event.get('candle') or {}
-    return {**base, 'path_outcome': outcome, 'path_event': ev, 'terminal': terminal, 'r_multiple': r, 'tp1_reached': bool(ev in ('TP1_ONLY', 'TP2') or event.get('tp1_seen_before')), 'event_time_ms': candle.get('open_time'), 'evaluated_through_ms': end_ms, 'elapsed_hours': round(elapsed_h, 3), 'settlement_method': '5M_PATH_WITH_1M_SAME_CANDLE_RESOLUTION'}
+    return {
+        **base, 'path_outcome': outcome, 'path_event': ev, 'terminal': terminal,
+        'r_multiple': r,
+        'tp1_reached': bool(ev in ('TP1_ONLY', 'TP2') or event.get('tp1_seen_before')),
+        'event_time_ms': candle.get('open_time'), 'evaluated_through_ms': end_ms,
+        'elapsed_hours': round(elapsed_h, 3),
+        'settlement_method': '5M_PATH_WITH_1M_SAME_CANDLE_RESOLUTION',
+    }
 
 
 def build_path_ledger(rows, geometry_map, scope='signals', symbol=None, limit=100, now_ms=None):
     scope = str(scope or 'signals').lower()
+    if scope not in ('signals', 'champions', 'all'):
+        raise ValueError('scope must be signals, champions or all')
     symbol = str(symbol or '').upper() or None
     selected = []
     for row in rows or []:
         if str(row.get('direction') or '').upper() not in ('LONG', 'SHORT'):
             continue
-        if scope == 'signals' and not bool(row.get('champion_take')):
+        if scope == 'signals' and not _is_production_signal(row):
+            continue
+        if scope == 'champions' and not _is_research_champion(row):
             continue
         if symbol and str(row.get('symbol') or '').upper() != symbol:
             continue
@@ -236,7 +273,19 @@ def summarize_path(items):
     rs = [float(x['r_multiple']) for x in terminal if x.get('r_multiple') is not None]
     positive_r = sum(x for x in rs if x > 0)
     negative_r = abs(sum(x for x in rs if x < 0))
-    return {'total': len(items), 'terminal': len(terminal), 'open': len(items) - len(terminal), 'wins': len(wins), 'losses': len(losses), 'expired': len(expired), 'win_rate_pct': round(100 * len(wins) / (len(wins) + len(losses)), 2) if wins or losses else None, 'net_r': round(sum(rs), 4) if rs else None, 'average_r': round(sum(rs) / len(rs), 4) if rs else None, 'profit_factor_r': round(positive_r / negative_r, 4) if negative_r > 0 else (None if positive_r == 0 else 'INF'), 'geometry_available': sum(1 for x in items if x.get('geometry_status') == 'FROZEN'), 'geometry_unavailable': sum(1 for x in items if x.get('geometry_status') != 'FROZEN'), 'tp1_reached': sum(1 for x in items if x.get('tp1_reached')), 'ambiguous': sum(1 for x in items if x.get('path_outcome') == 'AMBIGUOUS')}
+    return {
+        'total': len(items), 'terminal': len(terminal), 'open': len(items) - len(terminal),
+        'wins': len(wins), 'losses': len(losses), 'expired': len(expired),
+        'win_rate_pct': round(100 * len(wins) / (len(wins) + len(losses)), 2) if wins or losses else None,
+        'net_r': round(sum(rs), 4) if rs else None,
+        'average_r': round(sum(rs) / len(rs), 4) if rs else None,
+        'profit_factor_r': round(positive_r / negative_r, 4) if negative_r > 0 else (None if positive_r == 0 else 'INF'),
+        'geometry_available': sum(1 for x in items if x.get('geometry_status') == 'FROZEN'),
+        'geometry_unavailable': sum(1 for x in items if x.get('geometry_status') != 'FROZEN'),
+        'tp1_reached': sum(1 for x in items if x.get('tp1_reached')),
+        'ambiguous': sum(1 for x in items if x.get('path_outcome') == 'AMBIGUOUS'),
+        'scope_semantics': 'PRODUCTION_QUALIFIED_ONLY' if all(x.get('production_signal_qualified') for x in items) and items else None,
+    }
 
 
 def install_geometry_freezer(collector):
