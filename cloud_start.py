@@ -54,6 +54,7 @@ def _production_no_cache_headers(self):
 _collector.Handler.end_headers=_production_no_cache_headers
 from storage_hardening import install as _install_storage_hardening; _install_storage_hardening(_collector)
 from production_signal_scoring import install as _install_production_signal_scoring; _install_production_signal_scoring(_collector)
+from production_continuation_scoring import install as _install_production_continuation_scoring; _install_production_continuation_scoring(_collector)
 from production_decision_api import install as _install_production_decision_api; _install_production_decision_api(_collector)
 from decision_engine_v7 import install as _install_decision_engine_v7; _install_decision_engine_v7(_collector)
 from ai_trade_council import install as _install_ai_trade_council; _install_ai_trade_council(_collector)
