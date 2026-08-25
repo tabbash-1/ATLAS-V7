@@ -71,6 +71,8 @@ def test_install_does_not_wrap_decision_or_forward(monkeypatch, tmp_path):
 
 def test_successful_refresh_updates_governance_in_edge_protocol_guard_order(monkeypatch, tmp_path):
     c = collector(tmp_path)
+    original_decision = c.production_decision
+    original_forward = c.forward_observe
     monkeypatch.setattr(vwr.threading, 'Thread', FakeThread)
     state = vwr.install(c)
     expected = {
@@ -87,6 +89,8 @@ def test_successful_refresh_updates_governance_in_edge_protocol_guard_order(monk
     assert state['report'] == expected
     assert state['refreshes'] == 1
     assert c._calls == {'decision': 0, 'forward': 0}
+    assert c.production_decision is original_decision
+    assert c.forward_observe is original_forward
 
     new_manifest = c.EDGE_EVIDENCE_INTERACTION_PROTOCOL_STATE['manifest']
     assert new_manifest['protocol_hash']
@@ -102,6 +106,8 @@ def test_successful_refresh_updates_governance_in_edge_protocol_guard_order(monk
 
 def test_refresh_failure_is_unavailable_and_cannot_touch_production(monkeypatch, tmp_path):
     c = collector(tmp_path)
+    original_decision = c.production_decision
+    original_forward = c.forward_observe
     monkeypatch.setattr(vwr.threading, 'Thread', FakeThread)
     state = vwr.install(c)
     monkeypatch.setattr(
@@ -113,6 +119,8 @@ def test_refresh_failure_is_unavailable_and_cannot_touch_production(monkeypatch,
     assert state['report']['status'] == 'UNAVAILABLE'
     assert state['report']['gate_promoted'] is False
     assert state['report']['can_override_production'] is False
+    assert c.production_decision is original_decision
+    assert c.forward_observe is original_forward
 
     manifest = c.EDGE_EVIDENCE_INTERACTION_PROTOCOL_STATE['manifest']
     assert manifest['interaction_outcome_testing_performed'] is False
