@@ -7,6 +7,7 @@ on:
       - 'edge_evidence_interaction_protocol.py'
       - 'edge_evidence_interaction_rules.py'
       - 'edge_evidence_interaction_validator_guard.py'
+      - 'edge_evidence_interaction_preflight.py'
       - 'edge_evidence_interaction_outcome_validator.py'
       - 'edge_evidence_joint_coverage.py'
       - 'edge_evidence_overlap.py'
@@ -15,6 +16,7 @@ on:
       - 'tests/test_edge_evidence_interaction_protocol.py'
       - 'tests/test_edge_evidence_interaction_rules.py'
       - 'tests/test_edge_evidence_interaction_validator_guard.py'
+      - 'tests/test_edge_evidence_interaction_preflight.py'
       - 'tests/test_edge_evidence_interaction_outcome_validator.py'
       - 'tests/test_interaction_outcome_guard_hash_binding.py'
       - 'tests/test_volatility_walkforward_runtime.py'
@@ -25,6 +27,7 @@ on:
       - 'edge_evidence_interaction_protocol.py'
       - 'edge_evidence_interaction_rules.py'
       - 'edge_evidence_interaction_validator_guard.py'
+      - 'edge_evidence_interaction_preflight.py'
       - 'edge_evidence_interaction_outcome_validator.py'
       - 'edge_evidence_joint_coverage.py'
       - 'edge_evidence_overlap.py'
@@ -33,6 +36,7 @@ on:
       - 'tests/test_edge_evidence_interaction_protocol.py'
       - 'tests/test_edge_evidence_interaction_rules.py'
       - 'tests/test_edge_evidence_interaction_validator_guard.py'
+      - 'tests/test_edge_evidence_interaction_preflight.py'
       - 'tests/test_edge_evidence_interaction_outcome_validator.py'
       - 'tests/test_interaction_outcome_guard_hash_binding.py'
       - 'tests/test_volatility_walkforward_runtime.py'
@@ -50,9 +54,9 @@ jobs:
       - name: Install test runner
         run: python -m pip install --disable-pip-version-check pytest
       - name: Syntax
-        run: python -m py_compile edge_evidence_interaction_protocol.py edge_evidence_interaction_rules.py edge_evidence_interaction_validator_guard.py edge_evidence_interaction_outcome_validator.py edge_evidence_joint_coverage.py edge_evidence_overlap.py edge_evidence_redundancy.py volatility_walkforward_runtime.py
-      - name: Protocol and outcome-validator regression tests
-        run: PYTHONPATH=. python -m pytest -q tests/test_edge_evidence_interaction_protocol.py tests/test_edge_evidence_interaction_rules.py tests/test_edge_evidence_interaction_validator_guard.py tests/test_edge_evidence_interaction_outcome_validator.py tests/test_interaction_outcome_guard_hash_binding.py tests/test_edge_evidence_joint_coverage.py tests/test_volatility_walkforward_runtime.py
+        run: python -m py_compile edge_evidence_interaction_protocol.py edge_evidence_interaction_rules.py edge_evidence_interaction_validator_guard.py edge_evidence_interaction_preflight.py edge_evidence_interaction_outcome_validator.py edge_evidence_joint_coverage.py edge_evidence_overlap.py edge_evidence_redundancy.py volatility_walkforward_runtime.py
+      - name: Protocol preflight and outcome-validator regression tests
+        run: PYTHONPATH=. python -m pytest -q tests/test_edge_evidence_interaction_protocol.py tests/test_edge_evidence_interaction_rules.py tests/test_edge_evidence_interaction_validator_guard.py tests/test_edge_evidence_interaction_preflight.py tests/test_edge_evidence_interaction_outcome_validator.py tests/test_interaction_outcome_guard_hash_binding.py tests/test_edge_evidence_joint_coverage.py tests/test_volatility_walkforward_runtime.py
       - name: Preserve preregistration contract
         run: |
           grep -q "CHRONOLOGICAL_FOLDS = 3" edge_evidence_interaction_protocol.py
@@ -90,6 +94,13 @@ jobs:
           grep -q "outcomes_read.*False" edge_evidence_interaction_rules.py
           grep -q "gate_promoted.*False" edge_evidence_interaction_rules.py
           grep -q "can_override_production.*False" edge_evidence_interaction_rules.py
+          grep -q "outcome_access_allowed.*False" edge_evidence_interaction_preflight.py
+          grep -q "READY_FOR_CANONICAL_OUTCOME_READ" edge_evidence_interaction_preflight.py
+          grep -q "COLLECTING_PRE_OUTCOME" edge_evidence_interaction_preflight.py
+          grep -q "MIN_FROZEN_COMMON_COHORT_NOT_REACHED" edge_evidence_interaction_preflight.py
+          grep -q "MIN_FROZEN_H1_CANDIDATES_NOT_REACHED" edge_evidence_interaction_preflight.py
+          grep -q "outcomes_read.*False" edge_evidence_interaction_preflight.py
+          grep -q "can_override_production.*False" edge_evidence_interaction_preflight.py
           grep -q "Outcome loader is never called before authorization\|only now may canonical outcomes be read" edge_evidence_interaction_outcome_validator.py
           grep -q "GUARD_PROTOCOL_HASH_MISMATCH" edge_evidence_interaction_outcome_validator.py
           grep -q "armed_protocol_hash.*protocol_hash" edge_evidence_interaction_outcome_validator.py
