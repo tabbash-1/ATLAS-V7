@@ -6,20 +6,19 @@ from pathlib import Path
 import trade_path_settlement as tps
 
 
-def signal_payload(direction='LONG'):
-    if direction == 'LONG':
-        return {
-            'symbol': 'BTCUSDT', 'direction': 'LONG', 'entry': 100.0,
-            'champion_take': True, 'final_score': 84, 'rr_tp2': 2.0,
-            'support_distance_pct': 1.0, 'resistance_distance_pct': 4.0,
-            'execution_decision': 'LONG_CANDIDATE',
-        }
-    return {
-        'symbol': 'BTCUSDT', 'direction': 'SHORT', 'entry': 100.0,
-        'champion_take': True, 'final_score': 84, 'rr_tp2': 2.0,
-        'support_distance_pct': 4.0, 'resistance_distance_pct': 1.0,
-        'execution_decision': 'SHORT_CANDIDATE',
+def signal_payload(direction='LONG', score=84, production=True):
+    base = {
+        'symbol': 'BTCUSDT', 'entry': 100.0,
+        'champion_take': True, 'research_champion_take': True,
+        'production_signal_qualified': production,
+        'final_score': score, 'rr_tp2': 2.0,
+        'execution_decision': f'{direction}_CANDIDATE' if production else 'RESEARCH_OBSERVATION_ONLY',
     }
+    if direction == 'LONG':
+        base.update({'direction': 'LONG', 'support_distance_pct': 1.0, 'resistance_distance_pct': 4.0})
+    else:
+        base.update({'direction': 'SHORT', 'support_distance_pct': 4.0, 'resistance_distance_pct': 1.0})
+    return base
 
 
 def test_geometry_long_is_deterministic_and_does_not_change_decision():
@@ -52,42 +51,73 @@ def candle(ts, low, high):
     return {'open_time': ts, 'close_time': ts + 299999, 'open': 100, 'high': high, 'low': low, 'close': 100}
 
 
+def production_row(**extra):
+    row = {
+        'id': 'x', 'symbol': 'BTCUSDT', 'direction': 'LONG', 'entry': 100,
+        'captured_at_ms': 1_000_000, 'champion_take': True,
+        'research_champion_take': True, 'production_signal_qualified': True,
+        'final_score': 84, 'signal_threshold': 68,
+    }
+    row.update(extra)
+    return row
+
+
 def test_path_tp2_wins_and_returns_rr():
-    row = {'id': 'x', 'symbol': 'BTCUSDT', 'direction': 'LONG', 'entry': 100, 'captured_at_ms': 1_000_000, 'champion_take': True}
     geom = {'geometry': tps.derive_geometry(signal_payload('LONG'))}
     rows = [candle(1_000_000, 99, 101), candle(1_300_000, 101, 102.5), candle(1_600_000, 102, 104.2)]
-    out = tps.settle_row(row, geom, now_ms=2_000_000, candle_loader=lambda *_: rows)
+    out = tps.settle_row(production_row(), geom, now_ms=2_000_000, candle_loader=lambda *_: rows)
     assert out['path_outcome'] == 'WIN_TP2'
     assert out['r_multiple'] == 2.0
     assert out['terminal'] is True
+    assert out['production_signal_qualified'] is True
 
 
 def test_path_stop_loss_is_minus_one_r():
-    row = {'id': 'x', 'symbol': 'BTCUSDT', 'direction': 'LONG', 'entry': 100, 'captured_at_ms': 1_000_000, 'champion_take': True}
     geom = {'geometry': tps.derive_geometry(signal_payload('LONG'))}
     rows = [candle(1_000_000, 97.8, 100.5)]
-    out = tps.settle_row(row, geom, now_ms=2_000_000, candle_loader=lambda *_: rows)
+    out = tps.settle_row(production_row(), geom, now_ms=2_000_000, candle_loader=lambda *_: rows)
     assert out['path_outcome'] == 'LOSS'
     assert out['r_multiple'] == -1.0
 
 
 def test_same_candle_is_not_guessed_when_test_loader_cannot_resolve_order():
-    row = {'id': 'x', 'symbol': 'BTCUSDT', 'direction': 'LONG', 'entry': 100, 'captured_at_ms': 1_000_000, 'champion_take': True}
     geom = {'geometry': tps.derive_geometry(signal_payload('LONG'))}
     rows = [candle(1_000_000, 97.5, 104.5)]
-    out = tps.settle_row(row, geom, now_ms=2_000_000, candle_loader=lambda *_: rows)
+    out = tps.settle_row(production_row(), geom, now_ms=2_000_000, candle_loader=lambda *_: rows)
     assert out['path_outcome'] == 'AMBIGUOUS'
     assert out['r_multiple'] is None
 
 
 def test_24h_no_hit_expires_at_zero_r():
     start = 1_000_000
-    row = {'id': 'x', 'symbol': 'BTCUSDT', 'direction': 'LONG', 'entry': 100, 'captured_at_ms': start, 'champion_take': True}
     geom = {'geometry': tps.derive_geometry(signal_payload('LONG'))}
-    rows = [candle(start, 99.2, 100.8)]
-    out = tps.settle_row(row, geom, now_ms=start + 24 * 3600000, candle_loader=lambda *_: rows)
+    out = tps.settle_row(production_row(captured_at_ms=start), geom, now_ms=start + 24 * 3600000,
+                         candle_loader=lambda *_: [candle(start, 99.2, 100.8)])
     assert out['path_outcome'] == 'EXPIRED'
     assert out['r_multiple'] == 0.0
+
+
+def test_research_champion_is_excluded_from_signal_path_scope():
+    real = production_row(id='prod')
+    research = production_row(
+        id='research', final_score=64, champion_take=True, research_champion_take=True,
+        production_signal_qualified=False, signal_threshold=68,
+    )
+    items = tps.build_path_ledger([real, research], {}, scope='signals', now_ms=2_000_000)
+    assert [x['id'] for x in items] == ['prod']
+    assert items[0]['production_signal_qualified'] is True
+
+
+def test_research_champion_scope_remains_available_separately():
+    research = production_row(
+        id='research', final_score=64, champion_take=True, research_champion_take=True,
+        production_signal_qualified=False, signal_threshold=68,
+    )
+    items = tps.build_path_ledger([research], {}, scope='champions', now_ms=2_000_000)
+    assert len(items) == 1
+    assert items[0]['id'] == 'research'
+    assert items[0]['production_signal_qualified'] is False
+    assert items[0]['research_champion'] is True
 
 
 class FakeCollector:
@@ -104,11 +134,14 @@ class FakeCollector:
             'schema': 'ATLAS_FORWARD_V1', 'id': f'fwd-{self.seq}',
             'captured_at': '2026-08-23T00:00:00+00:00', 'captured_at_ms': 1_000_000 + self.seq,
             'symbol': payload['symbol'], 'direction': payload['direction'], 'entry': payload['entry'],
-            'champion_take': payload.get('champion_take', False), 'final_score': payload.get('final_score'),
+            'champion_take': payload.get('champion_take', False),
+            'research_champion_take': payload.get('research_champion_take', False),
+            'production_signal_qualified': payload.get('production_signal_qualified', False),
+            'final_score': payload.get('final_score'), 'signal_threshold': payload.get('signal_threshold', 68),
         }
 
 
-def test_freezer_persists_separate_exact_id_geometry_archive():
+def test_freezer_persists_separate_exact_id_geometry_archive_with_signal_semantics():
     c = FakeCollector()
     state = tps.install_geometry_freezer(c)
     result = c.forward_observe(signal_payload('LONG'))
@@ -118,8 +151,20 @@ def test_freezer_persists_separate_exact_id_geometry_archive():
     assert len(rows) == 1
     assert rows[0]['forward_observation_id'] == 'fwd-1'
     assert rows[0]['geometry']['stop_loss'] == 98.0
-    # The core forward return stays untouched by this independent archive.
+    assert rows[0]['production_signal_qualified'] is True
+    assert rows[0]['signal_qualified'] is True
+    assert rows[0]['research_champion'] is True
     assert 'frozen_trade_geometry' not in result
+
+
+def test_freezer_labels_research_champion_as_not_production_signal():
+    c = FakeCollector()
+    tps.install_geometry_freezer(c)
+    c.forward_observe(signal_payload('LONG', score=64, production=False))
+    rows = tps.read_geometry_archive(c)
+    assert rows[0]['production_signal_qualified'] is False
+    assert rows[0]['signal_qualified'] is False
+    assert rows[0]['research_champion'] is True
 
 
 if __name__ == '__main__':
@@ -130,5 +175,8 @@ if __name__ == '__main__':
     test_path_stop_loss_is_minus_one_r()
     test_same_candle_is_not_guessed_when_test_loader_cannot_resolve_order()
     test_24h_no_hit_expires_at_zero_r()
-    test_freezer_persists_separate_exact_id_geometry_archive()
+    test_research_champion_is_excluded_from_signal_path_scope()
+    test_research_champion_scope_remains_available_separately()
+    test_freezer_persists_separate_exact_id_geometry_archive_with_signal_semantics()
+    test_freezer_labels_research_champion_as_not_production_signal()
     print('trade path settlement tests: ok')
