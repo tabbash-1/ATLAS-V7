@@ -5,9 +5,11 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/render-live-smoke.yml'
+      - 'cloud_start.py'
       - 'trade_path_settlement.py'
       - 'trade_outcome_runtime.py'
       - 'execution_outcome_scope.py'
+      - 'execution_risk_management.py'
       - 'production_decision_api.py'
       - 'quick_reentry_guard.py'
   workflow_dispatch:
@@ -28,7 +30,7 @@ jobs:
           python3 -m json.tool /tmp/health.json >/dev/null
           curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --connect-timeout 10 --max-time 30 "$base/api/runtime/status" | tee /tmp/runtime.json
           python3 -m json.tool /tmp/runtime.json >/dev/null
-      - name: Verify signal and execution path summaries
+      - name: Verify managed signal and execution path summaries
         shell: bash
         run: |
           set -euo pipefail
@@ -45,16 +47,44 @@ jobs:
           signals=json.load(open('/tmp/path-signals.json'))
           execution=json.load(open('/tmp/path-execution.json'))
           expected='ATLAS_TRADE_PATH_SUMMARY_V2_EXECUTION_SCOPE'
+          policy='ATLAS_EXECUTION_RISK_V1_STRUCTURAL_TP1_PROTECT'
           assert signals.get('schema') == expected, signals
           assert execution.get('schema') == expected, execution
           for payload in (signals, execution):
               overall=payload.get('overall') or {}
               assert 'market_data_errors' in overall, overall
               assert 'market_data_circuit' in overall, overall
+              assert overall.get('management_policy') == policy, overall
+              assert isinstance(overall.get('unmanaged_baseline'), dict), overall
+              assert 'protected_tp1_exits' in overall, overall
           assert execution.get('scope') == 'execution', execution
           assert execution.get('signal_scope_semantics') == 'PRODUCTION_SCORE_QUALIFIED_PLUS_VALID_GEOMETRY_RR_GTE_1', execution
           assert execution.get('execution_rejection_summary') is not None, execution
-          print('SIGNALS_METRICS', json.dumps(signals.get('overall') or {}, sort_keys=True))
-          print('EXECUTION_METRICS', json.dumps(execution.get('overall') or {}, sort_keys=True))
+          print('SIGNALS_MANAGED_METRICS', json.dumps(signals.get('overall') or {}, sort_keys=True))
+          print('EXECUTION_MANAGED_METRICS', json.dumps(execution.get('overall') or {}, sort_keys=True))
           print('EXECUTION_REJECTIONS', json.dumps(execution.get('execution_rejection_summary') or {}, sort_keys=True))
+          PY
+      - name: Verify live decision exposes actual RR management plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://atlas-v7.onrender.com/api/decision/current?symbol=BTCUSDT'
+          code="$(curl -L --retry 3 --retry-delay 10 --retry-all-errors --connect-timeout 10 --max-time 45 -sS -w '%{http_code}' -o /tmp/decision.json "$url")"
+          echo "HTTP=$code"
+          cat /tmp/decision.json
+          test "$code" -ge 200 -a "$code" -lt 300
+          python3 - <<'PY'
+          import json
+          x=json.load(open('/tmp/decision.json'))
+          assert x.get('ok') is True, x
+          assert x.get('execution_policy_version') == 'ATLAS_EXECUTION_RISK_V1_STRUCTURAL_TP1_PROTECT', x
+          plan=x.get('management_plan')
+          if x.get('candidate_direction') in ('LONG','SHORT') and plan is not None:
+              assert plan.get('tp1_close_fraction') == 0.5, plan
+              assert plan.get('after_tp1_stop') == plan.get('initial_stop_loss') or plan.get('after_tp1_stop') == x.get('entry'), plan
+          gate=x.get('geometry_gate') or {}
+          if x.get('execution_ready'):
+              assert gate.get('qualified') is True, gate
+              assert float(x.get('risk_reward')) >= 1.0, x
+          print('DECISION_RISK_POLICY', json.dumps({'decision':x.get('actionable_decision'),'reason':x.get('actionable_reason'),'rr':x.get('risk_reward'),'policy':x.get('execution_policy_version'),'management_plan':plan}, sort_keys=True))
           PY
