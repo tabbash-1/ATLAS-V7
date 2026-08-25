@@ -12,6 +12,10 @@ on:
       - 'cloud_start.py'
       - 'atlas_runtime_server.py'
       - 'atlas_research_runtime_server.py'
+      - 'trade_outcome_ledger.py'
+      - 'trade_outcome_runtime.py'
+      - 'trade_path_settlement.py'
+      - 'research_memory_bridge.py'
       - 'production-status.html'
       - 'trade-outcomes.html'
       - 'cloud-forward-ui.js'
@@ -58,6 +62,10 @@ jobs:
           fetch_json readiness /api/production/readiness || true; sleep 5
           fetch_json outcomes /api/outcomes/summary || true; sleep 5
           fetch_json geometry /api/outcomes/geometry-status || true; sleep 5
+          # Canonical TP/SL path settlement. This is the only snapshot field that
+          # may report R; the 24h directional outcome ledger intentionally cannot.
+          fetch_json path_summary '/api/outcomes/path-summary?scope=signals' || true; sleep 5
+          fetch_json settlement_status /api/outcomes/settlement-status || true; sleep 5
           fetch_json ai_status /api/ai/council/status || true
           for s in BTCUSDT ETHUSDT SOLUSDT XRPUSDT BNBUSDT DOGEUSDT ZECUSDT HYPEUSDT; do
             sleep 6; fetch_json "decision_${s}" "/api/decision/current?symbol=${s}" || true
@@ -81,12 +89,30 @@ jobs:
           for s,a in councils.items():
               if a.get('error') or a.get('ok') is False: ai_failures.append({'symbol':s,'error':a.get('error'),'http_code':a.get('http_code')})
               else: ai_actions.append({'symbol':s,'direction':a.get('direction'),'verdict':a.get('verdict'),'confidence':a.get('confidence'),'reason':a.get('reason'),'production_decision':a.get('production_decision'),'production_score':a.get('production_score'),'judge':a.get('judge')})
+          path_summary=load('path_summary')
+          path_overall=(path_summary.get('overall') or {}) if isinstance(path_summary,dict) else {}
+          realized_r={
+              'available': path_overall.get('net_r') is not None,
+              'terminal': path_overall.get('terminal'),
+              'open': path_overall.get('open'),
+              'wins': path_overall.get('wins'),
+              'losses': path_overall.get('losses'),
+              'expired': path_overall.get('expired'),
+              'net_r': path_overall.get('net_r'),
+              'average_r': path_overall.get('average_r'),
+              'profit_factor_r': path_overall.get('profit_factor_r'),
+              'win_rate_pct': path_overall.get('win_rate_pct'),
+              'geometry_available': path_overall.get('geometry_available'),
+              'geometry_unavailable': path_overall.get('geometry_unavailable'),
+              'ambiguous': path_overall.get('ambiguous'),
+              'source': 'CANONICAL_FROZEN_TP_SL_PATH_SETTLEMENT',
+          }
           captured=datetime.datetime.now(datetime.timezone.utc)
-          summary={'schema':'ATLAS_PRODUCTION_SNAPSHOT_V6_AI_COUNCIL','captured_at':captured.isoformat(),'source':'https://atlas-v7.onrender.com','monitor_mode':'PACED_PER_SYMBOL_READ_ONLY','runtime':load('runtime'),'readiness':load('readiness'),'outcomes':load('outcomes'),'geometry_status':load('geometry'),'ai_status':load('ai_status'),'decisions':decisions,'ai_council':councils,'decision_summary':{'supported_assets':symbols,'qualified_count':len(qualified),'qualified':qualified,'wait_count':len(waits),'waits':waits,'failed_count':len(failures),'failures':failures},'ai_summary':{'analyzed_count':len(ai_actions),'analyses':ai_actions,'failed_count':len(ai_failures),'failures':ai_failures}}
+          summary={'schema':'ATLAS_PRODUCTION_SNAPSHOT_V7_PATH_R','captured_at':captured.isoformat(),'source':'https://atlas-v7.onrender.com','monitor_mode':'PACED_PER_SYMBOL_READ_ONLY','runtime':load('runtime'),'readiness':load('readiness'),'outcomes':load('outcomes'),'geometry_status':load('geometry'),'path_summary':path_summary,'realized_r':realized_r,'settlement_status':load('settlement_status'),'ai_status':load('ai_status'),'decisions':decisions,'ai_council':councils,'decision_summary':{'supported_assets':symbols,'qualified_count':len(qualified),'qualified':qualified,'wait_count':len(waits),'waits':waits,'failed_count':len(failures),'failures':failures},'ai_summary':{'analyzed_count':len(ai_actions),'analyses':ai_actions,'failed_count':len(ai_failures),'failures':ai_failures}}
           pathlib.Path('status/atlas-production-latest.json').write_text(json.dumps(summary,indent=2,sort_keys=True))
           history=pathlib.Path('status/history/production-snapshots.jsonl')
           with history.open('a') as f:f.write(json.dumps(summary,separators=(',',':'))+'\n')
-          # Keep the existing WAIT tracker contract; V6 history now also preserves frozen AI council analyses for later comparison.
+          # WAIT opportunity-cost tracking remains independent from signal R.
           rows=[]
           try:rows=[json.loads(x) for x in history.read_text().splitlines() if x.strip()]
           except Exception:rows=[]
