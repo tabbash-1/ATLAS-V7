@@ -1,5 +1,5 @@
 {
-  "schema": "ATLAS_PRODUCTION_LOSS_AUTOPSY_V1",
+  "schema": "ATLAS_PRODUCTION_LOSS_AUTOPSY_V2",
   "terminal": 15,
   "wins": 7,
   "losses": 8,
@@ -38,6 +38,45 @@
       "net_r": 2.2853
     }
   },
+  "entry_quality_evidence": {
+    "tight_stop_threshold_pct": 0.35,
+    "terminal_stop_distance_bands": {
+      "0.00-0.25%": 10,
+      "0.25-0.35%": 1,
+      "0.35-0.50%": 2,
+      "0.50-0.75%": 0,
+      "0.75-1.00%": 1,
+      ">=1.00%": 1
+    },
+    "loss_stop_distance_bands": {
+      "0.00-0.25%": 6,
+      "0.25-0.35%": 0,
+      "0.35-0.50%": 1,
+      "0.50-0.75%": 0,
+      "0.75-1.00%": 0,
+      ">=1.00%": 1
+    },
+    "median_stop_distance_pct_wins": 0.1204,
+    "median_stop_distance_pct_losses": 0.1205,
+    "geometry_generations": {
+      "UNVERSIONED_LEGACY_OR_UNKNOWN": {
+        "n": 15,
+        "wins": 7,
+        "losses": 8,
+        "net_r": 0.4978,
+        "median_stop_distance_pct": 0.1204,
+        "tight_stop_losses": 6
+      }
+    },
+    "generation_metadata_complete": false,
+    "tight_stop_loss_share_pct": 75.0
+  },
+  "research_recommendation": {
+    "action": "COLLECT_POST_FIX_COHORT",
+    "change_production_stop_policy_now": false,
+    "reason": "Ledger geometry is unversioned/mixed; do not attribute legacy tight stops to the current ATR-aware engine.",
+    "minimum_post_fix_terminal_sample": 30
+  },
   "loss_rows": [
     {
       "id": "511dade07b10a9992dc4",
@@ -45,6 +84,7 @@
       "direction": "LONG",
       "score": 72.0,
       "cause": "STOP_TOO_TIGHT_CANDIDATE",
+      "geometry_generation": "UNVERSIONED_LEGACY_OR_UNKNOWN",
       "tp1_reached": false,
       "rr_tp2": 5.079208,
       "stop_distance_pct": 0.101,
@@ -56,6 +96,7 @@
       "direction": "LONG",
       "score": 86.0,
       "cause": "STOP_TOO_TIGHT_CANDIDATE",
+      "geometry_generation": "UNVERSIONED_LEGACY_OR_UNKNOWN",
       "tp1_reached": false,
       "rr_tp2": 5.578571,
       "stop_distance_pct": 0.14,
@@ -67,6 +108,7 @@
       "direction": "LONG",
       "score": 76.0,
       "cause": "PRE_TP1_DIRECTION_OR_ENTRY_FAILURE",
+      "geometry_generation": "UNVERSIONED_LEGACY_OR_UNKNOWN",
       "tp1_reached": false,
       "rr_tp2": 1.769821,
       "stop_distance_pct": 0.391,
@@ -78,6 +120,7 @@
       "direction": "LONG",
       "score": 84.0,
       "cause": "PRE_TP1_DIRECTION_OR_ENTRY_FAILURE",
+      "geometry_generation": "UNVERSIONED_LEGACY_OR_UNKNOWN",
       "tp1_reached": false,
       "rr_tp2": 1.133,
       "stop_distance_pct": 1.1959,
@@ -89,6 +132,7 @@
       "direction": "LONG",
       "score": 75.0,
       "cause": "STOP_TOO_TIGHT_CANDIDATE",
+      "geometry_generation": "UNVERSIONED_LEGACY_OR_UNKNOWN",
       "tp1_reached": false,
       "rr_tp2": 2.211,
       "stop_distance_pct": 0.0371,
@@ -100,6 +144,7 @@
       "direction": "LONG",
       "score": 81.0,
       "cause": "STOP_TOO_TIGHT_CANDIDATE",
+      "geometry_generation": "UNVERSIONED_LEGACY_OR_UNKNOWN",
       "tp1_reached": false,
       "rr_tp2": 1.479,
       "stop_distance_pct": 0.1589,
@@ -111,6 +156,7 @@
       "direction": "LONG",
       "score": 70.0,
       "cause": "STOP_TOO_TIGHT_CANDIDATE",
+      "geometry_generation": "UNVERSIONED_LEGACY_OR_UNKNOWN",
       "tp1_reached": false,
       "rr_tp2": 1.467,
       "stop_distance_pct": 0.0845,
@@ -122,6 +168,7 @@
       "direction": "LONG",
       "score": 68.0,
       "cause": "STOP_TOO_TIGHT_CANDIDATE",
+      "geometry_generation": "UNVERSIONED_LEGACY_OR_UNKNOWN",
       "tp1_reached": false,
       "rr_tp2": 1.156,
       "stop_distance_pct": 0.0986,
@@ -131,5 +178,6 @@
   "production_threshold": 68,
   "production_threshold_changed": false,
   "production_score_adjustment": 0,
+  "production_stop_policy_changed": false,
   "research_only": true
 }
