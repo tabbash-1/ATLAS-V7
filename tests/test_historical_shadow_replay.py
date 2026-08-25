@@ -28,7 +28,9 @@ def test_replay_counts_directional_and_target_progress():
     r = hsr.build_report(payload, target_cases=2)
     assert r['progress']['directional_shadow_records'] == 2
     assert r['progress']['directional_24h_matured'] == 2
-    assert r['progress']['target_reached'] is True
+    assert r['progress']['target_reached_24h'] is True
+    assert r['progress']['target_reached_any_horizon'] is True
+    assert r['horizon_fit']['target_by_horizon']['12h']['target_reached'] is True
     assert r['production_threshold_changed'] is False
 
 
