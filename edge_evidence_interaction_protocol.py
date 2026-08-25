@@ -4,6 +4,12 @@ This module freezes the design of a possible future interaction study BEFORE any
 interaction outcome analysis is allowed. It consumes only the outcome-free joint
 coverage audit and produces a deterministic protocol manifest + hash.
 
+Registration is one-way. While joint coverage is not ready, the candidate may
+remain BLOCKED_BY_DESIGN. The first PREREGISTERED manifest is then frozen and,
+when collector.DATA is available, persisted atomically so process restarts load
+the exact same registration instead of silently re-registering a changed design.
+A present but corrupt registration is never overwritten automatically.
+
 It does not read outcomes, select profitable cells, search parameters, choose a
 single volatility horizon, activate filters, assign weights, create composite
 scores, or change Production. Any later interaction validator must prove it is
@@ -14,12 +20,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
 
 import edge_evidence_joint_coverage
 
-VERSION = 'EDGE_EVIDENCE_INTERACTION_PROTOCOL_V1_PREREGISTERED'
+VERSION = 'EDGE_EVIDENCE_INTERACTION_PROTOCOL_V2_PERSISTENT_PREREGISTRATION'
 PROTOCOL_SCHEMA = 'ATLAS_INTERACTION_VALIDATION_PROTOCOL_V1'
+REGISTRATION_FILENAME = 'interaction_validation_preregistration.json'
 
 # Frozen design constants. Changing any of these changes protocol_hash.
 CHRONOLOGICAL_FOLDS = 3
@@ -156,14 +164,78 @@ def verify_manifest(manifest):
     return expected == _protocol_hash(payload)
 
 
+def _registration_file(collector):
+    data = getattr(collector, 'DATA', None)
+    if data is None:
+        return None
+    return Path(data) / REGISTRATION_FILENAME
+
+
+def _load_registration(path):
+    try:
+        raw = json.loads(Path(path).read_text(encoding='utf-8'))
+    except Exception as exc:
+        return None, f'{type(exc).__name__}: {exc}'
+    if not isinstance(raw, dict):
+        return None, 'REGISTRATION_NOT_JSON_OBJECT'
+    if raw.get('status') != 'PREREGISTERED':
+        return raw, 'REGISTRATION_STATUS_NOT_PREREGISTERED'
+    if not verify_manifest(raw):
+        return raw, 'REGISTRATION_HASH_INVALID'
+    return raw, None
+
+
+def _atomic_write_registration(path, manifest):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + '.tmp')
+    tmp.write_text(_canonical_json(manifest) + '\n', encoding='utf-8')
+    os.replace(tmp, path)
+
+
 def install(collector):
-    """Expose protocol state read-only; never wrap Production or Forward capture."""
+    """Expose a one-way frozen protocol state; never wrap Production or Forward."""
     if getattr(collector, '_EDGE_EVIDENCE_INTERACTION_PROTOCOL_INSTALLED', False):
         return getattr(collector, 'EDGE_EVIDENCE_INTERACTION_PROTOCOL_STATE', {})
 
     original_decision = getattr(collector, 'production_decision', None)
     original_forward = getattr(collector, 'forward_observe', None)
+    registration_file = _registration_file(collector)
     joint_state = getattr(collector, 'EDGE_EVIDENCE_JOINT_COVERAGE_STATE', None)
+
+    manifest = None
+    registration_locked = False
+    persistence_error = None
+
+    if registration_file is not None and registration_file.exists():
+        loaded, load_error = _load_registration(registration_file)
+        registration_locked = True  # A present registration is never auto-overwritten.
+        if loaded is not None:
+            manifest = loaded
+        else:
+            manifest = {
+                'status': 'REGISTRATION_CORRUPT',
+                'protocol_hash': None,
+                'eligible_volatility_horizons_h': [],
+                'blockers': ['PERSISTED_PREREGISTRATION_UNREADABLE'],
+            }
+        persistence_error = load_error
+    else:
+        candidate = build_manifest(joint_state)
+        manifest = candidate
+        if candidate.get('status') == 'PREREGISTERED':
+            if registration_file is not None:
+                try:
+                    _atomic_write_registration(registration_file, candidate)
+                except Exception as exc:
+                    # Fail closed: do not call this registration locked if persistence failed.
+                    persistence_error = f'{type(exc).__name__}: {exc}'
+                else:
+                    registration_locked = True
+            else:
+                # Test/lightweight collectors without DATA still get process-local freezing.
+                registration_locked = True
+
     state = {
         'enabled': True,
         'version': VERSION,
@@ -171,13 +243,42 @@ def install(collector):
         'wraps_production_decision': False,
         'wraps_forward_observe': False,
         'can_override_production': False,
-        'manifest': build_manifest(joint_state),
+        'registration_file': str(registration_file) if registration_file is not None else None,
+        'registration_locked': registration_locked,
+        'persistence_error': persistence_error,
+        'manifest': manifest,
     }
 
     def refresh():
-        state['manifest'] = build_manifest(
+        # Once registered, NEVER rebuild from current joint coverage.
+        if state['registration_locked']:
+            if registration_file is not None:
+                loaded, load_error = _load_registration(registration_file)
+                state['persistence_error'] = load_error
+                if loaded is not None:
+                    state['manifest'] = loaded
+                else:
+                    state['manifest'] = {
+                        'status': 'REGISTRATION_CORRUPT',
+                        'protocol_hash': None,
+                        'eligible_volatility_horizons_h': [],
+                        'blockers': ['PERSISTED_PREREGISTRATION_UNREADABLE'],
+                    }
+            return state['manifest']
+
+        candidate = build_manifest(
             getattr(collector, 'EDGE_EVIDENCE_JOINT_COVERAGE_STATE', None)
         )
+        state['manifest'] = candidate
+        if candidate.get('status') == 'PREREGISTERED':
+            if registration_file is not None:
+                try:
+                    _atomic_write_registration(registration_file, candidate)
+                except Exception as exc:
+                    state['persistence_error'] = f'{type(exc).__name__}: {exc}'
+                    return state['manifest']
+            state['registration_locked'] = True
+            state['persistence_error'] = None
         return state['manifest']
 
     collector.EDGE_EVIDENCE_INTERACTION_PROTOCOL_STATE = state
