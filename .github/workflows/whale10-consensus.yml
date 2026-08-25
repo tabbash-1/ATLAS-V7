@@ -1,0 +1,44 @@
+name: ATLAS Whale-10 Consensus Integrity
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'whale10_consensus.py'
+      - 'tests/test_whale10_consensus.py'
+      - '.github/workflows/whale10-consensus.yml'
+  pull_request:
+    paths:
+      - 'whale10_consensus.py'
+      - 'tests/test_whale10_consensus.py'
+      - '.github/workflows/whale10-consensus.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  whale10-integrity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile Whale-10 research layer
+        run: python3 -m py_compile whale10_consensus.py tests/test_whale10_consensus.py
+      - name: Run Whale-10 integrity tests
+        run: PYTHONPATH=. python3 tests/test_whale10_consensus.py
+      - name: Protect Production isolation
+        run: |
+          python3 - <<'PY'
+          import whale10_consensus as w
+          rows=[{
+              'entity_id':f'w{i}','symbol':'BTCUSDT','entity_type':'FUND',
+              'validated':True,'independent':True,'source_confidence':'HIGH',
+              'netflow_z':1.0,
+          } for i in range(10)]
+          x=w.build_consensus(rows,'BTCUSDT')
+          assert x['production_eligible'] is False
+          assert x['research_only'] is True
+          assert x['schema']=='ATLAS_WHALE10_CONSENSUS_V1'
+          print('WHALE10_INTEGRITY_OK',x['consensus'],x['consensus_score'])
+          PY
