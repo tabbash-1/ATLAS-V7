@@ -1,15 +1,14 @@
-"""ATLAS Evidence-Bound Trade Council V3.
+"""ATLAS Evidence-Bound Trade Council V4.
 
 Research-only shadow analyst. It never executes trades and never weakens the
-production gate. V3 adds safe use of provider-specific derivatives shadow
-context when Production futures evidence is unavailable. Unvalidated futures
-context is explicitly labeled and down-weighted; it cannot alter Production.
+Production gate. V4 fixes conditional breakout geometry so a breakout entry
+cannot be placed before the resistance/support it claims to break.
 """
 from __future__ import annotations
 import json, math, urllib.parse
 from pathlib import Path
 
-VERSION = 'ATLAS_AI_TRADE_COUNCIL_V3_FUTURES_SHADOW_SAFE'
+VERSION = 'ATLAS_AI_TRADE_COUNCIL_V4_STRUCTURE_ANCHORED'
 HORIZON = '1-3H'
 
 
@@ -66,19 +65,57 @@ def _side_score(evidence, side):
     return sum(sign*x['value']*x['weight'] for x in evidence)/total
 
 
+def _breakout_anchor(decision, direction, px):
+    """Return the actual structure that price must clear before a breakout entry."""
+    geom=decision.get('structural_geometry') or {}
+    br=geom.get('breakout') or {}
+    obstacle=_num(geom.get('obstacle_price'))
+    range_level=_num(br.get('prior_24h_high') if direction=='LONG' else br.get('prior_24h_low'))
+    candidates=[]
+    if direction=='LONG':
+        if obstacle is not None and obstacle>px:candidates.append((obstacle,geom.get('source') or 'STRUCTURAL_OBSTACLE'))
+        if range_level is not None and range_level>px:candidates.append((range_level,'PRIOR_24H_HIGH'))
+        if not candidates:return None,None
+        # A LONG breakout must clear every relevant resistance ahead, therefore
+        # use the highest nearby structural boundary, not an ATR guess below it.
+        return max(candidates,key=lambda x:x[0])
+    if direction=='SHORT':
+        if obstacle is not None and obstacle<px:candidates.append((obstacle,geom.get('source') or 'STRUCTURAL_OBSTACLE'))
+        if range_level is not None and range_level<px:candidates.append((range_level,'PRIOR_24H_LOW'))
+        if not candidates:return None,None
+        # A SHORT breakdown must clear every relevant support below price.
+        return min(candidates,key=lambda x:x[0])
+    return None,None
+
+
 def _counterfactuals(decision,direction,confidence):
-    tac=decision.get('tactical_opportunity') or {}; px=_num(decision.get('entry')); atr=_num((decision.get('indicators') or {}).get('atr14')); rr=_num(tac.get('risk_reward'))
+    tac=decision.get('tactical_opportunity') or {}; px=_num(decision.get('entry')); atr=_num((decision.get('indicators') or {}).get('atr14'))
     target=_num(tac.get('target')); stop=_num(tac.get('stop_loss'))
     if not px:return []
     s=1 if direction=='LONG' else -1
     atr=atr or px*.01
     scenarios=[]
-    def add(name,entry,sl,tp,trigger,thesis):
+    def add(name,entry,sl,tp,trigger,thesis,**extra):
         risk=abs(entry-sl) if sl is not None else None; reward=abs(tp-entry) if tp is not None else None; xrr=(reward/risk) if risk and reward is not None else None
-        scenarios.append({'scenario':name,'direction':direction,'entry':round(entry,10),'stop_loss':round(sl,10) if sl is not None else None,'target':round(tp,10) if tp is not None else None,'risk_reward':round(xrr,3) if xrr is not None else None,'trigger':trigger,'thesis':thesis,'shadow_only':True})
+        row={'scenario':name,'direction':direction,'entry':round(entry,10),'stop_loss':round(sl,10) if sl is not None else None,'target':round(tp,10) if tp is not None else None,'risk_reward':round(xrr,3) if xrr is not None else None,'trigger':trigger,'thesis':thesis,'shadow_only':True}
+        row.update(extra); scenarios.append(row)
     add('ENTER_NOW',px,stop or px-s*atr*.65,target or px+s*atr*1.2,'Immediate only if current evidence remains valid','Capture current move without waiting for a better price.')
-    pull=px-s*atr*.35; add('WAIT_PULLBACK',pull,pull-s*atr*.75,target or pull+s*atr*1.5,'Price retraces ~0.35 ATR without structure failure','Trade better entry quality if trend survives the pullback.')
-    brk=px+s*atr*.45; add('WAIT_BREAKOUT',brk,brk-s*atr*.75,brk+s*atr*1.6,'Price confirms expansion beyond near-term structure','Pay a worse entry for stronger confirmation.')
+    pull=px-s*atr*.35
+    add('WAIT_PULLBACK',pull,pull-s*atr*.75,target or pull+s*atr*1.5,'Price retraces ~0.35 ATR without structure failure','Trade better entry quality if trend survives the pullback.')
+
+    level,source=_breakout_anchor(decision,direction,px)
+    if level is not None:
+        # Require a small confirmation buffer beyond the actual structural level.
+        buffer=max(atr*.10,abs(level)*.0005)
+        brk=level+s*buffer
+        sl=brk-s*atr*.75
+        tp=brk+s*atr*1.6
+        relation='above' if direction=='LONG' else 'below'
+        add('WAIT_BREAKOUT',brk,sl,tp,
+            f'1H price closes/holds {relation} {level:.8g} ({source}) with confirmation',
+            'Enter only after the actual blocking structure has been cleared.',
+            reference_level=round(level,10),reference_source=source,structure_anchored=True,confirmation_buffer=round(buffer,10))
+
     scenarios.append({'scenario':'REJECT','direction':None,'entry':None,'stop_loss':None,'target':None,'risk_reward':None,'trigger':'No setup reaches acceptable evidence + geometry','thesis':'Preserve capital when alternatives are weak.','shadow_only':True})
     return scenarios
 
@@ -98,7 +135,7 @@ def analyze(decision):
     confidence=round(max(50,min(92,50+strength*45)))
     scenarios=_counterfactuals(decision,direction,confidence)
     viable=[x for x in scenarios if x['scenario']!='REJECT' and x.get('risk_reward') is not None]
-    viable.sort(key=lambda x:(x['risk_reward'], 1 if x['scenario']=='WAIT_BREAKOUT' else 0),reverse=True)
+    viable.sort(key=lambda x:(x['risk_reward'],1 if x['scenario']=='WAIT_BREAKOUT' else 0),reverse=True)
     best=viable[0] if viable and viable[0]['risk_reward']>=.8 else next((x for x in scenarios if x['scenario']=='REJECT'),None)
     prod_dir=decision.get('candidate_direction'); prod_score=_num(decision.get('score')); prod_ok=bool(decision.get('signal_qualified'))
     agree=(prod_dir==direction) if prod_dir else False
@@ -107,14 +144,7 @@ def analyze(decision):
     elif not prod_ok and verdict=='TAKE_SHADOW' and best and best.get('scenario')!='REJECT': hybrid='AI_SHADOW_OPPORTUNITY'
     elif verdict=='REJECT': hybrid='REJECT'
     else: hybrid='WAIT'
-    futures_context={
-        'production_validated':decision.get('futures_score') is not None,
-        'production_score':decision.get('futures_score'),
-        'shadow_score':decision.get('futures_shadow_score'),
-        'shadow_provider':decision.get('futures_shadow_provider') or decision.get('futures_provider'),
-        'shadow_only':bool(decision.get('futures_shadow_score') is not None and decision.get('futures_score') is None),
-        'can_affect_production':False if decision.get('futures_score') is None else True,
-    }
+    futures_context={'production_validated':decision.get('futures_score') is not None,'production_score':decision.get('futures_score'),'shadow_score':decision.get('futures_shadow_score'),'shadow_provider':decision.get('futures_shadow_provider') or decision.get('futures_provider'),'shadow_only':bool(decision.get('futures_shadow_score') is not None and decision.get('futures_score') is None),'can_affect_production':False if decision.get('futures_score') is None else True}
     return {'version':VERSION,'mode':'SHADOW_RESEARCH_ONLY','symbol':decision.get('symbol'),'horizon':HORIZON,'generated_at':decision.get('generated_at'),'entry':decision.get('entry'),'direction':direction,'verdict':verdict,'confidence':confidence,'reason':reason,'bull_analyst':{'score':round(bull,3),'best_case':[x['detail'] for x in bull_top if x['value']>0]},'bear_analyst':{'score':round(bear,3),'best_case':[x['detail'] for x in bear_top if x['value']<0]},'judge':{'net_strength':round(strength,3),'tactical_rr':rr,'target':tac.get('target'),'stop_loss':tac.get('stop_loss'),'invalidation':'Frozen stop/structure; no post-outcome rewriting.'},'counterfactuals':scenarios,'best_counterfactual':best,'hybrid_judge':{'decision':hybrid,'production_direction':prod_dir,'production_score':prod_score,'production_qualified':prod_ok,'ai_direction':direction,'ai_verdict':verdict,'agreement':agree},'evidence':ev,'futures_context':futures_context,'missing_data':missing,'production_decision':decision.get('decision'),'production_score':decision.get('score'),'production_qualified':prod_ok,'outcome_contract':{'evaluate_after_hours':[1,3,6],'metrics':['directional_return_pct','MFE_pct','MAE_pct','target_hit','stop_hit','realized_R','time_to_target_minutes'],'frozen':True},'safety':{'can_execute':False,'can_change_threshold':False,'can_override_production':False,'freeze_before_outcome':True,'unvalidated_futures_can_affect_production':False}}
 
 
@@ -145,7 +175,7 @@ def install(atlas):
             rows=0
             try:rows=sum(1 for x in ledger.open() if x.strip()) if ledger.exists() else 0
             except Exception:pass
-            return self._json({'ok':True,'version':VERSION,'mode':'SHADOW_RESEARCH_ONLY','ledger_rows':rows,'ledger':str(ledger),'can_execute':False,'counterfactuals':True,'hybrid_judge':True,'futures_shadow_safe':True},200)
+            return self._json({'ok':True,'version':VERSION,'mode':'SHADOW_RESEARCH_ONLY','ledger_rows':rows,'ledger':str(ledger),'can_execute':False,'counterfactuals':True,'hybrid_judge':True,'futures_shadow_safe':True,'structure_anchored_breakouts':True},200)
         return original(self)
     atlas.Handler.do_GET=do_GET
-    return {'enabled':True,'version':VERSION,'endpoint':'/api/ai/council','mode':'SHADOW_RESEARCH_ONLY','counterfactuals':True,'hybrid_judge':True,'futures_shadow_safe':True}
+    return {'enabled':True,'version':VERSION,'endpoint':'/api/ai/council','mode':'SHADOW_RESEARCH_ONLY','counterfactuals':True,'hybrid_judge':True,'futures_shadow_safe':True,'structure_anchored_breakouts':True}
