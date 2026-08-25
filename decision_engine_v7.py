@@ -1,20 +1,18 @@
-"""ATLAS Decision Engine V7 alignment layer.
+"""ATLAS Decision Engine V8 continuation-aware alignment layer.
 
-Keeps the score threshold unchanged while ensuring the execution plan uses the
-same prior-structure model as Production scoring. It also exposes the strongest
-available lane instead of collapsing every non-Swing setup into a generic WAIT.
+Keeps the score threshold unchanged while aligning execution geometry with the
+continuation-aware Production scorer. Nearby prior structure is still respected,
+but a broad, strong market continuation can target an ATR extension beyond that
+structure instead of treating the first old swing as the final upside/downside.
 """
 
 import production_signal_scoring as scoring
 import futures_provider_chain
 
-VERSION = 'DECISION_ENGINE_V7_BREAKOUT_AWARE'
+VERSION = 'DECISION_ENGINE_V8_CONTINUATION_AWARE'
 
 
 def install(atlas):
-    # Install the resilient futures chain before Production Reliability wraps
-    # capture(). This keeps Binance/Kraken first, then OKX/Bybit, while HYPE can
-    # still fall through to the existing Hyperliquid adapter in the outer layer.
     futures_provider_chain.install(atlas)
     original = atlas.production_decision
 
@@ -31,6 +29,11 @@ def install(atlas):
         votes = int(result.get('direction_votes') or 0)
         mom24 = atlas.fnum(indicators.get('momentum_24h_pct'), 0) or 0
         paced_rv = atlas.fnum(result.get('relative_volume'), 0) or 0
+        attr = result.get('score_attribution') or {}
+        momentum_adj = atlas.fnum(attr.get('momentum_adjustment'), 0) or 0
+        breadth_adj = atlas.fnum(attr.get('market_breadth_adjustment'), 0) or 0
+        guard_adj = atlas.fnum(attr.get('extension_guard_adjustment'), 0) or 0
+        continuation_strong = bool(votes == 4 and momentum_adj >= 4 and breadth_adj >= 2 and guard_adj >= 0)
 
         if direction in ('LONG', 'SHORT') and px and atr and atr > 0:
             ks = atlas._spot_klines(sym)
@@ -39,9 +42,14 @@ def install(atlas):
             extension = 1.6 if breakout.get('confirmed') else 1.4
             target = level
             target_source = source
-            if target is None:
+
+            if continuation_strong and level is not None and distance is not None and distance <= 1.5:
+                target = level + atr * 1.4 if direction == 'LONG' else level - atr * 1.4
+                target_source = 'CONTINUATION_EXTENSION_BEYOND_PRIOR_STRUCTURE'
+            elif target is None:
                 target = px + atr * extension if direction == 'LONG' else px - atr * extension
                 target_source = 'ATR_EXTENSION_AFTER_CLEAR_STRUCTURE'
+
             stop = px - atr * 1.2 if direction == 'LONG' else px + atr * 1.2
             risk = abs(px - stop)
             reward = (target - px) if direction == 'LONG' else (px - target)
@@ -62,6 +70,8 @@ def install(atlas):
                 'obstacle_price': round(level, 10) if level is not None else None,
                 'obstacle_distance_pct': round(distance, 3) if distance is not None else None,
                 'breakout': breakout,
+                'continuation_strong': continuation_strong,
+                'continuation_target_extended': target_source == 'CONTINUATION_EXTENSION_BEYOND_PRIOR_STRUCTURE',
                 'uses_current_candle_as_obstacle': False,
             }
             result['geometry_gate'] = {
@@ -74,7 +84,7 @@ def install(atlas):
             result['execution_ready'] = bool(qualified and geometry_ok)
             result['actionable_decision'] = direction if result['execution_ready'] else 'WAIT'
             if qualified and geometry_ok:
-                result['actionable_reason'] = 'EXECUTION_READY_BREAKOUT_AWARE'
+                result['actionable_reason'] = 'EXECUTION_READY_CONTINUATION_AWARE' if continuation_strong else 'EXECUTION_READY_BREAKOUT_AWARE'
                 result['trade_plan_status'] = 'EXECUTION_READY'
             elif qualified:
                 result['actionable_reason'] = result['geometry_gate']['reason']
@@ -88,6 +98,7 @@ def install(atlas):
                 'actionable_decision': result['actionable_decision'],
                 'structural_target_source': target_source,
                 'breakout_confirmed': bool(breakout.get('confirmed')),
+                'continuation_strong': continuation_strong,
             })
             matrix['swing'] = swing
             result['timeframe_matrix'] = matrix
@@ -138,5 +149,6 @@ def install(atlas):
         'version': VERSION,
         'production_threshold_unchanged': True,
         'futures_provider_chain': futures_provider_chain.VERSION,
+        'continuation_aware': True,
     }
     return atlas.DECISION_ENGINE_V7_STATE
