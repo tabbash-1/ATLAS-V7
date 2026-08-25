@@ -70,6 +70,7 @@ from production_reliability import install as _install_production_reliability; _
 from profit_engine_runtime import install as _install_profit_engine_runtime; _install_profit_engine_runtime(_collector)
 from microstructure_runtime import install as _install_microstructure_runtime; _install_microstructure_runtime(_collector)
 from volatility_runtime import install as _install_volatility_runtime; _install_volatility_runtime(_collector)
+from volatility_walkforward_runtime import install as _install_volatility_walkforward_runtime; _install_volatility_walkforward_runtime(_collector)
 entrypoint="atlas_research_runtime_server.py"
 print(f"ATLAS production boot: data={DATA_DIR} runtime=resilient-free-research release={release_token}")
 runpy.run_path(str(BASE/entrypoint),run_name="__main__")
