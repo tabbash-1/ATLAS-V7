@@ -1,23 +1,26 @@
 """ATLAS independent shadow-edge evidence aggregator.
 
 Summarizes already-produced prequential walk-forward reports from Profit Engine,
-Microstructure and Volatility, the frozen-signal cohort overlap audit, and a
-read-only descriptive layer-redundancy diagnostic. It does not combine
-predictions, assign weights, score trades, recompute historical evidence, or
-alter Production.
+Microstructure and Volatility plus frozen-signal governance diagnostics:
+cohort overlap, descriptive layer redundancy and outcome-free joint-cell coverage.
+It does not combine predictions, assign weights, score trades, recompute
+historical evidence, search interaction rules, or alter Production.
 
 MULTI_LAYER_EVIDENCE_AVAILABLE requires independent layer support and a comparable
-frozen forward_id cohort. Redundancy diagnostics are informational only and do
-not promote or demote that status. This remains research/governance evidence,
-never a live-trading approval and never a gate promotion.
+frozen forward_id cohort. Redundancy and joint-coverage diagnostics are
+informational only and do not promote or demote that status. Joint coverage may
+only say whether a future, separately-approved interaction validation experiment
+has enough design support. This remains research/governance evidence, never a
+live-trading approval and never a gate promotion.
 """
 
 from __future__ import annotations
 
+import edge_evidence_joint_coverage
 import edge_evidence_overlap
 import edge_evidence_redundancy
 
-VERSION = 'EDGE_EVIDENCE_REPORT_V3_WITH_REDUNDANCY_DIAGNOSTIC'
+VERSION = 'EDGE_EVIDENCE_REPORT_V4_WITH_JOINT_COVERAGE_DIAGNOSTIC'
 LAYERS = ('profit_engine', 'microstructure', 'volatility')
 
 
@@ -169,12 +172,50 @@ def _redundancy_report(redundancy_state):
     }
 
 
+def _joint_coverage_report(joint_state):
+    if not joint_state:
+        return {
+            'available': False,
+            'status': 'UNAVAILABLE',
+            'future_interaction_validation_supported': False,
+            'informational_only': True,
+            'affects_multilayer_status': False,
+            'interaction_rule_selection_allowed': False,
+            'interaction_outcome_testing_performed': False,
+            'blockers': ['EDGE_EVIDENCE_JOINT_COVERAGE_AUDIT_UNAVAILABLE'],
+        }
+    report = _dict(_dict(joint_state).get('report'))
+    status = report.get('status') or 'COLLECTING'
+    return {
+        'available': True,
+        'status': status,
+        'matched_forward_ids': report.get('matched_forward_ids'),
+        'minimum_matched_observations': report.get('minimum_matched_observations'),
+        'minimum_cell_n': report.get('minimum_cell_n'),
+        'horizons_with_sufficient_joint_coverage_h': report.get('horizons_with_sufficient_joint_coverage_h') or [],
+        'future_interaction_validation_supported': bool(report.get('future_interaction_validation_supported')),
+        'horizon_coverage': report.get('horizon_coverage') or {},
+        'chosen_trade_horizon_assumed': False,
+        'outcomes_read': False,
+        'performance_metrics_computed': False,
+        'rules_searched': False,
+        'grid_search_performed': False,
+        'interaction_rule_selection_allowed': False,
+        'interaction_outcome_testing_performed': False,
+        'informational_only': True,
+        'affects_multilayer_status': False,
+        'blockers': list(report.get('blockers') or []),
+        'source_version': report.get('version'),
+    }
+
+
 def aggregate(
     profit_state=None,
     microstructure_state=None,
     volatility_walkforward_state=None,
     overlap_state=None,
     redundancy_state=None,
+    joint_coverage_state=None,
 ):
     layers = {
         'profit_engine': _profit_layer(profit_state),
@@ -183,6 +224,7 @@ def aggregate(
     }
     overlap = _overlap_report(overlap_state)
     redundancy = _redundancy_report(redundancy_state)
+    joint_coverage = _joint_coverage_report(joint_coverage_state)
     supported = [name for name, row in layers.items() if row['evidence_supported']]
     unavailable = [name for name, row in layers.items() if not row['available']]
 
@@ -217,6 +259,7 @@ def aggregate(
         'layers': layers,
         'cohort_overlap': overlap,
         'layer_redundancy': redundancy,
+        'joint_cell_coverage': joint_coverage,
         'supported_layers': supported,
         'supported_layer_count': len(supported),
         'total_layer_count': len(LAYERS),
@@ -225,6 +268,8 @@ def aggregate(
         'canonical_execution_count_consistent': canonical_consistent,
         'frozen_signal_cohorts_comparable': overlap['cohorts_comparable'],
         'redundancy_diagnostic_affects_status': False,
+        'joint_coverage_diagnostic_affects_status': False,
+        'interaction_validation_started': False,
         'blockers': blockers,
         'weights_assigned': False,
         'composite_trade_score_created': False,
@@ -234,7 +279,7 @@ def aggregate(
         'production_ready_claimed': False,
         'live_trading_ready_claimed': False,
         'research_only': True,
-        'method': 'INDEPENDENT_PREQUENTIAL_LAYER_READINESS_PLUS_FROZEN_COHORT_COMPARABILITY_WITH_INFORMATIONAL_REDUNDANCY_DIAGNOSTIC',
+        'method': 'INDEPENDENT_PREQUENTIAL_LAYER_READINESS_PLUS_FROZEN_COHORT_COMPARABILITY_WITH_INFORMATIONAL_REDUNDANCY_AND_JOINT_COVERAGE_DIAGNOSTICS',
     }
 
 
@@ -245,6 +290,7 @@ def from_collector(collector):
         getattr(collector, 'VOLATILITY_WALKFORWARD_RUNTIME_STATE', None),
         getattr(collector, 'EDGE_EVIDENCE_OVERLAP_STATE', None),
         getattr(collector, 'EDGE_EVIDENCE_REDUNDANCY_STATE', None),
+        getattr(collector, 'EDGE_EVIDENCE_JOINT_COVERAGE_STATE', None),
     )
 
 
@@ -257,6 +303,7 @@ def install(collector):
     original_forward = getattr(collector, 'forward_observe', None)
     edge_evidence_overlap.install(collector)
     edge_evidence_redundancy.install(collector)
+    edge_evidence_joint_coverage.install(collector)
     state = {
         'enabled': True,
         'version': VERSION,
@@ -274,6 +321,9 @@ def install(collector):
         redundancy_refresh = getattr(collector, 'edge_evidence_redundancy_refresh', None)
         if callable(redundancy_refresh):
             redundancy_refresh()
+        joint_refresh = getattr(collector, 'edge_evidence_joint_coverage_refresh', None)
+        if callable(joint_refresh):
+            joint_refresh()
         state['report'] = from_collector(collector)
         return state['report']
 
