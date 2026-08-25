@@ -11,8 +11,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: AI canonical priority
-        run: python -m pytest -q tests/test_ai_canonical_plan.py
+      - name: Actionable Production wins
+        run: python -m pytest -q tests/test_ai_canonical_plan.py::test_execution_ready_production_plan_wins_over_shadow_counterfactual
+      - name: AI cannot say wait
+        run: python -m pytest -q tests/test_ai_canonical_plan.py::test_ai_never_says_wait_when_production_is_actionable
+      - name: Conditional plan preserved
+        run: python -m pytest -q tests/test_ai_canonical_plan.py::test_non_actionable_can_still_use_counterfactuals
       - name: Production trade plan
         run: python -m pytest -q tests/test_production_trade_plan.py
       - name: UI canonical sync
