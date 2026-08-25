@@ -1,3 +1,4 @@
+from pathlib import Path
 from types import SimpleNamespace
 
 import edge_evidence_interaction_protocol as eip
@@ -75,28 +76,88 @@ def test_shared_production_fields_are_forbidden_predictors():
     ]
 
 
-def test_install_is_read_only_refreshable_and_idempotent():
+def _collector(tmp_path, joint_state):
+    decision = lambda symbol: {'ok': True, 'symbol': symbol}
+    forward = lambda payload: {'id': 'F1'}
+    return SimpleNamespace(
+        DATA=Path(tmp_path),
+        production_decision=decision,
+        forward_observe=forward,
+        EDGE_EVIDENCE_JOINT_COVERAGE_STATE=joint_state,
+    ), decision, forward
+
+
+def test_install_waits_then_registers_once_and_freezes(tmp_path):
+    collector, decision, forward = _collector(
+        tmp_path, joint('COLLECTING', False, [])
+    )
+    state = eip.install(collector)
+    assert state['manifest']['status'] == 'BLOCKED_BY_DESIGN'
+    assert state['registration_locked'] is False
+    assert not (tmp_path / eip.REGISTRATION_FILENAME).exists()
+
+    collector.EDGE_EVIDENCE_JOINT_COVERAGE_STATE = joint(horizons=[1, 4, 12])
+    registered = collector.edge_evidence_interaction_protocol_refresh()
+    frozen_hash = registered['protocol_hash']
+    assert registered['status'] == 'PREREGISTERED'
+    assert state['registration_locked'] is True
+    assert (tmp_path / eip.REGISTRATION_FILENAME).exists()
+
+    # A later design change must NOT silently create a new preregistration.
+    collector.EDGE_EVIDENCE_JOINT_COVERAGE_STATE = joint(horizons=[1, 4])
+    refreshed = collector.edge_evidence_interaction_protocol_refresh()
+    assert refreshed['protocol_hash'] == frozen_hash
+    assert refreshed['eligible_volatility_horizons_h'] == [1, 4, 12]
+    assert collector.production_decision is decision
+    assert collector.forward_observe is forward
+
+
+def test_restart_loads_exact_same_persisted_registration(tmp_path):
+    first, _, _ = _collector(tmp_path, joint(horizons=[1, 4, 12]))
+    first_state = eip.install(first)
+    frozen = first_state['manifest']
+    assert first_state['registration_locked'] is True
+
+    # Simulate process restart under a changed current design.
+    second, decision, forward = _collector(tmp_path, joint(horizons=[1, 4]))
+    second_state = eip.install(second)
+    assert second_state['registration_locked'] is True
+    assert second_state['manifest']['protocol_hash'] == frozen['protocol_hash']
+    assert second_state['manifest']['eligible_volatility_horizons_h'] == [1, 4, 12]
+    assert second.production_decision is decision
+    assert second.forward_observe is forward
+
+
+def test_corrupt_persisted_registration_is_never_overwritten(tmp_path):
+    path = tmp_path / eip.REGISTRATION_FILENAME
+    path.write_text('{not-json', encoding='utf-8')
+    collector, _, _ = _collector(tmp_path, joint())
+    state = eip.install(collector)
+    assert state['registration_locked'] is True
+    assert state['manifest']['status'] == 'REGISTRATION_CORRUPT'
+    assert state['persistence_error']
+    original = path.read_text(encoding='utf-8')
+
+    collector.edge_evidence_interaction_protocol_refresh()
+    assert path.read_text(encoding='utf-8') == original
+    assert state['manifest']['status'] == 'REGISTRATION_CORRUPT'
+
+
+def test_install_without_data_is_process_local_frozen_and_idempotent():
     decision = lambda symbol: {'ok': True, 'symbol': symbol}
     forward = lambda payload: {'id': 'F1'}
     collector = SimpleNamespace(
         production_decision=decision,
         forward_observe=forward,
-        EDGE_EVIDENCE_JOINT_COVERAGE_STATE=joint('COLLECTING', False, []),
+        EDGE_EVIDENCE_JOINT_COVERAGE_STATE=joint(),
     )
     first = eip.install(collector)
-    assert first['manifest']['status'] == 'BLOCKED_BY_DESIGN'
-    assert first['read_only'] is True
-    assert first['wraps_production_decision'] is False
-    assert first['wraps_forward_observe'] is False
-    assert collector.production_decision is decision
-    assert collector.forward_observe is forward
+    frozen_hash = first['manifest']['protocol_hash']
+    assert first['registration_locked'] is True
 
-    collector.EDGE_EVIDENCE_JOINT_COVERAGE_STATE = joint()
+    collector.EDGE_EVIDENCE_JOINT_COVERAGE_STATE = joint(horizons=[1, 4])
     refreshed = collector.edge_evidence_interaction_protocol_refresh()
-    assert refreshed['status'] == 'PREREGISTERED'
-    assert eip.verify_manifest(refreshed) is True
-    assert collector.production_decision is decision
-    assert collector.forward_observe is forward
+    assert refreshed['protocol_hash'] == frozen_hash
 
     second = eip.install(collector)
     assert first is second
