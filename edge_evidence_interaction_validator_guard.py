@@ -12,7 +12,7 @@ from copy import deepcopy
 
 import edge_evidence_interaction_protocol as protocol
 
-VERSION = 'EDGE_EVIDENCE_INTERACTION_VALIDATOR_GUARD_V1_FAIL_CLOSED'
+VERSION = 'EDGE_EVIDENCE_INTERACTION_VALIDATOR_GUARD_V2_HASH_BOUND'
 
 
 def _joint_report(joint_state):
@@ -27,7 +27,8 @@ def evaluate(manifest=None, joint_coverage_state=None):
     joint = _joint_report(joint_coverage_state)
     blockers = []
 
-    hash_present = bool(manifest.get('protocol_hash'))
+    protocol_hash = manifest.get('protocol_hash')
+    hash_present = bool(protocol_hash)
     hash_verified = bool(hash_present and protocol.verify_manifest(manifest))
     preregistered = manifest.get('status') == 'PREREGISTERED'
     design_ready = bool(
@@ -63,6 +64,7 @@ def evaluate(manifest=None, joint_coverage_state=None):
     return {
         'version': VERSION,
         'status': 'VALIDATOR_ARMED' if armed else 'BLOCKED',
+        'armed_protocol_hash': protocol_hash if armed else None,
         'protocol_hash_required': True,
         'protocol_hash_present': hash_present,
         'protocol_hash_verified': hash_verified,
