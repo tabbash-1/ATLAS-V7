@@ -16,9 +16,10 @@ from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
-SCHEMA = "ATLAS_HISTORICAL_SHADOW_REPLAY_V2_HORIZON_FIT"
+SCHEMA = "ATLAS_HISTORICAL_SHADOW_REPLAY_V3_OBSTACLE_CALIBRATION"
 HORIZONS = ("1h", "3h", "6h", "12h", "24h")
 TARGET_CASES = 100
+MIN_CALIBRATION_CASES_12H = 20
 
 
 def _f(v):
@@ -105,20 +106,50 @@ def _grouped_horizon_summary(rows):
     }
 
 
+def _group_rows(rows, key_fn):
+    grouped = defaultdict(list)
+    for row in rows:
+        grouped[str(key_fn(row) or "UNKNOWN")].append(row)
+    return {
+        key: {"records": len(group), "horizons": _grouped_horizon_summary(group)}
+        for key, group in sorted(grouped.items(), key=lambda kv: (-len(kv[1]), kv[0]))
+    }
+
+
+def _calibration_candidates(by_obstacle):
+    """Research recommendations only; never mutate Production scoring."""
+    out = []
+    for obstacle, data in by_obstacle.items():
+        s = (data.get("horizons") or {}).get("12h") or {}
+        n = int(s.get("n") or 0)
+        pos = _f(s.get("positive_rate_pct"))
+        mean = _f(s.get("mean_pct"))
+        if n < MIN_CALIBRATION_CASES_12H:
+            verdict = "INSUFFICIENT_SAMPLE"
+        elif mean is not None and pos is not None and mean > 0 and pos >= 55:
+            verdict = "REVIEW_FOR_PENALTY_RELIEF_IN_SWING_RESEARCH"
+        elif mean is not None and mean < 0:
+            verdict = "KEEP_OR_STRENGTHEN_PENALTY"
+        else:
+            verdict = "KEEP_CURRENT_POLICY"
+        out.append({
+            "obstacle_reason": obstacle,
+            "sample_12h": n,
+            "positive_rate_12h_pct": pos,
+            "mean_12h_pct": mean,
+            "verdict": verdict,
+            "production_change_allowed": False,
+        })
+    return sorted(out, key=lambda x: (-x["sample_12h"], x["obstacle_reason"]))
+
+
 def build_report(payload, execution_summary=None, target_cases=TARGET_CASES):
     records = list((payload or {}).get("records") or [])
     directional = [r for r in records if str(r.get("candidate_direction") or "NONE").upper() in ("LONG", "SHORT")]
     no_setup = [r for r in records if r not in directional]
 
     by_horizon = _grouped_horizon_summary(directional)
-
-    grouped = defaultdict(list)
-    for r in directional:
-        grouped[str(r.get("reason") or "UNKNOWN")].append(r)
-    by_reason_by_horizon = {
-        reason: {"records": len(rows), "horizons": _grouped_horizon_summary(rows)}
-        for reason, rows in sorted(grouped.items(), key=lambda kv: (-len(kv[1]), kv[0]))
-    }
+    by_reason_by_horizon = _group_rows(directional, lambda r: r.get("reason") or "UNKNOWN")
 
     banded = defaultdict(list)
     for r in directional:
@@ -142,6 +173,13 @@ def build_report(payload, execution_summary=None, target_cases=TARGET_CASES):
             "directional_records": len(directional_rows),
             "horizons": _grouped_horizon_summary(directional_rows),
         }
+
+    by_obstacle_reason_by_horizon = _group_rows(
+        directional,
+        lambda r: ((r.get("score_attribution") or {}).get("obstacle_reason") or "NONE"),
+    )
+    by_symbol_by_horizon = _group_rows(directional, lambda r: r.get("symbol") or "UNKNOWN")
+    by_direction_by_horizon = _group_rows(directional, lambda r: r.get("candidate_direction") or "NONE")
 
     blocker_counts = Counter(str(r.get("reason") or "UNKNOWN") for r in directional)
     obstacle_counts = Counter()
@@ -183,6 +221,10 @@ def build_report(payload, execution_summary=None, target_cases=TARGET_CASES):
         "by_wait_reason_by_horizon": by_reason_by_horizon,
         "by_score_band_by_horizon": by_score_band_by_horizon,
         "by_opportunity_state_by_horizon": by_state_by_horizon,
+        "by_obstacle_reason_by_horizon": by_obstacle_reason_by_horizon,
+        "by_symbol_by_horizon": by_symbol_by_horizon,
+        "by_direction_by_horizon": by_direction_by_horizon,
+        "calibration_candidates": _calibration_candidates(by_obstacle_reason_by_horizon),
         # Compatibility keys retained for existing consumers.
         "by_wait_reason_24h": {k: {"records": v["records"], "at_24h": v["horizons"]["24h"]} for k, v in by_reason_by_horizon.items()},
         "by_score_band_24h": {k: {"records": v["records"], "at_24h": v["horizons"]["24h"]} for k, v in by_score_band_by_horizon.items()},
@@ -193,6 +235,7 @@ def build_report(payload, execution_summary=None, target_cases=TARGET_CASES):
         "production_threshold_changed": False,
         "production_threshold": 68,
         "research_only": True,
+        "auto_calibration_enabled": False,
     }
     if execution_summary is not None:
         report["live_execution_comparison"] = execution_summary
