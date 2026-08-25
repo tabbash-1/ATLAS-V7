@@ -1,18 +1,20 @@
 """ATLAS independent shadow-edge evidence aggregator.
 
-This module summarizes already-produced prequential walk-forward reports from
-Profit Engine, Microstructure and Volatility. It does not combine predictions,
-assign weights, score trades, recompute historical evidence, or alter Production.
+Summarizes already-produced prequential walk-forward reports from Profit Engine,
+Microstructure and Volatility and the frozen-signal cohort overlap audit. It does
+not combine predictions, assign weights, score trades, recompute historical
+evidence, or alter Production.
 
-The purpose is governance: one conservative readiness matrix showing which
-independent research layers have enough settled frozen-at-signal evidence to
-support further validation work. Even MULTI_LAYER_EVIDENCE_AVAILABLE is not a
-live-trading approval and does not promote any gate.
+MULTI_LAYER_EVIDENCE_AVAILABLE requires both independent layer support and a
+comparable frozen forward_id cohort. It is still only a research/governance
+statement: never a live-trading approval and never a gate promotion.
 """
 
 from __future__ import annotations
 
-VERSION = 'EDGE_EVIDENCE_REPORT_V1_INDEPENDENT_READINESS'
+import edge_evidence_overlap
+
+VERSION = 'EDGE_EVIDENCE_REPORT_V2_WITH_COHORT_COMPARABILITY'
 LAYERS = ('profit_engine', 'microstructure', 'volatility')
 
 
@@ -105,12 +107,42 @@ def _volatility_layer(state):
     }
 
 
-def aggregate(profit_state=None, microstructure_state=None, volatility_walkforward_state=None):
+def _overlap_report(overlap_state):
+    if not overlap_state:
+        return {
+            'available': False,
+            'status': 'UNAVAILABLE',
+            'cohorts_comparable': False,
+            'blockers': ['EDGE_EVIDENCE_OVERLAP_AUDIT_UNAVAILABLE'],
+        }
+    report = _dict(_dict(overlap_state).get('report'))
+    status = report.get('status') or 'COLLECTING'
+    comparable = bool(status == 'COHORTS_IDENTICAL' and report.get('union_unique_forward_ids', 0) > 0)
+    blockers = list(report.get('blockers') or [])
+    if not comparable and not blockers:
+        blockers = ['FROZEN_SIGNAL_COHORTS_NOT_COMPARABLE']
+    return {
+        'available': True,
+        'status': status,
+        'cohorts_comparable': comparable,
+        'union_unique_forward_ids': report.get('union_unique_forward_ids'),
+        'three_way_intersection_unique_forward_ids': report.get('three_way_intersection_unique_forward_ids'),
+        'three_way_overlap_pct_of_union': report.get('three_way_overlap_pct_of_union'),
+        'missing_forward_id_counts_by_layer': report.get('missing_forward_id_counts_by_layer') or {},
+        'duplicate_layers': report.get('duplicate_layers') or [],
+        'missing_files': report.get('missing_files') or [],
+        'blockers': blockers,
+        'source_version': report.get('version'),
+    }
+
+
+def aggregate(profit_state=None, microstructure_state=None, volatility_walkforward_state=None, overlap_state=None):
     layers = {
         'profit_engine': _profit_layer(profit_state),
         'microstructure': _microstructure_layer(microstructure_state),
         'volatility': _volatility_layer(volatility_walkforward_state),
     }
+    overlap = _overlap_report(overlap_state)
     supported = [name for name, row in layers.items() if row['evidence_supported']]
     unavailable = [name for name, row in layers.items() if not row['available']]
 
@@ -128,8 +160,11 @@ def aggregate(profit_state=None, microstructure_state=None, volatility_walkforwa
             blockers.append(f'{name.upper()}:{blocker}')
     if not canonical_consistent:
         blockers.append('CANONICAL_EXECUTION_COUNT_MISMATCH_ACROSS_LAYER_REPORTS')
+    for blocker in overlap.get('blockers') or []:
+        blockers.append(f'COHORT_OVERLAP:{blocker}')
 
-    if len(supported) == len(LAYERS) and canonical_consistent:
+    all_layers_supported = len(supported) == len(LAYERS)
+    if all_layers_supported and canonical_consistent and overlap['cohorts_comparable']:
         status = 'MULTI_LAYER_EVIDENCE_AVAILABLE'
     elif supported:
         status = 'PARTIAL_EVIDENCE'
@@ -140,12 +175,14 @@ def aggregate(profit_state=None, microstructure_state=None, volatility_walkforwa
         'version': VERSION,
         'status': status,
         'layers': layers,
+        'cohort_overlap': overlap,
         'supported_layers': supported,
         'supported_layer_count': len(supported),
         'total_layer_count': len(LAYERS),
         'unavailable_layers': unavailable,
         'canonical_execution_rows_by_layer': canonical_counts,
         'canonical_execution_count_consistent': canonical_consistent,
+        'frozen_signal_cohorts_comparable': overlap['cohorts_comparable'],
         'blockers': blockers,
         'weights_assigned': False,
         'composite_trade_score_created': False,
@@ -155,7 +192,7 @@ def aggregate(profit_state=None, microstructure_state=None, volatility_walkforwa
         'production_ready_claimed': False,
         'live_trading_ready_claimed': False,
         'research_only': True,
-        'method': 'INDEPENDENT_PREQUENTIAL_LAYER_READINESS_WITHOUT_COMPOSITE_WEIGHTING',
+        'method': 'INDEPENDENT_PREQUENTIAL_LAYER_READINESS_PLUS_FROZEN_COHORT_COMPARABILITY_WITHOUT_COMPOSITE_WEIGHTING',
     }
 
 
@@ -164,16 +201,18 @@ def from_collector(collector):
         getattr(collector, 'PROFIT_ENGINE_RUNTIME_STATE', None),
         getattr(collector, 'MICROSTRUCTURE_RUNTIME_STATE', None),
         getattr(collector, 'VOLATILITY_WALKFORWARD_RUNTIME_STATE', None),
+        getattr(collector, 'EDGE_EVIDENCE_OVERLAP_STATE', None),
     )
 
 
 def install(collector):
-    """Expose a read-only refreshable report; never wrap Production functions."""
+    """Expose read-only governance reports; never wrap Production functions."""
     if getattr(collector, '_EDGE_EVIDENCE_REPORT_INSTALLED', False):
         return getattr(collector, 'EDGE_EVIDENCE_REPORT_STATE', {})
 
     original_decision = getattr(collector, 'production_decision', None)
     original_forward = getattr(collector, 'forward_observe', None)
+    edge_evidence_overlap.install(collector)
     state = {
         'enabled': True,
         'version': VERSION,
@@ -185,6 +224,9 @@ def install(collector):
     }
 
     def refresh():
+        overlap_refresh = getattr(collector, 'edge_evidence_overlap_refresh', None)
+        if callable(overlap_refresh):
+            overlap_refresh()
         state['report'] = from_collector(collector)
         return state['report']
 
@@ -192,8 +234,6 @@ def install(collector):
     collector.edge_evidence_refresh = refresh
     collector._EDGE_EVIDENCE_REPORT_INSTALLED = True
 
-    # Fail loudly in tests/development if this supposedly read-only installer ever
-    # mutates the Production callables.
     if getattr(collector, 'production_decision', None) is not original_decision:
         raise RuntimeError('edge evidence report mutated production_decision')
     if getattr(collector, 'forward_observe', None) is not original_forward:
