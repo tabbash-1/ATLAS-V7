@@ -25,6 +25,7 @@ on:
       - 'tests/test_edge_evidence_overlap.py'
       - 'tests/test_edge_evidence_redundancy.py'
       - 'tests/test_edge_evidence_joint_coverage.py'
+      - 'tests/test_edge_evidence_joint_governance.py'
       - 'tests/test_edge_evidence_report.py'
       - '.github/workflows/atlas-shadow-engines-ci.yml'
       - 'cloud_start.py'
@@ -52,6 +53,7 @@ on:
       - 'tests/test_edge_evidence_overlap.py'
       - 'tests/test_edge_evidence_redundancy.py'
       - 'tests/test_edge_evidence_joint_coverage.py'
+      - 'tests/test_edge_evidence_joint_governance.py'
       - 'tests/test_edge_evidence_report.py'
       - '.github/workflows/atlas-shadow-engines-ci.yml'
       - 'cloud_start.py'
@@ -83,6 +85,7 @@ jobs:
             tests/test_edge_evidence_overlap.py \
             tests/test_edge_evidence_redundancy.py \
             tests/test_edge_evidence_joint_coverage.py \
+            tests/test_edge_evidence_joint_governance.py \
             tests/test_edge_evidence_report.py
       - name: Preserve shadow-only contract
         run: |
@@ -148,8 +151,11 @@ jobs:
           grep -q "can_override_production.*False" edge_evidence_report.py
           grep -q "edge_evidence_overlap.install(collector)" edge_evidence_report.py
           grep -q "edge_evidence_redundancy.install(collector)" edge_evidence_report.py
+          grep -q "edge_evidence_joint_coverage.install(collector)" edge_evidence_report.py
           grep -q "frozen_signal_cohorts_comparable" edge_evidence_report.py
           grep -q "redundancy_diagnostic_affects_status.*False" edge_evidence_report.py
+          grep -q "joint_coverage_diagnostic_affects_status.*False" edge_evidence_report.py
+          grep -q "interaction_validation_started.*False" edge_evidence_report.py
           grep -q 'edge_evidence_report.install(collector)' volatility_walkforward_runtime.py
           grep -q '_install_profit_engine_runtime' cloud_start.py
           grep -q '_install_microstructure_runtime' cloud_start.py
