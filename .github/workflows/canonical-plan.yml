@@ -1,0 +1,33 @@
+name: ATLAS Canonical Trade Plan
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  canonical-plan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Test dependency
+        run: python -m pip install -q pytest
+      - name: Canonical scenario
+        run: python -m pytest -q tests/test_ai_canonical_plan.py::test_actionable_scenario_is_production_now
+      - name: Canonical levels
+        run: python -m pytest -q tests/test_ai_canonical_plan.py::test_actionable_levels_match_canonical_plan
+      - name: Canonical hybrid
+        run: python -m pytest -q tests/test_ai_canonical_plan.py::test_actionable_hybrid_confirms
+      - name: Canonical action
+        run: python -m pytest -q tests/test_ai_canonical_plan.py::test_actionable_canonical_action_is_buy
+      - name: AI cannot say wait
+        run: python -m pytest -q tests/test_ai_canonical_plan.py::test_ai_never_says_wait_when_production_is_actionable
+      - name: Conditional plan preserved
+        run: python -m pytest -q tests/test_ai_canonical_plan.py::test_non_actionable_can_still_use_counterfactuals
+      - name: Production trade plan
+        run: python -m pytest -q tests/test_production_trade_plan.py
+      - name: UI canonical sync
+        run: python -m pytest -q tests/test_ui_canonical_contract.py
+      - name: Syntax
+        run: python -m py_compile ai_trade_council.py production_trade_plan.py decision_engine_v7.py
