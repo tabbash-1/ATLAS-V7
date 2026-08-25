@@ -1,0 +1,55 @@
+name: ATLAS Swing Quality Forward Validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'swing_quality_forward_validation.py'
+      - 'tests/test_swing_quality_forward_validation.py'
+      - 'status/wait-outcomes.json'
+      - '.github/workflows/swing-quality-forward-validation.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  validate-forward:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate module
+        run: |
+          python3 -m py_compile swing_quality_forward_validation.py tests/test_swing_quality_forward_validation.py
+          PYTHONPATH=. python3 tests/test_swing_quality_forward_validation.py
+      - name: Build out-of-sample report
+        run: |
+          python3 swing_quality_forward_validation.py \
+            --wait-outcomes status/wait-outcomes.json \
+            --output status/swing-quality-forward-validation.json
+          python3 - <<'PY'
+          import json
+          x=json.load(open('status/swing-quality-forward-validation.json'))
+          assert x['schema']=='ATLAS_SWING_QUALITY_FORWARD_VALIDATION_V1'
+          assert x['production_threshold']==68
+          assert x['production_threshold_changed'] is False
+          assert x['production_score_adjustment']==0
+          assert x['auto_promotion_enabled'] is False
+          assert x['promotion_gate']['production_change_allowed'] is False
+          print('FORWARD_VALIDATION',json.dumps(x,sort_keys=True))
+          PY
+      - name: Commit forward validation report
+        run: |
+          if [ -z "$(git status --porcelain -- status/swing-quality-forward-validation.json)" ]; then
+            echo 'Forward validation report unchanged'
+            exit 0
+          fi
+          git config user.name 'atlas-swing-validation-bot'
+          git config user.email 'atlas-swing-validation-bot@users.noreply.github.com'
+          git add status/swing-quality-forward-validation.json
+          git commit -m 'chore: update swing quality forward validation [skip ci]'
+          git pull --rebase origin main
+          git push
