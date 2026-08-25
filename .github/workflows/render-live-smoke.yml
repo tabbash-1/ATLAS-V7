@@ -7,6 +7,7 @@ on:
       - '.github/workflows/render-live-smoke.yml'
       - 'trade_path_settlement.py'
       - 'trade_outcome_runtime.py'
+      - 'execution_outcome_scope.py'
       - 'production_decision_api.py'
       - 'quick_reentry_guard.py'
   workflow_dispatch:
@@ -27,22 +28,33 @@ jobs:
           python3 -m json.tool /tmp/health.json >/dev/null
           curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --connect-timeout 10 --max-time 30 "$base/api/runtime/status" | tee /tmp/runtime.json
           python3 -m json.tool /tmp/runtime.json >/dev/null
-      - name: Verify path summary returns JSON not gateway error
+      - name: Verify signal and execution path summaries
         shell: bash
         run: |
           set -euo pipefail
-          url='https://atlas-v7.onrender.com/api/outcomes/path-summary?scope=signals&limit=40'
-          code="$(curl -L --retry 3 --retry-delay 10 --retry-all-errors --connect-timeout 10 --max-time 45 -sS -w '%{http_code}' -o /tmp/path.json "$url")"
-          echo "HTTP=$code"
-          cat /tmp/path.json
-          test "$code" -ge 200 -a "$code" -lt 300
-          python3 -m json.tool /tmp/path.json >/dev/null
+          base='https://atlas-v7.onrender.com/api/outcomes/path-summary'
+          for scope in signals execution; do
+            code="$(curl -L --retry 3 --retry-delay 10 --retry-all-errors --connect-timeout 10 --max-time 45 -sS -w '%{http_code}' -o "/tmp/path-${scope}.json" "$base?scope=${scope}&limit=100")"
+            echo "scope=$scope HTTP=$code"
+            cat "/tmp/path-${scope}.json"
+            test "$code" -ge 200 -a "$code" -lt 300
+            python3 -m json.tool "/tmp/path-${scope}.json" >/dev/null
+          done
           python3 - <<'PY'
           import json
-          x=json.load(open('/tmp/path.json'))
-          assert x.get('schema') == 'ATLAS_TRADE_PATH_SUMMARY_V1', x
-          overall=x.get('overall') or {}
-          assert 'market_data_errors' in overall, overall
-          assert 'market_data_circuit' in overall, overall
-          print('path-summary-live-ok', json.dumps(overall, sort_keys=True))
+          signals=json.load(open('/tmp/path-signals.json'))
+          execution=json.load(open('/tmp/path-execution.json'))
+          expected='ATLAS_TRADE_PATH_SUMMARY_V2_EXECUTION_SCOPE'
+          assert signals.get('schema') == expected, signals
+          assert execution.get('schema') == expected, execution
+          for payload in (signals, execution):
+              overall=payload.get('overall') or {}
+              assert 'market_data_errors' in overall, overall
+              assert 'market_data_circuit' in overall, overall
+          assert execution.get('scope') == 'execution', execution
+          assert execution.get('signal_scope_semantics') == 'PRODUCTION_SCORE_QUALIFIED_PLUS_VALID_GEOMETRY_RR_GTE_1', execution
+          assert execution.get('execution_rejection_summary') is not None, execution
+          print('SIGNALS_METRICS', json.dumps(signals.get('overall') or {}, sort_keys=True))
+          print('EXECUTION_METRICS', json.dumps(execution.get('overall') or {}, sort_keys=True))
+          print('EXECUTION_REJECTIONS', json.dumps(execution.get('execution_rejection_summary') or {}, sort_keys=True))
           PY
