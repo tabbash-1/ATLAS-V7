@@ -37,8 +37,10 @@ if index_path.exists():
         else: html=html.replace('</main>',panel+'\n    </main>',1)
 
     decision_script=f'<script src="atlas-production-decision.js?v={release_token}"></script>'
+    calibration_script=f'<script src="outcome-calibration-ui.js?v={release_token}"></script>'
     html=re.sub(r'<script[^>]+src=["\']atlas-production-decision\.js(?:\?[^"\']*)?["\'][^>]*></script>','',html)
-    html=html.replace('</body>',f'  {decision_script}\n</body>',1) if '</body>' in html else html+'\n'+decision_script+'\n'
+    html=re.sub(r'<script[^>]+src=["\']outcome-calibration-ui\.js(?:\?[^"\']*)?["\'][^>]*></script>','',html)
+    html=html.replace('</body>',f'  {decision_script}\n  {calibration_script}\n</body>',1) if '</body>' in html else html+'\n'+decision_script+'\n'+calibration_script+'\n'
     index_path.write_text(html,encoding="utf-8")
 app_path=BASE/"app.js"
 if app_path.exists():
