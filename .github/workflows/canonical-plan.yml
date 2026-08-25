@@ -11,6 +11,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Test dependency
+        run: python -m pip install -q pytest
       - name: Canonical scenario
         run: python -m pytest -q tests/test_ai_canonical_plan.py::test_actionable_scenario_is_production_now
       - name: Canonical levels
