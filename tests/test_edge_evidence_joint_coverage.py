@@ -12,27 +12,29 @@ def _write(path, rows):
     path.write_text('\n'.join(json.dumps(x) for x in rows) + '\n', encoding='utf-8')
 
 
-def _profit(fid, label):
+def _profit(fid, label, ts=1):
     return {
         'schema': eeo.SCHEMAS['profit_engine'],
         'forward_id': fid,
+        'forward_captured_at_ms': ts,
         'production_signal_qualified': True,
         'research_sample': False,
         'profit_engine': {'regime_gate': {'reason': label}},
     }
 
 
-def _micro(fid, label):
+def _micro(fid, label, ts=1):
     return {
         'schema': eeo.SCHEMAS['microstructure'],
         'forward_id': fid,
+        'forward_captured_at_ms': ts,
         'production_signal_qualified': True,
         'research_sample': False,
         'relation_to_signal': label,
     }
 
 
-def _vol(fid, labels):
+def _vol(fid, labels, ts=1):
     fits = {}
     for h in ejc.VOLATILITY_HORIZONS_H:
         label = labels.get(h)
@@ -44,6 +46,7 @@ def _vol(fid, labels):
     return {
         'schema': eeo.SCHEMAS['volatility'],
         'forward_id': fid,
+        'forward_captured_at_ms': ts,
         'production_signal_qualified': True,
         'research_sample': False,
         'geometry_fit_by_horizon': fits,
@@ -59,11 +62,11 @@ def _populate_balanced(data_dir, n=40):
         ('ASSET_REGIME_NOT_ALIGNED', 'ALIGNED', ('PLAUSIBLE', 'WIDE')),
     ]
     for i in range(n):
-        fid = f'F{i:03d}'
+        fid = f'F{i:03d}'; ts = 1000 + i
         p, m, v = cells[i % len(cells)]
-        profits.append(_profit(fid, p))
-        micros.append(_micro(fid, m))
-        vols.append(_vol(fid, {1: v, 4: v, 12: v}))
+        profits.append(_profit(fid, p, ts))
+        micros.append(_micro(fid, m, ts))
+        vols.append(_vol(fid, {1: v, 4: v, 12: v}, ts))
     _write(Path(data_dir) / eeo.FILES['profit_engine'], profits)
     _write(Path(data_dir) / eeo.FILES['microstructure'], micros)
     _write(Path(data_dir) / eeo.FILES['volatility'], vols)
@@ -72,14 +75,14 @@ def _populate_balanced(data_dir, n=40):
 def _populate_concentrated(data_dir, n=40):
     profits, micros, vols = [], [], []
     for i in range(n):
-        fid = f'F{i:03d}'
+        fid = f'F{i:03d}'; ts = 1000 + i
         if i < 30:
             p, m, v = 'REGIME_ALIGNED', 'ALIGNED', ('PLAUSIBLE', 'PLAUSIBLE')
         else:
             p, m, v = 'ASSET_REGIME_NOT_ALIGNED', 'OPPOSED_OR_CROWDED', ('STRETCHED', 'TIGHT')
-        profits.append(_profit(fid, p))
-        micros.append(_micro(fid, m))
-        vols.append(_vol(fid, {1: v, 4: v, 12: v}))
+        profits.append(_profit(fid, p, ts))
+        micros.append(_micro(fid, m, ts))
+        vols.append(_vol(fid, {1: v, 4: v, 12: v}, ts))
     _write(Path(data_dir) / eeo.FILES['profit_engine'], profits)
     _write(Path(data_dir) / eeo.FILES['microstructure'], micros)
     _write(Path(data_dir) / eeo.FILES['volatility'], vols)
@@ -90,6 +93,7 @@ def test_balanced_joint_cells_support_future_interaction_design_but_do_not_test_
     out = ejc.audit(tmp_path)
     assert out['status'] == 'DESIGN_READ_AVAILABLE'
     assert out['matched_forward_ids'] == 40
+    assert out['aligned_cohort_comparable'] is True
     assert out['future_interaction_validation_supported'] is True
     assert out['horizons_with_sufficient_joint_coverage_h'] == [1, 4, 12]
     assert out['outcomes_read'] is False
@@ -126,7 +130,25 @@ def test_overconcentrated_cells_are_sparse_design_blocker(tmp_path):
         assert out['horizon_coverage'][h]['top_cell_overconcentrated'] is True
 
 
-def test_mismatched_cohort_fails_closed(tmp_path):
+def test_historical_rollout_rows_before_latest_layer_start_do_not_block(tmp_path):
+    _populate_balanced(tmp_path, 40)
+    p = Path(tmp_path) / eeo.FILES['profit_engine']
+    m = Path(tmp_path) / eeo.FILES['microstructure']
+    profit_rows = [json.loads(x) for x in p.read_text().splitlines()]
+    micro_rows = [json.loads(x) for x in m.read_text().splitlines()]
+    profit_rows.insert(0, _profit('P_OLD', 'REGIME_ALIGNED', 100))
+    micro_rows.insert(0, _micro('M_OLD', 'ALIGNED', 200))
+    _write(p, profit_rows); _write(m, micro_rows)
+    out = ejc.audit(tmp_path)
+    assert out['status'] == 'DESIGN_READ_AVAILABLE'
+    assert out['matched_forward_ids'] == 40
+    assert out['whole_history_overlap_status'] == 'COHORT_MISMATCH'
+    assert out['aligned_cohort_status'] == 'ALIGNED_COHORT_COMPLETE'
+    assert out['pre_alignment_rows_excluded_by_layer']['profit_engine'] == 1
+    assert out['pre_alignment_rows_excluded_by_layer']['microstructure'] == 1
+
+
+def test_missing_capture_inside_aligned_period_fails_closed(tmp_path):
     _populate_balanced(tmp_path, 40)
     vol_path = Path(tmp_path) / eeo.FILES['volatility']
     rows = [json.loads(x) for x in vol_path.read_text(encoding='utf-8').splitlines()]
@@ -136,7 +158,8 @@ def test_mismatched_cohort_fails_closed(tmp_path):
     assert out['status'] == 'COHORT_NOT_COMPARABLE'
     assert out['future_interaction_validation_supported'] is False
     assert out['horizon_coverage'] == {}
-    assert 'IDENTICAL_FROZEN_SIGNAL_COHORT_REQUIRED' in out['blockers']
+    assert 'ALIGNED_FROZEN_SIGNAL_COHORT_REQUIRED' in out['blockers']
+    assert 'ALIGNED_FROZEN_SIGNAL_COHORT_INCOMPLETE' in out['blockers']
 
 
 def test_missing_files_stays_collecting_and_never_claims_readiness(tmp_path):
@@ -157,7 +180,6 @@ def test_install_is_read_only_and_refreshes(tmp_path):
     assert state['read_only'] is True
     assert state['wraps_production_decision'] is False
     assert state['wraps_forward_observe'] is False
-
     _populate_balanced(tmp_path, 40)
     refreshed = collector.edge_evidence_joint_coverage_refresh()
     assert refreshed['status'] == 'DESIGN_READ_AVAILABLE'
@@ -166,11 +188,7 @@ def test_install_is_read_only_and_refreshes(tmp_path):
 
 
 def test_install_is_idempotent(tmp_path):
-    collector = SimpleNamespace(
-        DATA=Path(tmp_path),
-        production_decision=lambda symbol: {'ok': True},
-        forward_observe=lambda payload: {'id': 'F1'},
-    )
+    collector = SimpleNamespace(DATA=Path(tmp_path), production_decision=lambda symbol: {'ok': True}, forward_observe=lambda payload: {'id': 'F1'})
     first = ejc.install(collector)
     second = ejc.install(collector)
     assert first is second
