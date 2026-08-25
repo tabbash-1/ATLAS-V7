@@ -7,7 +7,9 @@ on:
       - 'outcome_calibration.py'
       - 'outcome_calibration_runtime.py'
       - 'outcome-calibration-ui.js'
+      - 'wait_diagnostics.py'
       - 'tests/test_outcome_calibration.py'
+      - 'tests/test_wait_diagnostics.py'
       - 'cloud_start.py'
       - '.github/workflows/outcome-calibration-ci.yml'
   pull_request:
@@ -26,14 +28,17 @@ jobs:
         with:
           node-version: '22'
       - name: Python syntax
-        run: python -m py_compile outcome_calibration.py outcome_calibration_runtime.py tests/test_outcome_calibration.py cloud_start.py
+        run: python -m py_compile outcome_calibration.py outcome_calibration_runtime.py wait_diagnostics.py tests/test_outcome_calibration.py tests/test_wait_diagnostics.py cloud_start.py
       - name: JavaScript syntax
         run: node --check outcome-calibration-ui.js
       - name: Calibration tests
-        run: PYTHONPATH=. python tests/test_outcome_calibration.py
+        run: |
+          PYTHONPATH=. python tests/test_outcome_calibration.py
+          PYTHONPATH=. python tests/test_wait_diagnostics.py
       - name: Safety invariants
         run: |
           grep -q "auto_apply.*False" outcome_calibration.py
           grep -q "threshold_changed.*False" outcome_calibration.py
+          grep -q "execution_rules_changed.*False" wait_diagnostics.py
           grep -q "ATLAS_CLOUD_FORWARD_MIN_SCORE.*68" cloud_start.py
           grep -q "_install_outcome_calibration_runtime" cloud_start.py
