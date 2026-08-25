@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
     paths:
+      - 'cloud_start.py'
       - 'edge_evidence_interaction_protocol.py'
       - 'edge_evidence_interaction_rules.py'
       - 'edge_evidence_interaction_validator_guard.py'
@@ -21,11 +22,13 @@ on:
       - 'tests/test_edge_evidence_interaction_outcome_validator.py'
       - 'tests/test_interaction_outcome_guard_hash_binding.py'
       - 'tests/test_interaction_outcome_runtime.py'
+      - 'tests/test_interaction_outcome_boot_contract.py'
       - 'tests/test_volatility_walkforward_runtime.py'
       - '.github/workflows/atlas-interaction-protocol-ci.yml'
   pull_request:
     branches: [main]
     paths:
+      - 'cloud_start.py'
       - 'edge_evidence_interaction_protocol.py'
       - 'edge_evidence_interaction_rules.py'
       - 'edge_evidence_interaction_validator_guard.py'
@@ -43,6 +46,7 @@ on:
       - 'tests/test_edge_evidence_interaction_outcome_validator.py'
       - 'tests/test_interaction_outcome_guard_hash_binding.py'
       - 'tests/test_interaction_outcome_runtime.py'
+      - 'tests/test_interaction_outcome_boot_contract.py'
       - 'tests/test_volatility_walkforward_runtime.py'
       - '.github/workflows/atlas-interaction-protocol-ci.yml'
 
@@ -58,9 +62,9 @@ jobs:
       - name: Install test runner
         run: python -m pip install --disable-pip-version-check pytest
       - name: Syntax
-        run: python -m py_compile edge_evidence_interaction_protocol.py edge_evidence_interaction_rules.py edge_evidence_interaction_validator_guard.py edge_evidence_interaction_preflight.py edge_evidence_interaction_outcome_validator.py interaction_outcome_runtime.py edge_evidence_joint_coverage.py edge_evidence_overlap.py edge_evidence_redundancy.py volatility_walkforward_runtime.py
-      - name: Protocol preflight outcome-validator and runtime regression tests
-        run: PYTHONPATH=. python -m pytest -q tests/test_edge_evidence_interaction_protocol.py tests/test_edge_evidence_interaction_rules.py tests/test_edge_evidence_interaction_validator_guard.py tests/test_edge_evidence_interaction_preflight.py tests/test_edge_evidence_interaction_outcome_validator.py tests/test_interaction_outcome_guard_hash_binding.py tests/test_interaction_outcome_runtime.py tests/test_edge_evidence_joint_coverage.py tests/test_volatility_walkforward_runtime.py
+        run: python -m py_compile cloud_start.py edge_evidence_interaction_protocol.py edge_evidence_interaction_rules.py edge_evidence_interaction_validator_guard.py edge_evidence_interaction_preflight.py edge_evidence_interaction_outcome_validator.py interaction_outcome_runtime.py edge_evidence_joint_coverage.py edge_evidence_overlap.py edge_evidence_redundancy.py volatility_walkforward_runtime.py
+      - name: Protocol preflight outcome-validator runtime and boot regression tests
+        run: PYTHONPATH=. python -m pytest -q tests/test_edge_evidence_interaction_protocol.py tests/test_edge_evidence_interaction_rules.py tests/test_edge_evidence_interaction_validator_guard.py tests/test_edge_evidence_interaction_preflight.py tests/test_edge_evidence_interaction_outcome_validator.py tests/test_interaction_outcome_guard_hash_binding.py tests/test_interaction_outcome_runtime.py tests/test_interaction_outcome_boot_contract.py tests/test_edge_evidence_joint_coverage.py tests/test_volatility_walkforward_runtime.py
       - name: Preserve preregistration contract
         run: |
           grep -q "CHRONOLOGICAL_FOLDS = 3" edge_evidence_interaction_protocol.py
@@ -118,6 +122,10 @@ jobs:
           grep -q "outcome_access_allowed.*is not True" interaction_outcome_runtime.py
           grep -q "canonical_outcome_loader_called.*False" interaction_outcome_runtime.py
           grep -q "_canonical_settlements" interaction_outcome_runtime.py
+          grep -q "from volatility_walkforward_runtime import install as _install_volatility_walkforward_runtime" cloud_start.py
+          grep -q "from interaction_outcome_runtime import install as _install_interaction_outcome_runtime" cloud_start.py
+          grep -q "_install_interaction_outcome_runtime(_collector)" cloud_start.py
+          grep -q "except Exception as _interaction_runtime_exc" cloud_start.py
           grep -q "edge_evidence_report.install(collector)" volatility_walkforward_runtime.py
           grep -q "edge_evidence_interaction_protocol.install(collector)" volatility_walkforward_runtime.py
           grep -q "edge_evidence_interaction_validator_guard.install(collector)" volatility_walkforward_runtime.py
