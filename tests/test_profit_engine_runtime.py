@@ -79,6 +79,8 @@ def test_shadow_does_not_override_production(monkeypatch, tmp_path):
     assert 'CALIBRATION_WARMUP' in shadow['blockers']
     assert 'EXECUTION_COST_MODEL_UNAVAILABLE' in shadow['blockers']
     assert state['shadow_only'] is True
+    assert state['walk_forward_report']['status'] == 'COLLECTING'
+    assert state['walk_forward_report']['can_override_production'] is False
 
 
 def test_production_signal_freezes_pre_outcome_evidence(monkeypatch, tmp_path):
@@ -96,7 +98,8 @@ def test_production_signal_freezes_pre_outcome_evidence(monkeypatch, tmp_path):
     assert row['research_samples_included'] is False
     assert row['outcome_known_at_capture'] is False
     assert row['derived_stop_loss'] == 98.0
-    assert row['profit_engine']['shadow_only'] is not False if 'shadow_only' in row['profit_engine'] else True
+    assert row['shadow_only'] is True
+    assert row['can_override_production'] is False
     assert state['frozen_signal_observations'] == 1
     assert state['research_observations_included'] == 0
 
@@ -122,6 +125,42 @@ def test_dedup_does_not_duplicate_profit_observation(monkeypatch, tmp_path):
     archive = tmp_path / 'profit_engine_observations.jsonl'
     assert not archive.exists()
     assert state['frozen_signal_observations'] == 0
+
+
+def test_walkforward_refresh_updates_state_without_touching_production(monkeypatch, tmp_path):
+    collector, state = _install_without_threads(monkeypatch, tmp_path)
+    before = collector.production_decision('BTCUSDT')['actionable_decision']
+
+    fake_report = {
+        'version': 'TEST_WF',
+        'status': 'VALIDATION_READ_AVAILABLE',
+        'improves_production_expectancy': True,
+        'blockers': [],
+        'settled_joined': 60,
+        'profit_ready_settled': 20,
+        'research_samples_included': False,
+        'shadow_only': True,
+        'can_override_production': False,
+    }
+    monkeypatch.setattr(runtime, 'build_walkforward_report', lambda collector_arg, path_arg: dict(fake_report))
+    refreshed = collector.profit_engine_refresh_walkforward()
+
+    assert refreshed['improves_production_expectancy'] is True
+    assert state['walk_forward_report']['status'] == 'VALIDATION_READ_AVAILABLE'
+    assert state['walkforward_refreshes'] == 1
+    assert state['last_walkforward_error'] is None
+    after = collector.production_decision('BTCUSDT')['actionable_decision']
+    assert before == 'LONG' and after == 'LONG'
+
+
+def test_walkforward_error_fails_closed(monkeypatch, tmp_path):
+    collector, state = _install_without_threads(monkeypatch, tmp_path)
+    monkeypatch.setattr(runtime, 'build_walkforward_report', lambda collector_arg, path_arg: (_ for _ in ()).throw(RuntimeError('boom')))
+    refreshed = collector.profit_engine_refresh_walkforward()
+    assert refreshed is None
+    assert state['walk_forward_report']['status'] == 'UNAVAILABLE'
+    assert state['walk_forward_report']['improves_production_expectancy'] is False
+    assert 'WALK_FORWARD_REFRESH_ERROR' in state['walk_forward_report']['blockers']
 
 
 def test_wilson_interval_is_bounded():
