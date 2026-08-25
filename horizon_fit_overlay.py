@@ -6,7 +6,7 @@ the Quick shadow lane and adds an explicit 12-24h Swing research lane.
 
 import horizon_fit_policy
 
-VERSION = 'HORIZON_FIT_OVERLAY_V1'
+VERSION = 'HORIZON_FIT_OVERLAY_V2_GUARD_CLEANUP'
 
 
 def install(atlas):
@@ -35,8 +35,23 @@ def install(atlas):
             execution_ready=bool(row.get('execution_ready')),
         )
 
-        # Preserve active/cooldown guard states; otherwise apply stricter Quick lane.
+        # Preserve genuinely pre-existing active/cooldown states. If the legacy
+        # layer just created a permissive QUICK_TRADE_SHADOW that the strict
+        # horizon policy rejects, cancel that ACTIVE record immediately so the
+        # persistent re-entry guard cannot be polluted by a hidden weak signal.
         existing_quick = row.get('quick_trade_shadow') or {}
+        legacy_just_registered = existing_quick.get('status') == 'QUICK_TRADE_SHADOW'
+        strict_quick_allowed = fit['quick'].get('status') == 'QUICK_TRADE_SHADOW'
+        guard_cleanup = None
+        if legacy_just_registered and not strict_quick_allowed:
+            guard = getattr(atlas, 'QUICK_REENTRY_GUARD', None)
+            if guard is not None and hasattr(guard, 'cancel_active'):
+                guard_cleanup = guard.cancel_active(
+                    row.get('symbol') or symbol,
+                    row.get('candidate_direction'),
+                    reason='HORIZON_FIT_STRICT_QUICK_REJECTED',
+                )
+
         if existing_quick.get('status') in ('QUICK_TRADE_ACTIVE',) or existing_quick.get('reason') == 'POST_STOP_REENTRY_COOLDOWN':
             strict_quick = dict(existing_quick)
             strict_quick['policy_version'] = horizon_fit_policy.VERSION
@@ -45,6 +60,8 @@ def install(atlas):
             strict_quick = dict(existing_quick)
             strict_quick.update(fit['quick'])
             strict_quick['policy_version'] = horizon_fit_policy.VERSION
+        if guard_cleanup is not None:
+            strict_quick['legacy_guard_cleanup'] = guard_cleanup
 
         swing = dict(matrix.get('swing') or {})
         swing.update(fit['swing'])
@@ -76,5 +93,6 @@ def install(atlas):
         'swing_horizon': '12-24H',
         'production_threshold_unchanged': True,
         'production_override_allowed': False,
+        'legacy_quick_guard_cleanup': True,
     }
     return atlas.HORIZON_FIT_STATE
