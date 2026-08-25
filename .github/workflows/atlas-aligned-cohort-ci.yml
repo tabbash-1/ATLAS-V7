@@ -1,0 +1,45 @@
+name: ATLAS Aligned Frozen Cohort CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'edge_evidence_aligned_cohort.py'
+      - 'edge_evidence_joint_coverage.py'
+      - 'tests/test_edge_evidence_aligned_cohort.py'
+      - 'tests/test_edge_evidence_joint_coverage.py'
+      - '.github/workflows/atlas-aligned-cohort-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'edge_evidence_aligned_cohort.py'
+      - 'edge_evidence_joint_coverage.py'
+      - 'tests/test_edge_evidence_aligned_cohort.py'
+      - 'tests/test_edge_evidence_joint_coverage.py'
+      - '.github/workflows/atlas-aligned-cohort-ci.yml'
+
+jobs:
+  aligned-cohort-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test runner
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Syntax
+        run: python -m py_compile edge_evidence_aligned_cohort.py edge_evidence_joint_coverage.py
+      - name: Regression tests
+        run: PYTHONPATH=. python -m pytest -q tests/test_edge_evidence_aligned_cohort.py tests/test_edge_evidence_joint_coverage.py
+      - name: Preserve outcome-free alignment contract
+        run: |
+          grep -q "outcomes_read.*False" edge_evidence_aligned_cohort.py
+          grep -q "historical_backfill_performed.*False" edge_evidence_aligned_cohort.py
+          grep -q "historical_features_recomputed.*False" edge_evidence_aligned_cohort.py
+          grep -q "can_override_production.*False" edge_evidence_aligned_cohort.py
+          grep -q "gate_promoted.*False" edge_evidence_aligned_cohort.py
+          grep -q "outcomes_read.*False" edge_evidence_joint_coverage.py
+          grep -q "interaction_outcome_testing_performed.*False" edge_evidence_joint_coverage.py
+          grep -q "can_override_production.*False" edge_evidence_joint_coverage.py
