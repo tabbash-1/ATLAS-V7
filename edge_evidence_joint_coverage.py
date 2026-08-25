@@ -1,12 +1,13 @@
 """ATLAS frozen cross-layer joint-cell coverage audit.
 
-This is a precondition audit for any future interaction research. It measures
-whether layer-specific frozen categorical outputs form joint cells with enough
-forward observations to support later, separately-approved validation.
+Joint interaction research uses only the chronologically aligned frozen cohort:
+rows captured after all three shadow layers were demonstrably active, with exact
+forward_id coverage required from that point onward. Older rollout-era rows stay
+in the archives but cannot permanently block modern research. Any missing capture
+inside the aligned period remains a fail-closed blocker.
 
-It deliberately does NOT read outcomes, test performance, search rules, assign
+This module does not read outcomes, test performance, search rules, assign
 weights, choose a trade horizon, create a composite score, or alter Production.
-Sparse joint cells are a research-design blocker only, never a Production gate.
 """
 
 from __future__ import annotations
@@ -15,10 +16,11 @@ import json
 from collections import Counter
 from pathlib import Path
 
+import edge_evidence_aligned_cohort
 import edge_evidence_overlap
 import edge_evidence_redundancy
 
-VERSION = 'EDGE_EVIDENCE_JOINT_COVERAGE_V1_OUTCOME_FREE'
+VERSION = 'EDGE_EVIDENCE_JOINT_COVERAGE_V2_ALIGNED_FROZEN_COHORT'
 MIN_MATCHED_OBSERVATIONS = 30
 MIN_CELL_N = 10
 MAX_CELL_SHARE_PCT = 65.0
@@ -81,15 +83,22 @@ def _cell_report(counter, n):
 
 def audit(data_dir):
     data_dir = Path(data_dir)
-    overlap = edge_evidence_overlap.audit(data_dir)
+    whole_history = edge_evidence_overlap.audit(data_dir)
+    aligned = edge_evidence_aligned_cohort.audit(data_dir)
     comparable = bool(
-        overlap.get('status') == 'COHORTS_IDENTICAL'
-        and int(overlap.get('union_unique_forward_ids') or 0) > 0
+        aligned.get('aligned_cohort_complete') is True
+        and int(aligned.get('aligned_common_count') or 0) > 0
     )
     base = {
         'version': VERSION,
-        'overlap_status': overlap.get('status'),
+        'overlap_status': whole_history.get('status'),
+        'whole_history_overlap_status': whole_history.get('status'),
+        'aligned_cohort_status': aligned.get('status'),
+        'aligned_cohort_comparable': comparable,
         'cohort_comparable': comparable,
+        'aligned_start_ms': aligned.get('aligned_start_ms'),
+        'pre_alignment_rows_excluded_by_layer': aligned.get('pre_alignment_rows_excluded_by_layer') or {},
+        'aligned_unique_forward_ids_by_layer': aligned.get('aligned_unique_forward_ids_by_layer') or {},
         'minimum_matched_observations': MIN_MATCHED_OBSERVATIONS,
         'minimum_cell_n': MIN_CELL_N,
         'maximum_single_cell_share_pct': MAX_CELL_SHARE_PCT,
@@ -108,23 +117,26 @@ def audit(data_dir):
         'production_ready_claimed': False,
         'live_trading_ready_claimed': False,
         'research_only': True,
-        'method': 'OUTCOME_FREE_FROZEN_JOINT_CATEGORICAL_CELL_PREVALENCE',
+        'method': 'OUTCOME_FREE_CHRONOLOGICALLY_ALIGNED_FROZEN_JOINT_CELL_PREVALENCE',
     }
     if not comparable:
         return {
             **base,
-            'status': 'COLLECTING' if overlap.get('status') == 'COLLECTING' else 'COHORT_NOT_COMPARABLE',
-            'matched_forward_ids': int(overlap.get('three_way_intersection_unique_forward_ids') or 0),
+            'status': 'COLLECTING' if aligned.get('status') == 'COLLECTING' else 'COHORT_NOT_COMPARABLE',
+            'matched_forward_ids': int(aligned.get('aligned_common_count') or 0),
             'horizon_coverage': {},
+            'horizons_with_sufficient_joint_coverage_h': [],
             'future_interaction_validation_supported': False,
-            'blockers': ['IDENTICAL_FROZEN_SIGNAL_COHORT_REQUIRED'] + list(overlap.get('blockers') or []),
+            'interaction_rule_selection_allowed': False,
+            'interaction_outcome_testing_performed': False,
+            'blockers': ['ALIGNED_FROZEN_SIGNAL_COHORT_REQUIRED'] + list(aligned.get('blockers') or []),
         }
 
     rows = {
         layer: _read(data_dir / edge_evidence_overlap.FILES[layer], edge_evidence_overlap.SCHEMAS[layer])
         for layer in ('profit_engine', 'microstructure', 'volatility')
     }
-    ids = sorted(set(rows['profit_engine']) & set(rows['microstructure']) & set(rows['volatility']))
+    ids = [str(x) for x in aligned.get('aligned_common_forward_ids') or []]
     horizon_coverage = {}
     blockers = []
 
@@ -179,7 +191,6 @@ def audit(data_dir):
 
 
 def install(collector):
-    """Expose a read-only outcome-free design audit without wrapping Production."""
     if getattr(collector, '_EDGE_EVIDENCE_JOINT_COVERAGE_INSTALLED', False):
         return getattr(collector, 'EDGE_EVIDENCE_JOINT_COVERAGE_STATE', {})
     original_decision = getattr(collector, 'production_decision', None)
