@@ -36,10 +36,12 @@ jobs:
           python3 - <<'PY'
           import json
           x=json.load(open('status/production-loss-autopsy.json'))
-          assert x['schema']=='ATLAS_PRODUCTION_LOSS_AUTOPSY_V1'
+          assert x['schema']=='ATLAS_PRODUCTION_LOSS_AUTOPSY_V2'
           assert x['production_threshold']==68
           assert x['production_threshold_changed'] is False
           assert x['production_score_adjustment']==0
+          assert x['production_stop_policy_changed'] is False
+          assert x['research_recommendation']['change_production_stop_policy_now'] is False
           print('AUTOPSY',json.dumps(x,sort_keys=True))
           PY
       - name: Commit report
