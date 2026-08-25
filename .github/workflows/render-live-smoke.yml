@@ -64,7 +64,7 @@ jobs:
           print('EXECUTION_MANAGED_METRICS', json.dumps(execution.get('overall') or {}, sort_keys=True))
           print('EXECUTION_REJECTIONS', json.dumps(execution.get('execution_rejection_summary') or {}, sort_keys=True))
           PY
-      - name: Verify live decision exposes actual RR management plan
+      - name: Verify live decision exposes only valid management geometry
         shell: bash
         run: |
           set -euo pipefail
@@ -79,12 +79,42 @@ jobs:
           assert x.get('ok') is True, x
           assert x.get('execution_policy_version') == 'ATLAS_EXECUTION_RISK_V1_STRUCTURAL_TP1_PROTECT', x
           plan=x.get('management_plan')
-          if x.get('candidate_direction') in ('LONG','SHORT') and plan is not None:
+          if plan is not None:
               assert plan.get('tp1_close_fraction') == 0.5, plan
-              assert plan.get('after_tp1_stop') == plan.get('initial_stop_loss') or plan.get('after_tp1_stop') == x.get('entry'), plan
-          gate=x.get('geometry_gate') or {}
+              direction=plan.get('direction')
+              entry=float(plan['entry'])
+              stop=float(plan['initial_stop_loss'])
+              tp1=float(plan['tp1'])
+              tp2=float(plan['tp2'])
+              rr=float(plan['rr_tp2_actual'])
+              assert rr >= 1.0, plan
+              assert float(plan['after_tp1_stop']) == entry, plan
+              if direction == 'LONG':
+                  assert stop < entry < tp1 <= tp2, plan
+              elif direction == 'SHORT':
+                  assert tp2 <= tp1 < entry < stop, plan
+              else:
+                  raise AssertionError(plan)
+
+              trade=x.get('trade_plan') or {}
+              if plan.get('source') == 'TRADE_PLAN':
+                  assert float(trade['entry']) == entry, (trade, plan)
+                  assert float(trade['stop_loss']) == stop, (trade, plan)
+                  assert float(trade['tp1']) == tp1, (trade, plan)
+                  assert float(trade['tp2']) == tp2, (trade, plan)
+          else:
+              assert str(x.get('management_plan_status') or '').startswith('BLOCKED'), x
+
           if x.get('execution_ready'):
+              gate=x.get('geometry_gate') or {}
               assert gate.get('qualified') is True, gate
               assert float(x.get('risk_reward')) >= 1.0, x
-          print('DECISION_RISK_POLICY', json.dumps({'decision':x.get('actionable_decision'),'reason':x.get('actionable_reason'),'rr':x.get('risk_reward'),'policy':x.get('execution_policy_version'),'management_plan':plan}, sort_keys=True))
+          print('DECISION_RISK_POLICY', json.dumps({
+              'decision':x.get('actionable_decision'),
+              'reason':x.get('actionable_reason'),
+              'rr':x.get('risk_reward'),
+              'policy':x.get('execution_policy_version'),
+              'management_plan_status':x.get('management_plan_status'),
+              'management_plan':plan,
+          }, sort_keys=True))
           PY
