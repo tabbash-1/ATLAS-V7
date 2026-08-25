@@ -1,13 +1,19 @@
-"""ATLAS spot candle adapter with resilient public fallback.
+"""ATLAS market-data resilience adapter.
 
-HYPEUSDT keeps its dedicated provider order:
-1) OKX HYPE-USDT spot 1h candles
-2) Bybit HYPEUSDT spot 1h candles
+Spot:
+- HYPEUSDT: OKX -> Bybit.
+- Other ATLAS assets: existing Binance chain -> OKX fallback.
 
-All other ATLAS assets keep the existing Binance path as primary. If that
-primary path fails (for example regional HTTP 451 responses), ATLAS falls back
-to OKX spot candles for the same symbol. This module never changes scoring,
-thresholds, forward logic, geometry, or execution rules.
+Futures:
+- Preserve the existing futures capture as primary.
+- For HYPE only, if the primary result is missing or explicitly unvalidated,
+  try the same normalized OKX/Bybit derivatives contract used by ATLAS for
+  other assets. A fallback is accepted only when the existing validation
+  contract marks it ``futures_evidence_validated=True``.
+- If no validated CEX contract is available, preserve the primary HYPE result
+  (or let the later Hyperliquid reliability fallback handle a primary error).
+
+No scoring, thresholds, forward logic, geometry, or execution rules are changed.
 """
 
 from __future__ import annotations
@@ -16,7 +22,7 @@ import json
 import urllib.parse
 import urllib.request
 
-VERSION = "ATLAS_SPOT_RESILIENCE_V2"
+VERSION = "ATLAS_MARKET_DATA_RESILIENCE_V3"
 
 
 def _f(value):
@@ -90,18 +96,89 @@ def _bybit_hype(limit, ua):
     return out[-int(limit):], "api.bybit.com"
 
 
-def _mark_success(atlas, provider):
-    state = getattr(atlas, "MARKET_DATA_STATE", {}).get("spot")
+def _mark_success(atlas, family, provider):
+    state = getattr(atlas, "MARKET_DATA_STATE", {}).get(family)
     if state is not None:
         state["last_provider"] = provider
         state["last_success_at"] = atlas.now_iso()
         state["last_error"] = None
 
 
-def _mark_error(atlas, message):
-    state = getattr(atlas, "MARKET_DATA_STATE", {}).get("spot")
+def _mark_error(atlas, family, message):
+    state = getattr(atlas, "MARKET_DATA_STATE", {}).get(family)
     if state is not None:
         state["last_error"] = message
+
+
+def _persist_futures(atlas, snap):
+    with atlas.ARCHIVE_LOCK:
+        with atlas.ARCHIVE.open("a") as handle:
+            handle.write(json.dumps(snap, separators=(",", ":")) + "\n")
+
+
+def _install_hype_futures_fallback(atlas):
+    """Upgrade HYPE to validated futures only when the normal contract passes."""
+    try:
+        import futures_provider_chain as fpc
+    except Exception:
+        return {"enabled": False, "reason": "futures_provider_chain_import_failed"}
+
+    original_capture = atlas.capture
+    state = {
+        "enabled": True,
+        "attempts": 0,
+        "validated_successes": 0,
+        "primary_unvalidated": 0,
+        "last_provider": None,
+        "last_error": None,
+    }
+
+    def capture(symbol):
+        normalized = str(symbol or "").upper().replace("BINANCE:", "")
+        if normalized != "HYPEUSDT":
+            return original_capture(normalized)
+
+        primary = None
+        primary_error = None
+        try:
+            primary = original_capture(normalized)
+            if isinstance(primary, dict) and primary.get("futures_evidence_validated") is True:
+                return primary
+            state["primary_unvalidated"] += 1
+        except Exception as exc:
+            primary_error = exc
+
+        state["attempts"] += 1
+        errors = []
+        for provider_name, fetcher in (
+            ("OKX_USDT_SWAP_PUBLIC", fpc._okx_capture),
+            ("BYBIT_LINEAR_PUBLIC", fpc._bybit_capture),
+        ):
+            try:
+                snap = fetcher(atlas, normalized)
+                if not isinstance(snap, dict) or snap.get("futures_evidence_validated") is not True:
+                    raise RuntimeError("normalized derivatives validation contract incomplete")
+                _persist_futures(atlas, snap)
+                state["validated_successes"] += 1
+                state["last_provider"] = provider_name
+                state["last_error"] = None
+                _mark_success(atlas, "futures", provider_name)
+                return snap
+            except Exception as exc:
+                errors.append(f"{provider_name}: {type(exc).__name__}: {exc}")
+
+        state["last_error"] = " | ".join(errors) if errors else "no validated HYPE futures fallback"
+        if primary is not None:
+            # Keep the honest unvalidated primary evidence instead of fabricating
+            # validation. Production scoring already treats it as shadow-only.
+            return primary
+        if primary_error is not None:
+            raise primary_error
+        raise RuntimeError(state["last_error"])
+
+    atlas.capture = capture
+    atlas.HYPE_FUTURES_VALIDATION_STATE = state
+    return state
 
 
 def install(atlas):
@@ -118,12 +195,12 @@ def install(atlas):
             ):
                 try:
                     rows, provider = fetcher()
-                    _mark_success(atlas, provider)
+                    _mark_success(atlas, "spot", provider)
                     return rows
                 except Exception as exc:
                     errors.append(f"{type(exc).__name__}: {exc}")
             message = "HYPEUSDT spot providers failed: " + " | ".join(errors)
-            _mark_error(atlas, message)
+            _mark_error(atlas, "spot", message)
             raise RuntimeError(message)
 
         try:
@@ -131,7 +208,7 @@ def install(atlas):
         except Exception as primary:
             try:
                 rows, provider = _okx(normalized, limit, atlas.UA)
-                _mark_success(atlas, provider)
+                _mark_success(atlas, "spot", provider)
                 return rows
             except Exception as fallback:
                 message = (
@@ -139,10 +216,11 @@ def install(atlas):
                     f"primary={type(primary).__name__}: {primary}; "
                     f"OKX={type(fallback).__name__}: {fallback}"
                 )
-                _mark_error(atlas, message)
+                _mark_error(atlas, "spot", message)
                 raise RuntimeError(message) from fallback
 
     atlas._spot_klines = spot_klines
+    futures_state = _install_hype_futures_fallback(atlas)
     atlas.HYPE_MARKET_DATA_VERSION = VERSION
     atlas.SPOT_MARKET_DATA_VERSION = VERSION
     return {
@@ -150,6 +228,7 @@ def install(atlas):
         "version": VERSION,
         "hype_symbol": "HYPEUSDT",
         "primary": "existing Binance chain",
-        "fallback": "OKX spot",
-        "hype_providers": ["OKX", "Bybit"],
+        "spot_fallback": "OKX spot",
+        "hype_spot_providers": ["OKX", "Bybit"],
+        "hype_futures_validation": futures_state,
     }
