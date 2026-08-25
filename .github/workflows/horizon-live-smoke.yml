@@ -50,12 +50,14 @@ jobs:
                 .horizon_fit_overlay_version == $ov and
                 .horizon_policy_version == $pv and
                 .production_threshold_changed_by_horizon_policy == false and
-                .horizon_fit.production_override_allowed == false
+                .horizon_fit.production_override_allowed == false and
+                .horizon_fit.production_score_adjustment == 0 and
+                .swing_research.production_score_adjustment == 0
               ' /tmp/decision.json >/dev/null; then
                 ok=1
                 break
               fi
-              jq '{horizon_fit_overlay_version,horizon_policy_version,quick_trade_shadow,horizon_fit,signal_threshold,production_signal_qualified}' /tmp/decision.json || true
+              jq '{horizon_fit_overlay_version,horizon_policy_version,quick_trade_shadow,horizon_fit,signal_threshold,production_signal_qualified,swing_quality_tier,swing_quality_evidence}' /tmp/decision.json || true
             fi
             sleep 15
           done
@@ -70,16 +72,16 @@ jobs:
               (.quick_trade_shadow | has("active_remaining_seconds") | not)
             else true end
           ' /tmp/decision.json >/dev/null
-          jq '{symbol,decision,score,signal_threshold,preferred_horizon,horizon_fit_overlay_version,quick_trade_shadow,swing_research}' /tmp/decision.json
+          jq '{symbol,decision,score,signal_threshold,preferred_horizon,horizon_fit_overlay_version,quick_trade_shadow,swing_research,swing_quality_tier,swing_quality_evidence}' /tmp/decision.json
       - name: Persist verified live proof
         run: |
           mkdir -p status
           source /tmp/expected.env
           python3 - <<'PY'
-          import json, os, datetime
+          import json, datetime
           d=json.load(open('/tmp/decision.json'))
           proof={
-            'schema':'ATLAS_HORIZON_LIVE_SMOKE_V1',
+            'schema':'ATLAS_HORIZON_LIVE_SMOKE_V2_COMBO_QUALITY',
             'verified_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),
             'source':'https://atlas-v7.onrender.com/api/decision/current?symbol=BTCUSDT',
             'symbol':d.get('symbol'),
@@ -88,11 +90,15 @@ jobs:
             'signal_threshold':d.get('signal_threshold'),
             'production_threshold_changed':d.get('production_threshold_changed_by_horizon_policy'),
             'production_override_allowed':(d.get('horizon_fit') or {}).get('production_override_allowed'),
+            'production_score_adjustment':(d.get('horizon_fit') or {}).get('production_score_adjustment'),
             'preferred_horizon':d.get('preferred_horizon'),
             'quick_status':(d.get('quick_trade_shadow') or {}).get('status'),
             'quick_reason':(d.get('quick_trade_shadow') or {}).get('reason'),
             'quick_has_stale_geometry':any(k in (d.get('quick_trade_shadow') or {}) for k in ('entry','stop_loss','target','active_remaining_seconds')) if (d.get('quick_trade_shadow') or {}).get('status') in ('WATCH_ONLY','NO_SETUP') else False,
             'swing_status':(d.get('swing_research') or {}).get('status'),
+            'swing_quality_tier':d.get('swing_quality_tier'),
+            'swing_quality_evidence':d.get('swing_quality_evidence'),
+            'calibration_combo':(d.get('swing_research') or {}).get('calibration_combo'),
             'ok':True,
           }
           open('status/horizon-live-smoke.json','w').write(json.dumps(proof,indent=2)+'\n')
