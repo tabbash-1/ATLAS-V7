@@ -1,0 +1,63 @@
+name: ATLAS Historical Shadow Replay
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'historical_shadow_replay.py'
+      - 'tests/test_historical_shadow_replay.py'
+      - 'status/wait-outcomes.json'
+      - '.github/workflows/historical-shadow-replay.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate replay engine
+        run: |
+          python3 -m py_compile historical_shadow_replay.py tests/test_historical_shadow_replay.py
+          python3 tests/test_historical_shadow_replay.py
+      - name: Fetch live execution comparison
+        run: |
+          curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 10 --max-time 60 \
+            'https://atlas-v7.onrender.com/api/outcomes/path-summary?scope=execution&limit=100' \
+            -o /tmp/execution-summary.json
+          python3 -m json.tool /tmp/execution-summary.json >/dev/null
+      - name: Build 100-case shadow replay report
+        run: |
+          python3 historical_shadow_replay.py \
+            --wait-outcomes status/wait-outcomes.json \
+            --execution-summary /tmp/execution-summary.json \
+            --output status/historical-shadow-replay.json \
+            --target 100
+          python3 - <<'PY'
+          import json
+          x=json.load(open('status/historical-shadow-replay.json'))
+          assert x['schema'] == 'ATLAS_HISTORICAL_SHADOW_REPLAY_V1'
+          assert x['production_threshold_changed'] is False
+          print('PROGRESS', json.dumps(x['progress'], sort_keys=True))
+          print('24H', json.dumps(x['directional_forward_performance']['24h'], sort_keys=True))
+          print('SCORE_BANDS', json.dumps(x['by_score_band_24h'], sort_keys=True))
+          print('TOP_BLOCKERS', json.dumps(x['directional_blocker_counts'], sort_keys=True))
+          live=(x.get('live_execution_comparison') or {}).get('overall') or {}
+          print('LIVE_EXECUTION', json.dumps({k:live.get(k) for k in ('total','terminal','wins','losses','win_rate_pct','net_r','average_r','profit_factor_r','protected_tp1_exits')}, sort_keys=True))
+          PY
+      - name: Commit replay report
+        run: |
+          if git diff --quiet -- status/historical-shadow-replay.json; then
+            echo 'Replay report unchanged'
+            exit 0
+          fi
+          git config user.name 'atlas-replay-bot'
+          git config user.email 'atlas-replay-bot@users.noreply.github.com'
+          git add status/historical-shadow-replay.json
+          git commit -m 'Update historical shadow replay report'
+          git push
