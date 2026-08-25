@@ -1,0 +1,49 @@
+name: ATLAS Interaction Status API CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cloud_start.py'
+      - 'interaction_status_api.py'
+      - 'tests/test_interaction_status_api.py'
+      - 'tests/test_interaction_status_boot_contract.py'
+      - '.github/workflows/atlas-interaction-status-api-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'cloud_start.py'
+      - 'interaction_status_api.py'
+      - 'tests/test_interaction_status_api.py'
+      - 'tests/test_interaction_status_boot_contract.py'
+      - '.github/workflows/atlas-interaction-status-api-ci.yml'
+
+jobs:
+  cached-status-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test runner
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Syntax
+        run: python -m py_compile interaction_status_api.py cloud_start.py
+      - name: Cached endpoint tests
+        run: PYTHONPATH=. python -m pytest -q tests/test_interaction_status_api.py tests/test_interaction_status_boot_contract.py
+      - name: Preserve cached-only contract
+        run: |
+          grep -q "PATH = '/api/research/interaction-status'" interaction_status_api.py
+          grep -q "cached_only.*True" interaction_status_api.py
+          grep -q "background_refresh_triggered.*False" interaction_status_api.py
+          grep -q "canonical_outcome_loader_called_by_request.*False" interaction_status_api.py
+          grep -q "outcomes_read_by_request.*False" interaction_status_api.py
+          grep -q "INTERACTION_OUTCOME_RUNTIME_STATE" interaction_status_api.py
+          ! grep -q "interaction_outcome_refresh(" interaction_status_api.py
+          ! grep -q "_canonical_settlements(" interaction_status_api.py
+          ! grep -q "trade_path_settlement" interaction_status_api.py
+          grep -q "from interaction_status_api import install as _install_interaction_status_api" cloud_start.py
+          grep -q "_install_interaction_status_api(_collector)" cloud_start.py
+          grep -q "except Exception as _interaction_status_api_exc" cloud_start.py
