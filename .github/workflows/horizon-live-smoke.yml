@@ -12,12 +12,17 @@ on:
       - '.github/workflows/horizon-live-smoke.yml'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   live-horizon-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Resolve expected versions
         run: |
           python3 - <<'PY' > /tmp/expected.env
@@ -66,3 +71,36 @@ jobs:
             else true end
           ' /tmp/decision.json >/dev/null
           jq '{symbol,decision,score,signal_threshold,preferred_horizon,horizon_fit_overlay_version,quick_trade_shadow,swing_research}' /tmp/decision.json
+      - name: Persist verified live proof
+        run: |
+          mkdir -p status
+          source /tmp/expected.env
+          python3 - <<'PY'
+          import json, os, datetime
+          d=json.load(open('/tmp/decision.json'))
+          proof={
+            'schema':'ATLAS_HORIZON_LIVE_SMOKE_V1',
+            'verified_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            'source':'https://atlas-v7.onrender.com/api/decision/current?symbol=BTCUSDT',
+            'symbol':d.get('symbol'),
+            'overlay_version':d.get('horizon_fit_overlay_version'),
+            'policy_version':d.get('horizon_policy_version'),
+            'signal_threshold':d.get('signal_threshold'),
+            'production_threshold_changed':d.get('production_threshold_changed_by_horizon_policy'),
+            'production_override_allowed':(d.get('horizon_fit') or {}).get('production_override_allowed'),
+            'preferred_horizon':d.get('preferred_horizon'),
+            'quick_status':(d.get('quick_trade_shadow') or {}).get('status'),
+            'quick_reason':(d.get('quick_trade_shadow') or {}).get('reason'),
+            'quick_has_stale_geometry':any(k in (d.get('quick_trade_shadow') or {}) for k in ('entry','stop_loss','target','active_remaining_seconds')) if (d.get('quick_trade_shadow') or {}).get('status') in ('WATCH_ONLY','NO_SETUP') else False,
+            'swing_status':(d.get('swing_research') or {}).get('status'),
+            'ok':True,
+          }
+          open('status/horizon-live-smoke.json','w').write(json.dumps(proof,indent=2)+'\n')
+          PY
+          git config user.name 'atlas-live-smoke-bot'
+          git config user.email 'atlas-live-smoke-bot@users.noreply.github.com'
+          git add status/horizon-live-smoke.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'chore: update horizon live smoke proof [skip ci]'
+          git pull --rebase origin main
+          git push
