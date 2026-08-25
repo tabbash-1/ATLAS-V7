@@ -6,7 +6,7 @@ the Quick shadow lane and adds an explicit 12-24h Swing research lane.
 
 import horizon_fit_policy
 
-VERSION = 'HORIZON_FIT_OVERLAY_V2_GUARD_CLEANUP'
+VERSION = 'HORIZON_FIT_OVERLAY_V3_LEGACY_STATE_MIGRATION'
 
 
 def install(atlas):
@@ -35,24 +35,47 @@ def install(atlas):
             execution_ready=bool(row.get('execution_ready')),
         )
 
-        # Preserve genuinely pre-existing active/cooldown states. If the legacy
-        # layer just created a permissive QUICK_TRADE_SHADOW that the strict
-        # horizon policy rejects, cancel that ACTIVE record immediately so the
-        # persistent re-entry guard cannot be polluted by a hidden weak signal.
         existing_quick = row.get('quick_trade_shadow') or {}
-        legacy_just_registered = existing_quick.get('status') == 'QUICK_TRADE_SHADOW'
+        guard = getattr(atlas, 'QUICK_REENTRY_GUARD', None)
         strict_quick_allowed = fit['quick'].get('status') == 'QUICK_TRADE_SHADOW'
         guard_cleanup = None
-        if legacy_just_registered and not strict_quick_allowed:
-            guard = getattr(atlas, 'QUICK_REENTRY_GUARD', None)
-            if guard is not None and hasattr(guard, 'cancel_active'):
+        guard_approval = None
+
+        # The legacy decision layer may register a permissive shadow before this
+        # overlay runs. Approve it only when the strict policy independently
+        # agrees; otherwise cancel it immediately.
+        if existing_quick.get('status') == 'QUICK_TRADE_SHADOW' and guard is not None:
+            if strict_quick_allowed and hasattr(guard, 'approve_active_policy'):
+                guard_approval = guard.approve_active_policy(
+                    row.get('symbol') or symbol,
+                    row.get('candidate_direction'),
+                    horizon_fit_policy.VERSION,
+                )
+            elif not strict_quick_allowed and hasattr(guard, 'cancel_active'):
                 guard_cleanup = guard.cancel_active(
                     row.get('symbol') or symbol,
                     row.get('candidate_direction'),
                     reason='HORIZON_FIT_STRICT_QUICK_REJECTED',
                 )
 
-        if existing_quick.get('status') in ('QUICK_TRADE_ACTIVE',) or existing_quick.get('reason') == 'POST_STOP_REENTRY_COOLDOWN':
+        # Migration: an ACTIVE record without the current strict policy stamp was
+        # created before Horizon Fit became authoritative. Reject it once instead
+        # of preserving a contradictory legacy Quick state until TTL expiry.
+        legacy_active_rejected = False
+        if existing_quick.get('status') == 'QUICK_TRADE_ACTIVE' and guard is not None and hasattr(guard, 'reject_legacy_active'):
+            guard_cleanup = guard.reject_legacy_active(
+                row.get('symbol') or symbol,
+                existing_quick.get('direction') or row.get('candidate_direction'),
+                horizon_fit_policy.VERSION,
+                reason='LEGACY_QUICK_ACTIVE_PREDATES_HORIZON_FIT',
+            )
+            legacy_active_rejected = bool((guard_cleanup or {}).get('cancelled'))
+
+        preserve_guard_state = (
+            existing_quick.get('reason') == 'POST_STOP_REENTRY_COOLDOWN' or
+            (existing_quick.get('status') == 'QUICK_TRADE_ACTIVE' and not legacy_active_rejected)
+        )
+        if preserve_guard_state:
             strict_quick = dict(existing_quick)
             strict_quick['policy_version'] = horizon_fit_policy.VERSION
             strict_quick['evaluation_horizons'] = ['1h', '3h']
@@ -60,8 +83,11 @@ def install(atlas):
             strict_quick = dict(existing_quick)
             strict_quick.update(fit['quick'])
             strict_quick['policy_version'] = horizon_fit_policy.VERSION
+
         if guard_cleanup is not None:
             strict_quick['legacy_guard_cleanup'] = guard_cleanup
+        if guard_approval is not None:
+            strict_quick['guard_policy_approval'] = guard_approval
 
         swing = dict(matrix.get('swing') or {})
         swing.update(fit['swing'])
@@ -72,7 +98,7 @@ def install(atlas):
         matrix['quick_1_3h'] = strict_quick
         matrix.pop('quick_1_2h', None)
         matrix['swing_12_24h'] = swing
-        matrix['swing'] = swing  # compatibility alias
+        matrix['swing'] = swing
 
         row['quick_trade_shadow'] = strict_quick
         row['swing_research'] = swing
@@ -94,5 +120,6 @@ def install(atlas):
         'production_threshold_unchanged': True,
         'production_override_allowed': False,
         'legacy_quick_guard_cleanup': True,
+        'legacy_active_state_migration': True,
     }
     return atlas.HORIZON_FIT_STATE
