@@ -38,18 +38,18 @@ jobs:
           mkdir -p status/history
           tmp="status/interaction-validation-latest.json.tmp"
           ok=0
-          for attempt in $(seq 1 16); do
+          for attempt in $(seq 1 20); do
             code="$(curl -L --connect-timeout 20 --max-time 60 -sS -w '%{http_code}' -o "$tmp" "${BASE_URL}/api/research/interaction-status" || true)"
             if [[ "$code" =~ ^2 ]] && jq -e . "$tmp" >/dev/null 2>&1 && \
-               jq -e '.research_only == true and .live_execution == false and .cached_only == true and .version == "INTERACTION_STATUS_API_V1_CACHED_READ_ONLY"' "$tmp" >/dev/null 2>&1; then
+               jq -e '.research_only == true and .live_execution == false and .cached_only == true and .version == "INTERACTION_STATUS_API_V1_CACHED_READ_ONLY" and (.runtime.refreshes // 0) >= 1 and (.preflight | type) == "object"' "$tmp" >/dev/null 2>&1; then
               ok=1
               break
             fi
-            echo "Waiting for deployed interaction status contract (attempt ${attempt}/16, HTTP ${code:-none})"
+            echo "Waiting for deployed interaction preflight (attempt ${attempt}/20, HTTP ${code:-none})"
             sleep 15
           done
           if [[ "$ok" != "1" ]]; then
-            echo "Interaction status endpoint did not reach the required cached/read-only contract within the deployment grace period." >&2
+            echo "Interaction status endpoint did not reach a completed cached preflight within the deployment grace period." >&2
             echo "Last HTTP code: ${code:-none}" >&2
             cat "$tmp" >&2 || true
             exit 1
