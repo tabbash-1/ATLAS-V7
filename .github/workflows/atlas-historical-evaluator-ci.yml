@@ -7,7 +7,9 @@ on:
       - 'historical_microstructure_evaluator.py'
       - 'historical_evaluation_protocol.py'
       - 'historical_replay_registry.py'
+      - 'forward_microstructure_freeze_runtime.py'
       - 'tests/test_historical_microstructure_evaluator.py'
+      - 'tests/test_forward_microstructure_freeze.py'
       - '.github/workflows/atlas-historical-evaluator-ci.yml'
   workflow_dispatch:
 
@@ -20,8 +22,9 @@ jobs:
       - name: Syntax and guarded outcome tests
         run: |
           set -euo pipefail
-          python3 -m py_compile historical_microstructure_evaluator.py historical_evaluation_protocol.py historical_replay_registry.py tests/test_historical_microstructure_evaluator.py
+          python3 -m py_compile historical_microstructure_evaluator.py historical_evaluation_protocol.py historical_replay_registry.py forward_microstructure_freeze_runtime.py tests/test_historical_microstructure_evaluator.py tests/test_forward_microstructure_freeze.py
           PYTHONPATH=. python3 tests/test_historical_microstructure_evaluator.py
+          PYTHONPATH=. python3 tests/test_forward_microstructure_freeze.py
       - name: Preregistered evaluation safety contract
         run: |
           set -euo pipefail
@@ -34,3 +37,12 @@ jobs:
           ! grep -q "best_horizon" historical_microstructure_evaluator.py
           ! grep -q "grid_search" historical_microstructure_evaluator.py
           ! grep -q "trade_path_settlement" historical_microstructure_evaluator.py
+      - name: Forward microstructure freeze safety contract
+        run: |
+          set -euo pipefail
+          grep -q "sts <= ts" forward_microstructure_freeze_runtime.py
+          grep -q "microstructure_outcome_known_at_entry.*False" forward_microstructure_freeze_runtime.py
+          grep -q "microstructure_future_data_allowed_at_entry.*False" forward_microstructure_freeze_runtime.py
+          grep -q "microstructure_can_override_production.*False" forward_microstructure_freeze_runtime.py
+          ! grep -q "forward_return_pct" forward_microstructure_freeze_runtime.py
+          ! grep -q "trade_path_settlement" forward_microstructure_freeze_runtime.py
