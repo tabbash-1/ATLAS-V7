@@ -1,0 +1,71 @@
+name: ATLAS Prospective Microstructure Snapshot
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'prospective_microstructure_cohort.py'
+      - 'prospective_microstructure_evaluator.py'
+      - 'prospective_microstructure_validation_runtime.py'
+      - 'forward_microstructure_freeze_runtime.py'
+      - '.github/workflows/atlas-prospective-microstructure-snapshot.yml'
+  schedule:
+    - cron: '53 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atlas-prospective-microstructure-snapshot
+  cancel-in-progress: true
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      BASE_URL: https://atlas-v7.onrender.com
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch deployed prospective validation
+        run: |
+          set -euo pipefail
+          mkdir -p status/history
+          tmp="status/prospective-microstructure-latest.json.tmp"
+          ok=0
+          for attempt in $(seq 1 28); do
+            code="$(curl -L --connect-timeout 20 --max-time 60 -sS -w '%{http_code}' -o "$tmp" "${BASE_URL}/api/research/prospective-microstructure-validation" || true)"
+            if [[ "$code" =~ ^2 ]] && jq -e . "$tmp" >/dev/null 2>&1 && \
+               jq -e '.version == "ATLAS_PROSPECTIVE_MICROSTRUCTURE_VALIDATION_RUNTIME_V1" and .cached_only == true and .background_refresh_triggered == false and .archive_read_triggered_by_request == false and .outcome_read_triggered_by_request == false and .research_only == true and .live_execution == false and .can_override_production == false and (.runtime.refreshes // 0) >= 1 and .evaluation.forward_proof_cohort == true and .evaluation.historical_rows_allowed == false' "$tmp" >/dev/null 2>&1; then
+              ok=1
+              break
+            fi
+            echo "Waiting for prospective microstructure runtime (attempt ${attempt}/28, HTTP ${code:-none})"
+            sleep 15
+          done
+          if [[ "$ok" != "1" ]]; then
+            echo "Prospective microstructure validation did not become available within deployment grace period." >&2
+            echo "Last HTTP code: ${code:-none}" >&2
+            cat "$tmp" >&2 || true
+            exit 1
+          fi
+          mv "$tmp" status/prospective-microstructure-latest.json
+          python3 - <<'PY'
+          import datetime,json,pathlib
+          p=pathlib.Path('status/prospective-microstructure-latest.json')
+          row=json.loads(p.read_text())
+          row['_snapshot_captured_at']=datetime.datetime.now(datetime.timezone.utc).isoformat()
+          p.write_text(json.dumps(row,indent=2,sort_keys=True))
+          h=pathlib.Path('status/history/prospective-microstructure-snapshots.jsonl')
+          with h.open('a') as f:f.write(json.dumps(row,separators=(',',':'))+'\n')
+          PY
+      - name: Commit prospective snapshot
+        run: |
+          git config user.name "atlas-prospective-microstructure-monitor"
+          git config user.email "atlas-prospective-microstructure-monitor@users.noreply.github.com"
+          git add status/prospective-microstructure-latest.json status/history/prospective-microstructure-snapshots.jsonl
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "chore: update prospective microstructure snapshot [skip ci]"
+          git pull --rebase origin main
+          git push
