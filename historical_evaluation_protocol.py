@@ -149,6 +149,19 @@ def refresh(collector, path=None):
     return copy.deepcopy(STATE)
 
 
+def _start_evaluator_after_registration(collector):
+    # Import only AFTER the protocol is durably PREREGISTERED. This preserves
+    # the temporal contract: no outcome evaluator exists in the startup path
+    # before the immutable rules/hash are locked.
+    if STATE.get('status') != 'PREREGISTERED' or not STATE.get('registration_locked'):
+        return
+    try:
+        import historical_evaluation_runtime
+        historical_evaluation_runtime.install(collector)
+    except Exception as exc:
+        STATE['last_error'] = f'HISTORICAL_EVALUATOR_INSTALL_ERROR: {type(exc).__name__}: {exc}'
+
+
 def install(collector):
     collector.HISTORICAL_EVALUATION_PROTOCOL_STATE = STATE
     refresh(collector)
@@ -160,8 +173,11 @@ def install(collector):
         while STATE.get('status') not in ('PREREGISTERED', 'REGISTRATION_CORRUPT'):
             time.sleep(5)
             refresh(collector)
-        # One-way immutable registration: no periodic rule mutation loop.
+        if STATE.get('status') == 'PREREGISTERED':
+            _start_evaluator_after_registration(collector)
 
-    if STATE.get('status') not in ('PREREGISTERED', 'REGISTRATION_CORRUPT'):
+    if STATE.get('status') == 'PREREGISTERED':
+        _start_evaluator_after_registration(collector)
+    elif STATE.get('status') != 'REGISTRATION_CORRUPT':
         threading.Thread(target=retry_until_registered, daemon=True, name='atlas-historical-evaluation-preregistration').start()
     return STATE
