@@ -2,16 +2,18 @@
 """ATLAS Production loss autopsy + entry-quality diagnostics.
 
 Read-only research module. It never changes Production score, threshold,
-direction, geometry, or execution eligibility. V2 diagnostics deliberately
-separate stop-distance evidence from policy recommendations so legacy/frozen
-geometry cannot silently drive a current Production change.
+direction, geometry, or execution eligibility. V3 explicitly separates the
+current frozen geometry generation from legacy/unversioned history so old stop
+behavior cannot silently drive a current Production change.
 """
 from __future__ import annotations
 import argparse, json, math, statistics
 from collections import defaultdict
 from pathlib import Path
 
-SCHEMA='ATLAS_PRODUCTION_LOSS_AUTOPSY_V2'
+SCHEMA='ATLAS_PRODUCTION_LOSS_AUTOPSY_V3_COHORT_AWARE'
+CURRENT_GEOMETRY_VERSION='ATLAS_GEOMETRY_V3_STRUCTURAL_TP2_FROZEN_RR'
+MIN_CURRENT_TERMINAL_SAMPLE=30
 TIGHT_STOP_PCT=0.35
 STOP_BANDS=(0.25,0.35,0.50,0.75,1.00)
 
@@ -42,8 +44,8 @@ def stop_distance_pct(r):
 def geometry_generation(r):
     """Best-effort cohort tag; never invents a version when the ledger lacks one."""
     g=r.get('geometry') or {}
-    for key in ('decision_engine_version','geometry_version','version'):
-        value=g.get(key) or r.get(key)
+    for key in ('geometry_generation','decision_engine_version','geometry_version','version'):
+        value=r.get(key) if key=='geometry_generation' else (g.get(key) or r.get(key))
         if value: return str(value)
     source=g.get('source') or r.get('geometry_source') or r.get('trade_plan_source')
     return str(source) if source else 'UNVERSIONED_LEGACY_OR_UNKNOWN'
@@ -83,11 +85,32 @@ def _cohorts(rows):
             'n':len(sr),
             'wins':sum(x>0 for x in rs),
             'losses':sum(x<0 for x in rs),
+            'win_rate_pct':round(100*sum(x>0 for x in rs)/len(rs),2) if rs else None,
             'net_r':round(sum(rs),4) if rs else None,
+            'avg_r':round(sum(rs)/len(rs),4) if rs else None,
             'median_stop_distance_pct':_median([stop_distance_pct(r) for r in sr]),
             'tight_stop_losses':sum(classify_loss(r)=='STOP_TOO_TIGHT_CANDIDATE' for r in losses),
         }
     return out
+
+
+def _cohort_summary(rows):
+    rs=[_f(r.get('r_multiple')) for r in rows]
+    rs=[x for x in rs if x is not None]
+    losses=[r for r in rows if (_f(r.get('r_multiple')) or 0)<0]
+    causes=defaultdict(int)
+    for r in losses: causes[classify_loss(r)] += 1
+    return {
+        'terminal':len(rows),
+        'wins':sum(x>0 for x in rs),
+        'losses':sum(x<0 for x in rs),
+        'win_rate_pct':round(100*sum(x>0 for x in rs)/len(rs),2) if rs else None,
+        'net_r':round(sum(rs),4) if rs else None,
+        'avg_r':round(sum(rs)/len(rs),4) if rs else None,
+        'loss_cause_counts':dict(sorted(causes.items())),
+        'tight_stop_losses':sum(classify_loss(r)=='STOP_TOO_TIGHT_CANDIDATE' for r in losses),
+        'median_stop_distance_pct':_median([stop_distance_pct(r) for r in rows]),
+    }
 
 
 def build_report(rows):
@@ -126,12 +149,37 @@ def build_report(rows):
         'generation_metadata_complete':not unknown_only,
         'tight_stop_loss_share_pct':round(100*tight_loss_count/len(losses),2) if losses else None,
     }
-    recommendation={
-        'action':'COLLECT_POST_FIX_COHORT' if unknown_only else 'COMPARE_GEOMETRY_GENERATIONS',
-        'change_production_stop_policy_now':False,
-        'reason':'Ledger geometry is unversioned/mixed; do not attribute legacy tight stops to the current ATR-aware engine.' if unknown_only else 'Compare current geometry generation against legacy cohorts before any Production stop-policy change.',
-        'minimum_post_fix_terminal_sample':30,
+
+    current_rows=[r for r in terminal if geometry_generation(r)==CURRENT_GEOMETRY_VERSION]
+    legacy_rows=[r for r in terminal if geometry_generation(r)!=CURRENT_GEOMETRY_VERSION]
+    current_summary=_cohort_summary(current_rows)
+    legacy_summary=_cohort_summary(legacy_rows)
+    current_ready=len(current_rows)>=MIN_CURRENT_TERMINAL_SAMPLE
+    cohort_focus={
+        'current_geometry_version':CURRENT_GEOMETRY_VERSION,
+        'minimum_current_terminal_sample':MIN_CURRENT_TERMINAL_SAMPLE,
+        'current_terminal_progress':f'{len(current_rows)}/{MIN_CURRENT_TERMINAL_SAMPLE}',
+        'current_sample_ready':current_ready,
+        'current':current_summary,
+        'legacy_or_other':legacy_summary,
+        'production_policy_evaluable':current_ready,
     }
+
+    if not current_ready:
+        recommendation={
+            'action':'COLLECT_CURRENT_GEOMETRY_COHORT',
+            'change_production_stop_policy_now':False,
+            'reason':f'Current geometry has only {len(current_rows)}/{MIN_CURRENT_TERMINAL_SAMPLE} terminal trades; legacy/unversioned losses cannot justify a current Production stop-policy change.',
+            'minimum_post_fix_terminal_sample':MIN_CURRENT_TERMINAL_SAMPLE,
+        }
+    else:
+        recommendation={
+            'action':'EVALUATE_CURRENT_GEOMETRY_ONLY',
+            'change_production_stop_policy_now':False,
+            'reason':'Current geometry sample is large enough for a preregistered shadow rejection-filter test; do not mutate Production directly from the autopsy.',
+            'minimum_post_fix_terminal_sample':MIN_CURRENT_TERMINAL_SAMPLE,
+        }
+
     return {
         'schema':SCHEMA,'terminal':len(terminal),'wins':len(wins),'losses':len(losses),
         'win_rate_pct':round(100*len(wins)/(len(wins)+len(losses)),2) if wins or losses else None,
@@ -141,6 +189,7 @@ def build_report(rows):
         'loss_cause_counts':{k:len(v) for k,v in sorted(causes.items())},
         'losses_after_tp1':sum(bool(r.get('tp1_reached')) for r in losses),
         'by_symbol':by_symbol,'entry_quality_evidence':evidence,
+        'cohort_focus':cohort_focus,
         'research_recommendation':recommendation,'loss_rows':loss_rows,
         'production_threshold':68,'production_threshold_changed':False,
         'production_score_adjustment':0,'production_stop_policy_changed':False,
