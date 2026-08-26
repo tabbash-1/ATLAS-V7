@@ -20,6 +20,37 @@ def test_blocked_near_resistance_becomes_breakout_plan():
     assert x['entry']>101.0 and x['stop_loss']<x['entry']<x['tp1']<x['tp2']
 
 
+def test_conditional_long_clears_prior_24h_high_not_only_nearest_swing():
+    d=base(execution_ready=False,production_signal_qualified=False,structural_geometry={
+        'obstacle_price':100.7,'obstacle_distance_pct':0.7,'continuation_strong':False,
+        'breakout':{'confirmed':False,'prior_24h_high':101.2,'prior_24h_low':97.0}})
+    x=p.build(d)
+    assert x['entry_mode']=='BREAKOUT'
+    assert x['reference_structure']==101.2
+    assert x['reference_structure_source']=='PRIOR_24H_HIGH'
+    assert x['entry']>101.2
+
+
+def test_conditional_short_clears_prior_24h_low_not_only_nearest_swing():
+    d=base(candidate_direction='SHORT',entry=100.0,execution_ready=False,production_signal_qualified=False,structural_geometry={
+        'obstacle_price':99.4,'obstacle_distance_pct':0.6,'continuation_strong':False,
+        'breakout':{'confirmed':False,'prior_24h_high':103.0,'prior_24h_low':98.9}})
+    x=p.build(d)
+    assert x['entry_mode']=='BREAKOUT'
+    assert x['reference_structure']==98.9
+    assert x['reference_structure_source']=='PRIOR_24H_LOW'
+    assert x['entry']<98.9
+
+
+def test_far_24h_blocker_prefers_pullback_over_chasing_breakout():
+    d=base(execution_ready=False,production_signal_qualified=False,structural_geometry={
+        'obstacle_price':100.7,'obstacle_distance_pct':0.7,'continuation_strong':False,
+        'breakout':{'confirmed':False,'prior_24h_high':103.0,'prior_24h_low':97.0}})
+    x=p.build(d)
+    assert x['entry_mode']=='PULLBACK' and x['entry']<100
+    assert x['reference_structure']==103.0
+
+
 def test_clear_room_wait_uses_pullback():
     d=base(execution_ready=False,production_signal_qualified=False,structural_geometry={'obstacle_price':106.0,'obstacle_distance_pct':6.0,'continuation_strong':False,'breakout':{'confirmed':False}})
     x=p.build(d)
