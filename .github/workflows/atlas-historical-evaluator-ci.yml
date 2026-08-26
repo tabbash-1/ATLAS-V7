@@ -8,11 +8,13 @@ on:
       - 'historical_evaluation_protocol.py'
       - 'historical_replay_registry.py'
       - 'forward_microstructure_freeze_runtime.py'
+      - 'cloud_forward_diagnostics_runtime.py'
       - 'prospective_microstructure_cohort.py'
       - 'prospective_microstructure_evaluator.py'
       - 'prospective_microstructure_validation_runtime.py'
       - 'tests/test_historical_microstructure_evaluator.py'
       - 'tests/test_forward_microstructure_freeze.py'
+      - 'tests/test_cloud_forward_diagnostics.py'
       - 'tests/test_prospective_microstructure_validation.py'
       - '.github/workflows/atlas-historical-evaluator-ci.yml'
   workflow_dispatch:
@@ -26,9 +28,10 @@ jobs:
       - name: Syntax and guarded outcome tests
         run: |
           set -euo pipefail
-          python3 -m py_compile historical_microstructure_evaluator.py historical_evaluation_protocol.py historical_replay_registry.py forward_microstructure_freeze_runtime.py prospective_microstructure_cohort.py prospective_microstructure_evaluator.py prospective_microstructure_validation_runtime.py tests/test_historical_microstructure_evaluator.py tests/test_forward_microstructure_freeze.py tests/test_prospective_microstructure_validation.py
+          python3 -m py_compile historical_microstructure_evaluator.py historical_evaluation_protocol.py historical_replay_registry.py forward_microstructure_freeze_runtime.py cloud_forward_diagnostics_runtime.py prospective_microstructure_cohort.py prospective_microstructure_evaluator.py prospective_microstructure_validation_runtime.py tests/test_historical_microstructure_evaluator.py tests/test_forward_microstructure_freeze.py tests/test_cloud_forward_diagnostics.py tests/test_prospective_microstructure_validation.py
           PYTHONPATH=. python3 tests/test_historical_microstructure_evaluator.py
           PYTHONPATH=. python3 tests/test_forward_microstructure_freeze.py
+          PYTHONPATH=. python3 tests/test_cloud_forward_diagnostics.py
           PYTHONPATH=. python3 tests/test_prospective_microstructure_validation.py
       - name: Preregistered historical evaluation safety contract
         run: |
@@ -51,6 +54,15 @@ jobs:
           grep -q "microstructure_can_override_production.*False" forward_microstructure_freeze_runtime.py
           ! grep -q "forward_return_pct" forward_microstructure_freeze_runtime.py
           ! grep -q "trade_path_settlement" forward_microstructure_freeze_runtime.py
+      - name: Cloud forward diagnostics safety contract
+        run: |
+          set -euo pipefail
+          grep -q "extra_market_calls.*False" cloud_forward_diagnostics_runtime.py
+          grep -q "threshold_changes.*False" cloud_forward_diagnostics_runtime.py
+          grep -q "market_call_triggered_by_request.*False" cloud_forward_diagnostics_runtime.py
+          grep -q "outcome_read_triggered_by_request.*False" cloud_forward_diagnostics_runtime.py
+          ! grep -q "forward_observe(" cloud_forward_diagnostics_runtime.py
+          ! grep -q "capture(" cloud_forward_diagnostics_runtime.py
       - name: Prospective cohort safety contract
         run: |
           set -euo pipefail
