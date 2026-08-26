@@ -11,6 +11,8 @@ import copy
 import hashlib
 import json
 import os
+import threading
+import time
 from pathlib import Path
 
 VERSION = 'ATLAS_HISTORICAL_EVALUATION_PROTOCOL_V1_12H_PREREGISTERED'
@@ -149,4 +151,17 @@ def refresh(collector, path=None):
 
 def install(collector):
     collector.HISTORICAL_EVALUATION_PROTOCOL_STATE = STATE
-    return refresh(collector)
+    refresh(collector)
+
+    def retry_until_registered():
+        # Retry only while waiting for the feature registry's asynchronous first
+        # freeze. Once a protocol file exists, refresh() validates it and never
+        # rewrites or expands it.
+        while STATE.get('status') not in ('PREREGISTERED', 'REGISTRATION_CORRUPT'):
+            time.sleep(5)
+            refresh(collector)
+        # One-way immutable registration: no periodic rule mutation loop.
+
+    if STATE.get('status') not in ('PREREGISTERED', 'REGISTRATION_CORRUPT'):
+        threading.Thread(target=retry_until_registered, daemon=True, name='atlas-historical-evaluation-preregistration').start()
+    return STATE
