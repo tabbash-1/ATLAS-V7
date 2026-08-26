@@ -8,6 +8,8 @@ It does not modify Production scoring or execution.
 from __future__ import annotations
 
 import copy
+import urllib.parse
+from collections import Counter
 
 import microstructure_memory
 import microstructure_walkforward
@@ -20,10 +22,19 @@ STATE = {
     'frozen_rows': 0,
     'errors': 0,
     'last_error': None,
+    'last_frozen_at': None,
+    'last_forward_id': None,
+    'last_relation': None,
+    'last_consensus': None,
+    'relation_counts_since_install': {},
+    'consensus_counts_since_install': {},
     'research_only': True,
     'live_execution': False,
     'can_override_production': False,
+    'cached_only': True,
 }
+_RELATIONS = Counter()
+_CONSENSUS = Counter()
 
 
 def _ts(row):
@@ -88,6 +99,21 @@ def enrich_row(collector, row):
     return out
 
 
+def _status_payload():
+    return {
+        'ok': bool(STATE.get('installed')),
+        'version': VERSION,
+        'cached_only': True,
+        'background_refresh_triggered': False,
+        'archive_read_triggered_by_request': False,
+        'outcome_read_triggered_by_request': False,
+        'research_only': True,
+        'live_execution': False,
+        'can_override_production': False,
+        'state': copy.deepcopy(STATE),
+    }
+
+
 def install(collector):
     if STATE.get('installed'):
         return STATE
@@ -97,8 +123,18 @@ def install(collector):
         try:
             enriched = enrich_row(collector, row)
             original_write(enriched)
+            relation = enriched.get('microstructure_relation_at_entry') or 'UNCLASSIFIED'
+            consensus = enriched.get('microstructure_consensus_at_entry') or 'UNKNOWN'
+            _RELATIONS[relation] += 1
+            _CONSENSUS[consensus] += 1
             STATE['frozen_rows'] += 1
             STATE['last_error'] = None
+            STATE['last_frozen_at'] = enriched.get('captured_at')
+            STATE['last_forward_id'] = enriched.get('id')
+            STATE['last_relation'] = relation
+            STATE['last_consensus'] = consensus
+            STATE['relation_counts_since_install'] = dict(sorted(_RELATIONS.items()))
+            STATE['consensus_counts_since_install'] = dict(sorted(_CONSENSUS.items()))
         except Exception as exc:
             # Fail open for collection only: never lose a Forward observation
             # because the research-only enrichment layer had an error.
@@ -108,5 +144,14 @@ def install(collector):
 
     collector._forward_write = frozen_write
     collector.FORWARD_MICROSTRUCTURE_FREEZE_STATE = STATE
+
+    original_get = collector.Handler.do_GET
+    def do_GET(self):
+        u = urllib.parse.urlparse(self.path)
+        if u.path == '/api/research/forward-microstructure-freeze':
+            return self._json(_status_payload())
+        return original_get(self)
+    collector.Handler.do_GET = do_GET
+
     STATE['installed'] = True
     return STATE
