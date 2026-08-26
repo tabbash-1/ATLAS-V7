@@ -1,0 +1,74 @@
+name: ATLAS Historical Evaluation Snapshot
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'historical_evaluation_runtime.py'
+      - 'historical_microstructure_evaluator.py'
+      - 'historical_evaluation_protocol.py'
+      - 'historical_replay_registry.py'
+      - 'historical_source_runtime.py'
+      - 'cloud_start.py'
+      - '.github/workflows/atlas-historical-evaluation-snapshot.yml'
+  schedule:
+    - cron: '37 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atlas-historical-evaluation-snapshot
+  cancel-in-progress: true
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      BASE_URL: https://atlas-v7.onrender.com
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch deployed cached historical evaluation
+        run: |
+          set -euo pipefail
+          mkdir -p status/history
+          tmp="status/historical-evaluation-latest.json.tmp"
+          ok=0
+          for attempt in $(seq 1 28); do
+            code="$(curl -L --connect-timeout 20 --max-time 60 -sS -w '%{http_code}' -o "$tmp" "${BASE_URL}/api/research/historical-evaluation" || true)"
+            if [[ "$code" =~ ^2 ]] && jq -e . "$tmp" >/dev/null 2>&1 && \
+               jq -e '.version == "ATLAS_HISTORICAL_EVALUATION_RUNTIME_V1_BACKGROUND_ONLY" and .cached_only == true and .background_refresh_triggered == false and .research_only == true and .live_execution == false and .can_override_production == false and .outcome_read_triggered_by_request == false and (.runtime.refreshes // 0) >= 1 and (.evaluation | type) == "object"' "$tmp" >/dev/null 2>&1; then
+              ok=1
+              break
+            fi
+            echo "Waiting for deployed cached historical evaluator (attempt ${attempt}/28, HTTP ${code:-none})"
+            sleep 15
+          done
+          if [[ "$ok" != "1" ]]; then
+            echo "Historical evaluator did not become available within deployment grace period." >&2
+            echo "Last HTTP code: ${code:-none}" >&2
+            cat "$tmp" >&2 || true
+            exit 1
+          fi
+          mv "$tmp" status/historical-evaluation-latest.json
+          python3 - <<'PY'
+          import datetime, json, pathlib
+          p=pathlib.Path('status/historical-evaluation-latest.json')
+          row=json.loads(p.read_text())
+          row['_snapshot_captured_at']=datetime.datetime.now(datetime.timezone.utc).isoformat()
+          p.write_text(json.dumps(row,indent=2,sort_keys=True))
+          h=pathlib.Path('status/history/historical-evaluation-snapshots.jsonl')
+          with h.open('a') as f:
+              f.write(json.dumps(row,separators=(',',':'))+'\n')
+          PY
+      - name: Commit historical evaluation snapshot
+        run: |
+          git config user.name "atlas-historical-evaluation-monitor"
+          git config user.email "atlas-historical-evaluation-monitor@users.noreply.github.com"
+          git add status/historical-evaluation-latest.json status/history/historical-evaluation-snapshots.jsonl
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "chore: update historical evaluation snapshot [skip ci]"
+          git pull --rebase origin main
+          git push
