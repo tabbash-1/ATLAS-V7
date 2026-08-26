@@ -22,6 +22,8 @@ jobs:
   calibrate:
     runs-on: ubuntu-latest
     timeout-minutes: 8
+    env:
+      PYTHONPATH: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v4
       - name: Validate WAIT diagnostics
@@ -52,6 +54,7 @@ jobs:
                   'shadow_only':True,
               },
           }
+          pathlib.Path('status').mkdir(parents=True, exist_ok=True)
           pathlib.Path('status/wait-opportunity-calibration.json').write_text(json.dumps(report,indent=2,sort_keys=True))
           PY
       - name: Commit report
