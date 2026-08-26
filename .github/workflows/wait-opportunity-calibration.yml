@@ -1,0 +1,65 @@
+name: ATLAS WAIT Opportunity Calibration
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'wait_diagnostics.py'
+      - 'tests/test_wait_diagnostics.py'
+      - '.github/workflows/wait-opportunity-calibration.yml'
+  schedule:
+    - cron: '27 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atlas-wait-opportunity-calibration
+  cancel-in-progress: true
+
+jobs:
+  calibrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate WAIT diagnostics
+        run: python3 tests/test_wait_diagnostics.py
+      - name: Build guarded calibration report
+        run: |
+          python3 - <<'PY'
+          import json, pathlib
+          import wait_diagnostics as w
+          src=pathlib.Path('status/wait-outcomes.json')
+          if not src.exists():
+              payload={'records':[]}
+          else:
+              payload=json.loads(src.read_text())
+          report={
+              'schema':'ATLAS_WAIT_OPPORTUNITY_REPORT_V1',
+              'diagnostics_1h':w.diagnose(payload,1),
+              'diagnostics_3h':w.diagnose(payload,3),
+              'diagnostics_6h':w.diagnose(payload,6),
+              'diagnostics_12h':w.diagnose(payload,12),
+              'diagnostics_24h':w.diagnose(payload,24),
+              'calibration':w.calibration(payload),
+              'production_safety':{
+                  'threshold':68,
+                  'threshold_changed':False,
+                  'production_weights_changed':False,
+                  'execution_rules_changed':False,
+                  'shadow_only':True,
+              },
+          }
+          pathlib.Path('status/wait-opportunity-calibration.json').write_text(json.dumps(report,indent=2,sort_keys=True))
+          PY
+      - name: Commit report
+        run: |
+          git config user.name "atlas-wait-calibration"
+          git config user.email "atlas-wait-calibration@users.noreply.github.com"
+          git add status/wait-opportunity-calibration.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "chore: update WAIT opportunity calibration [skip ci]"
+          git pull --rebase origin main
+          git push
