@@ -1,0 +1,38 @@
+name: ATLAS Historical Replay CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'historical_microstructure_replay.py'
+      - 'historical_replay_registry.py'
+      - 'historical_source_runtime.py'
+      - 'tests/test_historical_microstructure_replay.py'
+      - 'tests/test_historical_replay_registry.py'
+      - '.github/workflows/atlas-historical-replay-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  historical-replay-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax and replay safety tests
+        run: |
+          set -euo pipefail
+          python3 -m py_compile historical_microstructure_replay.py historical_replay_registry.py historical_source_runtime.py tests/test_historical_microstructure_replay.py tests/test_historical_replay_registry.py
+          PYTHONPATH=. python3 tests/test_historical_microstructure_replay.py
+          PYTHONPATH=. python3 tests/test_historical_replay_registry.py
+      - name: Immutable no-outcome contract
+        run: |
+          set -euo pipefail
+          grep -q "outcomes_read.*False" historical_microstructure_replay.py
+          grep -q "future_data_allowed.*False" historical_microstructure_replay.py
+          grep -q "outcomes_read_before_freeze.*False" historical_replay_registry.py
+          grep -q "FEATURE_HASH_MISMATCH" historical_replay_registry.py
+          grep -q "registration_locked.*True" historical_replay_registry.py
+          ! grep -q "trade_path_settlement" historical_microstructure_replay.py
+          ! grep -q "trade_path_settlement" historical_replay_registry.py
+          ! grep -q "canonical_outcome" historical_microstructure_replay.py
+          ! grep -q "canonical_outcome" historical_replay_registry.py
