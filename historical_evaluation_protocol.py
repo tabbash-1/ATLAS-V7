@@ -162,7 +162,20 @@ def _start_evaluator_after_registration(collector):
         STATE['last_error'] = f'HISTORICAL_EVALUATOR_INSTALL_ERROR: {type(exc).__name__}: {exc}'
 
 
+def _install_forward_microstructure_freeze(collector):
+    # Independent forward-proof collector. It freezes only decision-time
+    # microstructure fields into NEW Forward rows and never reads outcomes.
+    try:
+        import forward_microstructure_freeze_runtime
+        forward_microstructure_freeze_runtime.install(collector)
+    except Exception as exc:
+        # Keep historical governance available even if this enrichment layer
+        # cannot install; Production and base Forward collection remain intact.
+        print(f"ATLAS forward microstructure freeze unavailable: {type(exc).__name__}: {exc}")
+
+
 def install(collector):
+    _install_forward_microstructure_freeze(collector)
     collector.HISTORICAL_EVALUATION_PROTOCOL_STATE = STATE
     refresh(collector)
 
