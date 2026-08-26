@@ -52,6 +52,11 @@ if index_path.exists():
     html = index_path.read_text(encoding="utf-8")
     old_theme = '<script src="theme-toggle.js"></script>'
     versioned = f'<script src="theme-toggle.js?v={release_token}"></script>'
+    old_app = '<script src="app.js"></script>'
+    versioned_app = f'<script src="app.js?v={release_token}"></script>'
+    if old_app in html:
+        html = html.replace(old_app, versioned_app, 1)
+
     if old_theme in html:
         html = html.replace(old_theme, versioned, 1)
 
