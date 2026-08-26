@@ -27,7 +27,7 @@ index_path=BASE/"index.html"
 if index_path.exists():
     html=index_path.read_text(encoding="utf-8")
     old_theme='<script src="theme-toggle.js"></script>'
-    versioned=f'<script src="theme-toggle.js?v={release_token}"></script>\n  <script src="atlas-product-shell.js?v={release_token}"></script>'
+    versioned=f'<script src="theme-toggle.js?v={release_token}"></script>'
     if old_theme in html: html=html.replace(old_theme,versioned,1)
 
     if 'id="atlasAiCouncilCard"' not in html:
