@@ -45,23 +45,9 @@
     });
   }
 
-  const PRODUCT_SHELL_VERSION='production-score-label-lock-v1';
-  loadScript(`atlas-product-shell.js?v=${PRODUCT_SHELL_VERSION}`,'atlas-product-shell')
-    .then(async()=>{
-      try{
-        await loadScript('atlas-production-label-lock.js?v=1','atlas-production-label-lock');
-      }catch(err){
-        console.error('ATLAS Production label lock failed:',err);
-      }
-      window.dispatchEvent(new CustomEvent('atlas:product-shell-ready'));
-      try{
-        await loadScript('atlas-decision-explanation.js?v=3','atlas-decision-explanation');
-        window.ATLAS_DECISION_EXPLANATION?.refresh?.();
-      }catch(err){
-        console.error('ATLAS decision explanation layer failed:',err);
-      }
-    })
-    .catch(err=>console.error('ATLAS product shell bootstrap failed:',err));
+  loadScript('atlas-decision-explanation.js?v=3','atlas-decision-explanation')
+    .then(()=>window.ATLAS_DECISION_EXPLANATION?.refresh?.())
+    .catch(err=>console.error('ATLAS decision explanation layer failed:',err));
 
   const scripts=['atlas-timeframe-engine.js','atlas-ai-analysis-layer.js','atlas-decision-quality.js','atlas-ai-ui.js'];
   (async()=>{
