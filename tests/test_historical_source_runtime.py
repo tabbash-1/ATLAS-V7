@@ -1,4 +1,3 @@
-import json
 import historical_source_runtime as h
 
 
@@ -30,7 +29,6 @@ def sm(ts, validated=True):
 
 
 def test_uses_only_prior_smart_money_and_never_forward_returns():
-    # Prior row is eligible. A much closer FUTURE row must never be selected.
     a=A([fwd()], [sm(9_000_000, True), sm(10_000_001, False)])
     r=h.build_report(a, max_smart_age_ms=2_000_000)
     assert r['prior_context_join']['matched_forward_rows'] == 1
@@ -59,3 +57,11 @@ def test_replay_is_not_forward_proof():
     r=h.build_report(a, max_smart_age_ms=5_000_000)
     assert r['replay_classification']['historical_backtest_possible'] is True
     assert r['replay_classification']['forward_proof_equivalent'] is False
+
+
+if __name__ == '__main__':
+    test_uses_only_prior_smart_money_and_never_forward_returns()
+    test_future_only_context_does_not_match()
+    test_stale_prior_context_does_not_match()
+    test_replay_is_not_forward_proof()
+    print('historical source runtime safety tests: OK')
