@@ -10,7 +10,7 @@ on:
       - 'forward_microstructure_freeze_runtime.py'
       - '.github/workflows/atlas-cloud-forward-snapshot.yml'
   schedule:
-    - cron: '7,37 * * * *'
+    - cron: '7,57 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -37,15 +37,15 @@ jobs:
           for attempt in $(seq 1 28); do
             code="$(curl -L --connect-timeout 20 --max-time 60 -sS -w '%{http_code}' -o "$tmp" "${BASE_URL}/api/cloud-forward/status" || true)"
             if [[ "$code" =~ ^2 ]] && jq -e . "$tmp" >/dev/null 2>&1 && \
-               jq -e '.interval_seconds == 1800 and .min_score == 68 and .max_per_cycle == 3 and (.cycles // 0) >= 1 and .research_only == true and .live_execution == false' "$tmp" >/dev/null 2>&1; then
+               jq -e '.interval_seconds == 3000 and .min_score == 68 and .max_per_cycle == 3 and (.cycles // 0) >= 1 and .research_only == true and .live_execution == false' "$tmp" >/dev/null 2>&1; then
               ok=1
               break
             fi
-            echo "Waiting for deployed 30m cloud-forward collector (attempt ${attempt}/28, HTTP ${code:-none})"
+            echo "Waiting for deployed 50m cloud-forward collector (attempt ${attempt}/28, HTTP ${code:-none})"
             sleep 15
           done
           if [[ "$ok" != "1" ]]; then
-            echo "30m Cloud Forward collector did not become live within deployment grace period." >&2
+            echo "50m Cloud Forward collector did not become live within deployment grace period." >&2
             echo "Last HTTP code: ${code:-none}" >&2
             cat "$tmp" >&2 || true
             exit 1
