@@ -67,6 +67,21 @@ def _settle_forward_maturity(collector):
     }
 
 
+def _settlement_status_payload(state):
+    """Return a race-safe public settlement status snapshot.
+
+    The legacy last_settlement_* fields always describe the same completed run.
+    A currently running settlement is exposed separately so callers never compare
+    the start of the current run with the finish of the previous run.
+    """
+    payload = dict(state)
+    completed = state.get('last_completed_settlement')
+    if isinstance(completed, dict):
+        payload['last_settlement_started_at'] = completed.get('started_at')
+        payload['last_settlement_finished_at'] = completed.get('finished_at')
+    return payload
+
+
 def install(collector):
     if getattr(collector, '_TRADE_OUTCOME_RUNTIME_INSTALLED', False):
         return getattr(collector, 'TRADE_OUTCOME_RUNTIME_STATE', {})
@@ -82,6 +97,9 @@ def install(collector):
         'settlement_runs': 0,
         'settlement_updates': 0,
         'settlement_repairs': 0,
+        'settlement_running': False,
+        'current_settlement_started_at': None,
+        'last_completed_settlement': None,
         'last_settlement_started_at': None,
         'last_settlement_finished_at': None,
         'last_settlement_error': None,
@@ -94,7 +112,9 @@ def install(collector):
     def settle_once():
         if not settlement_lock.acquire(blocking=False):
             return {'skipped': True, 'reason': 'SETTLEMENT_ALREADY_RUNNING'}
-        state['last_settlement_started_at'] = collector.now_iso() if hasattr(collector, 'now_iso') else None
+        started_at = collector.now_iso() if hasattr(collector, 'now_iso') else None
+        state['settlement_running'] = True
+        state['current_settlement_started_at'] = started_at
         try:
             result = _settle_forward_maturity(collector)
             state['settlement_runs'] += 1
@@ -106,7 +126,20 @@ def install(collector):
             state['last_settlement_error'] = f'{type(exc).__name__}: {exc}'
             return {'error': state['last_settlement_error']}
         finally:
-            state['last_settlement_finished_at'] = collector.now_iso() if hasattr(collector, 'now_iso') else None
+            finished_at = collector.now_iso() if hasattr(collector, 'now_iso') else None
+            completed = {
+                'started_at': started_at,
+                'finished_at': finished_at,
+                'error': state['last_settlement_error'],
+            }
+            # Publish the completed run as one immutable object first. Public
+            # status derives the legacy timestamps from this object, avoiding
+            # cross-run timestamp pairs while another request reads state.
+            state['last_completed_settlement'] = completed
+            state['last_settlement_started_at'] = started_at
+            state['last_settlement_finished_at'] = finished_at
+            state['current_settlement_started_at'] = None
+            state['settlement_running'] = False
             settlement_lock.release()
 
     def settlement_loop():
@@ -141,7 +174,12 @@ def install(collector):
             symbol = q.get('symbol', [None])[0]
 
             if u.path == '/api/outcomes/settlement-status':
-                payload = {'schema': 'ATLAS_OUTCOME_SETTLEMENT_STATUS_V1', **state, 'research_only': True, 'live_execution': False}
+                payload = {
+                    'schema': 'ATLAS_OUTCOME_SETTLEMENT_STATUS_V2_RUN_SAFE',
+                    **_settlement_status_payload(state),
+                    'research_only': True,
+                    'live_execution': False,
+                }
                 return self._json(payload)
 
             settle_once()
