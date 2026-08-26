@@ -1,0 +1,70 @@
+name: ATLAS Historical Source Snapshot
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'historical_source_runtime.py'
+      - 'cloud_start.py'
+      - '.github/workflows/atlas-historical-source-snapshot.yml'
+  schedule:
+    - cron: '27 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atlas-historical-source-snapshot
+  cancel-in-progress: true
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      BASE_URL: https://atlas-v7.onrender.com
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch deployed cached historical source audit
+        run: |
+          set -euo pipefail
+          mkdir -p status/history
+          tmp="status/historical-source-latest.json.tmp"
+          ok=0
+          for attempt in $(seq 1 24); do
+            code="$(curl -L --connect-timeout 20 --max-time 60 -sS -w '%{http_code}' -o "$tmp" "${BASE_URL}/api/research/historical-source-audit" || true)"
+            if [[ "$code" =~ ^2 ]] && jq -e . "$tmp" >/dev/null 2>&1 && \
+               jq -e '.version == "ATLAS_HISTORICAL_SOURCE_AUDIT_V1_PRIOR_ONLY_CACHED" and .cached_only == true and .background_refresh_triggered == false and .research_only == true and .live_execution == false and .outcomes_read_by_request == false and (.runtime.refreshes // 0) >= 1 and (.report | type) == "object" and .report.outcomes_read == false and .report.forward_return_fields_read == false and .report.future_smart_money_match_allowed == false and .report.backfill_performed == false' "$tmp" >/dev/null 2>&1; then
+              ok=1
+              break
+            fi
+            echo "Waiting for deployed historical source audit (attempt ${attempt}/24, HTTP ${code:-none})"
+            sleep 15
+          done
+          if [[ "$ok" != "1" ]]; then
+            echo "Historical source audit did not reach the required cached no-lookahead contract within the deployment grace period." >&2
+            echo "Last HTTP code: ${code:-none}" >&2
+            cat "$tmp" >&2 || true
+            exit 1
+          fi
+          mv "$tmp" status/historical-source-latest.json
+          python3 - <<'PY'
+          import datetime, json, pathlib
+          p=pathlib.Path('status/historical-source-latest.json')
+          row=json.loads(p.read_text())
+          row['_snapshot_captured_at']=datetime.datetime.now(datetime.timezone.utc).isoformat()
+          p.write_text(json.dumps(row,indent=2,sort_keys=True))
+          h=pathlib.Path('status/history/historical-source-snapshots.jsonl')
+          with h.open('a') as f:
+              f.write(json.dumps(row,separators=(',',':'))+'\n')
+          PY
+      - name: Commit historical source snapshot
+        run: |
+          git config user.name "atlas-historical-source-monitor"
+          git config user.email "atlas-historical-source-monitor@users.noreply.github.com"
+          git add status/historical-source-latest.json status/history/historical-source-snapshots.jsonl
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "chore: update historical source snapshot [skip ci]"
+          git pull --rebase origin main
+          git push
