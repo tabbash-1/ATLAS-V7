@@ -14,6 +14,8 @@ import time
 import urllib.parse
 from collections import Counter, defaultdict
 
+import historical_replay_registry
+
 VERSION = "ATLAS_HISTORICAL_SOURCE_AUDIT_V1_PRIOR_ONLY_CACHED"
 MAX_SMART_AGE_MS = 2 * 60 * 60 * 1000
 REFRESH_SECONDS = 900
@@ -67,8 +69,6 @@ def _present(row, key):
 
 
 def _sanitized(row, allowed):
-    # Explicit selection prevents outcome fields living in Forward rows from
-    # becoming inputs to this audit even accidentally.
     return {k: row.get(k) for k in allowed if k in row}
 
 
@@ -149,7 +149,7 @@ def build_report(atlas, max_smart_age_ms=MAX_SMART_AGE_MS):
     fwd_times = [_ts(r) for r in fwd_valid]
     sm_times = [_ts(r) for r in sm_valid]
     n = len(fwd_valid)
-    report = {
+    return {
         "schema": VERSION,
         "generated_at": atlas.now_iso(),
         "research_only": True,
@@ -193,7 +193,6 @@ def build_report(atlas, max_smart_age_ms=MAX_SMART_AGE_MS):
             "note": "Recorded prior-only inputs can accelerate retrospective model discovery, but they do not replace the live frozen forward cohort for final validation.",
         },
     }
-    return report
 
 
 def refresh(atlas):
@@ -216,6 +215,7 @@ def install(atlas):
     def do_GET(self):
         u = urllib.parse.urlparse(self.path)
         if u.path == "/api/research/historical-source-audit":
+            registry = getattr(atlas, 'HISTORICAL_REPLAY_REGISTRY_STATE', {}) or {}
             return self._json({
                 "ok": STATE.get("report") is not None,
                 "version": VERSION,
@@ -225,6 +225,7 @@ def install(atlas):
                 "live_execution": False,
                 "outcomes_read_by_request": False,
                 "runtime": {k: STATE.get(k) for k in ("enabled", "background_only", "refreshes", "last_error", "last_started_at", "last_finished_at")},
+                "replay_registry": {k: registry.get(k) for k in ("status", "registration_locked", "frozen_feature_rows", "feature_dataset_sha256", "last_error", "last_checked_at")},
                 "report": copy.deepcopy(STATE.get("report")),
             })
         return original(self)
@@ -238,4 +239,8 @@ def install(atlas):
             time.sleep(REFRESH_SECONDS)
 
     threading.Thread(target=loop, daemon=True, name="atlas-historical-source-audit").start()
+    try:
+        historical_replay_registry.install(atlas)
+    except Exception as exc:
+        STATE['last_error'] = f"HISTORICAL_REPLAY_REGISTRY_INSTALL_ERROR: {type(exc).__name__}: {exc}"
     return STATE
