@@ -73,8 +73,29 @@ def test_non_dict_forward_return_container_is_repaired_safely():
         assert collector.rows[0]['forward_return_pct']['24'] == 2.5
 
 
+def test_public_status_never_mixes_current_start_with_previous_finish():
+    state = {
+        'settlement_running': True,
+        'current_settlement_started_at': '2026-08-26T07:05:10+00:00',
+        # Legacy fields intentionally simulate the previously confusing state.
+        'last_settlement_started_at': '2026-08-26T07:05:10+00:00',
+        'last_settlement_finished_at': '2026-08-26T06:58:47+00:00',
+        'last_completed_settlement': {
+            'started_at': '2026-08-26T06:43:47+00:00',
+            'finished_at': '2026-08-26T06:58:47+00:00',
+            'error': None,
+        },
+    }
+    payload = runtime._settlement_status_payload(state)
+    assert payload['settlement_running'] is True
+    assert payload['current_settlement_started_at'] == '2026-08-26T07:05:10+00:00'
+    assert payload['last_settlement_started_at'] == '2026-08-26T06:43:47+00:00'
+    assert payload['last_settlement_finished_at'] == '2026-08-26T06:58:47+00:00'
+
+
 if __name__ == '__main__':
     test_null_horizon_placeholder_is_repaired_then_matured()
     test_real_matured_return_is_never_rewritten()
     test_non_dict_forward_return_container_is_repaired_safely()
+    test_public_status_never_mixes_current_start_with_previous_finish()
     print('trade outcome runtime tests: ok')
