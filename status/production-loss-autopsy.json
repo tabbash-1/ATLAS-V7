@@ -1,15 +1,15 @@
 {
-  "schema": "ATLAS_PRODUCTION_LOSS_AUTOPSY_V2",
-  "terminal": 30,
-  "wins": 15,
-  "losses": 15,
-  "win_rate_pct": 50.0,
-  "net_r": 7.0898,
-  "avg_win_score": 76.2,
-  "avg_loss_score": 76.8667,
+  "schema": "ATLAS_PRODUCTION_LOSS_AUTOPSY_V3_COHORT_AWARE",
+  "terminal": 34,
+  "wins": 18,
+  "losses": 16,
+  "win_rate_pct": 52.94,
+  "net_r": 9.7015,
+  "avg_win_score": 76.2222,
+  "avg_loss_score": 76.625,
   "loss_cause_counts": {
     "PRE_TP1_DIRECTION_OR_ENTRY_FAILURE": 4,
-    "STOP_TOO_TIGHT_CANDIDATE": 11
+    "STOP_TOO_TIGHT_CANDIDATE": 12
   },
   "losses_after_tp1": 0,
   "by_symbol": {
@@ -26,10 +26,10 @@
       "net_r": -1.0
     },
     "DOGEUSDT": {
-      "n": 6,
-      "positive": 4,
-      "negative": 2,
-      "net_r": 3.7009
+      "n": 8,
+      "positive": 5,
+      "negative": 3,
+      "net_r": 3.2009
     },
     "ETHUSDT": {
       "n": 2,
@@ -50,52 +50,98 @@
       "net_r": -2.0
     },
     "ZECUSDT": {
-      "n": 6,
-      "positive": 3,
+      "n": 8,
+      "positive": 5,
       "negative": 3,
-      "net_r": 2.1318
+      "net_r": 5.2435
     }
   },
   "entry_quality_evidence": {
     "tight_stop_threshold_pct": 0.35,
     "terminal_stop_distance_bands": {
-      "0.00-0.25%": 21,
+      "0.00-0.25%": 24,
       "0.25-0.35%": 1,
-      "0.35-0.50%": 3,
+      "0.35-0.50%": 4,
       "0.50-0.75%": 1,
       "0.75-1.00%": 1,
       ">=1.00%": 3
     },
     "loss_stop_distance_bands": {
-      "0.00-0.25%": 11,
+      "0.00-0.25%": 12,
       "0.25-0.35%": 0,
       "0.35-0.50%": 1,
       "0.50-0.75%": 0,
       "0.75-1.00%": 0,
       ">=1.00%": 3
     },
-    "median_stop_distance_pct_wins": 0.124,
-    "median_stop_distance_pct_losses": 0.1589,
+    "median_stop_distance_pct_wins": 0.1222,
+    "median_stop_distance_pct_losses": 0.1494,
     "geometry_generations": {
       "UNVERSIONED_LEGACY_OR_UNKNOWN": {
-        "n": 30,
-        "wins": 15,
-        "losses": 15,
-        "net_r": 7.0898,
-        "median_stop_distance_pct": 0.1494,
-        "tight_stop_losses": 11
+        "n": 34,
+        "wins": 18,
+        "losses": 16,
+        "win_rate_pct": 52.94,
+        "net_r": 9.7015,
+        "avg_r": 0.2853,
+        "median_stop_distance_pct": 0.132,
+        "tight_stop_losses": 12
       }
     },
     "generation_metadata_complete": false,
-    "tight_stop_loss_share_pct": 73.33
+    "tight_stop_loss_share_pct": 75.0
+  },
+  "cohort_focus": {
+    "current_geometry_version": "ATLAS_GEOMETRY_V3_STRUCTURAL_TP2_FROZEN_RR",
+    "minimum_current_terminal_sample": 30,
+    "current_terminal_progress": "0/30",
+    "current_sample_ready": false,
+    "current": {
+      "terminal": 0,
+      "wins": 0,
+      "losses": 0,
+      "win_rate_pct": null,
+      "net_r": null,
+      "avg_r": null,
+      "loss_cause_counts": {},
+      "tight_stop_losses": 0,
+      "median_stop_distance_pct": null
+    },
+    "legacy_or_other": {
+      "terminal": 34,
+      "wins": 18,
+      "losses": 16,
+      "win_rate_pct": 52.94,
+      "net_r": 9.7015,
+      "avg_r": 0.2853,
+      "loss_cause_counts": {
+        "PRE_TP1_DIRECTION_OR_ENTRY_FAILURE": 4,
+        "STOP_TOO_TIGHT_CANDIDATE": 12
+      },
+      "tight_stop_losses": 12,
+      "median_stop_distance_pct": 0.132
+    },
+    "production_policy_evaluable": false
   },
   "research_recommendation": {
-    "action": "COLLECT_POST_FIX_COHORT",
+    "action": "COLLECT_CURRENT_GEOMETRY_COHORT",
     "change_production_stop_policy_now": false,
-    "reason": "Ledger geometry is unversioned/mixed; do not attribute legacy tight stops to the current ATR-aware engine.",
+    "reason": "Current geometry has only 0/30 terminal trades; legacy/unversioned losses cannot justify a current Production stop-policy change.",
     "minimum_post_fix_terminal_sample": 30
   },
   "loss_rows": [
+    {
+      "id": "96693560da8d83149e67",
+      "symbol": "DOGEUSDT",
+      "direction": "SHORT",
+      "score": 73.0,
+      "cause": "STOP_TOO_TIGHT_CANDIDATE",
+      "geometry_generation": "UNVERSIONED_LEGACY_OR_UNKNOWN",
+      "tp1_reached": false,
+      "rr_tp2": 2.507246,
+      "stop_distance_pct": 0.069,
+      "r_multiple": -1.0
+    },
     {
       "id": "d68001143127791e4570",
       "symbol": "ZECUSDT",
