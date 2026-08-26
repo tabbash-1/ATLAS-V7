@@ -1,15 +1,19 @@
-"""ATLAS WAIT diagnostics.
+"""ATLAS WAIT diagnostics and guarded opportunity calibration.
 
 Analyzes settled opportunity-cost records produced from Production WAIT snapshots.
-This layer is descriptive only: it identifies which blockers are associated with
-missed directional moves, but never changes score thresholds or execution rules.
+This layer is descriptive/research-only: it identifies which blockers are associated
+with missed directional moves and may emit a SHADOW adjustment suggestion, but it
+never changes Production score thresholds, execution rules, or live weights.
 """
 
-VERSION = 'WAIT_DIAGNOSTICS_V1'
+VERSION = 'WAIT_DIAGNOSTICS_V2_GUARDED_CALIBRATION'
 HORIZONS = (1, 3, 6, 12, 24)
 MIN_REVIEW_SAMPLE = 10
+MIN_PROMOTION_SAMPLE = 20
+MIN_CONFIRMING_HORIZONS = 2
 MATERIAL_DIRECTIONAL_MOVE_PCT = 1.0
 MATERIAL_UNSIGNED_MOVE_PCT = 2.0
+SHADOW_MAX_ADJUSTMENT_POINTS = 2.0
 
 
 def _f(v, default=None):
@@ -87,6 +91,64 @@ def _stats(rows, hours):
     }
 
 
+def _rows_by_blocker(records):
+    out = {}
+    for r in records:
+        out.setdefault(blocker(r), []).append(r)
+    return out
+
+
+def calibration(payload):
+    """Build a conservative multi-horizon SHADOW-only calibration proposal.
+
+    A blocker is eligible for review only when it has >= MIN_PROMOTION_SAMPLE
+    decisive observations on at least MIN_CONFIRMING_HORIZONS horizons and the
+    missed-opportunity rate is >=65% on each confirming horizon. The maximum
+    suggestion is +2 score points and is never applied to Production here.
+    """
+    records = payload.get('records') if isinstance(payload, dict) else payload
+    records = [r for r in (records or []) if isinstance(r, dict)]
+    by_blocker = _rows_by_blocker(records)
+    proposals = []
+    for name, rows in sorted(by_blocker.items()):
+        confirmations = []
+        horizon_stats = {}
+        for h in HORIZONS:
+            st = _stats(rows, h)
+            horizon_stats[f'{h}h'] = st
+            rate = st.get('missed_directional_rate_pct')
+            if st.get('directional_decisive', 0) >= MIN_PROMOTION_SAMPLE and rate is not None and rate >= 65.0:
+                confirmations.append(h)
+        eligible = len(confirmations) >= MIN_CONFIRMING_HORIZONS and name != 'NO_DIRECTIONAL_CONSENSUS'
+        max_rate = max([horizon_stats[f'{h}h'].get('missed_directional_rate_pct') or 0 for h in confirmations], default=0)
+        suggested = 0.0
+        if eligible:
+            suggested = 1.0 if max_rate < 75 else SHADOW_MAX_ADJUSTMENT_POINTS
+        proposals.append({
+            'blocker': name,
+            'eligible_for_shadow_experiment': eligible,
+            'confirming_horizons_h': confirmations,
+            'suggested_shadow_adjustment_points': suggested,
+            'horizon_stats': horizon_stats,
+            'production_applied': False,
+        })
+    return {
+        'schema': 'ATLAS_WAIT_OPPORTUNITY_CALIBRATION_V1',
+        'version': VERSION,
+        'records': len(records),
+        'guardrails': {
+            'min_decisive_sample_per_horizon': MIN_PROMOTION_SAMPLE,
+            'min_confirming_horizons': MIN_CONFIRMING_HORIZONS,
+            'min_missed_rate_pct': 65.0,
+            'max_shadow_adjustment_points': SHADOW_MAX_ADJUSTMENT_POINTS,
+        },
+        'proposals': proposals,
+        'production_change_authorized': False,
+        'threshold_changed': False,
+        'execution_rules_changed': False,
+    }
+
+
 def diagnose(payload, hours=24):
     hours = int(hours)
     if hours not in HORIZONS: raise ValueError('hours must be one of 1,3,6,12,24')
@@ -115,17 +177,18 @@ def diagnose(payload, hours=24):
     review.sort(key=lambda x: (x['review_priority']=='HIGH', x['missed_rate_pct'], x['decisive_sample']), reverse=True)
 
     return {
-        'schema': 'ATLAS_WAIT_DIAGNOSTICS_V1', 'version': VERSION, 'horizon_h': hours,
+        'schema': 'ATLAS_WAIT_DIAGNOSTICS_V2', 'version': VERSION, 'horizon_h': hours,
         'records': len(records), 'overall': _stats(records, hours),
         'by_reason': {k:_stats(v,hours) for k,v in sorted(by_reason.items())},
         'by_blocker': blocker_rows,
         'by_score_band': {k:_stats(v,hours) for k,v in by_band.items()},
         'by_symbol': {k:_stats(v,hours) for k,v in sorted(by_symbol.items())},
         'blocker_review': review,
+        'calibration': calibration({'records': records}),
         'definitions': {
             'missed_directional_opportunity': f'candidate direction gained >= {MATERIAL_DIRECTIONAL_MOVE_PCT}% by horizon',
             'wait_protected_capital': f'candidate direction lost >= {MATERIAL_DIRECTIONAL_MOVE_PCT}% by horizon',
             'material_move_without_consensus': f'no candidate direction and absolute market move >= {MATERIAL_UNSIGNED_MOVE_PCT}%; hindsight only, not a missed signal',
         },
-        'safety': {'research_only': True, 'threshold_changed': False, 'execution_rules_changed': False},
+        'safety': {'research_only': True, 'threshold_changed': False, 'execution_rules_changed': False, 'production_weights_changed': False},
     }
