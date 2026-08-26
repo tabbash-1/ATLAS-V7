@@ -86,6 +86,14 @@ try:
     _install_interaction_status_api(_collector)
 except Exception as _interaction_status_api_exc:
     print(f"ATLAS interaction status API unavailable: {type(_interaction_status_api_exc).__name__}: {_interaction_status_api_exc}")
+# Historical source audit is separate, cached and outcome-free. It reads only
+# decision-time Forward fields and the latest same-symbol Smart-Money snapshot
+# at or before each Forward timestamp. It cannot change Production or validation.
+try:
+    from historical_source_runtime import install as _install_historical_source_runtime
+    _install_historical_source_runtime(_collector)
+except Exception as _historical_source_exc:
+    print(f"ATLAS historical source audit unavailable: {type(_historical_source_exc).__name__}: {_historical_source_exc}")
 entrypoint="atlas_research_runtime_server.py"
 print(f"ATLAS production boot: data={DATA_DIR} runtime=resilient-free-research release={release_token}")
 runpy.run_path(str(BASE/entrypoint),run_name="__main__")
