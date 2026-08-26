@@ -13,6 +13,7 @@ from collections import Counter
 
 import microstructure_memory
 import microstructure_walkforward
+import prospective_microstructure_cohort
 
 VERSION = 'ATLAS_FORWARD_MICROSTRUCTURE_FREEZE_V1_PRIOR_ONLY'
 LOOKBACK_MS = 24 * 60 * 60 * 1000
@@ -99,7 +100,8 @@ def enrich_row(collector, row):
     return out
 
 
-def _status_payload():
+def _status_payload(collector=None):
+    cohort = getattr(collector, 'PROSPECTIVE_MICROSTRUCTURE_COHORT_STATE', {}) if collector is not None else {}
     return {
         'ok': bool(STATE.get('installed')),
         'version': VERSION,
@@ -111,12 +113,22 @@ def _status_payload():
         'live_execution': False,
         'can_override_production': False,
         'state': copy.deepcopy(STATE),
+        'prospective_cohort': {k: cohort.get(k) for k in ('status','registration_locked','cohort_hash','cohort_start_ms','cohort_start_at','last_error')},
     }
 
 
 def install(collector):
     if STATE.get('installed'):
         return STATE
+
+    # Critical ordering: register and lock the prospective cohort BEFORE
+    # replacing _forward_write. Therefore the first eligible frozen row cannot
+    # predate the cohort manifest in this process.
+    cohort_state = prospective_microstructure_cohort.install(collector)
+    if cohort_state.get('status') != 'PREREGISTERED' or not cohort_state.get('registration_locked'):
+        STATE['last_error'] = 'PROSPECTIVE_COHORT_NOT_PREREGISTERED'
+        return STATE
+
     original_write = collector._forward_write
 
     def frozen_write(row):
@@ -149,7 +161,7 @@ def install(collector):
     def do_GET(self):
         u = urllib.parse.urlparse(self.path)
         if u.path == '/api/research/forward-microstructure-freeze':
-            return self._json(_status_payload())
+            return self._json(_status_payload(collector))
         return original_get(self)
     collector.Handler.do_GET = do_GET
 
