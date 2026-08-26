@@ -1,0 +1,34 @@
+name: ATLAS Historical Source CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'historical_source_runtime.py'
+      - 'tests/test_historical_source_runtime.py'
+      - 'cloud_start.py'
+      - '.github/workflows/atlas-historical-source-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  historical-source-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax and no-lookahead tests
+        run: |
+          set -euo pipefail
+          python3 -m py_compile historical_source_runtime.py tests/test_historical_source_runtime.py cloud_start.py
+          python3 tests/test_historical_source_runtime.py
+      - name: Static safety contract
+        run: |
+          set -euo pipefail
+          grep -q 'future_smart_money_match_allowed.*False' historical_source_runtime.py
+          grep -q 'forward_return_fields_read.*False' historical_source_runtime.py
+          grep -q 'settlement_files_read.*False' historical_source_runtime.py
+          grep -q '/api/research/historical-source-audit' historical_source_runtime.py
+          grep -q '_install_historical_source_runtime' cloud_start.py
+          ! grep -q 'trade_path_settlement' historical_source_runtime.py
+          ! grep -q 'canonical_outcome' historical_source_runtime.py
+          ! grep -q 'forward_return_pct' historical_source_runtime.py
