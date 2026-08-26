@@ -167,6 +167,15 @@ def install(collector):
 
     STATE['installed'] = True
 
+    # Observational-only diagnostics wrap the exact Cloud Forward scoring calls
+    # already made by the collector. They make no extra market calls and do not
+    # alter score thresholds, candidate ordering, storage, or Production.
+    try:
+        import cloud_forward_diagnostics_runtime
+        cloud_forward_diagnostics_runtime.install(collector)
+    except Exception as exc:
+        STATE['last_error'] = f'CLOUD_FORWARD_DIAGNOSTICS_INSTALL_ERROR: {type(exc).__name__}: {exc}'
+
     # The forward evaluator is installed only after both conditions hold:
     # cohort is durably preregistered and the entry-time freeze wrapper is live.
     try:
