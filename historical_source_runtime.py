@@ -14,6 +14,7 @@ import time
 import urllib.parse
 from collections import Counter, defaultdict
 
+import historical_evaluation_protocol
 import historical_replay_registry
 
 VERSION = "ATLAS_HISTORICAL_SOURCE_AUDIT_V1_PRIOR_ONLY_CACHED"
@@ -216,6 +217,7 @@ def install(atlas):
         u = urllib.parse.urlparse(self.path)
         if u.path == "/api/research/historical-source-audit":
             registry = getattr(atlas, 'HISTORICAL_REPLAY_REGISTRY_STATE', {}) or {}
+            protocol = getattr(atlas, 'HISTORICAL_EVALUATION_PROTOCOL_STATE', {}) or {}
             return self._json({
                 "ok": STATE.get("report") is not None,
                 "version": VERSION,
@@ -226,6 +228,7 @@ def install(atlas):
                 "outcomes_read_by_request": False,
                 "runtime": {k: STATE.get(k) for k in ("enabled", "background_only", "refreshes", "last_error", "last_started_at", "last_finished_at")},
                 "replay_registry": {k: registry.get(k) for k in ("status", "registration_locked", "frozen_feature_rows", "feature_dataset_sha256", "last_error", "last_checked_at")},
+                "evaluation_protocol": {k: protocol.get(k) for k in ("status", "registration_locked", "protocol_hash", "feature_dataset_sha256", "last_error")},
                 "report": copy.deepcopy(STATE.get("report")),
             })
         return original(self)
@@ -241,6 +244,9 @@ def install(atlas):
     threading.Thread(target=loop, daemon=True, name="atlas-historical-source-audit").start()
     try:
         historical_replay_registry.install(atlas)
+        # Preregister only after the replay registry has frozen and locked its
+        # feature dataset. This module contains no outcome reader.
+        historical_evaluation_protocol.install(atlas)
     except Exception as exc:
-        STATE['last_error'] = f"HISTORICAL_REPLAY_REGISTRY_INSTALL_ERROR: {type(exc).__name__}: {exc}"
+        STATE['last_error'] = f"HISTORICAL_REPLAY_GOVERNANCE_INSTALL_ERROR: {type(exc).__name__}: {exc}"
     return STATE
