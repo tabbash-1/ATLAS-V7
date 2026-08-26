@@ -1,15 +1,25 @@
 const DEFAULT_ASSETS = [
   { name: 'Bitcoin / USDT', symbol: 'BINANCE:BTCUSDT', cls: 'Crypto' },
   { name: 'Ethereum / USDT', symbol: 'BINANCE:ETHUSDT', cls: 'Crypto' },
+  { name: 'Solana / USDT', symbol: 'BINANCE:SOLUSDT', cls: 'Crypto' },
+  { name: 'XRP / USDT', symbol: 'BINANCE:XRPUSDT', cls: 'Crypto' },
+  { name: 'BNB / USDT', symbol: 'BINANCE:BNBUSDT', cls: 'Crypto' },
+  { name: 'Dogecoin / USDT', symbol: 'BINANCE:DOGEUSDT', cls: 'Crypto' },
   { name: 'Zcash / USDT', symbol: 'BINANCE:ZECUSDT', cls: 'Crypto' },
-  { name: 'Gold', symbol: 'OANDA:XAUUSD', cls: 'Commodity' },
-  { name: 'S&P 500', symbol: 'SP:SPX', cls: 'Index' },
-  { name: 'Apple', symbol: 'NASDAQ:AAPL', cls: 'Stock' },
-  { name: 'EUR / USD', symbol: 'FX:EURUSD', cls: 'Forex' }
+  { name: 'Hyperliquid / USDT', symbol: 'BINANCE:HYPEUSDT', cls: 'Crypto' }
 ];
 
+const savedAssets = JSON.parse(localStorage.getItem('atlas.assets') || 'null');
+const savedCrypto = Array.isArray(savedAssets)
+  ? savedAssets.filter(a => a && a.cls === 'Crypto' && String(a.symbol || '').toUpperCase().endsWith('USDT'))
+  : [];
+const assetMap = new Map(DEFAULT_ASSETS.map(a => [a.symbol, a]));
+savedCrypto.forEach(a => assetMap.set(String(a.symbol).toUpperCase(), {...a, cls: 'Crypto'}));
+const cryptoAssets = [...assetMap.values()];
+localStorage.setItem('atlas.assets', JSON.stringify(cryptoAssets));
+
 const state = {
-  assets: JSON.parse(localStorage.getItem('atlas.assets') || 'null') || DEFAULT_ASSETS,
+  assets: cryptoAssets,
   active: 0,
   interval: 'D',
   trial: null,
@@ -125,8 +135,12 @@ function renderActiveSignal(){
   const cached=state.liveResults[resultKey()];
   if(cached){
     applySignal(cached.result,`${cached.provider} · ${new Date(cached.time).toLocaleString()}`);
-    if(cached.confluence) renderConfluence(cached.confluence); else resetConfluence();
-  } else { resetSignal(); resetConfluence(); }
+    if(cached.confluence && typeof renderConfluence === 'function') renderConfluence(cached.confluence);
+    else if(typeof resetConfluence === 'function') resetConfluence();
+  } else {
+    resetSignal();
+    if(typeof resetConfluence === 'function') resetConfluence();
+  }
 }
 
 async function analyzeActive(){
