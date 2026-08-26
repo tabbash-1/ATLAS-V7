@@ -7,6 +7,7 @@ on:
       - 'historical_source_runtime.py'
       - 'historical_microstructure_replay.py'
       - 'historical_replay_registry.py'
+      - 'historical_evaluation_protocol.py'
       - 'cloud_start.py'
       - '.github/workflows/atlas-historical-source-snapshot.yml'
   schedule:
@@ -37,15 +38,15 @@ jobs:
           for attempt in $(seq 1 24); do
             code="$(curl -L --connect-timeout 20 --max-time 60 -sS -w '%{http_code}' -o "$tmp" "${BASE_URL}/api/research/historical-source-audit" || true)"
             if [[ "$code" =~ ^2 ]] && jq -e . "$tmp" >/dev/null 2>&1 && \
-               jq -e '.version == "ATLAS_HISTORICAL_SOURCE_AUDIT_V1_PRIOR_ONLY_CACHED" and .cached_only == true and .background_refresh_triggered == false and .research_only == true and .live_execution == false and .outcomes_read_by_request == false and (.runtime.refreshes // 0) >= 1 and (.report | type) == "object" and .report.outcomes_read == false and .report.forward_return_fields_read == false and .report.future_smart_money_match_allowed == false and .report.backfill_performed == false and (.replay_registry | type) == "object" and (.replay_registry.status | type) == "string"' "$tmp" >/dev/null 2>&1; then
+               jq -e '.version == "ATLAS_HISTORICAL_SOURCE_AUDIT_V1_PRIOR_ONLY_CACHED" and .cached_only == true and .background_refresh_triggered == false and .research_only == true and .live_execution == false and .outcomes_read_by_request == false and (.runtime.refreshes // 0) >= 1 and (.report | type) == "object" and .report.outcomes_read == false and .report.forward_return_fields_read == false and .report.future_smart_money_match_allowed == false and .report.backfill_performed == false and .replay_registry.status == "FROZEN_READY" and .replay_registry.registration_locked == true and (.replay_registry.feature_dataset_sha256 | type) == "string" and .evaluation_protocol.status == "PREREGISTERED" and .evaluation_protocol.registration_locked == true and .evaluation_protocol.feature_dataset_sha256 == .replay_registry.feature_dataset_sha256 and (.evaluation_protocol.protocol_hash | type) == "string"' "$tmp" >/dev/null 2>&1; then
               ok=1
               break
             fi
-            echo "Waiting for deployed historical replay registry (attempt ${attempt}/24, HTTP ${code:-none})"
+            echo "Waiting for deployed frozen replay + preregistered evaluation protocol (attempt ${attempt}/24, HTTP ${code:-none})"
             sleep 15
           done
           if [[ "$ok" != "1" ]]; then
-            echo "Historical source audit did not reach the required cached no-lookahead + replay-registry contract within the deployment grace period." >&2
+            echo "Historical source audit did not reach the frozen replay + preregistration contract within the deployment grace period." >&2
             echo "Last HTTP code: ${code:-none}" >&2
             cat "$tmp" >&2 || true
             exit 1
