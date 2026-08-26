@@ -166,4 +166,12 @@ def install(collector):
     collector.Handler.do_GET = do_GET
 
     STATE['installed'] = True
+
+    # The forward evaluator is installed only after both conditions hold:
+    # cohort is durably preregistered and the entry-time freeze wrapper is live.
+    try:
+        import prospective_microstructure_validation_runtime
+        prospective_microstructure_validation_runtime.install(collector)
+    except Exception as exc:
+        STATE['last_error'] = f'PROSPECTIVE_VALIDATION_INSTALL_ERROR: {type(exc).__name__}: {exc}'
     return STATE
