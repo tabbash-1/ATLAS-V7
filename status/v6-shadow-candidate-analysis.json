@@ -1,0 +1,76 @@
+{
+  "baseline": {
+    "12h": {
+      "mean_pct": -0.8918,
+      "median_pct": -0.5606,
+      "n": 63,
+      "win_rate_pct": 39.68
+    },
+    "24h": {
+      "mean_pct": -1.3141,
+      "median_pct": -1.4621,
+      "n": 54,
+      "win_rate_pct": 33.33
+    }
+  },
+  "candidate_policy": {
+    "mode": "RANKING_AND_FILTER_ONLY",
+    "name": "V6_SHADOW_QUALITY_GATE_A",
+    "production_mutation": false,
+    "rules": [
+      {
+        "priority": "HIGH",
+        "reason": "V6 sample: 80% 24h wins, +2.2193% mean, n=5",
+        "rule": "relative_volume >= 1.0"
+      },
+      {
+        "priority": "MEDIUM",
+        "reason": "V6 sample: 60% 24h wins, +0.7214% mean, n=10",
+        "rule": "relative_strength_reason == ALIGNED_STRONG"
+      },
+      {
+        "priority": "HIGH",
+        "reason": "4 votes underperformed 3 votes at 12h and 24h",
+        "rule": "do not reward 4 votes over 3 votes"
+      },
+      {
+        "priority": "HIGH",
+        "reason": "higher trend_base underperformed 64..68",
+        "rule": "do not raise confidence solely from trend_base 68..72"
+      },
+      {
+        "priority": "MEDIUM",
+        "reason": "aligned/opposed buckets both negative at 24h",
+        "rule": "treat futures as secondary evidence until monotonicity improves"
+      }
+    ],
+    "shadow_quality_score_formula": "baseline_score + volume_quality_overlay + relative_strength_overlay; trend/vote/futures bonuses capped until revalidated"
+  },
+  "diagnosis": {
+    "direction_votes": "4_VOTES_DO_NOT_OUTPERFORM_3_VOTES",
+    "futures": "NO_STABLE_POSITIVE_MONOTONIC_SIGNAL",
+    "relative_strength": "ALIGNED_STRONG_IS_POSITIVE_AT_24H",
+    "structure": "CLOSE_PRIOR_STRUCTURE_IS_WEAK; VERY_CLOSE_IS_LESS_BAD_BUT_NOT_POSITIVE_OVERALL",
+    "trend_base": "ANTI_PREDICTIVE_IN_CURRENT_V6_SAMPLE",
+    "volume": "RV_GTE_1_IS_STRONGLY_POSITIVE_AT_24H"
+  },
+  "episodes": 67,
+  "generated_at": "2026-08-27T21:43:31.200488+00:00",
+  "guardrails": {
+    "auto_promotion_enabled": false,
+    "production_score_changed": false,
+    "production_threshold_changed": false,
+    "research_only": true
+  },
+  "promotion_gate": {
+    "requirements": [
+      "evaluate candidate at record level against same independent V6 episodes",
+      "compare coverage, 12h/24h win rate, mean and median directional return",
+      "require no material degradation in downside tails",
+      "keep threshold unchanged during shadow test"
+    ],
+    "status": "NOT_ELIGIBLE_FOR_PRODUCTION"
+  },
+  "schema": "ATLAS_V6_SHADOW_CANDIDATE_ANALYSIS_V1",
+  "source_schema": "ATLAS_V6_ATTRIBUTION_SUMMARY_V1"
+}
