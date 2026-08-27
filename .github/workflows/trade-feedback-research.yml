@@ -1,0 +1,44 @@
+name: ATLAS Trade Feedback Research
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'trade_feedback_analysis.py'
+      - 'tests/test_trade_feedback_analysis.py'
+      - 'trade-monitor.html'
+      - 'feedback-lab.html'
+      - 'trader.html'
+      - '.github/workflows/trade-feedback-research.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'trade_feedback_analysis.py'
+      - 'tests/test_trade_feedback_analysis.py'
+      - 'trade-monitor.html'
+      - 'feedback-lab.html'
+      - 'trader.html'
+      - '.github/workflows/trade-feedback-research.yml'
+
+jobs:
+  validate-feedback-layer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Python syntax
+        run: python -m py_compile trade_feedback_analysis.py tests/test_trade_feedback_analysis.py
+      - name: Feedback regression tests
+        run: PYTHONPATH=. python tests/test_trade_feedback_analysis.py
+      - name: Preserve research-only safety contract
+        run: |
+          grep -q 'auto_promotion_enabled.*False' trade_feedback_analysis.py
+          grep -q 'production_threshold_changed.*False' trade_feedback_analysis.py
+          grep -q 'production_score_adjustment.*0' trade_feedback_analysis.py
+          grep -q 'Research-only' feedback-lab.html
+          grep -q 'No automatic execution' trade-monitor.html
+          ! grep -q 'fetch.*order' trade-monitor.html
+          ! grep -q 'api/v3/order' trade-monitor.html
