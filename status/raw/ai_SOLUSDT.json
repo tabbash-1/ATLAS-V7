@@ -3,66 +3,67 @@
   "mode": "SHADOW_RESEARCH_ONLY",
   "symbol": "SOLUSDT",
   "horizon": "1-3H",
-  "generated_at": "2026-08-26T23:30:20.782308+00:00",
-  "entry": 100.85,
+  "generated_at": "2026-08-27T04:34:15.463654+00:00",
+  "entry": 100.98,
   "direction": "LONG",
-  "verdict": "CONFIRM_PRODUCTION",
-  "confidence": 78,
-  "reason": "CANONICAL_PRODUCTION_ACTIONABLE",
+  "verdict": "TAKE_SHADOW",
+  "confidence": 71,
+  "reason": "EVIDENCE_CONVERGENCE",
   "canonical_action": {
-    "status": "ACTIONABLE",
-    "action": "BUY",
+    "status": "CONDITIONAL",
+    "action": "BUY_ONLY_IF",
     "direction": "LONG",
-    "entry_mode": "NOW",
-    "entry": 100.85,
-    "stop_loss": 99.2634285714,
-    "tp1": 102.77,
-    "tp2": 104.0231428571,
-    "rr_tp1": 1.21,
-    "rr_tp2": 2.0,
-    "entry_trigger": "Verified Production setup is executable now.",
+    "entry_mode": "BREAKOUT",
+    "entry": 102.5895,
+    "stop_loss": 101.48875,
+    "tp1": 103.69025,
+    "tp2": 104.9205,
+    "rr_tp1": 1.0,
+    "rr_tp2": 2.118,
+    "entry_trigger": "Buy only after 1H close/hold above 102.46.",
     "source": "production_trade_plan"
   },
   "bull_analyst": {
-    "score": 0.615,
+    "score": 0.477,
     "best_case": [
       "LONG 4 vs SHORT 0",
-      "Price/EMA20/EMA50 structure 100.85/97.5764/97.314",
-      "Tactical RR 1.90",
-      "24h momentum 4.40%",
-      "RSI14 75.9"
+      "Price/EMA20/EMA50 structure 100.98/99.0186/98.0315",
+      "24h momentum 4.50%",
+      "RSI14 78.2",
+      "trend_base +68.00"
     ]
   },
   "bear_analyst": {
-    "score": -0.615,
+    "score": -0.477,
     "best_case": [
-      "Validated futures score -17.0",
-      "futures_adjustment -1.70"
+      "RV 0.44x",
+      "Validated futures score -27.0",
+      "futures_adjustment -2.70"
     ]
   },
   "judge": {
-    "net_strength": 0.615,
-    "tactical_rr": 1.899,
+    "net_strength": 0.477,
+    "tactical_rr": 0.969,
     "canonical_trade_plan": {
       "version": "PRODUCTION_TRADE_PLAN_V2_RANGE_ALIGNED",
-      "status": "ACTIONABLE",
-      "action": "BUY",
+      "status": "CONDITIONAL",
+      "action": "BUY_ONLY_IF",
       "direction": "LONG",
-      "entry_mode": "NOW",
-      "entry": 100.85,
-      "entry_trigger": "Verified Production setup is executable now.",
-      "stop_loss": 99.2634285714,
-      "tp1": 102.77,
-      "tp2": 104.0231428571,
-      "rr_tp1": 1.21,
-      "rr_tp2": 2.0,
-      "reference_structure": 102.77,
+      "entry_mode": "BREAKOUT",
+      "entry": 102.5895,
+      "entry_trigger": "Buy only after 1H close/hold above 102.46.",
+      "stop_loss": 101.48875,
+      "tp1": 103.69025,
+      "tp2": 104.9205,
+      "rr_tp1": 1.0,
+      "rr_tp2": 2.118,
+      "reference_structure": 102.46,
       "reference_structure_source": "STRUCTURAL_OBSTACLE",
       "continuation_strong": false,
       "breakout_confirmed": false,
       "qualification_required": 68,
       "production_qualified": true,
-      "execution_ready": true,
+      "execution_ready": false,
       "invalidation": "Cancel/re-evaluate if stop/structure fails or verified direction changes.",
       "can_execute": false,
       "research_only": true
@@ -71,28 +72,80 @@
   },
   "counterfactuals": [
     {
-      "scenario": "PRODUCTION_NOW",
+      "scenario": "PRODUCTION_CONDITIONAL",
       "direction": "LONG",
-      "entry": 100.85,
-      "stop_loss": 99.2634285714,
-      "target": 104.0231428571,
-      "tp1": 102.77,
-      "risk_reward": 2.0,
-      "trigger": "Verified Production setup is executable now.",
+      "entry": 102.5895,
+      "stop_loss": 101.48875,
+      "target": 104.9205,
+      "tp1": 103.69025,
+      "risk_reward": 2.118,
+      "trigger": "Buy only after 1H close/hold above 102.46.",
       "thesis": "Canonical Production trade plan.",
       "shadow_only": false,
       "canonical": true
+    },
+    {
+      "scenario": "ENTER_NOW",
+      "direction": "LONG",
+      "entry": 100.98,
+      "stop_loss": 100.13825,
+      "target": 101.796,
+      "risk_reward": 0.969,
+      "trigger": "Immediate only if current evidence remains valid",
+      "thesis": "Shadow comparison only.",
+      "shadow_only": true,
+      "canonical": false
+    },
+    {
+      "scenario": "WAIT_PULLBACK",
+      "direction": "LONG",
+      "entry": 100.52675,
+      "stop_loss": 99.5555,
+      "target": 101.796,
+      "risk_reward": 1.307,
+      "trigger": "Price retraces ~0.35 ATR without structure failure",
+      "thesis": "Requalify after a better entry.",
+      "shadow_only": true,
+      "canonical": false
+    },
+    {
+      "scenario": "WAIT_BREAKOUT",
+      "direction": "LONG",
+      "entry": 102.5895,
+      "stop_loss": 101.61825,
+      "target": 104.6615,
+      "risk_reward": 2.133,
+      "trigger": "1H price closes/holds above 102.46 (PRIOR_SWING_HIGH) with confirmation",
+      "thesis": "Enter only after actual blocking structure is cleared.",
+      "shadow_only": true,
+      "canonical": false,
+      "reference_level": 102.46,
+      "reference_source": "PRIOR_SWING_HIGH",
+      "structure_anchored": true,
+      "confirmation_buffer": 0.1295
+    },
+    {
+      "scenario": "REJECT",
+      "direction": null,
+      "entry": null,
+      "stop_loss": null,
+      "target": null,
+      "risk_reward": null,
+      "trigger": "No acceptable setup",
+      "thesis": "Preserve capital.",
+      "shadow_only": true,
+      "canonical": false
     }
   ],
   "best_counterfactual": {
-    "scenario": "PRODUCTION_NOW",
+    "scenario": "PRODUCTION_CONDITIONAL",
     "direction": "LONG",
-    "entry": 100.85,
-    "stop_loss": 99.2634285714,
-    "target": 104.0231428571,
-    "tp1": 102.77,
-    "risk_reward": 2.0,
-    "trigger": "Verified Production setup is executable now.",
+    "entry": 102.5895,
+    "stop_loss": 101.48875,
+    "target": 104.9205,
+    "tp1": 103.69025,
+    "risk_reward": 2.118,
+    "trigger": "Buy only after 1H close/hold above 102.46.",
     "thesis": "Canonical Production trade plan.",
     "shadow_only": false,
     "canonical": true
@@ -100,13 +153,13 @@
   "hybrid_judge": {
     "decision": "CONFIRM",
     "production_direction": "LONG",
-    "production_score": 74.0,
+    "production_score": 69.0,
     "production_qualified": true,
-    "execution_ready": true,
+    "execution_ready": false,
     "ai_direction": "LONG",
-    "ai_verdict": "CONFIRM_PRODUCTION",
+    "ai_verdict": "TAKE_SHADOW",
     "agreement": true,
-    "production_priority": true
+    "production_priority": false
   },
   "evidence": [
     {
@@ -120,49 +173,49 @@
       "name": "ema_structure",
       "value": 1.0,
       "weight": 1.2,
-      "detail": "Price/EMA20/EMA50 structure 100.85/97.5764/97.314",
+      "detail": "Price/EMA20/EMA50 structure 100.98/99.0186/98.0315",
       "source": "production_decision"
     },
     {
       "name": "rsi",
       "value": 1.0,
       "weight": 0.7,
-      "detail": "RSI14 75.9",
+      "detail": "RSI14 78.2",
       "source": "production_decision"
     },
     {
       "name": "momentum",
       "value": 1.0,
       "weight": 0.9,
-      "detail": "24h momentum 4.40%",
+      "detail": "24h momentum 4.50%",
       "source": "production_decision"
     },
     {
       "name": "relative_volume",
-      "value": 0.309,
+      "value": -0.668,
       "weight": 0.75,
-      "detail": "RV 1.26x",
+      "detail": "RV 0.44x",
       "source": "production_decision"
     },
     {
       "name": "relative_strength",
-      "value": 0.263,
+      "value": 0.216,
       "weight": 1.0,
-      "detail": "RS 56.6",
+      "detail": "RS 55.4",
       "source": "production_decision"
     },
     {
       "name": "futures",
-      "value": -0.17,
+      "value": -0.27,
       "weight": 1.05,
-      "detail": "Validated futures score -17.0",
+      "detail": "Validated futures score -27.0",
       "source": "production_decision"
     },
     {
       "name": "tactical_geometry",
-      "value": 0.733,
+      "value": 0.113,
       "weight": 1.5,
-      "detail": "Tactical RR 1.90",
+      "detail": "Tactical RR 0.97",
       "source": "production_decision"
     },
     {
@@ -180,29 +233,15 @@
       "source": "production_scorer"
     },
     {
-      "name": "scorer_market_breadth_adjustment",
-      "value": 0.1,
-      "weight": 0.45,
-      "detail": "market_breadth_adjustment +1.00",
-      "source": "production_scorer"
-    },
-    {
-      "name": "scorer_volume_bonus",
-      "value": 0.257,
-      "weight": 0.45,
-      "detail": "volume_bonus +2.57",
-      "source": "production_scorer"
-    },
-    {
       "name": "scorer_futures_adjustment",
-      "value": -0.17,
+      "value": -0.27,
       "weight": 0.45,
-      "detail": "futures_adjustment -1.70",
+      "detail": "futures_adjustment -2.70",
       "source": "production_scorer"
     }
   ],
   "production_decision": "LONG",
-  "production_score": 74.0,
+  "production_score": 69.0,
   "production_qualified": true,
   "safety": {
     "can_execute": false,
