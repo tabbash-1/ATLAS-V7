@@ -14,6 +14,7 @@ from pathlib import Path
 
 SRC=Path('status/wait-outcomes.json')
 OUT=Path('status/smart-existing-results-analysis.json')
+V6OUT=Path('status/v6-attribution-summary.json')
 GAP=timedelta(hours=12)
 ALIASES={'VERY_CLOSE':'VERY_CLOSE_PRIOR_STRUCTURE','CLOSE':'CLOSE_PRIOR_STRUCTURE'}
 
@@ -110,22 +111,21 @@ def main():
         }
     current_versions=[v for v in versions if v.startswith('PROD_SIGNAL_SCORING_V6_BREAKOUT_AWARE')]
     current_rows=[r for r in eps if version(r) in current_versions]
+    current={
+      'versions':current_versions,'episodes':len(current_rows),
+      'overall':{'12h':stats(current_rows,'12h'),'24h':stats(current_rows,'24h')},
+      'by_score_band':grouped_report(current_rows,bucket_score),
+      'by_volume':grouped_report(current_rows,bucket_volume),
+      'by_obstacle':grouped_report(current_rows,obstacle),
+      'attribution':attribution_report(current_rows),
+    }
     report={
       'schema':'ATLAS_SMART_EXISTING_RESULTS_V3_ATTRIBUTION_AWARE','generated_at':datetime.now(timezone.utc).isoformat(),
       'purpose':'Use existing independent evidence before requesting more data, without mixing scoring policies.',
       'raw_records':len(raw),'independent_directional_episodes':len(eps),'episode_gap_hours':12,
       'warning':'Cross-version pooled score bands are descriptive only. Production changes must be justified inside the matching scoring version.',
       'overall':{'12h':stats(eps,'12h'),'24h':stats(eps,'24h')},
-      'by_scoring_version':version_reports,
-      'current_v6_family':{
-        'versions':current_versions,
-        'episodes':len(current_rows),
-        'overall':{'12h':stats(current_rows,'12h'),'24h':stats(current_rows,'24h')},
-        'by_score_band':grouped_report(current_rows,bucket_score),
-        'by_volume':grouped_report(current_rows,bucket_volume),
-        'by_obstacle':grouped_report(current_rows,obstacle),
-        'attribution':attribution_report(current_rows),
-      },
+      'by_scoring_version':version_reports,'current_v6_family':current,
       'by_symbol':grouped_report(eps,lambda r:str(r.get('symbol') or 'UNKNOWN').upper()),
       'by_direction':grouped_report(eps,lambda r:str(r.get('candidate_direction') or 'NONE').upper()),
       'by_score_band_descriptive_only':grouped_report(eps,bucket_score),
@@ -136,6 +136,9 @@ def main():
       'guardrails':{'research_only':True,'production_threshold_changed':False,'production_score_adjustment':0,'auto_promotion_enabled':False},
       'next_decision':'Use current_v6_family attribution to identify which score component is anti-predictive. Build a shadow candidate formula and compare it to V6 baseline before any Production change.'
     }
+    compact={'schema':'ATLAS_V6_ATTRIBUTION_SUMMARY_V1','generated_at':report['generated_at'],**current,
+      'guardrails':report['guardrails'],'next_decision':report['next_decision']}
     OUT.parent.mkdir(exist_ok=True); OUT.write_text(json.dumps(report,indent=2,sort_keys=True)+'\n')
+    V6OUT.write_text(json.dumps(compact,indent=2,sort_keys=True)+'\n')
     print(json.dumps({'raw':len(raw),'episodes':len(eps),'versions':{v:version_reports[v]['episodes'] for v in versions},'current_v6_family_episodes':len(current_rows)},sort_keys=True))
 if __name__=='__main__':main()
