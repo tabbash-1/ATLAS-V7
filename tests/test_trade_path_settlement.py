@@ -6,6 +6,16 @@ from pathlib import Path
 import trade_path_settlement as tps
 
 
+def test_canonical_production_plan_geometry_is_frozen_directly():
+    geometry = tps.derive_geometry({
+        'direction': 'LONG', 'entry': 100, 'stop_loss': 98,
+        'tp1': 102, 'tp2': 104, 'rr_tp1': 1, 'rr_tp2': 2,
+    })
+    assert geometry['method'] == 'CANONICAL_PRODUCTION_TRADE_PLAN'
+    assert geometry['geometry_version'] == 'ATLAS_GEOMETRY_V4_CANONICAL_PRODUCTION_PLAN'
+    assert geometry['stop_loss'] == 98 and geometry['tp2'] == 104
+
+
 def signal_payload(direction='LONG', score=84, production=True):
     base = {
         'symbol': 'BTCUSDT', 'entry': 100.0,

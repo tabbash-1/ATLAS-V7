@@ -271,6 +271,7 @@ class RuntimeHandler(atlas.Handler):
                 'cloud_runtime':CLOUD_RUNTIME_STATE,
                 'research_memory_bridge':RESEARCH_MEMORY_BRIDGE_STATE,
                 'storage_hardening':getattr(atlas,'STORAGE_HARDENING_STATE',{}),
+                'production_opportunities':getattr(atlas,'PRODUCTION_OPPORTUNITY_RUNTIME_STATE',{}),
                 'market_data':atlas.MARKET_DATA_STATE,
                 'research_only':True,
                 'live_execution':False,

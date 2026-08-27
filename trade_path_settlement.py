@@ -51,6 +51,24 @@ def derive_geometry(payload):
     entry = _fnum(x.get('entry'))
     rr2 = _fnum(x.get('rr_tp2'))
     direction = str(x.get('direction') or '').upper()
+    direct_stop = _fnum(x.get('stop_loss'))
+    direct_tp1 = _fnum(x.get('tp1'))
+    direct_tp2 = _fnum(x.get('tp2'))
+    if (entry and entry > 0 and direction in ('LONG', 'SHORT') and
+            None not in (direct_stop, direct_tp1, direct_tp2, rr2)):
+        directional = ((direction == 'LONG' and direct_stop < entry < direct_tp1 <= direct_tp2) or
+                       (direction == 'SHORT' and direct_stop > entry > direct_tp1 >= direct_tp2))
+        risk = abs(entry - direct_stop)
+        if directional and risk > 0 and rr2 >= 1.0:
+            return {
+                'entry': round(entry, 12), 'stop_loss': round(direct_stop, 12),
+                'tp1': round(direct_tp1, 12), 'tp2': round(direct_tp2, 12),
+                'risk_abs': round(risk, 12), 'rr_tp1': round(_fnum(x.get('rr_tp1')) or abs(direct_tp1-entry)/risk, 6),
+                'rr_tp2': round(rr2, 6), 'direction': direction,
+                'geometry_version': 'ATLAS_GEOMETRY_V4_CANONICAL_PRODUCTION_PLAN',
+                'method': 'CANONICAL_PRODUCTION_TRADE_PLAN', 'tp1_method': 'PRODUCTION_PLAN',
+                'tp1_is_terminal_exit': False, 'frozen_at_observation': True,
+            }
     sd = _fnum(x.get('support_distance_pct'))
     rd = _fnum(x.get('resistance_distance_pct'))
     if not entry or entry <= 0 or direction not in ('LONG', 'SHORT') or not rr2 or rr2 <= 0:

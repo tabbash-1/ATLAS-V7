@@ -141,6 +141,8 @@ from outcome_calibration_runtime import install as _install_outcome_calibration_
 _install_outcome_calibration_runtime(_collector)
 from production_reliability import install as _install_production_reliability
 _install_production_reliability(_collector)
+from production_opportunity_runtime import install as _install_production_opportunity_runtime
+_install_production_opportunity_runtime(_collector)
 from profit_engine_runtime import install as _install_profit_engine_runtime
 _install_profit_engine_runtime(_collector)
 

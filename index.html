@@ -134,12 +134,12 @@
 
       <section class="card metrics-card">
         <div class="card-head">
-          <div><strong>ATLAS CONFIRMED OPPORTUNITY ALERTS — ALPHA 25</strong><div class="muted small">High-confidence LONG / SHORT only · strict confirmation gate · cooldown · browser + in-app alerts.</div></div>
+          <div><strong>ATLAS PRODUCTION EXECUTION ALERTS</strong><div class="muted small">ACTIONABLE Production only · valid Geometry · browser + in-app alerts.</div></div>
           <span id="confirmedAlertBadge" class="pill neutral">ARMING</span>
         </div>
         <div class="backtest-actions"><button id="alertEnableBrowserBtn">Enable Browser Alerts</button><button id="alertSoundBtn">Sound: ON</button><button id="alertRefreshBtn">Refresh Alerts</button></div>
         <div id="confirmedAlertMetrics" class="trial-grid"><div><span>Status</span><b>Waiting for alert engine</b></div></div>
-        <div id="confirmedAlertNotes" class="comparison-box muted small">Only confirmed opportunities can create an alert.</div>
+        <div id="confirmedAlertNotes" class="comparison-box muted small">Only executable Production decisions can create an alert.</div>
         <div class="v42-table-wrap"><table class="v42-table"><thead><tr><th>Time</th><th>Asset</th><th>Side</th><th>Score</th><th>Entry</th><th>R:R</th><th>Playbook</th></tr></thead><tbody id="confirmedAlertBody"><tr><td colspan="7">No confirmed opportunity has fired yet.</td></tr></tbody></table></div>
       </section>
       <section class="card metrics-card">
@@ -327,13 +327,13 @@
 
       <section class="card smart-money-card">
         <div class="card-head">
-          <div><strong>V5 OPPORTUNITY SCANNER</strong><div class="muted small">Two-stage ranking · regime/relative strength first · Futures/Liquidity/Pattern Memory enrichment for top candidates</div></div>
+          <div><strong>ATLAS PRODUCTION OPPORTUNITY SCANNER</strong><div class="muted small">One decision authority · Production score + Geometry Gate · all eight crypto assets</div></div>
           <span id="opportunityBadge" class="pill neutral">NOT RUN</span>
         </div>
         <div class="backtest-actions"><button id="opportunityScanBtn">Scan Crypto Opportunities</button><button id="opportunityExportBtn">Export Scan JSON</button></div>
-        <div id="opportunityMeta" class="muted small backtest-meta">Ranks BTC · ETH · SOL · XRP · BNB · DOGE · ZEC using the currently selected timeframe. Research-only; score is not a probability.</div>
-        <div class="v42-table-wrap"><table class="v42-table"><thead><tr><th>#</th><th>Asset</th><th>Base</th><th>Regime</th><th>Rel vs BTC</th><th>Volume</th><th>Anomaly</th><th>Stage 1</th><th>Futures</th><th>Liquidity</th><th>Hist 24h</th><th>Final</th><th>R:R2</th><th>Playbook</th><th>Execution</th></tr></thead><tbody id="opportunityBody"><tr><td colspan="15">Run the opportunity scan.</td></tr></tbody></table></div>
-        <p class="muted tiny">The scanner first compares opportunities across the market. Futures, liquidity, Pattern Memory and news will be used as enrichment/validation layers rather than allowing one noisy factor to dominate the ranking.</p>
+        <div id="opportunityMeta" class="muted small backtest-meta">Scans BTC · ETH · SOL · XRP · BNB · DOGE · ZEC · HYPE through the canonical Production engine. Only ACTIONABLE can become ENTER LONG/SHORT.</div>
+        <div class="v42-table-wrap"><table class="v42-table"><thead><tr><th>#</th><th>Asset</th><th>Decision</th><th>State</th><th>Direction</th><th>Score</th><th>Production</th><th>Geometry</th><th>Entry</th><th>Stop</th><th>Targets</th><th>R:R2</th><th>Trigger / reason</th></tr></thead><tbody id="opportunityBody"><tr><td colspan="13">Run the Production opportunity scan.</td></tr></tbody></table></div>
+        <p class="muted tiny">ARMED means a qualified conditional plan is waiting for its defined trigger; it is still WAIT and is never recorded as an entry. AI explains the Production decision but cannot replace it.</p>
       </section>
 
 
@@ -687,7 +687,7 @@
   <script src="event-intelligence-engine.js"></script>
   <script src="event-surprise-engine.js"></script>
   <script src="final-opportunity-engine.js"></script>
-  <script src="opportunity-scanner-ui.js"></script>
+  <script src="opportunity-scanner-ui.js?v=production-v1"></script>
   <script src="event-intelligence-ui.js"></script>
   <script src="trade-management-ui.js"></script>
   <script src="portfolio-risk-ui.js"></script>
@@ -707,7 +707,7 @@
   <script src="performance-dashboard-ui.js"></script>
   <script src="v7-ui-redesign.js"></script>
   <script src="theme-toggle.js"></script>
-  <script src="confirmed-alerts-ui.js"></script>
+  <script src="confirmed-alerts-ui.js?v=production-v1"></script>
   <div id="atlasAlertToastHost" class="atlas-alert-toast-host" aria-live="polite"></div>
 </body>
 </html>

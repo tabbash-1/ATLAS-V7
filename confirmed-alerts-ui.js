@@ -15,17 +15,17 @@ function markResearchLane(){
   const card=badge?.closest('.card');
   const title=card?.querySelector('.card-head strong');
   const sub=card?.querySelector('.card-head .muted.small');
-  if(title)title.textContent='ATLAS RESEARCH OPPORTUNITY ALERTS — ALPHA 25';
-  if(sub)sub.textContent='Legacy /100 research lane · not Production qualification · does not override Production 68 + Geometry Gate.';
+  if(title)title.textContent='ATLAS PRODUCTION EXECUTION ALERTS';
+  if(sub)sub.textContent='Alerts only for ACTIONABLE Production + valid Geometry · ARMED and WATCH remain silent.';
 }
 
 function toast(a){
   const host=$('atlasAlertToastHost');if(!host)return;
   const el=document.createElement('div');
   el.className=`atlas-alert-toast ${tone(a.direction)}`;
-  el.innerHTML=`<div class="alert-toast-top"><strong>ATLAS RESEARCH ${a.direction}</strong><span>${a.score}/100 research</span></div>
+  el.innerHTML=`<div class="alert-toast-top"><strong>ATLAS ENTER ${a.direction}</strong><span>Production ${a.score}/${a.threshold||68}</span></div>
     <div class="alert-toast-symbol">${a.symbol}</div>
-    <div class="alert-toast-meta">Entry ${fmt(a.entry)} · R:R ${fmt(a.rr_tp2)} · ${a.playbook||'Research setup'} · NOT Production-qualified</div>`;
+    <div class="alert-toast-meta">Entry ${fmt(a.entry)} · Stop ${fmt(a.stop_loss)} · TP2 ${fmt(a.tp2)} · R:R ${fmt(a.rr_tp2)}</div>`;
   host.prepend(el);setTimeout(()=>el.classList.add('show'),20);setTimeout(()=>{el.classList.remove('show');setTimeout(()=>el.remove(),300)},9000);
 }
 function beep(){
@@ -39,40 +39,19 @@ function beep(){
 }
 function browserNotify(a){
   if(!settings.browser || !('Notification' in window) || Notification.permission!=='granted')return;
-  try{new Notification(`ATLAS RESEARCH ${a.direction} · ${a.symbol}`,{body:`Research score ${a.score}/100 · Entry ${fmt(a.entry)} · R:R ${fmt(a.rr_tp2)} · Not Production-qualified`,tag:`atlas-research-${a.symbol}-${a.direction}`});}catch{}
+  try{new Notification(`ATLAS ENTER ${a.direction} · ${a.symbol}`,{body:`Production ${a.score}/${a.threshold||68} · Entry ${fmt(a.entry)} · Stop ${fmt(a.stop_loss)} · TP2 ${fmt(a.tp2)}`,tag:`atlas-production-${a.symbol}-${a.direction}`});}catch{}
 }
 function announce(a){
   if(!a?.id||seen.has(a.id))return;
   seen.add(a.id);saveSeen();toast(a);beep();browserNotify(a);
 }
 function rowPayload(r){
-  if(!r?.enriched)return null;
-  const dir=r.plan?.direction||r.final?.direction;
-  if(!['LONG','SHORT'].includes(dir))return null;
-  const pa=window.ATLAS_PORTFOLIO_ASSESSMENT;
-  const portfolioAllowed=(pa?.assessment?.blockers?.length===0 || pa==null) ? true : false;
-  return {
-    symbol:r.symbol,direction:dir,entry:r.plan?.entry,
-    final_score:r.final?.score??r.opp?.score??0,champion_score:r.final?.score??r.opp?.score??0,
-    execution_decision:r.execution_decision??r.final?.decision,
-    trade_plan_status:r.plan?.status,rr_tp2:r.plan?.rr_tp2,
-    volume_quality:r.confluence?.volume?.quality_score,
-    futures_score:r.futures?.score??0,
-    playbook_primary:r.playbook?.primary?.id,
-    regime:r.regime?.regime,
-    portfolio_allowed:portfolioAllowed,
-    store:true,source:'BROWSER_ALPHA25_RESEARCH'
-  };
+  if(!r||!['ENTER_LONG','ENTER_SHORT'].includes(r.action)||r.opportunity_state!=='ACTIONABLE')return null;
+  return {id:`${r.symbol}-${r.direction}-${r.generated_at||r.entry}`,symbol:r.symbol,direction:r.direction,
+    score:r.score,threshold:r.threshold,entry:r.entry,stop_loss:r.stop_loss,tp1:r.tp1,tp2:r.tp2,rr_tp2:r.rr_tp2};
 }
 async function evaluateRows(rows){
-  const candidates=(rows||[]).filter(x=>x?.enriched).sort((a,b)=>(b.final?.score??b.opp?.score??0)-(a.final?.score??a.opp?.score??0)).slice(0,3);
-  for(const r of candidates){
-    const payload=rowPayload(r);if(!payload)continue;
-    try{
-      const a=await fetch('/api/alerts/evaluate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(r=>r.json());
-      if(a.status==='CONFIRMED')announce(a);
-    }catch{}
-  }
+  for(const r of (rows||[])){const payload=rowPayload(r);if(payload)announce(payload);}
   refresh();
 }
 async function refresh(){
@@ -80,16 +59,14 @@ async function refresh(){
   const badge=$('confirmedAlertBadge'),grid=$('confirmedAlertMetrics'),body=$('confirmedAlertBody'),note=$('confirmedAlertNotes');
   if(!grid||!body)return;
   try{
-    const j=await fetch('/api/alerts/status').then(r=>r.json()),p=j.policy||{},rows=j.recent||[];
+    const j=await fetch('/api/production/paper-trades?limit=20',{cache:'no-store'}).then(r=>r.json()),rows=j.rows||[];
     grid.innerHTML=[
-      ['Research alerts',j.total_alerts||0],['Research min score',p.min_score??'—'],['Min R:R',p.min_rr_tp2??'—'],
-      ['Min Volume',p.min_volume_quality??'—'],['Cooldown',p.cooldown_minutes?`${p.cooldown_minutes} min`:'—'],
-      ['Browser research alerts',settings.browser?'ON':'OFF']
+      ['Qualified paper entries',j.count||0],['Required state','ACTIONABLE'],['Production threshold','68+'],
+      ['Geometry','PASS'],['Fallback signals','BLOCKED'],['Browser execution alerts',settings.browser?'ON':'OFF']
     ].map(([k,v])=>`<div><span>${k}</span><b>${v}</b></div>`).join('');
-    body.innerHTML=rows.length?rows.slice(0,10).map(a=>`<tr><td>${a.created_at?.replace('T',' ').slice(0,16)||'—'}</td><td>${a.symbol}</td><td><span class="pill ${tone(a.direction)}">${a.direction}</span></td><td>${fmt(a.score,0)}</td><td>${fmt(a.entry)}</td><td>${fmt(a.rr_tp2)}</td><td>${a.playbook||'—'}</td></tr>`).join(''):'<tr><td colspan="7">No research opportunity alert has fired yet.</td></tr>';
-    note.innerHTML=`<div><b>Research alert rule:</b> legacy /100 opportunity score + valid research plan + R:R + volume confirmation + no strong Futures conflict + no research risk/data/drift block.</div><div class="muted tiny"><b>Important:</b> this lane is research-only. It is not a Production 68 signal and cannot override Production qualification or the Geometry Gate.</div>`;
-    badge.textContent='RESEARCH ARMED';badge.className='pill working';
-    rows.slice().reverse().forEach(a=>announce(a));
+    body.innerHTML=rows.length?rows.slice(0,10).map(a=>`<tr><td>${a.captured_at?.replace('T',' ').slice(0,16)||'—'}</td><td>${a.symbol}</td><td><span class="pill ${tone(a.direction)}">${a.direction}</span></td><td>${fmt(a.score,0)}</td><td>${fmt(a.entry)}</td><td>${fmt(a.rr_tp2)}</td><td>Production ACTIONABLE</td></tr>`).join(''):'<tr><td colspan="7">No qualified Production paper entry has fired yet.</td></tr>';
+    note.innerHTML=`<div><b>Alert rule:</b> Production-qualified + ACTIONABLE now + complete Entry/Stop/TP1/TP2 + Geometry PASS.</div><div class="muted tiny">ARMED, WATCH, AI fallback and legacy Research scores cannot create an alert.</div>`;
+    badge.textContent='PRODUCTION ARMED';badge.className='pill working';
   }catch(e){badge.textContent='OFFLINE';badge.className='pill sell';note.textContent=e.message;}
 }
 async function enableBrowser(){

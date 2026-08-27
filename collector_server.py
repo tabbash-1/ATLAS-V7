@@ -685,8 +685,13 @@ def forward_observe(payload):
     if direction not in ('LONG','SHORT') or not entry: raise ValueError('direction LONG/SHORT and entry required')
     nowms=int(time.time()*1000)
     dedup_minutes=int(payload.get('dedup_minutes') or 50)
+    incoming_execution=bool(payload.get('production_signal_qualified') and payload.get('execution_ready'))
     for old in reversed(read_forward()[-500:]):
       if old.get('symbol')==symbol and old.get('direction')==direction and nowms-int(old.get('captured_at_ms',0))<dedup_minutes*60*1000:
+        # A legacy research observation must never swallow the first canonical
+        # ACTIONABLE Production entry in the same window.
+        if incoming_execution and not bool(old.get('production_signal_qualified') and old.get('execution_ready')):
+          continue
         return {'stored':False,'reason':'DEDUP_WINDOW','existing_id':old.get('id'),'record':old}
     # Freeze the promoted-rule set at observation time. Future rule changes cannot rewrite history.
     validation=validate_learning_rules(symbol,24)
@@ -750,7 +755,9 @@ def forward_observe(payload):
          'canary_shadow_risk_pct':round(canary_risk,4),
          'forward_return_pct':{}}
     # Store selected context for auditability.
-    for k in ('trade_plan_status','rr_tp1','rr_tp2','anomaly_score','futures_score','liquidity_score','regime','volume_quality','relative_volume'):
+    for k in ('trade_plan_status','rr_tp1','rr_tp2','stop_loss','tp1','tp2','signal_threshold',
+              'production_signal_qualified','execution_ready','opportunity_state',
+              'anomaly_score','futures_score','liquidity_score','regime','volume_quality','relative_volume'):
       if payload.get(k) is not None: row[k]=payload.get(k)
     _forward_write(row)
     return row
