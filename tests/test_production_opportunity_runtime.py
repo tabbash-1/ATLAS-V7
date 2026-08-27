@@ -66,3 +66,20 @@ def test_scan_records_only_actionable_and_mirrors_explicit_production_flags(tmp_
     assert payload['opportunity_state'] == 'ACTIONABLE'
     saved = [json.loads(line) for line in (tmp_path / 'production_paper_trades.jsonl').read_text().splitlines()]
     assert len(saved) == 1 and saved[0]['action'] == 'ENTER_LONG'
+
+
+def test_stale_snapshot_clears_all_entry_gates(tmp_path):
+    status = tmp_path / 'status'
+    status.mkdir()
+    payload = {
+        'captured_at': '2020-01-01T00:00:00+00:00',
+        'decisions': {'BTCUSDT': decision()},
+    }
+    (status / 'atlas-production-latest.json').write_text(json.dumps(payload))
+    atlas = FakeAtlas(tmp_path)
+    atlas.ROOT = tmp_path
+    report = runtime._snapshot_report(atlas)
+    row = report['rows'][0]
+    assert row['action'] == 'WAIT' and row['opportunity_state'] == 'STALE'
+    assert row['production_signal_qualified'] is False
+    assert row['geometry_valid'] is False and row['execution_ready'] is False

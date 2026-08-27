@@ -196,6 +196,7 @@ def _snapshot_report(atlas):
             for row in rows:
                 row.update({
                     "action": "WAIT", "opportunity_state": "STALE", "execution_ready": False,
+                    "production_signal_qualified": False, "geometry_valid": False,
                     "reason": f"PRODUCTION_SNAPSHOT_STALE_{round(age_minutes, 1)}M",
                 })
         return {
