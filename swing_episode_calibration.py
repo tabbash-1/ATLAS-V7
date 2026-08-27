@@ -19,6 +19,17 @@ SCHEMA='ATLAS_SWING_EPISODE_CALIBRATION_V1'
 EPISODE_GAP_HOURS=12
 MIN_EPISODES_FOR_DIRECTIONAL_TIER=5
 
+# Pre-2026-08-24T21:07Z snapshots used shorter obstacle_reason labels that were
+# renamed in production_signal_scoring.py without any change in the underlying
+# distance-to-structure logic (VERY_CLOSE == VERY_CLOSE_PRIOR_STRUCTURE < 0.7%,
+# CLOSE == CLOSE_PRIOR_STRUCTURE 0.7-1.4%). Confirmed by non-overlapping
+# timestamp ranges in status/wait-outcomes.json. Normalize aliases so a naming
+# migration cannot manufacture false independent episodes.
+OBSTACLE_ALIASES={
+    'VERY_CLOSE':'VERY_CLOSE_PRIOR_STRUCTURE',
+    'CLOSE':'CLOSE_PRIOR_STRUCTURE',
+}
+
 
 def _dt(v):
     if not v:return None
@@ -32,10 +43,15 @@ def _f(v):
     except (TypeError,ValueError):return None
 
 
+def _obstacle(v):
+    x=str(v or 'NONE').upper()
+    return OBSTACLE_ALIASES.get(x,x)
+
+
 def combo(row):
     s=str(row.get('symbol') or 'UNKNOWN').upper()
     d=str(row.get('candidate_direction') or 'NONE').upper()
-    o=str(((row.get('score_attribution') or {}).get('obstacle_reason') or 'NONE')).upper()
+    o=_obstacle((row.get('score_attribution') or {}).get('obstacle_reason'))
     return f'{s}|{d}|{o}'
 
 
