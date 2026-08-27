@@ -98,8 +98,6 @@
 
   // Mirror existing source-of-truth status into the always-visible Command Strip.
   const mirrors=[
-    ['masterBadge','cmdMasterValue'],
-    ['tradeMgmtBadge','cmdPlanValue'],
     ['portfolioRiskBadge','cmdRiskValue'],
     ['playbookBadge','cmdPlaybookValue'],
     ['driftBadge','cmdDriftValue'],
@@ -132,13 +130,8 @@
     const rg=regimeSource();
     if(rg) paint($('cmdRegimeValue'),rg.textContent.trim());
 
-    const masterSub=$('cmdMasterSub');
-    if(masterSub){
-      const vals=[...document.querySelectorAll('#masterMetrics b')];
-      const score=vals[1],base=vals[2];
-      const next=score?`Conviction ${score.textContent.trim()} · Base ${base?.textContent.trim()||'—'}`:'No live analysis';
-      if(masterSub.textContent!==next) masterSub.textContent=next;
-    }
+    // Production Opportunity Runtime owns the decision and plan tiles.
+    // Legacy browser research engines remain visible below but cannot overwrite them.
   }
   updateCommandStrip();
 

@@ -16,6 +16,24 @@ def test_opportunity_scanner_is_production_only_and_fail_closed():
     assert "r.opportunity_state==='ACTIONABLE'" not in js or 'ENTER_LONG' in js
     assert 'opportunityScore(' not in js
     assert 'HYPEUSDT' in js
+    assert 'syncProductionCommand' in js
+    assert "setTimeout(run,1200)" in js
+
+
+def test_command_strip_cannot_be_overwritten_by_legacy_research():
+    js=Path('v7-ui-redesign.js').read_text()
+    assert "['masterBadge','cmdMasterValue']" not in js
+    assert "['tradeMgmtBadge','cmdPlanValue']" not in js
+    html=Path('index.html').read_text()
+    assert 'PRODUCTION DECISION' in html
+    assert 'PRODUCTION PLAN' in html
+
+
+def test_drift_monitor_retries_and_never_mislabels_transport_as_offline():
+    js=Path('drift-monitor-ui.js').read_text()
+    assert 'fetchJson' in js
+    assert "badge.textContent='OFFLINE'" not in js
+    assert 'MONITOR UNAVAILABLE' in js
 
 
 def test_alerts_only_accept_actionable_production_rows():

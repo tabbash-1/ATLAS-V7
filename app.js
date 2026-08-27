@@ -174,6 +174,7 @@ function renderAll(){
   const asset=state.assets[state.active];
   window.ATLAS_APP_STATE=state; window.ATLAS_STATE={selectedAsset:asset};
   $('activeTitle').textContent=asset.name; $('tvSymbolLabel').textContent=asset.symbol;
+  window.dispatchEvent(new CustomEvent('atlas:active-asset-change',{detail:{symbol:asset.symbol}}));
   $('providerLabel').className='muted small';
   renderWatchlist(); renderAssetTable(); loadTradingView(asset.symbol); renderTrial(); renderActiveSignal(); renderBacktest(); renderV4();
   setPill($('engineBadge'),state.liveResults[resultKey()]?'CACHED':'READY',state.liveResults[resultKey()]?'buy':'neutral');

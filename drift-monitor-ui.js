@@ -10,13 +10,21 @@ function classifyQuality(q){
  if(q?.status==='HEALTHY') return {label:'STABLE',tone:'buy',kind:'HEALTHY'};
  return {label:'COLLECTING',tone:'working',kind:'COLLECTING'};
 }
+async function fetchJson(url,attempts=2){
+ let last;
+ for(let i=0;i<attempts;i++){
+  try{const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw new Error(`HTTP ${r.status}`);return await r.json();}
+  catch(e){last=e;if(i<attempts-1)await new Promise(resolve=>setTimeout(resolve,1200));}
+ }
+ throw last;
+}
 async function refresh(){
  const badge=$('driftBadge'),grid=$('driftMetrics'),note=$('driftNotes'),body=$('driftPlaybookBody');
  if(!grid||!body)return;
  try{
   const [q,d]=await Promise.all([
-   fetch('/api/data-quality',{cache:'no-store'}).then(r=>r.json()),
-   fetch('/api/drift?horizon=24&recent=30&prior=60',{cache:'no-store'}).then(r=>r.json())
+   fetchJson('/api/data-quality'),
+   fetchJson('/api/drift?horizon=24&recent=30&prior=60')
   ]);
   const qc=classifyQuality(q);
   grid.innerHTML=[
@@ -40,9 +48,9 @@ async function refresh(){
     badge.textContent=qc.label; badge.className=`pill ${qc.tone}`;
   }
   window.ATLAS_DRIFT={quality:q,drift:d,ui_quality:qc};
- }catch(e){badge.textContent='OFFLINE';badge.className='pill sell';note.textContent=e.message;}
+ }catch(e){badge.textContent='MONITOR UNAVAILABLE';badge.className='pill sell';note.textContent=`Drift endpoint unavailable after retry: ${e.message}`;}
 }
 $('driftRefreshBtn')?.addEventListener('click',refresh);
 window.refreshDriftMonitor=refresh;
-setTimeout(refresh,5200);setInterval(refresh,180000);
+setTimeout(refresh,800);setInterval(refresh,180000);
 })();
