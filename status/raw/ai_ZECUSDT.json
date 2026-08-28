@@ -3,52 +3,94 @@
   "mode": "SHADOW_RESEARCH_ONLY",
   "symbol": "ZECUSDT",
   "horizon": "1-3H",
-  "generated_at": "2026-08-28T05:38:36.023103+00:00",
-  "entry": 788.69,
+  "generated_at": "2026-08-28T07:16:49.779147+00:00",
+  "entry": 790.94,
   "direction": "SHORT",
   "verdict": "WATCH",
   "confidence": 65,
   "reason": "PARTIAL_CONVERGENCE",
   "canonical_action": {
-    "status": "WAIT",
-    "action": "WAIT",
-    "direction": null,
+    "status": "CONDITIONAL",
+    "action": "SELL_ONLY_IF",
+    "direction": "SHORT",
+    "entry_mode": "PULLBACK",
+    "entry": 795.1585,
+    "stop_loss": 806.0060714286,
+    "tp1": 779.48,
+    "tp2": 773.4633571429,
+    "rr_tp1": 1.445,
+    "rr_tp2": 2.0,
+    "entry_trigger": "Enter only if the pullback holds trend structure and directional evidence remains valid.",
     "source": "production_trade_plan"
   },
   "bull_analyst": {
-    "score": -0.343,
+    "score": -0.332,
     "best_case": [
-      "24h momentum 0.76%"
+      "trend_base +64.00",
+      "Validated futures score 21.0",
+      "24h momentum 0.63%"
     ]
   },
   "bear_analyst": {
-    "score": 0.343,
+    "score": 0.332,
     "best_case": [
-      "Price/EMA20/EMA50 structure 788.69/798.342/798.098",
-      "RV 0.24x",
-      "RSI14 39.8"
+      "Price/EMA20/EMA50 structure 790.94/797.226/797.829",
+      "LONG 1 vs SHORT 3",
+      "RV 0.19x",
+      "RSI14 24.1",
+      "Tactical RR 1.24"
     ]
   },
   "judge": {
-    "net_strength": 0.343,
-    "tactical_rr": null,
+    "net_strength": 0.332,
+    "tactical_rr": 1.243,
     "canonical_trade_plan": {
-      "status": "WAIT",
-      "direction": null,
-      "entry_mode": "NONE",
-      "reason": "NO_DIRECTIONAL_CONSENSUS",
-      "version": "PRODUCTION_TRADE_PLAN_V2_RANGE_ALIGNED"
+      "version": "PRODUCTION_TRADE_PLAN_V2_RANGE_ALIGNED",
+      "status": "CONDITIONAL",
+      "action": "SELL_ONLY_IF",
+      "direction": "SHORT",
+      "entry_mode": "PULLBACK",
+      "entry": 795.1585,
+      "entry_trigger": "Enter only if the pullback holds trend structure and directional evidence remains valid.",
+      "stop_loss": 806.0060714286,
+      "tp1": 779.48,
+      "tp2": 773.4633571429,
+      "rr_tp1": 1.445,
+      "rr_tp2": 2.0,
+      "reference_structure": 776.91,
+      "reference_structure_source": "PRIOR_24H_LOW",
+      "continuation_strong": false,
+      "breakout_confirmed": false,
+      "qualification_required": 68,
+      "production_qualified": false,
+      "execution_ready": false,
+      "invalidation": "Cancel/re-evaluate if stop/structure fails or verified direction changes.",
+      "can_execute": false,
+      "research_only": true
     },
     "invalidation": "Production trade_plan is canonical while actionable."
   },
   "counterfactuals": [
     {
+      "scenario": "PRODUCTION_CONDITIONAL",
+      "direction": "SHORT",
+      "entry": 795.1585,
+      "stop_loss": 806.0060714286,
+      "target": 773.4633571429,
+      "tp1": 779.48,
+      "risk_reward": 2.0,
+      "trigger": "Enter only if the pullback holds trend structure and directional evidence remains valid.",
+      "thesis": "Canonical Production trade plan.",
+      "shadow_only": false,
+      "canonical": true
+    },
+    {
       "scenario": "ENTER_NOW",
       "direction": "SHORT",
-      "entry": 788.69,
-      "stop_loss": 797.829,
-      "target": 771.818,
-      "risk_reward": 1.846,
+      "entry": 790.94,
+      "stop_loss": 798.7743571429,
+      "target": 781.199,
+      "risk_reward": 1.243,
       "trigger": "Immediate only if current evidence remains valid",
       "thesis": "Shadow comparison only.",
       "shadow_only": true,
@@ -57,14 +99,30 @@
     {
       "scenario": "WAIT_PULLBACK",
       "direction": "SHORT",
-      "entry": 793.611,
-      "stop_loss": 804.156,
-      "target": 772.521,
-      "risk_reward": 2.0,
+      "entry": 795.1585,
+      "stop_loss": 804.1981428571,
+      "target": 781.199,
+      "risk_reward": 1.544,
       "trigger": "Price retraces ~0.35 ATR without structure failure",
       "thesis": "Requalify after a better entry.",
       "shadow_only": true,
       "canonical": false
+    },
+    {
+      "scenario": "WAIT_BREAKOUT",
+      "direction": "SHORT",
+      "entry": 775.7047142857,
+      "stop_loss": 784.7443571429,
+      "target": 756.4201428571,
+      "risk_reward": 2.133,
+      "trigger": "1H price closes/holds below 776.91 (PRIOR_24H_LOW) with confirmation",
+      "thesis": "Enter only after actual blocking structure is cleared.",
+      "shadow_only": true,
+      "canonical": false,
+      "reference_level": 776.91,
+      "reference_source": "PRIOR_24H_LOW",
+      "structure_anchored": true,
+      "confirmation_buffer": 1.2052857143
     },
     {
       "scenario": "REJECT",
@@ -80,67 +138,103 @@
     }
   ],
   "best_counterfactual": {
-    "scenario": "WAIT_PULLBACK",
+    "scenario": "PRODUCTION_CONDITIONAL",
     "direction": "SHORT",
-    "entry": 793.611,
-    "stop_loss": 804.156,
-    "target": 772.521,
+    "entry": 795.1585,
+    "stop_loss": 806.0060714286,
+    "target": 773.4633571429,
+    "tp1": 779.48,
     "risk_reward": 2.0,
-    "trigger": "Price retraces ~0.35 ATR without structure failure",
-    "thesis": "Requalify after a better entry.",
-    "shadow_only": true,
-    "canonical": false
+    "trigger": "Enter only if the pullback holds trend structure and directional evidence remains valid.",
+    "thesis": "Canonical Production trade plan.",
+    "shadow_only": false,
+    "canonical": true
   },
   "hybrid_judge": {
     "decision": "WAIT",
-    "production_direction": null,
-    "production_score": null,
+    "production_direction": "SHORT",
+    "production_score": 62.0,
     "production_qualified": false,
     "execution_ready": false,
     "ai_direction": "SHORT",
     "ai_verdict": "WATCH",
-    "agreement": false,
+    "agreement": true,
     "production_priority": false
   },
   "evidence": [
     {
       "name": "direction_votes",
-      "value": 0.0,
+      "value": -0.5,
       "weight": 2.1,
-      "detail": "LONG 2 vs SHORT 2",
+      "detail": "LONG 1 vs SHORT 3",
       "source": "production_decision"
     },
     {
       "name": "ema_structure",
       "value": -1.0,
       "weight": 1.2,
-      "detail": "Price/EMA20/EMA50 structure 788.69/798.342/798.098",
+      "detail": "Price/EMA20/EMA50 structure 790.94/797.226/797.829",
       "source": "production_decision"
     },
     {
       "name": "rsi",
-      "value": -0.408,
+      "value": -1.0,
       "weight": 0.7,
-      "detail": "RSI14 39.8",
+      "detail": "RSI14 24.1",
       "source": "production_decision"
     },
     {
       "name": "momentum",
-      "value": 0.253,
+      "value": 0.211,
       "weight": 0.9,
-      "detail": "24h momentum 0.76%",
+      "detail": "24h momentum 0.63%",
       "source": "production_decision"
     },
     {
       "name": "relative_volume",
-      "value": -0.908,
+      "value": -0.966,
       "weight": 0.75,
-      "detail": "RV 0.24x",
+      "detail": "RV 0.19x",
       "source": "production_decision"
+    },
+    {
+      "name": "relative_strength",
+      "value": -0.072,
+      "weight": 1.0,
+      "detail": "RS 48.2",
+      "source": "production_decision"
+    },
+    {
+      "name": "futures",
+      "value": 0.21,
+      "weight": 1.05,
+      "detail": "Validated futures score 21.0",
+      "source": "production_decision"
+    },
+    {
+      "name": "tactical_geometry",
+      "value": -0.295,
+      "weight": 1.5,
+      "detail": "Tactical RR 1.24",
+      "source": "production_decision"
+    },
+    {
+      "name": "scorer_trend_base",
+      "value": 1.0,
+      "weight": 0.5,
+      "detail": "trend_base +64.00",
+      "source": "production_scorer"
+    },
+    {
+      "name": "scorer_futures_adjustment",
+      "value": -0.21,
+      "weight": 0.45,
+      "detail": "futures_adjustment -2.10",
+      "source": "production_scorer"
     }
   ],
   "production_decision": "WAIT",
-  "production_score": null,
+  "production_score": 62.0,
   "production_qualified": false,
   "safety": {
     "can_execute": false,
