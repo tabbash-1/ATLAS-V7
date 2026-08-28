@@ -22,7 +22,7 @@ jobs:
           node-version: '22'
       - name: Python syntax
         run: |
-          python -m py_compile collector_server.py cloud_start.py cloud_start_web.py cloud_web_only.py atlas_runtime_server.py atlas_research_runtime_server.py atlas_ai_server.py research_memory_bridge.py research_coverage.py storage_hardening.py trade_outcome_ledger.py trade_outcome_runtime.py trade_path_settlement.py execution_outcome_scope.py execution_risk_management.py tests/test_ai_validation.py tests/test_research_memory_bridge.py tests/test_research_coverage.py tests/test_storage_hardening.py tests/test_trade_outcome_ledger.py tests/test_trade_path_settlement.py tests/test_execution_outcome_scope.py tests/test_execution_risk_management.py
+          python -m py_compile collector_server.py cloud_start.py cloud_start_web.py cloud_web_only.py atlas_runtime_server.py atlas_research_runtime_server.py atlas_ai_server.py research_memory_bridge.py research_coverage.py storage_hardening.py trade_outcome_ledger.py trade_outcome_runtime.py trade_path_settlement.py execution_outcome_scope.py execution_risk_management.py prospective_fourth_vote_shadow.py tests/test_ai_validation.py tests/test_research_memory_bridge.py tests/test_research_coverage.py tests/test_storage_hardening.py tests/test_trade_outcome_ledger.py tests/test_trade_path_settlement.py tests/test_execution_outcome_scope.py tests/test_execution_risk_management.py tests/test_prospective_fourth_vote_shadow.py
       - name: JavaScript syntax
         run: |
           set -e
@@ -40,6 +40,7 @@ jobs:
           PYTHONPATH=. python tests/test_trade_path_settlement.py
           PYTHONPATH=. python tests/test_execution_outcome_scope.py
           PYTHONPATH=. python tests/test_execution_risk_management.py
+          PYTHONPATH=. python tests/test_prospective_fourth_vote_shadow.py
       - name: Verify delegated production entrypoints
         run: |
           set -euo pipefail
@@ -64,16 +65,20 @@ jobs:
           grep -q '_install_trade_outcome_runtime' cloud_start_web.py
           grep -q 'trade_geometry.jsonl' cloud_start_web.py
 
-          # Render/Docker web-only stack retains Production decision safety and isolated research shadow.
+          # Render/Docker web-only stack retains Production decision safety and isolated research shadows.
           grep -q 'install_scoring(atlas)' cloud_web_only.py
           grep -q 'install_continuation(atlas)' cloud_web_only.py
           grep -q 'install_decision_api(atlas)' cloud_web_only.py
           grep -q 'install_decision_engine(atlas)' cloud_web_only.py
           grep -q 'install_execution_risk(atlas)' cloud_web_only.py
           grep -q 'install_consensus_tiebreak_shadow(atlas)' cloud_web_only.py
+          grep -q 'install_fourth_vote_shadow(atlas)' cloud_web_only.py
           grep -q "ATLAS_CLOUD_FORWARD_MIN_SCORE','68'" cloud_web_only.py
           grep -q 'can_override_production.*False' cloud_web_only.py
           grep -q 'live_execution.*False' cloud_web_only.py
+          grep -q '/api/research/fourth-vote-shadow' prospective_fourth_vote_shadow.py
+          grep -q 'can_override_production.*False' prospective_fourth_vote_shadow.py
+          grep -q 'production_threshold_changed.*False' prospective_fourth_vote_shadow.py
       - name: Verify resilient provider chain and safety invariants
         run: |
           grep -q 'KRAKEN_FUTURES_PUBLIC' atlas_runtime_server.py
@@ -117,9 +122,12 @@ jobs:
           grep -q 'BREAKEVEN_ENTRY' execution_risk_management.py
       - name: Verify additive product shell invariants
         run: |
+          set -euo pipefail
           grep -q 'atlasProductShell' atlas-product-shell.js
           grep -q "\$('analyzeBtn')?.click" atlas-product-shell.js
-          grep -q 'existing engines preserved' atlas-product-shell.js
+          # Product shell delegates to existing Production and AI engines rather than replacing them.
+          grep -q '/api/decision/current' atlas-product-shell.js
+          grep -q '/api/ai/council' atlas-product-shell.js
           grep -q 'atlas-product-shell.js' theme-toggle.js
           ! grep -q '\.remove(' atlas-product-shell.js
           ! grep -q 'CLOUD_FORWARD_MIN_SCORE' atlas-product-shell.js
