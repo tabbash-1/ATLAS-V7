@@ -29,8 +29,8 @@
   }
   function decision(){
     const p=production();
-    const actionable=String(p?.actionable_decision||'').toUpperCase();
-    if(actionable==='LONG'||actionable==='SHORT')return actionable;
+    const plan=p?.trade_plan||{};
+    if(plan.status==='ACTIONABLE'&&p?.execution_ready&&plan.direction)return plan.direction;
     if(p)return 'WAIT';
     const d=String(master()?.decision||'').toUpperCase();
     return d==='LONG_CANDIDATE'?'LONG':d==='SHORT_CANDIDATE'?'SHORT':'WAIT';
@@ -52,27 +52,22 @@
   }
 
   const simpleDir=d=>String(d||'').toUpperCase()==='LONG'?'UP / LONG':String(d||'').toUpperCase()==='SHORT'?'DOWN / SHORT':'WAIT';
-  function simpleAction(best,ai,prod){
-    const sc=String(best?.scenario||'').toUpperCase(),dir=simpleDir(best?.direction||ai?.direction);
-    if(sc==='WAIT_BREAKOUT')return`WAIT FOR BREAKOUT → ${dir}`;
-    if(sc==='WAIT_PULLBACK')return`WAIT FOR PULLBACK → ${dir}`;
-    if(sc==='ENTER_NOW')return`ENTER NOW → ${dir}`;
-    if(sc==='REJECT')return'DO NOT ENTER';
-    if(prod?.actionable_decision==='WAIT'||prod?.decision==='WAIT')return'WAIT';
-    return dir;
-  }
   function renderAi(ai,prod){
-    const tac=prod?.tactical_opportunity||{},best=ai?.best_counterfactual||{};
-    $('apsAiProd').textContent=prod?.actionable_decision==='WAIT'||prod?.decision==='WAIT'?`WAIT${prod.score!=null?` · ${prod.score}/${prod.signal_threshold}`:''}`:simpleDir(prod?.actionable_decision||prod?.decision);
+    const tac=prod?.tactical_opportunity||{},plan=prod?.trade_plan||{},canonical=Object.keys(plan).length?plan:(ai?.canonical_action||{});
+    const actionable=canonical.status==='ACTIONABLE'&&!!prod?.execution_ready;
+    const armed=canonical.status==='CONDITIONAL'&&!!prod?.production_signal_qualified;
+    const dir=canonical.direction||prod?.candidate_direction;
+    $('apsAiProd').textContent=actionable?`${simpleDir(dir)}${prod.score!=null?` · ${prod.score}/${prod.signal_threshold}`:''}`:armed?`ARMED · ${simpleDir(dir)}${prod.score!=null?` · ${prod.score}/${prod.signal_threshold}`:''}`:`WAIT${prod?.score!=null?` · ${prod.score}/${prod.signal_threshold}`:''}`;
     $('apsAiJudge').textContent=`${simpleDir(ai?.direction)}${ai?.confidence!=null?` · ${ai.confidence}% confidence`:''}`;
     $('apsAiTactical').textContent=tac?.direction?`${simpleDir(tac.direction)} · 1–3H${Number.isFinite(Number(tac.risk_reward))?` · Tactical R:R ${fmt(tac.risk_reward,2)}`:''}`:'No clear conditional short-term setup';
-    $('apsAiBest').textContent=simpleAction(best,ai,prod);
-    $('apsAiGeometry').textContent=best.entry==null?'No conditional trade levels yet':`Conditional breakout plan · Entry ${fmt(best.entry)} · Stop ${fmt(best.stop_loss)} · Target ${fmt(best.target)} · Breakout R:R ${fmt(best.risk_reward,2)}`;
-    let trigger=String(best.trigger||best.thesis||'').replace(/Price confirms expansion beyond near-term structure/i,'Enter only after price clearly breaks the nearby resistance/support level.').replace(/_/g,' ');
-    $('apsAiTrigger').textContent=trigger||'This is a conditional plan; wait for confirmation before entering.';
+    const action=canonical.action||'WAIT';
+    $('apsAiBest').textContent=actionable?`${action} NOW → ${simpleDir(dir)}`:armed?`ARMED · ${humanize(action)} → ${simpleDir(dir)}`:'WAIT';
+    const entry=canonical.entry,stop=canonical.stop_loss,tp1=canonical.tp1,tp2=canonical.tp2,rr2=canonical.rr_tp2;
+    $('apsAiGeometry').textContent=entry==null?'No canonical Production trade levels yet':`${actionable?'Verified Production plan':armed?'Armed conditional Production plan':'Production plan'} · Entry ${fmt(entry)} · Stop ${fmt(stop)} · TP1 ${fmt(tp1)} · TP2 ${fmt(tp2)} · R:R ${fmt(rr2,2)}`;
+    $('apsAiTrigger').textContent=canonical.entry_trigger||canonical.invalidation||'Reassess if the verified Production structure changes.';
     const bull=(ai?.bull_analyst?.best_case||[])[0],bear=(ai?.bear_analyst?.best_case||[])[0];
     $('apsAiReason').textContent=`Why: ${bull?humanize(bull)+'. ':''}${bear?'Main risk: '+humanize(bear)+'.':''}`||'AI evidence is still limited.';
-    $('apsAiState').textContent='AI analysis ready';
+    $('apsAiState').textContent=actionable?'Production canonical decision':armed?'ARMED — verified trigger defined':'AI analysis ready';
   }
   function productionWhy(p){
     if(!p)return null;
@@ -83,9 +78,10 @@
   }
   function productionRisk(p){
     if(!p)return text('cmdRiskValue','Risk context unavailable.');
-    const bits=[];
+    const bits=[],plan=p.trade_plan||{};
     if(p.geometry_gate?.status==='BLOCK')bits.push(`Current geometry blocked: ${humanize(p.geometry_gate.reason)}`);
-    if(Number.isFinite(Number(p.risk_reward)))bits.push(`Current Production R:R ${fmt(p.risk_reward,2)}`);
+    const rr=plan.rr_tp2??p.risk_reward;
+    if(Number.isFinite(Number(rr)))bits.push(`Current Production R:R ${fmt(rr,2)}`);
     const obstacle=Number(p.score_attribution?.obstacle_adjustment);
     if(Number.isFinite(obstacle)&&obstacle<0)bits.push(`Obstacle penalty ${fmt(obstacle,0)}`);
     if(p.futures_available===false)bits.push('Futures confirmation unavailable');
@@ -93,9 +89,9 @@
   }
   function productionChange(p){
     if(!p)return 'Wait for stronger direction, structure and risk/reward confirmation.';
-    if(p.production_signal_qualified&&!p.execution_ready)return `Current Production execution needs valid Entry/SL/TP geometry and R:R of at least ${fmt(p.geometry_gate?.min_risk_reward??1,1)}. Conditional AI breakout levels do not override this gate.`;
+    if(p.production_signal_qualified&&!p.execution_ready)return `Current Production execution needs valid Entry/SL/TP geometry and R:R of at least ${fmt(p.geometry_gate?.min_risk_reward??1,1)}. Conditional AI research does not override this gate.`;
     const gap=Number(p.score_gap_to_signal);
-    if(!p.production_signal_qualified&&Number.isFinite(gap)&&gap>0)return `Needs ${fmt(gap,0)} more score points or stronger evidence / more room from the obstacle to reach Production qualification. The breakout plan above is conditional, not a current Production trade.`;
+    if(!p.production_signal_qualified&&Number.isFinite(gap)&&gap>0)return `Needs ${fmt(gap,0)} more score points or stronger evidence / more room from the obstacle to reach Production qualification.`;
     if(p.execution_ready)return 'Exit or reassess if the Production trade structure is invalidated.';
     return 'Wait for the next Production confirmation.';
   }
@@ -117,15 +113,14 @@
   }
   function update(){
     ensureHypeAsset();
-    const p=production(),d=decision(),de=$('apsDecision');
+    const p=production(),plan=p?.trade_plan||{},d=decision(),de=$('apsDecision');
     de.textContent=d;de.className='aps-value '+d.toLowerCase();
     $('apsAsset').textContent=text('activeTitle','Current asset');
     $('apsConfidence').textContent=setupScore();
     const w=d==='WAIT';
-    $('apsEntry').textContent=w?'—':fmt(p?.entry??text('entry'));
-    $('apsStop').textContent=w?'—':fmt(p?.stop_loss??text('stop'));
-    const tp=p?.take_profit;
-    $('apsTarget').textContent=w?'—':`${fmt(tp??text('target'))}${Number.isFinite(Number(p?.risk_reward))?` · R:R ${fmt(p.risk_reward,2)}`:''}`;
+    $('apsEntry').textContent=w?'—':fmt(plan.entry);
+    $('apsStop').textContent=w?'—':fmt(plan.stop_loss);
+    $('apsTarget').textContent=w?'—':`${fmt(plan.tp2)}${Number.isFinite(Number(plan.rr_tp2))?` · R:R ${fmt(plan.rr_tp2,2)}`:''}`;
     $('apsRegime').textContent=p?.regime||text('cmdRegimeValue','—');
     $('apsTrend').textContent=p?.candidate_direction||text('trendState','—');
     $('apsMomentum').textContent=p?`Votes L${p.direction_votes_long??'—'}/S${p.direction_votes_short??'—'}`:text('momentumState','—');
@@ -135,7 +130,7 @@
     $('apsWhy').textContent=productionWhy(p)||text('masterNotes',d==='WAIT'?'Waiting for stronger confirmation.':'Trade conditions aligned.');
     $('apsRisks').textContent=productionRisk(p);
     $('apsChanges').textContent=productionChange(p);
-    $('apsStatus').textContent=$('analyzeBtn')?.disabled?'Analysis running…':w?'WAIT = no trade now':'Production trade plan ready';
+    $('apsStatus').textContent=$('analyzeBtn')?.disabled?'Analysis running…':w?'WAIT = no trade now':plan.status==='ACTIONABLE'?'Canonical Production trade plan ready':'Production plan not actionable';
     const s=$('intervalSelect'),tf=$('apsTimeframe');
     if(s&&tf&&!tf.options.length){[...s.options].forEach(o=>tf.add(new Option(o.textContent,o.value)));tf.onchange=()=>{s.value=tf.value;s.dispatchEvent(new Event('change',{bubbles:true}));};}
     if(s&&tf)tf.value=s.value;
@@ -158,7 +153,6 @@
     $('apsAnalyze').disabled=true;
     $('apsStatus').textContent='Analysis running…';
     $('apsAiState').textContent='Waiting for ATLAS analysis…';
-    // existing engines preserved; canonical delegated analyze control remains $('analyzeBtn')?.click compatible.
     button.click();
     await waitForAnalysisReady();
     await refreshAi();
@@ -172,5 +166,5 @@
   ensureHypeAsset();
   update();
   setTimeout(refreshAi,1200);
-  window.ATLAS_PRODUCT_SHELL={refresh:update,refreshAi};
+  window.ATLAS_PRODUCT_SHELL={refresh:update,refreshAi,canonicalProductionPlan:true};
 })();
