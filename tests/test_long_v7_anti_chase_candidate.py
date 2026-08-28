@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from long_v7_anti_chase_candidate import evaluate
+from long_v7_anti_chase_candidate import evaluate_eps
 
 
 def row(symbol, score, mom, ret):
@@ -20,7 +20,7 @@ def test_equal_coverage_anti_chase_ranking():
         row('CCC', 65, 0.5, 2.0),
         row('DDDD', 64, 1.0, 3.0),
     ]
-    out = evaluate(rows)
+    out = evaluate_eps(rows)
     assert out['equal_mature_coverage_k'] == 2
     assert out['baseline_v6']['n'] == 2
     assert out['candidate_anti_chase']['n'] == 2
@@ -34,6 +34,7 @@ def test_guardrails():
     assert "'production_scoring_changed': False" in src
     assert "'can_override_production': False" in src
     assert "'live_execution': False" in src
+    assert 'FULL_DECORELATE_THEN_SPLIT' in src
 
 
 if __name__ == '__main__':
