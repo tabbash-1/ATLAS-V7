@@ -1,0 +1,43 @@
+name: ATLAS V6 RS Aligned Veto Stability
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'v6_rs_aligned_veto_stability.py'
+      - 'v6_shadow_replay.py'
+      - 'status/wait-outcomes.json'
+      - '.github/workflows/v6-rs-aligned-veto-stability.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run predeclared equal-coverage veto falsification
+        run: python v6_rs_aligned_veto_stability.py
+      - name: Guard Production
+        run: |
+          python - <<'PY'
+          import json
+          p=json.load(open('status/v6-rs-aligned-veto-stability.json'))
+          g=p['guardrails']
+          assert g['research_only'] is True
+          assert g['production_threshold_changed'] is False
+          assert g['production_score_changed'] is False
+          assert g['auto_promotion_enabled'] is False
+          assert g['production_veto_enabled'] is False
+          print('guardrails: ok')
+          PY
+      - name: Commit report
+        run: |
+          if [ -z "$(git status --porcelain -- status/v6-rs-aligned-veto-stability.json)" ]; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add status/v6-rs-aligned-veto-stability.json
+          git commit -m 'data: refresh RS aligned veto stability'
+          git push
