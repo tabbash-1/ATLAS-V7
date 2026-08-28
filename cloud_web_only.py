@@ -61,11 +61,13 @@ install_execution_risk(atlas)
 from ai_trade_council import install as install_ai_council
 install_ai_council(atlas)
 
-# Research-only prospective tie-break shadow. It is deliberately installed after
-# the Production decision function and only exposes a separate endpoint. It
-# cannot override Production, lower threshold 68, or execute orders.
+# Research-only prospective shadows. They are deliberately installed after the
+# Production decision function and only expose separate endpoints. Neither can
+# override Production, lower threshold 68, or execute orders.
 from consensus_tiebreak_shadow import install as install_consensus_tiebreak_shadow
 CONSENSUS_TIEBREAK_SHADOW = install_consensus_tiebreak_shadow(atlas)
+from prospective_fourth_vote_shadow import install as install_fourth_vote_shadow
+FOURTH_VOTE_SHADOW = install_fourth_vote_shadow(atlas)
 
 # Expose explicit web-safe mode for UI/ops diagnostics.
 atlas.WEB_SAFE_MODE = {
@@ -75,6 +77,7 @@ atlas.WEB_SAFE_MODE = {
     'production_threshold': float(atlas.CLOUD_FORWARD_MIN_SCORE),
     'research_execution_location': 'GITHUB_ACTIONS',
     'consensus_tiebreak_shadow': CONSENSUS_TIEBREAK_SHADOW,
+    'fourth_vote_shadow': FOURTH_VOTE_SHADOW,
 }
 
 
@@ -163,5 +166,6 @@ if __name__ == '__main__':
     print('Production decision UI: ON + autoload', flush=True)
     print(f'Production scoring: {PRODUCTION_SCORING_VERSION}', flush=True)
     print(f'Consensus tie-break shadow: {CONSENSUS_TIEBREAK_SHADOW["version"]}', flush=True)
+    print(f'Fourth-vote prospective shadow: {FOURTH_VOTE_SHADOW["version"]}', flush=True)
     print(f'Listening on {port}', flush=True)
     Server(('0.0.0.0',port), WebOnlyHandler).serve_forever(poll_interval=0.5)
