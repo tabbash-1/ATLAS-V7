@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""ATLAS LONG V7 Candidate R1: 24h anti-chase ranking.
+"""ATLAS LONG V7 Candidate R1: 24h anti-chase ranking, fixed-episode V2.
 
-The raw representation audit found `momentum_24h_pct` to be the only raw feature
-with stable negative 12h discrimination across Train, Holdout and every
-leave-one-symbol-out test. This candidate tests that finding without changing
-opportunity count: at equal mature coverage K, V6 ranks by total score while R1
-ranks LONG by LOWER 24h momentum first.
+The corrected raw representation audit still finds `momentum_24h_pct` to be the
+only raw feature with stable negative 12h discrimination across Train, Holdout
+and every leave-one-symbol-out test.
 
-No new threshold is selected and no Production code is changed.
-Evaluation trigger note: methodology frozen for R1.
+V2 fixes chronology: mature independent LONG episodes are built ONCE on the full
+history and only then split 60/40. Baseline and candidate rank the exact same
+fixed episode sets at identical mature coverage K. No threshold is selected and
+no Production code is changed.
 """
 from __future__ import annotations
 
@@ -17,11 +17,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import qualified_false_confidence_audit as base
-import counterfactual_episode_evaluation as paired
 import long_v7_raw_representation_audit as raw
+import long_v7_fixed_episode_split as fixed
 
 OUT = Path('status/long-v7-anti-chase-candidate.json')
-SCHEMA = 'ATLAS_LONG_V7_ANTI_CHASE_CANDIDATE_R1'
+SCHEMA = 'ATLAS_LONG_V7_ANTI_CHASE_CANDIDATE_R1_V2_FIXED_EPISODES'
 H = 12
 
 
@@ -29,16 +29,12 @@ def _num(v, default=0.0):
     return base.fnum(v, default)
 
 
-def pool(rows):
-    return raw.mature_episodes(rows)
-
-
 def k_v6(eps):
     return sum(1 for r in eps if _num(r.get('corrected_score')) >= base.THRESHOLD)
 
 
-def evaluate(rows):
-    eps = pool(rows)
+def evaluate_eps(eps):
+    eps = list(eps)
     k = k_v6(eps)
     baseline = sorted(eps, key=lambda r: (-_num(r.get('corrected_score')), str(r.get('captured_at')), str(r.get('symbol'))))[:k]
     candidate = sorted(eps, key=lambda r: (_num(r.get('momentum_24h_pct')), str(r.get('captured_at')), str(r.get('symbol'))))[:k]
@@ -58,12 +54,11 @@ def evaluate(rows):
     }
 
 
-def loo(rows):
-    eps = pool(rows)
-    syms = sorted({r.get('symbol') for r in eps if r.get('symbol')})
+def loo_fixed(full_eps):
+    syms = sorted({r.get('symbol') for r in full_eps if r.get('symbol')})
     tests = []
     for sym in syms:
-        ev = evaluate([r for r in rows if r.get('symbol') != sym])
+        ev = evaluate_eps([r for r in full_eps if r.get('symbol') != sym])
         tests.append({
             'left_out_symbol': sym,
             'k': ev['equal_mature_coverage_k'],
@@ -82,17 +77,30 @@ def loo(rows):
 
 def run(path=base.SRC):
     snaps, hourly = raw.load_rows(path)
-    train_rows, holdout_rows, cutoff = paired.split_60_40(hourly)
-    lanes = {'full': evaluate(hourly), 'train': evaluate(train_rows), 'holdout': evaluate(holdout_rows)}
-    cross = loo(hourly)
+    full_eps = fixed.full_fixed_episodes(hourly)
+    train_eps, holdout_eps, cutoff = fixed.split_fixed_60_40(full_eps)
+    lanes = {
+        'full': evaluate_eps(full_eps),
+        'train': evaluate_eps(train_eps),
+        'holdout': evaluate_eps(holdout_eps),
+    }
+    cross = loo_fixed(full_eps)
     enough = lanes['train']['equal_mature_coverage_k'] >= 3 and lanes['holdout']['equal_mature_coverage_k'] >= 3
     deltas = {k: v['comparison']['mean_delta_pct'] for k, v in lanes.items()}
-    passed = enough and all(deltas[x] is not None and deltas[x] > 0 for x in ('full','train','holdout')) and cross['all_mean_non_worse']
+    passed = enough and all(deltas[x] is not None and deltas[x] > 0 for x in ('full', 'train', 'holdout')) and cross['all_mean_non_worse']
     return {
         'schema': SCHEMA,
         'generated_at': datetime.now(timezone.utc).isoformat(),
         'hypothesis': 'For 12h LONG selection, avoiding already-extended 24h momentum ranks opportunities better than total V6 score at identical mature coverage.',
-        'coverage': {'snapshots': len(snaps), 'cutoff_at': cutoff.isoformat() if cutoff else None},
+        'coverage': {
+            'snapshots': len(snaps),
+            'cutoff_at': cutoff.isoformat() if hasattr(cutoff, 'isoformat') else (str(cutoff) if cutoff else None),
+            'full_episode_n': len(full_eps),
+            'train_episode_n': len(train_eps),
+            'holdout_episode_n': len(holdout_eps),
+            'train_plus_holdout_equals_full': len(train_eps) + len(holdout_eps) == len(full_eps),
+            'episode_split_order': 'FULL_DECORELATE_THEN_SPLIT',
+        },
         'lanes': lanes,
         'leave_one_symbol_out': cross,
         'gate': {
