@@ -14,6 +14,11 @@ from http.server import ThreadingHTTPServer
 os.environ.setdefault('ATLAS_CLOUD_FORWARD_ENABLED','0')
 os.environ.setdefault('ATLAS_CLOUD_FORWARD_MIN_SCORE','68')
 
+# Always prepare the ephemeral Render UI even when this file is used directly as
+# the dashboard Start Command or Docker CMD. This avoids relying on render.yaml.
+from render_boot_patch import apply as apply_render_boot_patch
+apply_render_boot_patch()
+
 import collector_server as atlas
 
 # Keep HYPE in the API universe, but do not run any boot-wide warm-up scan.
@@ -75,5 +80,6 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT','8080'))
     print('ATLAS Render WEB-ONLY safe mode', flush=True)
     print('Background workers: OFF (GitHub Actions owns scheduled research)', flush=True)
+    print('Production decision UI: ON + autoload', flush=True)
     print(f'Listening on {port}', flush=True)
     Server(('0.0.0.0',port), WebOnlyHandler).serve_forever(poll_interval=0.5)
