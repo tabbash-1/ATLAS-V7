@@ -16,28 +16,45 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Print compact schema only
+      - name: Print compact V6 field sample only
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
+
           p=Path('status/history/production-snapshots.jsonl')
-          rows=[]
+          first_at=last_at=None; snapshots=0; decision_rows=0; sample=None
           with p.open() as f:
               for line in f:
                   line=line.strip()
                   if not line: continue
-                  try: rows.append(json.loads(line))
-                  except Exception: pass
-                  if len(rows)>=2: break
-          def desc(x,depth=0):
-              if depth>=3: return type(x).__name__
-              if isinstance(x,dict):
-                  return {k:desc(v,depth+1) for k,v in list(x.items())[:30]}
-              if isinstance(x,list):
-                  return {'list_len':len(x),'first':desc(x[0],depth+1) if x else None}
-              return type(x).__name__
-          print('nonblank_sample_rows=',len(rows))
-          for i,r in enumerate(rows):
-              print('ROW',i,json.dumps(desc(r),sort_keys=True))
+                  try: snap=json.loads(line)
+                  except Exception: continue
+                  snapshots+=1
+                  at=snap.get('captured_at')
+                  first_at=first_at or at; last_at=at
+                  for symbol,d in (snap.get('decisions') or {}).items():
+                      decision_rows+=1
+                      ver=str(d.get('scoring_version') or '')
+                      if sample is None and ver.startswith('PROD_SIGNAL_SCORING_V6_BREAKOUT_AWARE') and d.get('score_attribution'):
+                          sample=(at,symbol,d)
+          print(json.dumps({'snapshots':snapshots,'decision_rows':decision_rows,'first_at':first_at,'last_at':last_at},sort_keys=True))
+          if sample:
+              at,symbol,d=sample
+              indicators=d.get('indicators') or {}
+              chosen_ind={k:indicators.get(k) for k in sorted(indicators) if k.lower() in {'close','price','last','last_price','current_price','rsi','ema20','ema50','momentum_24h_pct','momentum_pct','volume'}}
+              print('V6_SAMPLE',json.dumps({
+                  'captured_at':at,
+                  'symbol':symbol,
+                  'entry':d.get('entry'),
+                  'score':d.get('score'),
+                  'signal_qualified':d.get('signal_qualified'),
+                  'candidate_direction':d.get('candidate_direction'),
+                  'scoring_version':d.get('scoring_version'),
+                  'relative_volume':d.get('relative_volume'),
+                  'direction_votes':d.get('direction_votes'),
+                  'score_attribution':d.get('score_attribution'),
+                  'indicator_keys':sorted(indicators.keys()),
+                  'selected_indicators':chosen_ind,
+              },sort_keys=True))
           PY
