@@ -1,0 +1,34 @@
+name: ATLAS LONG V7 Raw Feature Schema
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'long_v7_raw_feature_schema_probe.py'
+      - '.github/workflows/long-v7-raw-feature-schema.yml'
+      - 'status/history/production-snapshots.jsonl'
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Probe historical raw features
+        run: |
+          python -m py_compile long_v7_raw_feature_schema_probe.py
+          python long_v7_raw_feature_schema_probe.py
+      - name: Persist report
+        run: |
+          if [ -n "$(git status --porcelain -- status/long-v7-raw-feature-schema.json)" ]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add status/long-v7-raw-feature-schema.json
+            git commit -m 'data: refresh long v7 raw feature schema'
+            git push
+          fi
