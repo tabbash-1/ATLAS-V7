@@ -10,6 +10,7 @@ regime episodes are diversified across symbols/days and whether the positive
 mean survives leave-one-symbol-out and leave-one-day-out. Because the regime was
 selected after viewing Train+Holdout, passing this audit permits only a frozen
 prospective shadow, never Production promotion.
+Evaluation trigger note: selected regime boundaries are frozen for V1.
 """
 from __future__ import annotations
 
