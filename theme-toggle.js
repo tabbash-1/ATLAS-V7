@@ -49,7 +49,9 @@
     .then(()=>window.ATLAS_DECISION_EXPLANATION?.refresh?.())
     .catch(err=>console.error('ATLAS decision explanation layer failed:',err));
 
-  const scripts=['atlas-timeframe-engine.js','atlas-ai-analysis-layer.js','atlas-decision-quality.js','atlas-ai-ui.js'];
+  // Keep the product shell additive: it loads after the existing decision/AI
+  // layers and delegates to their APIs/state rather than replacing any engine.
+  const scripts=['atlas-timeframe-engine.js','atlas-ai-analysis-layer.js','atlas-decision-quality.js','atlas-ai-ui.js','atlas-product-shell.js'];
   (async()=>{
     for(const src of scripts){
       try{ await loadScript(src,src); }
