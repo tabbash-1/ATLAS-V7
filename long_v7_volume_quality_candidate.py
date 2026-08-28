@@ -44,6 +44,10 @@ def _num(v, default=0.0):
         return default
 
 
+def _iso(v):
+    return v.isoformat() if hasattr(v, 'isoformat') else (str(v) if v is not None else None)
+
+
 def _episode_pool(rows):
     # Fixed anchors first; both baseline and candidate are evaluated on the exact
     # same independent episode set to prevent episode-substitution contamination.
@@ -79,8 +83,8 @@ def lane(rows):
     candidate, _ = _select(pool, _rank_candidate)
     bs = base.stats(baseline, H)
     cs = base.stats(candidate, H)
-    bkeys = {(r.get('symbol'), r.get('captured_at')) for r in baseline}
-    ckeys = {(r.get('symbol'), r.get('captured_at')) for r in candidate}
+    bkeys = {(r.get('symbol'), _iso(r.get('captured_at'))) for r in baseline}
+    ckeys = {(r.get('symbol'), _iso(r.get('captured_at'))) for r in candidate}
     return {
         'independent_long_episode_pool': len(pool),
         'equal_coverage_k': k,
@@ -94,11 +98,11 @@ def lane(rows):
             'added_n': len(ckeys - bkeys),
         },
         'baseline_members': [
-            {'symbol': r.get('symbol'), 'captured_at': r.get('captured_at'), 'score': r.get('corrected_score'), 'volume_bonus': r.get('volume_bonus'), 'return_12h_pct': r.get('return_12h_pct')}
+            {'symbol': r.get('symbol'), 'captured_at': _iso(r.get('captured_at')), 'score': r.get('corrected_score'), 'volume_bonus': r.get('volume_bonus'), 'return_12h_pct': r.get('return_12h_pct')}
             for r in baseline
         ],
         'candidate_members': [
-            {'symbol': r.get('symbol'), 'captured_at': r.get('captured_at'), 'score': r.get('corrected_score'), 'volume_bonus': r.get('volume_bonus'), 'return_12h_pct': r.get('return_12h_pct')}
+            {'symbol': r.get('symbol'), 'captured_at': _iso(r.get('captured_at')), 'score': r.get('corrected_score'), 'volume_bonus': r.get('volume_bonus'), 'return_12h_pct': r.get('return_12h_pct')}
             for r in candidate
         ],
     }
