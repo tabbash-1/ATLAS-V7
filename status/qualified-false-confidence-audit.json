@@ -1,0 +1,614 @@
+{
+  "by_direction_votes": {
+    "3": {
+      "hourly_rows": 22,
+      "outcomes": {
+        "12h": {
+          "mean_pct": 1.0169,
+          "median_pct": 0.2591,
+          "n": 4,
+          "win_rate_pct": 50.0
+        },
+        "24h": {
+          "mean_pct": 0.708,
+          "median_pct": -0.5806,
+          "n": 4,
+          "win_rate_pct": 50.0
+        },
+        "3h": {
+          "mean_pct": 0.1964,
+          "median_pct": 0.0149,
+          "n": 12,
+          "win_rate_pct": 50.0
+        }
+      }
+    },
+    "4": {
+      "hourly_rows": 109,
+      "outcomes": {
+        "12h": {
+          "mean_pct": -0.9452,
+          "median_pct": -1.2106,
+          "n": 24,
+          "win_rate_pct": 29.17
+        },
+        "24h": {
+          "mean_pct": -1.7958,
+          "median_pct": -1.9137,
+          "n": 9,
+          "win_rate_pct": 22.22
+        },
+        "3h": {
+          "mean_pct": -0.0387,
+          "median_pct": -0.1035,
+          "n": 42,
+          "win_rate_pct": 47.62
+        }
+      }
+    }
+  },
+  "coverage": {
+    "excluded": {},
+    "first_snapshot_at": "2026-08-24T06:08:11.170753+00:00",
+    "hourly_v6_rows": 298,
+    "last_snapshot_at": "2026-08-28T07:35:57.256180+00:00",
+    "replay_qualified_hours": 131,
+    "snapshots": 87,
+    "stored_qualified_hours": 111,
+    "v6_decomposable_rows": 413,
+    "volume_fix_recovered_qualified_hours": 20
+  },
+  "generated_at": "2026-08-28T08:44:06.856949+00:00",
+  "guardrails": {
+    "auto_promotion_enabled": false,
+    "live_execution": false,
+    "production_score_changed": false,
+    "production_threshold": 68.0,
+    "production_threshold_changed": false,
+    "research_only": true
+  },
+  "method": {
+    "counterfactual": "remove exactly one positive bonus; flag only if replay-qualified score falls below 68",
+    "hourly_dedupe": "earliest symbol/direction observation per UTC hour",
+    "important_limit": "directional return from snapshot price is not realized trade PnL and does not simulate stop/target path.",
+    "outcome_independence": "minimum gap equals each evaluated horizon (3h/12h/24h)",
+    "settlement": "nearest same-symbol snapshot to +3h/+12h/+24h within \u00b190 minutes",
+    "snapshot_price": "decision.entry; production_signal_scoring.py stores entry = px",
+    "source": "status/history/production-snapshots.jsonl",
+    "stability_gate": "n>=8 independent observations, negative train and holdout mean, holdout win<50%, and all leave-one-symbol-out tests negative with win<50%",
+    "volume_replay": "pre PARTIAL_VOLUME_TIME_FIX_V1 observations are replayed with paced RV before qualification analysis"
+  },
+  "next_decision": "Only a single bonus with stable harmful evidence may advance to an isolated demotion shadow. If none qualify, keep Production unchanged and move to predeclared interaction calibration rather than feature fishing.",
+  "purpose": "Test whether any single positive V6 score component creates stable false confidence above threshold 68, using only existing Production snapshots.",
+  "replay_qualified_outcomes": {
+    "12h": {
+      "mean_pct": -0.5555,
+      "median_pct": -0.3634,
+      "n": 27,
+      "win_rate_pct": 37.04
+    },
+    "24h": {
+      "mean_pct": -0.9417,
+      "median_pct": -1.7876,
+      "n": 12,
+      "win_rate_pct": 33.33
+    },
+    "3h": {
+      "mean_pct": 0.0614,
+      "median_pct": -0.0368,
+      "n": 52,
+      "win_rate_pct": 50.0
+    }
+  },
+  "schema": "ATLAS_V6_QUALIFIED_FALSE_CONFIDENCE_AUDIT_V1",
+  "score_bands": {
+    "68-71": {
+      "hourly_rows": 36,
+      "outcomes": {
+        "12h": {
+          "mean_pct": -0.4769,
+          "median_pct": -0.2831,
+          "n": 19,
+          "win_rate_pct": 42.11
+        },
+        "24h": {
+          "mean_pct": -1.315,
+          "median_pct": -1.9137,
+          "n": 11,
+          "win_rate_pct": 27.27
+        },
+        "3h": {
+          "mean_pct": 0.1581,
+          "median_pct": -0.1091,
+          "n": 23,
+          "win_rate_pct": 43.48
+        }
+      }
+    },
+    "72-75": {
+      "hourly_rows": 37,
+      "outcomes": {
+        "12h": {
+          "mean_pct": 0.4425,
+          "median_pct": 0.5876,
+          "n": 15,
+          "win_rate_pct": 66.67
+        },
+        "24h": {
+          "mean_pct": -0.3863,
+          "median_pct": -0.4298,
+          "n": 13,
+          "win_rate_pct": 46.15
+        },
+        "3h": {
+          "mean_pct": 0.0787,
+          "median_pct": -0.1188,
+          "n": 25,
+          "win_rate_pct": 44.0
+        }
+      }
+    },
+    "76-79": {
+      "hourly_rows": 24,
+      "outcomes": {
+        "12h": {
+          "mean_pct": 1.0999,
+          "median_pct": 1.4002,
+          "n": 10,
+          "win_rate_pct": 60.0
+        },
+        "24h": {
+          "mean_pct": 1.32,
+          "median_pct": 0.276,
+          "n": 5,
+          "win_rate_pct": 60.0
+        },
+        "3h": {
+          "mean_pct": 0.1898,
+          "median_pct": 0.0643,
+          "n": 16,
+          "win_rate_pct": 56.25
+        }
+      }
+    },
+    "80+": {
+      "hourly_rows": 34,
+      "outcomes": {
+        "12h": {
+          "mean_pct": -0.4278,
+          "median_pct": 0.0036,
+          "n": 10,
+          "win_rate_pct": 50.0
+        },
+        "24h": {
+          "mean_pct": -1.516,
+          "median_pct": -1.0826,
+          "n": 3,
+          "win_rate_pct": 33.33
+        },
+        "3h": {
+          "mean_pct": -0.3101,
+          "median_pct": -0.1913,
+          "n": 16,
+          "win_rate_pct": 43.75
+        }
+      }
+    }
+  },
+  "shadow_demotion_candidates": [
+    "FOURTH_VOTE_PREMIUM",
+    "VOLUME_BONUS"
+  ],
+  "single_bonus_counterfactuals": {
+    "ALIGNED_FUTURES_BONUS": {
+      "horizons": {
+        "12h": {
+          "outcomes": {
+            "mean_pct": -1.9379,
+            "median_pct": -1.988,
+            "n": 9,
+            "win_rate_pct": 22.22
+          },
+          "stability": {
+            "eligible": true,
+            "holdout": {
+              "mean_pct": -2.2146,
+              "median_pct": -1.944,
+              "n": 4,
+              "win_rate_pct": 0.0
+            },
+            "leave_one_symbol_out": {
+              "all_negative_and_win_lt_50": true,
+              "negative_mean": 6,
+              "tests": 6,
+              "win_rate_lt_50": 6
+            },
+            "n": 9,
+            "stable_harmful": false,
+            "train": {
+              "mean_pct": -1.7166,
+              "median_pct": -1.988,
+              "n": 5,
+              "win_rate_pct": 40.0
+            }
+          }
+        },
+        "24h": {
+          "outcomes": {
+            "mean_pct": -4.6999,
+            "median_pct": -4.7034,
+            "n": 4,
+            "win_rate_pct": 0.0
+          },
+          "stability": {
+            "eligible": false,
+            "n": 4,
+            "stable_harmful": false
+          }
+        },
+        "3h": {
+          "outcomes": {
+            "mean_pct": -0.4018,
+            "median_pct": -0.5151,
+            "n": 7,
+            "win_rate_pct": 28.57
+          },
+          "stability": {
+            "eligible": true,
+            "holdout": {
+              "mean_pct": -0.1328,
+              "median_pct": -0.0722,
+              "n": 3,
+              "win_rate_pct": 33.33
+            },
+            "leave_one_symbol_out": {
+              "all_negative_and_win_lt_50": true,
+              "negative_mean": 6,
+              "tests": 6,
+              "win_rate_lt_50": 6
+            },
+            "n": 7,
+            "stable_harmful": false,
+            "train": {
+              "mean_pct": -0.6035,
+              "median_pct": -1.4367,
+              "n": 4,
+              "win_rate_pct": 25.0
+            }
+          }
+        }
+      },
+      "hourly_bonus_critical_qualifications": 13,
+      "production_change_recommended": false,
+      "research_interpretation": "NO_STABLE_FALSE_CONFIDENCE_EVIDENCE"
+    },
+    "ALIGNED_RELATIVE_STRENGTH_BONUS": {
+      "horizons": {
+        "12h": {
+          "outcomes": {
+            "mean_pct": 0.6797,
+            "median_pct": 2.0225,
+            "n": 6,
+            "win_rate_pct": 66.67
+          },
+          "stability": {
+            "eligible": true,
+            "holdout": {
+              "mean_pct": -0.3323,
+              "median_pct": -0.1768,
+              "n": 3,
+              "win_rate_pct": 33.33
+            },
+            "leave_one_symbol_out": {
+              "all_negative_and_win_lt_50": false,
+              "negative_mean": 1,
+              "tests": 4,
+              "win_rate_lt_50": 1
+            },
+            "n": 7,
+            "stable_harmful": false,
+            "train": {
+              "mean_pct": 1.2246,
+              "median_pct": 2.5775,
+              "n": 4,
+              "win_rate_pct": 75.0
+            }
+          }
+        },
+        "24h": {
+          "outcomes": {
+            "mean_pct": 0.4785,
+            "median_pct": 4.2616,
+            "n": 3,
+            "win_rate_pct": 66.67
+          },
+          "stability": {
+            "eligible": false,
+            "n": 4,
+            "stable_harmful": false
+          }
+        },
+        "3h": {
+          "outcomes": {
+            "mean_pct": 1.5342,
+            "median_pct": 2.1088,
+            "n": 9,
+            "win_rate_pct": 77.78
+          },
+          "stability": {
+            "eligible": true,
+            "holdout": {
+              "mean_pct": 1.7988,
+              "median_pct": 2.1422,
+              "n": 4,
+              "win_rate_pct": 75.0
+            },
+            "leave_one_symbol_out": {
+              "all_negative_and_win_lt_50": false,
+              "negative_mean": 0,
+              "tests": 3,
+              "win_rate_lt_50": 0
+            },
+            "n": 9,
+            "stable_harmful": false,
+            "train": {
+              "mean_pct": 1.3226,
+              "median_pct": 2.1088,
+              "n": 5,
+              "win_rate_pct": 80.0
+            }
+          }
+        }
+      },
+      "hourly_bonus_critical_qualifications": 16,
+      "production_change_recommended": false,
+      "research_interpretation": "NO_STABLE_FALSE_CONFIDENCE_EVIDENCE"
+    },
+    "CLEAR_STRUCTURE_BONUS": {
+      "horizons": {
+        "12h": {
+          "outcomes": {
+            "mean_pct": null,
+            "median_pct": null,
+            "n": 0,
+            "win_rate_pct": null
+          },
+          "stability": {
+            "eligible": false,
+            "n": 0,
+            "stable_harmful": false
+          }
+        },
+        "24h": {
+          "outcomes": {
+            "mean_pct": null,
+            "median_pct": null,
+            "n": 0,
+            "win_rate_pct": null
+          },
+          "stability": {
+            "eligible": false,
+            "n": 0,
+            "stable_harmful": false
+          }
+        },
+        "3h": {
+          "outcomes": {
+            "mean_pct": null,
+            "median_pct": null,
+            "n": 0,
+            "win_rate_pct": null
+          },
+          "stability": {
+            "eligible": false,
+            "n": 0,
+            "stable_harmful": false
+          }
+        }
+      },
+      "hourly_bonus_critical_qualifications": 0,
+      "production_change_recommended": false,
+      "research_interpretation": "NO_STABLE_FALSE_CONFIDENCE_EVIDENCE"
+    },
+    "FOURTH_VOTE_PREMIUM": {
+      "horizons": {
+        "12h": {
+          "outcomes": {
+            "mean_pct": -0.7537,
+            "median_pct": -0.2831,
+            "n": 15,
+            "win_rate_pct": 40.0
+          },
+          "stability": {
+            "eligible": true,
+            "holdout": {
+              "mean_pct": -0.9924,
+              "median_pct": -0.4465,
+              "n": 7,
+              "win_rate_pct": 28.57
+            },
+            "leave_one_symbol_out": {
+              "all_negative_and_win_lt_50": true,
+              "negative_mean": 8,
+              "tests": 8,
+              "win_rate_lt_50": 8
+            },
+            "n": 16,
+            "stable_harmful": true,
+            "train": {
+              "mean_pct": -0.9869,
+              "median_pct": -0.0769,
+              "n": 9,
+              "win_rate_pct": 44.44
+            }
+          }
+        },
+        "24h": {
+          "outcomes": {
+            "mean_pct": -1.816,
+            "median_pct": -1.9137,
+            "n": 9,
+            "win_rate_pct": 22.22
+          },
+          "stability": {
+            "eligible": true,
+            "holdout": {
+              "mean_pct": 0.8449,
+              "median_pct": 0.0461,
+              "n": 4,
+              "win_rate_pct": 50.0
+            },
+            "leave_one_symbol_out": {
+              "all_negative_and_win_lt_50": true,
+              "negative_mean": 7,
+              "tests": 7,
+              "win_rate_lt_50": 7
+            },
+            "n": 10,
+            "stable_harmful": false,
+            "train": {
+              "mean_pct": -2.953,
+              "median_pct": -1.8139,
+              "n": 6,
+              "win_rate_pct": 16.67
+            }
+          }
+        },
+        "3h": {
+          "outcomes": {
+            "mean_pct": 0.0705,
+            "median_pct": -0.157,
+            "n": 20,
+            "win_rate_pct": 40.0
+          },
+          "stability": {
+            "eligible": true,
+            "holdout": {
+              "mean_pct": 0.0212,
+              "median_pct": -0.3274,
+              "n": 8,
+              "win_rate_pct": 25.0
+            },
+            "leave_one_symbol_out": {
+              "all_negative_and_win_lt_50": false,
+              "negative_mean": 2,
+              "tests": 8,
+              "win_rate_lt_50": 8
+            },
+            "n": 20,
+            "stable_harmful": false,
+            "train": {
+              "mean_pct": 0.1035,
+              "median_pct": 0.1163,
+              "n": 12,
+              "win_rate_pct": 50.0
+            }
+          }
+        }
+      },
+      "hourly_bonus_critical_qualifications": 31,
+      "production_change_recommended": false,
+      "research_interpretation": "SHADOW_DEMOTION_CANDIDATE"
+    },
+    "VOLUME_BONUS": {
+      "horizons": {
+        "12h": {
+          "outcomes": {
+            "mean_pct": -0.0117,
+            "median_pct": 0.0557,
+            "n": 11,
+            "win_rate_pct": 54.55
+          },
+          "stability": {
+            "eligible": true,
+            "holdout": {
+              "mean_pct": 0.0862,
+              "median_pct": -0.3634,
+              "n": 5,
+              "win_rate_pct": 20.0
+            },
+            "leave_one_symbol_out": {
+              "all_negative_and_win_lt_50": false,
+              "negative_mean": 3,
+              "tests": 6,
+              "win_rate_lt_50": 1
+            },
+            "n": 11,
+            "stable_harmful": false,
+            "train": {
+              "mean_pct": -0.0933,
+              "median_pct": 0.3376,
+              "n": 6,
+              "win_rate_pct": 83.33
+            }
+          }
+        },
+        "24h": {
+          "outcomes": {
+            "mean_pct": -0.6477,
+            "median_pct": -0.5806,
+            "n": 6,
+            "win_rate_pct": 50.0
+          },
+          "stability": {
+            "eligible": true,
+            "holdout": {
+              "mean_pct": -3.6343,
+              "median_pct": -3.0869,
+              "n": 4,
+              "win_rate_pct": 25.0
+            },
+            "leave_one_symbol_out": {
+              "all_negative_and_win_lt_50": true,
+              "negative_mean": 6,
+              "tests": 6,
+              "win_rate_lt_50": 6
+            },
+            "n": 8,
+            "stable_harmful": true,
+            "train": {
+              "mean_pct": -0.5524,
+              "median_pct": -0.3772,
+              "n": 4,
+              "win_rate_pct": 50.0
+            }
+          }
+        },
+        "3h": {
+          "outcomes": {
+            "mean_pct": -0.1914,
+            "median_pct": -0.1928,
+            "n": 19,
+            "win_rate_pct": 31.58
+          },
+          "stability": {
+            "eligible": true,
+            "holdout": {
+              "mean_pct": -0.4527,
+              "median_pct": -0.3962,
+              "n": 8,
+              "win_rate_pct": 25.0
+            },
+            "leave_one_symbol_out": {
+              "all_negative_and_win_lt_50": true,
+              "negative_mean": 6,
+              "tests": 6,
+              "win_rate_lt_50": 6
+            },
+            "n": 19,
+            "stable_harmful": true,
+            "train": {
+              "mean_pct": -0.0013,
+              "median_pct": -0.1091,
+              "n": 11,
+              "win_rate_pct": 36.36
+            }
+          }
+        }
+      },
+      "hourly_bonus_critical_qualifications": 29,
+      "production_change_recommended": false,
+      "research_interpretation": "SHADOW_DEMOTION_CANDIDATE"
+    }
+  }
+}
