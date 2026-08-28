@@ -22,7 +22,7 @@ jobs:
           node-version: '22'
       - name: Python syntax
         run: |
-          python -m py_compile collector_server.py cloud_start.py atlas_runtime_server.py atlas_research_runtime_server.py atlas_ai_server.py research_memory_bridge.py research_coverage.py storage_hardening.py trade_outcome_ledger.py trade_outcome_runtime.py trade_path_settlement.py execution_outcome_scope.py execution_risk_management.py tests/test_ai_validation.py tests/test_research_memory_bridge.py tests/test_research_coverage.py tests/test_storage_hardening.py tests/test_trade_outcome_ledger.py tests/test_trade_path_settlement.py tests/test_execution_outcome_scope.py tests/test_execution_risk_management.py
+          python -m py_compile collector_server.py cloud_start.py cloud_start_web.py cloud_web_only.py atlas_runtime_server.py atlas_research_runtime_server.py atlas_ai_server.py research_memory_bridge.py research_coverage.py storage_hardening.py trade_outcome_ledger.py trade_outcome_runtime.py trade_path_settlement.py execution_outcome_scope.py execution_risk_management.py tests/test_ai_validation.py tests/test_research_memory_bridge.py tests/test_research_coverage.py tests/test_storage_hardening.py tests/test_trade_outcome_ledger.py tests/test_trade_path_settlement.py tests/test_execution_outcome_scope.py tests/test_execution_risk_management.py
       - name: JavaScript syntax
         run: |
           set -e
@@ -40,19 +40,40 @@ jobs:
           PYTHONPATH=. python tests/test_trade_path_settlement.py
           PYTHONPATH=. python tests/test_execution_outcome_scope.py
           PYTHONPATH=. python tests/test_execution_risk_management.py
-      - name: Verify production entrypoints
+      - name: Verify delegated production entrypoints
         run: |
+          set -euo pipefail
           grep -q 'cloud_start.py' Procfile
           grep -q 'cloud_start.py' render.yaml
           grep -q 'cloud_start.py' Dockerfile
           grep -q 'mountPath: /var/data' render.yaml
           ! grep -q 'OPENAI_API_KEY' render.yaml
-          grep -q 'atlas_research_runtime_server.py' cloud_start.py
-          grep -q '_install_storage_hardening' cloud_start.py
-          grep -q '_install_execution_risk_management' cloud_start.py
-          grep -q '_install_trade_geometry_freezer' cloud_start.py
-          grep -q '_install_trade_outcome_runtime' cloud_start.py
-          grep -q 'trade_geometry.jsonl' cloud_start.py
+
+          # Compatibility entrypoint must explicitly route Render and local/manual
+          # starts into their real runtime files instead of owning hidden installers.
+          grep -q 'cloud_web_only.py' cloud_start.py
+          grep -q 'cloud_start_web.py' cloud_start.py
+          grep -q 'ATLAS_CLOUD_FORWARD_ENABLED.*0' cloud_start.py
+          grep -q 'ATLAS_WEB_ONLY.*1' cloud_start.py
+
+          # Full web stack retains persistence/outcome/risk wiring.
+          grep -q '_install_storage_hardening' cloud_start_web.py
+          grep -q '_install_execution_risk_management' cloud_start_web.py
+          grep -q '_install_trade_geometry_freezer' cloud_start_web.py
+          grep -q '_install_trade_outcome_runtime' cloud_start_web.py
+          grep -q 'trade_geometry.jsonl' cloud_start_web.py
+
+          # Render web-only stack must retain Production scoring/decision/risk while
+          # keeping the research tie-break isolated from Production.
+          grep -q 'install_scoring(atlas)' cloud_web_only.py
+          grep -q 'install_continuation(atlas)' cloud_web_only.py
+          grep -q 'install_decision_api(atlas)' cloud_web_only.py
+          grep -q 'install_decision_engine(atlas)' cloud_web_only.py
+          grep -q 'install_execution_risk(atlas)' cloud_web_only.py
+          grep -q 'install_consensus_tiebreak_shadow(atlas)' cloud_web_only.py
+          grep -q "ATLAS_CLOUD_FORWARD_MIN_SCORE','68'" cloud_web_only.py
+          grep -q 'can_override_production.*False' cloud_web_only.py
+          grep -q 'live_execution.*False' cloud_web_only.py
       - name: Verify resilient provider chain and safety invariants
         run: |
           grep -q 'KRAKEN_FUTURES_PUBLIC' atlas_runtime_server.py
@@ -79,8 +100,8 @@ jobs:
           grep -q 'choose_research_samples' atlas_research_runtime_server.py
           grep -q 'LEAST_COVERED_OLDEST_FIRST' atlas_research_runtime_server.py
           grep -q 'ATLAS_RESEARCH_COVERAGE_STALE_HOURS' atlas_research_runtime_server.py
-          grep -q 'ATLAS_CLOUD_FORWARD_MIN_SCORE.*68' cloud_start.py
-          grep -q 'ATLAS_ALERT_MIN_SCORE.*82' cloud_start.py
+          grep -q 'ATLAS_CLOUD_FORWARD_MIN_SCORE.*68' cloud_start_web.py
+          grep -q 'ATLAS_ALERT_MIN_SCORE.*82' cloud_start_web.py
           grep -q 'live_execution.*False' collector_server.py
           grep -q 'ATLAS_AI_ANALYSIS_PACKET_V1' atlas-ai-analysis-layer.js
           grep -q 'atlasApplyDecisionGate' atlas-decision-quality.js
