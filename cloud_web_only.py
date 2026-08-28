@@ -9,6 +9,7 @@ profit-engine background jobs are started here.
 Scheduled research remains on GitHub Actions. Production threshold is unchanged.
 """
 import os
+import urllib.parse
 from http.server import ThreadingHTTPServer
 
 os.environ.setdefault('ATLAS_CLOUD_FORWARD_ENABLED','0')
@@ -40,7 +41,12 @@ atlas.Handler.end_headers = _no_cache
 # Minimal Production stack only. Intentionally omitted:
 # production_reliability (concurrent universe warm-up), production_opportunity_runtime
 # (background scans), profit_engine_runtime, outcome/calibration workers, cloud/news loops.
-from production_signal_scoring import install as install_scoring
+from production_signal_scoring import (
+    VERSION as PRODUCTION_SCORING_VERSION,
+    candle_progress,
+    install as install_scoring,
+    paced_relative_volume,
+)
 install_scoring(atlas)
 from production_continuation_scoring import install as install_continuation
 install_continuation(atlas)
@@ -64,10 +70,61 @@ atlas.WEB_SAFE_MODE = {
     'research_execution_location': 'GITHUB_ACTIONS',
 }
 
+
+def volume_diagnostic(symbol):
+    symbol = str(symbol or 'BTCUSDT').upper().replace('BINANCE:', '')
+    if symbol not in atlas.ON_DEMAND_SYMBOLS:
+        return {
+            'ok': False,
+            'error': 'unsupported symbol',
+            'symbol': symbol,
+            'supported_symbols': list(atlas.ON_DEMAND_SYMBOLS),
+            'research_only': True,
+            'live_execution': False,
+        }
+    ks = atlas._spot_klines(symbol)
+    if len(ks) < 21:
+        return {
+            'ok': False,
+            'error': 'insufficient candles',
+            'symbol': symbol,
+            'candles': len(ks),
+            'research_only': True,
+            'live_execution': False,
+        }
+    current = ks[-1]
+    current_volume = float(current.get('volume') or 0.0)
+    prior = [float(x.get('volume') or 0.0) for x in ks[-21:-1]]
+    prior_avg = sum(prior) / len(prior) if prior else 0.0
+    raw_rv = current_volume / prior_avg if prior_avg > 0 else 1.0
+    progress = candle_progress(current)
+    paced_rv = paced_relative_volume(raw_rv, progress)
+    return {
+        'ok': True,
+        'symbol': symbol,
+        'current_candle_time': current.get('time') or current.get('open_time'),
+        'current_volume': round(current_volume, 10),
+        'prior_20_full_volume_avg': round(prior_avg, 10),
+        'raw_relative_volume': round(raw_rv, 6),
+        'candle_progress': round(progress, 6),
+        'paced_relative_volume': round(paced_rv, 6),
+        'expected_formula': 'min(4.0, raw_relative_volume / max(0.10, candle_progress))',
+        'scoring_version': PRODUCTION_SCORING_VERSION,
+        'production_threshold': float(atlas.CLOUD_FORWARD_MIN_SCORE),
+        'research_only': True,
+        'live_execution': False,
+    }
+
+
 class WebOnlyHandler(atlas.Handler):
     def do_GET(self):
-        if self.path.split('?',1)[0] == '/api/web-mode':
+        parsed = urllib.parse.urlparse(self.path)
+        if parsed.path == '/api/web-mode':
             return self._json({'ok':True, **atlas.WEB_SAFE_MODE, 'research_only':True, 'live_execution':False})
+        if parsed.path == '/api/web/volume-diagnostic':
+            q = urllib.parse.parse_qs(parsed.query)
+            symbol = q.get('symbol', ['BTCUSDT'])[0]
+            return self._json(volume_diagnostic(symbol))
         return super().do_GET()
 
 class Server(ThreadingHTTPServer):
@@ -81,5 +138,6 @@ if __name__ == '__main__':
     print('ATLAS Render WEB-ONLY safe mode', flush=True)
     print('Background workers: OFF (GitHub Actions owns scheduled research)', flush=True)
     print('Production decision UI: ON + autoload', flush=True)
+    print(f'Production scoring: {PRODUCTION_SCORING_VERSION}', flush=True)
     print(f'Listening on {port}', flush=True)
     Server(('0.0.0.0',port), WebOnlyHandler).serve_forever(poll_interval=0.5)
