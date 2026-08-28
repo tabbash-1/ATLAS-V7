@@ -1,0 +1,61 @@
+name: ATLAS Render Memory-Safe Smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'render.yaml'
+      - 'Dockerfile'
+      - 'cloud_start_web.py'
+      - 'render_boot_patch.py'
+      - 'atlas_runtime_server.py'
+      - 'collector_server.py'
+      - '.github/workflows/render-memory-safe-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Wait for Render deploy
+        run: sleep 100
+      - name: Verify health, workers and Cloud Forward
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://atlas-v7.onrender.com'
+          curl -fsSL --retry 8 --retry-delay 10 --retry-all-errors --connect-timeout 10 --max-time 35 "$base/health" -o /tmp/health.json
+          curl -fsSL --retry 8 --retry-delay 10 --retry-all-errors --connect-timeout 10 --max-time 35 "$base/api/runtime/status" -o /tmp/runtime.json
+          curl -fsSL --retry 8 --retry-delay 10 --retry-all-errors --connect-timeout 10 --max-time 35 "$base/api/cloud-forward/status" -o /tmp/cloud.json
+          python3 - <<'PY'
+          import json
+          h=json.load(open('/tmp/health.json'))
+          r=json.load(open('/tmp/runtime.json'))
+          c=json.load(open('/tmp/cloud.json'))
+          assert h.get('status') == 'ok', h
+          workers=r.get('workers') or {}
+          for name in ('smart_money','news','cloud_forward'):
+              assert name in workers, (name, workers)
+              assert int((workers[name] or {}).get('starts') or 0) >= 1, workers[name]
+          assert c.get('enabled') is True, c
+          assert c.get('research_only') is True, c
+          assert c.get('live_execution') is False, c
+          print('BOOT', r.get('boot_id'))
+          print('UPTIME', r.get('uptime_seconds'))
+          print('WORKERS', json.dumps(workers, sort_keys=True))
+          print('CLOUD', json.dumps({k:c.get(k) for k in ('enabled','running','cycles','stored','errors','last_success_at','last_error')}, sort_keys=True))
+          PY
+      - name: Verify live HYPE Production endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://atlas-v7.onrender.com'
+          curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --connect-timeout 10 --max-time 45 "$base/api/decision/current?symbol=HYPEUSDT" -o /tmp/hype.json
+          python3 - <<'PY'
+          import json
+          x=json.load(open('/tmp/hype.json'))
+          assert x.get('ok') is True, x
+          assert x.get('research_only') is True, x
+          print('HYPE', json.dumps({k:x.get(k) for k in ('score','signal_threshold','candidate_direction','opportunity_state','wait_reason','actionable_reason')}, sort_keys=True))
+          PY
