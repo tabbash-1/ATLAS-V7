@@ -17,7 +17,7 @@ from statistics import mean, median
 
 V6_PREFIX = "PROD_SIGNAL_SCORING_V6_BREAKOUT_AWARE"
 FIX_TAG = "PARTIAL_VOLUME_TIME_FIX_V1"
-SCHEMA = "ATLAS_PARTIAL_HOUR_VOLUME_BIAS_AUDIT_V1"
+SCHEMA = "ATLAS_PARTIAL_HOUR_VOLUME_BIAS_AUDIT_V2_DENOMINATOR_AWARE"
 DEFAULT_THRESHOLD = 68.0
 
 
@@ -35,6 +35,10 @@ def parse_time(v):
         return dt.datetime.fromisoformat(str(v).replace("Z", "+00:00"))
     except Exception:
         return None
+
+
+def hour_key(symbol, ts):
+    return (symbol, ts.replace(minute=0, second=0, microsecond=0).isoformat())
 
 
 def progress_from_timestamp(ts):
@@ -111,11 +115,21 @@ def summarise_group(items):
         return {"n": 0}
     deltas = [x["total_score_delta"] for x in items]
     direct = [x["direct_volume_score_delta"] for x in items]
+    old_waits = sum(not bool(x["old_qualified"]) for x in items)
+    flips = sum(bool(x["qualification_flip"]) for x in items)
+    direct_flips = sum(bool(x["direct_volume_qualification_flip"]) for x in items)
+    breakout_context_n = sum(bool(x.get("breakout_context_available")) for x in items)
     return {
         "n": len(items),
+        "old_qualified": len(items) - old_waits,
+        "old_waits": old_waits,
         "score_changed": sum(x > 0 for x in deltas),
-        "qualification_flips": sum(bool(x["qualification_flip"]) for x in items),
-        "direct_volume_flips": sum(bool(x["direct_volume_qualification_flip"]) for x in items),
+        "qualification_flips": flips,
+        "direct_volume_flips": direct_flips,
+        "flip_rate_pct_among_old_waits": round(100.0 * flips / old_waits, 2) if old_waits else 0.0,
+        "direct_flip_rate_pct_among_old_waits": round(100.0 * direct_flips / old_waits, 2) if old_waits else 0.0,
+        "breakout_context_available": breakout_context_n,
+        "breakout_context_coverage_pct": round(100.0 * breakout_context_n / len(items), 2),
         "breakout_recovered": sum(bool(x["breakout_recovered"]) for x in items),
         "rv_crossed_0_8": sum(bool(x["rv_crossed_0_8"]) for x in items),
         "rv_crossed_1_0": sum(bool(x["rv_crossed_1_0"]) for x in items),
@@ -149,6 +163,15 @@ def audit(rows):
                 raw = fnum(d.get("relative_volume_raw"))
                 p = fnum(d.get("current_candle_progress"))
                 actual = fnum(d.get("relative_volume"))
+                # Decision API also exposes the same fields under volume_pacing;
+                # support both shapes so later snapshots validate the live fix.
+                vp = d.get("volume_pacing") or {}
+                if raw is None:
+                    raw = fnum(vp.get("raw_relative_volume"))
+                if p is None:
+                    p = fnum(vp.get("candle_progress"))
+                if actual is None:
+                    actual = fnum(vp.get("paced_relative_volume"))
                 if raw is not None and p is not None and actual is not None:
                     expected = paced_rv(raw, p)
                     fixed_validation.append({
@@ -178,7 +201,8 @@ def audit(rows):
             new_bonus = volume_bonus_v6(paced)
             direct_delta = max(0.0, new_bonus - old_bonus)
 
-            br_recovered = recovered_breakout(d, raw, paced)
+            breakout_context_available = bool(d.get("breakout_context"))
+            br_recovered = recovered_breakout(d, raw, paced) if breakout_context_available else False
             obstacle_distance = fnum(attr.get("obstacle_distance_pct"))
             old_obstacle = fnum(attr.get("obstacle_adjustment"), 0.0) or 0.0
             # Current V6 grants +3 clear-space adjustment only when a confirmed
@@ -208,6 +232,7 @@ def audit(rows):
                 "old_volume_bonus": round(old_bonus, 6),
                 "counterfactual_volume_bonus": round(new_bonus, 6),
                 "direct_volume_score_delta": round(direct_delta, 6),
+                "breakout_context_available": breakout_context_available,
                 "breakout_recovered": br_recovered,
                 "breakout_obstacle_score_delta": round(breakout_obstacle_delta, 6),
                 "total_score_delta": round(direct_delta + breakout_obstacle_delta, 6),
@@ -243,15 +268,19 @@ def audit(rows):
         by_symbol[x["symbol"]].append(x)
         by_progress[x["progress_bucket"]].append(x)
 
-    # Count NO_DIRECTIONAL_CONSENSUS during the same pre-fix V6 time window.
-    no_consensus = 0
-    other_wait_without_score = 0
+    # Track upstream no-score WAIT states in the same time window using BOTH raw
+    # observation count and unique symbol-hour count. The latter is the fairer
+    # comparator to the hourly de-correlated score audit.
+    no_consensus_raw = 0
+    other_wait_without_score_raw = 0
+    no_consensus_hours = set()
+    other_no_score_hours = set()
     if observations:
         lo = min(parse_time(x["generated_at"]) for x in observations)
         hi = max(parse_time(x["generated_at"]) for x in observations)
         for snap in rows:
             captured = parse_time(snap.get("captured_at"))
-            for _, d in (snap.get("decisions") or {}).items():
+            for symbol, d in (snap.get("decisions") or {}).items():
                 if not isinstance(d, dict) or not d.get("ok"):
                     continue
                 ts = parse_time(d.get("generated_at")) or captured
@@ -261,9 +290,11 @@ def audit(rows):
                     continue
                 reason = d.get("wait_reason")
                 if reason == "NO_DIRECTIONAL_CONSENSUS":
-                    no_consensus += 1
+                    no_consensus_raw += 1
+                    no_consensus_hours.add(hour_key(symbol, ts))
                 elif reason:
-                    other_wait_without_score += 1
+                    other_wait_without_score_raw += 1
+                    other_no_score_hours.add(hour_key(symbol, ts))
     else:
         lo = hi = None
 
@@ -275,6 +306,8 @@ def audit(rows):
 
     validation_max_error = max((x["abs_error"] for x in fixed_validation), default=None)
     validation_mean_error = mean([x["abs_error"] for x in fixed_validation]) if fixed_validation else None
+    hourly_summary = summarise_group(hourly_items)
+    breakout_coverage = hourly_summary.get("breakout_context_coverage_pct", 0.0)
 
     return {
         "schema": SCHEMA,
@@ -285,7 +318,7 @@ def audit(rows):
             "progress_estimate": "decision generated_at minute+second within the UTC hour, bounded 0.10..1.00",
             "paced_rv_formula": "min(4.0, raw_rv / progress)",
             "direct_score_replay": "historical raw_score + (V6 volume_bonus(paced_rv) - historical volume_bonus)",
-            "breakout_replay": "adds only the exact +3 clear-space obstacle effect when RV alone recovers V6 breakout confirmation; other geometry effects are reported but not invented",
+            "breakout_replay": "only evaluated where historical breakout_context exists; otherwise breakout effect is UNKNOWN, not zero",
             "hourly_independence": "de-duplicate symbol+UTC-hour+direction+scoring-version; retain largest modeled impact within hour",
         },
         "guardrails": {
@@ -297,11 +330,22 @@ def audit(rows):
         },
         "pre_fix_window": {"start": lo.isoformat() if lo else None, "end": hi.isoformat() if hi else None},
         "raw_observations": summarise_group(observations),
-        "independent_hourly_observations": summarise_group(hourly_items),
+        "independent_hourly_observations": hourly_summary,
         "wait_attribution": {
-            "no_directional_consensus_without_score_in_same_window": no_consensus,
-            "other_wait_without_score_in_same_window": other_wait_without_score,
-            "interpretation": "NO_DIRECTIONAL_CONSENSUS is upstream of volume scoring and cannot be fixed by the partial-hour RV correction.",
+            "scored_directional_wait_hours": hourly_summary.get("old_waits", 0),
+            "volume_direct_qualification_flip_hours": hourly_summary.get("direct_volume_flips", 0),
+            "volume_direct_flip_rate_pct_among_scored_wait_hours": hourly_summary.get("direct_flip_rate_pct_among_old_waits", 0.0),
+            "no_directional_consensus_raw_observations": no_consensus_raw,
+            "no_directional_consensus_unique_symbol_hours": len(no_consensus_hours),
+            "other_wait_without_score_raw_observations": other_wait_without_score_raw,
+            "other_wait_without_score_unique_symbol_hours": len(other_no_score_hours),
+            "interpretation": "NO_DIRECTIONAL_CONSENSUS is upstream of volume scoring and cannot be fixed by the partial-hour RV correction. Unique symbol-hours are the fair comparator; raw counts are shown only for transparency.",
+        },
+        "breakout_replay_coverage": {
+            "hourly_context_available": hourly_summary.get("breakout_context_available", 0),
+            "hourly_context_coverage_pct": breakout_coverage,
+            "recovered_breakouts_observed": hourly_summary.get("breakout_recovered", 0),
+            "interpretation": "If coverage is low, recovered_breakouts_observed is an under-observed lower bound and must not be interpreted as proof of zero breakout impact.",
         },
         "by_symbol_hourly": {k: summarise_group(v) for k, v in sorted(by_symbol.items())},
         "by_candle_progress_hourly": {k: summarise_group(v) for k, v in sorted(by_progress.items())},
@@ -310,6 +354,7 @@ def audit(rows):
             "mean_abs_rv_error": round(validation_mean_error, 8) if validation_mean_error is not None else None,
             "max_abs_rv_error": round(validation_max_error, 8) if validation_max_error is not None else None,
             "formula_matches_within_0_002": bool(fixed_validation and validation_max_error <= 0.002),
+            "note": "n=0 means no post-fix candidate row with both raw/progress fields existed in the checked-in history at replay time; live Render smoke is a separate validation path.",
         },
         "most_affected_hourly_examples": affected,
         "skipped": dict(skipped),
@@ -330,6 +375,7 @@ def main():
         "pre_fix_window": report["pre_fix_window"],
         "hourly": report["independent_hourly_observations"],
         "wait_attribution": report["wait_attribution"],
+        "breakout_replay_coverage": report["breakout_replay_coverage"],
         "post_fix_formula_validation": report["post_fix_formula_validation"],
     }, indent=2))
 
