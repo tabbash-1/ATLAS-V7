@@ -1,4 +1,4 @@
-name: ATLAS Cloud Forward Snapshot
+name: ATLAS Web Runtime Snapshot
 
 on:
   push:
@@ -7,7 +7,9 @@ on:
       - 'render.yaml'
       - 'collector_server.py'
       - 'cloud_start.py'
-      - 'forward_microstructure_freeze_runtime.py'
+      - 'cloud_web_only.py'
+      - 'production_signal_scoring.py'
+      - 'production_decision_api.py'
       - '.github/workflows/atlas-cloud-forward-snapshot.yml'
   schedule:
     - cron: '7,57 * * * *'
@@ -17,55 +19,55 @@ permissions:
   contents: write
 
 concurrency:
-  group: atlas-cloud-forward-snapshot
+  group: atlas-web-runtime-snapshot
   cancel-in-progress: true
 
 jobs:
   snapshot:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 5
     env:
       BASE_URL: https://atlas-v7.onrender.com
     steps:
       - uses: actions/checkout@v4
-      - name: Fetch deployed cloud forward status
+      - name: Verify deployed web-only runtime
         run: |
           set -euo pipefail
           mkdir -p status/history
-          tmp="status/cloud-forward-latest.json.tmp"
+          tmp="status/web-runtime-latest.json.tmp"
           ok=0
-          for attempt in $(seq 1 28); do
-            code="$(curl -L --connect-timeout 20 --max-time 60 -sS -w '%{http_code}' -o "$tmp" "${BASE_URL}/api/cloud-forward/status" || true)"
+          for attempt in $(seq 1 8); do
+            code="$(curl -L --connect-timeout 20 --max-time 60 -sS -w '%{http_code}' -o "$tmp" "${BASE_URL}/api/web-mode" || true)"
             if [[ "$code" =~ ^2 ]] && jq -e . "$tmp" >/dev/null 2>&1 && \
-               jq -e '.interval_seconds == 3000 and .min_score == 68 and .max_per_cycle == 3 and (.cycles // 0) >= 1 and .research_only == true and .live_execution == false' "$tmp" >/dev/null 2>&1; then
+               jq -e '.ok == true and .enabled == true and .background_workers == false and .cloud_forward_in_web_process == false and .production_threshold == 68 and .research_execution_location == "GITHUB_ACTIONS" and .research_only == true and .live_execution == false' "$tmp" >/dev/null 2>&1; then
               ok=1
               break
             fi
-            echo "Waiting for deployed 50m cloud-forward collector (attempt ${attempt}/28, HTTP ${code:-none})"
-            sleep 15
+            echo "Waiting for deployed ATLAS web-only runtime (attempt ${attempt}/8, HTTP ${code:-none})"
+            sleep 10
           done
           if [[ "$ok" != "1" ]]; then
-            echo "50m Cloud Forward collector did not become live within deployment grace period." >&2
+            echo "ATLAS web-only runtime did not pass readiness contract." >&2
             echo "Last HTTP code: ${code:-none}" >&2
             cat "$tmp" >&2 || true
             exit 1
           fi
-          mv "$tmp" status/cloud-forward-latest.json
+          mv "$tmp" status/web-runtime-latest.json
           python3 - <<'PY'
           import datetime,json,pathlib
-          p=pathlib.Path('status/cloud-forward-latest.json')
+          p=pathlib.Path('status/web-runtime-latest.json')
           row=json.loads(p.read_text())
           row['_snapshot_captured_at']=datetime.datetime.now(datetime.timezone.utc).isoformat()
           p.write_text(json.dumps(row,indent=2,sort_keys=True))
-          h=pathlib.Path('status/history/cloud-forward-snapshots.jsonl')
+          h=pathlib.Path('status/history/web-runtime-snapshots.jsonl')
           with h.open('a') as f:f.write(json.dumps(row,separators=(',',':'))+'\n')
           PY
-      - name: Commit cloud forward snapshot
+      - name: Commit web runtime snapshot
         run: |
-          git config user.name "atlas-cloud-forward-monitor"
-          git config user.email "atlas-cloud-forward-monitor@users.noreply.github.com"
-          git add status/cloud-forward-latest.json status/history/cloud-forward-snapshots.jsonl
+          git config user.name "atlas-web-runtime-monitor"
+          git config user.email "atlas-web-runtime-monitor@users.noreply.github.com"
+          git add status/web-runtime-latest.json status/history/web-runtime-snapshots.jsonl
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m "chore: update cloud forward snapshot [skip ci]"
+          git commit -m "chore: update web runtime snapshot [skip ci]"
           git pull --rebase origin main
           git push
