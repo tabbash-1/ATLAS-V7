@@ -153,7 +153,7 @@
     $('apsAnalyze').disabled=true;
     $('apsStatus').textContent='Analysis running…';
     $('apsAiState').textContent='Waiting for ATLAS analysis…';
-    button.click();
+    $('analyzeBtn')?.click();
     await waitForAnalysisReady();
     await refreshAi();
     update();
