@@ -68,6 +68,21 @@ def test_summary_win_rate_uses_decisive_closed_only():
     assert s['r_multiple_available'] is False
 
 
+def test_version_provenance_is_preserved_in_outcome_rows():
+    x = ledger.classify_row(row(
+        scoring_version='PROD_SIGNAL_V6',
+        decision_version='DECISION_V3',
+        trade_plan_version='PLAN_V2',
+        policy_version='POLICY_V1',
+        generation_id='gen-20260828-001',
+    ), 24)
+    assert x['scoring_version'] == 'PROD_SIGNAL_V6'
+    assert x['decision_version'] == 'DECISION_V3'
+    assert x['trade_plan_version'] == 'PLAN_V2'
+    assert x['policy_version'] == 'POLICY_V1'
+    assert x['generation_id'] == 'gen-20260828-001'
+
+
 if __name__ == '__main__':
     test_long_positive_is_win_and_negative_is_loss()
     test_short_inverts_market_return()
@@ -75,4 +90,5 @@ if __name__ == '__main__':
     test_signal_scope_is_production_threshold_not_research_champion()
     test_explicit_production_flag_wins_over_legacy_score_fallback()
     test_summary_win_rate_uses_decisive_closed_only()
+    test_version_provenance_is_preserved_in_outcome_rows()
     print('trade outcome ledger tests: ok')
