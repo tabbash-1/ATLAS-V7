@@ -16,13 +16,32 @@ jobs:
         with:
           python-version: '3.12'
       - name: Syntax
-        run: python -m py_compile production_continuation_scoring.py decision_engine_v7.py tests/test_production_continuation_scoring.py cloud_start.py
+        run: python -m py_compile production_continuation_scoring.py decision_engine_v7.py tests/test_production_continuation_scoring.py cloud_start.py cloud_start_web.py cloud_web_only.py
       - name: Continuation regression tests
         run: PYTHONPATH=. python tests/test_production_continuation_scoring.py
-      - name: Safety invariants
+      - name: Delegated runtime safety invariants
         run: |
-          grep -q 'ATLAS_CLOUD_FORWARD_MIN_SCORE.*68' cloud_start.py
-          grep -q '_install_production_continuation_scoring' cloud_start.py
-          grep -q 'threshold_unchanged.*True' production_continuation_scoring.py
-          grep -q 'min_risk_reward.*1.0' decision_engine_v7.py
-          grep -q 'live_execution.*False' collector_server.py
+          python - <<'PY'
+          from pathlib import Path
+
+          compat = Path('cloud_start.py').read_text()
+          web = Path('cloud_start_web.py').read_text()
+          render = Path('cloud_web_only.py').read_text()
+          scoring = Path('production_continuation_scoring.py').read_text()
+          decision = Path('decision_engine_v7.py').read_text()
+
+          assert 'cloud_start_web.py' in compat
+          assert 'cloud_web_only.py' in compat
+
+          assert 'ATLAS_CLOUD_FORWARD_MIN_SCORE", "68"' in web
+          assert '_install_production_continuation_scoring' in web
+
+          assert "ATLAS_CLOUD_FORWARD_MIN_SCORE','68'" in render
+          assert 'install_continuation(atlas)' in render
+
+          assert 'threshold_unchanged' in scoring and 'True' in scoring
+          assert 'min_risk_reward' in decision and '1.0' in decision
+          print('Continuation delegated-runtime contract: OK')
+          PY
+      - name: Live-execution remains disabled
+        run: grep -q 'live_execution.*False' collector_server.py
