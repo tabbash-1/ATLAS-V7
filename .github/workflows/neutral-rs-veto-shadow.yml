@@ -1,0 +1,39 @@
+name: ATLAS Neutral RS Veto Shadow
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'neutral_rs_veto_shadow.py'
+      - 'tests/test_neutral_rs_veto_shadow.py'
+      - '.github/workflows/neutral-rs-veto-shadow.yml'
+      - 'status/**'
+
+permissions:
+  contents: write
+
+jobs:
+  shadow:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax and regression test
+        run: |
+          python -m py_compile neutral_rs_veto_shadow.py tests/test_neutral_rs_veto_shadow.py
+          PYTHONPATH=. python tests/test_neutral_rs_veto_shadow.py
+      - name: Run isolated neutral-RS replay
+        run: python neutral_rs_veto_shadow.py
+      - name: Persist report
+        run: |
+          if [ -n "$(git status --porcelain -- status/neutral-rs-veto-shadow.json)" ]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add status/neutral-rs-veto-shadow.json
+            git commit -m 'data: refresh neutral rs veto shadow'
+            git push
+          else
+            echo 'No report change to persist.'
+          fi
