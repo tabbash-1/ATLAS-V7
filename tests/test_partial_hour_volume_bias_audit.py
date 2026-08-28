@@ -22,8 +22,10 @@ class PartialHourVolumeBiasAuditTests(unittest.TestCase):
         r=audit(rows)
         h=r['independent_hourly_observations']
         self.assertEqual(h['n'],1)
+        self.assertEqual(h['old_waits'],1)
         self.assertEqual(h['direct_volume_flips'],1)
         self.assertEqual(h['qualification_flips'],1)
+        self.assertEqual(h['direct_flip_rate_pct_among_old_waits'],100.0)
         ex=r['most_affected_hourly_examples'][0]
         self.assertAlmostEqual(ex['counterfactual_paced_relative_volume'],1.2,places=5)
         self.assertAlmostEqual(ex['direct_volume_score_delta'],2.0,places=5)
@@ -61,7 +63,9 @@ class PartialHourVolumeBiasAuditTests(unittest.TestCase):
             }
         }]
         r=audit(rows)
-        self.assertEqual(r['wait_attribution']['no_directional_consensus_without_score_in_same_window'],1)
+        w=r['wait_attribution']
+        self.assertEqual(w['no_directional_consensus_raw_observations'],1)
+        self.assertEqual(w['no_directional_consensus_unique_symbol_hours'],1)
         # Repeated ETH observations in same hour collapse to one hourly behavior unit.
         self.assertEqual(r['independent_hourly_observations']['n'],1)
 
@@ -81,6 +85,9 @@ class PartialHourVolumeBiasAuditTests(unittest.TestCase):
             }
         }]
         r=audit(rows)
+        h=r['independent_hourly_observations']
+        self.assertEqual(h['breakout_context_available'],1)
+        self.assertEqual(h['breakout_context_coverage_pct'],100.0)
         ex=r['most_affected_hourly_examples'][0]
         self.assertTrue(ex['breakout_recovered'])
         self.assertEqual(ex['breakout_obstacle_score_delta'],3.0)
