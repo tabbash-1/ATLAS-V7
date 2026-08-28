@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
-"""ATLAS LONG V7 raw-market representation audit.
+"""ATLAS LONG V7 raw-market representation audit (fixed-episode V2).
 
 Uses only historical Production snapshots already in the repository. It enriches
-V6 LONG observations with raw indicators that are present on every historical
-LONG row: EMA20, EMA50, RSI14, ATR14, 24h momentum and volume ratio.
+V6 LONG observations with raw indicators present on every historical LONG row:
+EMA20, EMA50, RSI14, ATR14, 24h momentum and volume ratio.
+
+Method correction in V2: mature independent 12h LONG episodes are built ONCE on
+the full history, then those fixed episodes are split chronologically 60/40.
+This guarantees Train + Holdout == Full and prevents boundary re-anchoring.
 
 Feature transforms are pre-specified market-structure quantities rather than a
 parameter sweep. Pre-fix volume is normalized through the same historical paced
@@ -14,17 +18,15 @@ Research-only; no Production score, threshold or execution path is modified.
 from __future__ import annotations
 
 import json
-import math
-from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
 import qualified_false_confidence_audit as base
-import counterfactual_episode_evaluation as paired
 import long_v7_train_fitted_ranker as rankutil
+import long_v7_fixed_episode_split as fixed
 
 OUT = Path('status/long-v7-raw-representation-audit.json')
-SCHEMA = 'ATLAS_LONG_V7_RAW_REPRESENTATION_AUDIT_V1'
+SCHEMA = 'ATLAS_LONG_V7_RAW_REPRESENTATION_AUDIT_V2_FIXED_EPISODES'
 H = 12
 FEATURES = (
     'price_vs_ema20_pct',
@@ -84,8 +86,7 @@ def load_rows(path=base.SRC):
 
 
 def mature_episodes(rows):
-    mature = [r for r in rows if r.get('return_12h_pct') is not None]
-    return base.independent(mature, H)
+    return fixed.full_fixed_episodes(rows)
 
 
 def feature_stats(rows, feature):
@@ -108,8 +109,7 @@ def feature_stats(rows, feature):
     }
 
 
-def lane(rows):
-    eps = mature_episodes(rows)
+def lane_eps(eps):
     return {
         'episode_n': len(eps),
         'features': {f: feature_stats(eps, f) for f in FEATURES},
@@ -117,8 +117,7 @@ def lane(rows):
     }
 
 
-def leave_one_symbol_out(rows):
-    eps = mature_episodes(rows)
+def leave_one_symbol_out(eps):
     syms = sorted({r.get('symbol') for r in eps if r.get('symbol')})
     out = {}
     for f in FEATURES:
@@ -143,9 +142,16 @@ def leave_one_symbol_out(rows):
 
 def run(path=base.SRC):
     snaps, hourly = load_rows(path)
-    train_rows, holdout_rows, cutoff = paired.split_60_40(hourly)
-    lanes = {'full': lane(hourly), 'train': lane(train_rows), 'holdout': lane(holdout_rows)}
-    loo = leave_one_symbol_out(hourly)
+    full_eps = fixed.full_fixed_episodes(hourly)
+    train_eps, holdout_eps, cutoff = fixed.split_fixed_60_40(full_eps)
+    if len(train_eps) + len(holdout_eps) != len(full_eps):
+        raise AssertionError('fixed split count invariant violated')
+    lanes = {
+        'full': lane_eps(full_eps),
+        'train': lane_eps(train_eps),
+        'holdout': lane_eps(holdout_eps),
+    }
+    loo = leave_one_symbol_out(full_eps)
 
     stable_pos = []
     stable_neg = []
@@ -162,14 +168,16 @@ def run(path=base.SRC):
     return {
         'schema': SCHEMA,
         'generated_at': datetime.now(timezone.utc).isoformat(),
-        'purpose': 'Determine whether raw market-state representation carries stable LONG quality signal that is missing from the V6 aggregate score.',
+        'purpose': 'Determine whether raw market-state representation carries stable LONG quality signal missing from the V6 aggregate score, using fixed independent episodes.',
         'coverage': {
             'snapshots': len(snaps),
             'hourly_v6_long_rows_with_raw_features': len(hourly),
-            'cutoff_at': cutoff.isoformat() if cutoff else None,
-            'full_mature_independent_12h_episodes': lanes['full']['episode_n'],
-            'train_mature_independent_12h_episodes': lanes['train']['episode_n'],
-            'holdout_mature_independent_12h_episodes': lanes['holdout']['episode_n'],
+            'cutoff_at': cutoff.isoformat() if hasattr(cutoff, 'isoformat') else (str(cutoff) if cutoff else None),
+            'full_mature_independent_12h_episodes': len(full_eps),
+            'train_mature_independent_12h_episodes': len(train_eps),
+            'holdout_mature_independent_12h_episodes': len(holdout_eps),
+            'train_plus_holdout_equals_full': len(train_eps) + len(holdout_eps) == len(full_eps),
+            'episode_split_order': 'FULL_DECORELATE_THEN_SPLIT',
         },
         'feature_definitions': {
             'price_vs_ema20_pct': '(entry / ema20 - 1) * 100',
