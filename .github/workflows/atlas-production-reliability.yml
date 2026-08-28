@@ -16,7 +16,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Syntax
-        run: python -m py_compile production_reliability.py production_signal_scoring.py tests/test_production_reliability.py tests/test_partial_hour_volume_progress.py cloud_start.py cloud_web_only.py
+        run: python -m py_compile production_reliability.py production_signal_scoring.py production_decision_api.py tests/test_production_reliability.py tests/test_partial_hour_volume_progress.py cloud_start.py cloud_web_only.py
       - name: Reliability regressions
         run: PYTHONPATH=. python tests/test_production_reliability.py
       - name: Partial-hour volume regressions
@@ -44,3 +44,7 @@ jobs:
           PY
           grep -q 'PARTIAL_VOLUME_TIME_FIX_V1' production_signal_scoring.py
           grep -q "r.get('open_time') or r.get('time')" production_signal_scoring.py
+          grep -q 'PACED_VOLUME_V1' production_decision_api.py
+          grep -q 'from production_signal_scoring import candle_progress, paced_relative_volume' production_decision_api.py
+          grep -q 'rv=paced_relative_volume(raw_rv,progress)' production_decision_api.py
+          grep -q "'volume_pacing':" production_decision_api.py
