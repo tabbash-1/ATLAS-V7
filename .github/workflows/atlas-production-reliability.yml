@@ -16,13 +16,18 @@ jobs:
         with:
           python-version: '3.12'
       - name: Syntax
-        run: python -m py_compile production_reliability.py tests/test_production_reliability.py cloud_start.py
+        run: python -m py_compile production_reliability.py production_signal_scoring.py tests/test_production_reliability.py tests/test_partial_hour_volume_progress.py cloud_start.py cloud_web_only.py
       - name: Reliability regressions
         run: PYTHONPATH=. python tests/test_production_reliability.py
+      - name: Partial-hour volume regressions
+        run: PYTHONPATH=. python tests/test_partial_hour_volume_progress.py
       - name: Preserve Production safety contract
         run: |
           grep -q 'ATLAS_CLOUD_FORWARD_MIN_SCORE.*68' cloud_start.py
           grep -q 'production_unchanged' production_reliability.py
           grep -q 'requires_requalification' production_reliability.py
           grep -q 'futures_evidence_validated.*False' production_reliability.py
-          grep -q '_install_production_reliability' cloud_start.py
+          grep -q 'cloud_web_only.py' cloud_start.py
+          grep -q 'production_reliability' cloud_web_only.py && exit 1 || true
+          grep -q 'PARTIAL_VOLUME_TIME_FIX_V1' production_signal_scoring.py
+          grep -q "r.get('open_time') or r.get('time')" production_signal_scoring.py
