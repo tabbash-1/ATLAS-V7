@@ -8,6 +8,7 @@ opportunity count: at equal mature coverage K, V6 ranks by total score while R1
 ranks LONG by LOWER 24h momentum first.
 
 No new threshold is selected and no Production code is changed.
+Evaluation trigger note: methodology frozen for R1.
 """
 from __future__ import annotations
 
