@@ -1,0 +1,42 @@
+name: ATLAS Render Web-Only Smoke
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'render.yaml'
+      - 'cloud_web_only.py'
+      - 'render_boot_patch.py'
+      - '.github/workflows/render-web-only-smoke.yml'
+  workflow_dispatch:
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Wait for Render deploy
+        run: sleep 90
+      - name: Verify web-safe runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://atlas-v7.onrender.com'
+          curl -fsSL --retry 8 --retry-delay 10 --retry-all-errors --connect-timeout 10 --max-time 30 "$base/health" | tee /tmp/health.json
+          curl -fsSL --retry 8 --retry-delay 10 --retry-all-errors --connect-timeout 10 --max-time 30 "$base/api/web-mode" | tee /tmp/web.json
+          curl -fsSL --retry 5 --retry-delay 8 --retry-all-errors --connect-timeout 10 --max-time 45 "$base/api/cloud-forward/status" | tee /tmp/cloud.json
+          curl -fsSL --retry 5 --retry-delay 8 --retry-all-errors --connect-timeout 10 --max-time 60 "$base/api/decision/current?symbol=HYPEUSDT" | tee /tmp/hype.json
+          python3 - <<'PY'
+          import json
+          h=json.load(open('/tmp/health.json'))
+          w=json.load(open('/tmp/web.json'))
+          c=json.load(open('/tmp/cloud.json'))
+          d=json.load(open('/tmp/hype.json'))
+          assert h.get('status')=='ok', h
+          assert w.get('ok') is True and w.get('enabled') is True, w
+          assert w.get('background_workers') is False, w
+          assert w.get('cloud_forward_in_web_process') is False, w
+          assert float(w.get('production_threshold')) == 68.0, w
+          assert c.get('enabled') is False, c
+          assert d.get('ok') is True, d
+          assert float(d.get('signal_threshold')) == 68.0, d
+          print('RENDER_WEB_ONLY_SAFE_MODE_OK')
+          PY
