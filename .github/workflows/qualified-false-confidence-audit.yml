@@ -1,0 +1,41 @@
+name: ATLAS Qualified False Confidence Audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - qualified_false_confidence_audit.py
+      - tests/test_qualified_false_confidence_audit.py
+      - .github/workflows/qualified-false-confidence-audit.yml
+      - status/history/production-snapshots.jsonl
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax and regression test
+        run: |
+          python -m py_compile qualified_false_confidence_audit.py tests/test_qualified_false_confidence_audit.py
+          PYTHONPATH=. python tests/test_qualified_false_confidence_audit.py
+      - name: Run historical audit
+        run: python qualified_false_confidence_audit.py
+      - name: Persist report
+        run: |
+          if [ -n "$(git status --porcelain -- status/qualified-false-confidence-audit.json)" ]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add status/qualified-false-confidence-audit.json
+            git commit -m 'data: refresh qualified false confidence audit'
+            git push
+          else
+            echo 'No report change to persist.'
+          fi
