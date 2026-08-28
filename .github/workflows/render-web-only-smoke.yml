@@ -9,6 +9,7 @@ on:
       - 'cloud_web_only.py'
       - 'render_boot_patch.py'
       - 'production_signal_scoring.py'
+      - 'production_decision_api.py'
       - 'tests/test_partial_hour_volume_progress.py'
       - 'production-web-autoload.js'
       - 'atlas-production-decision.js'
@@ -56,6 +57,20 @@ jobs:
           for d in (btc,hype):
               assert d.get('ok') is True, d
               assert float(d.get('signal_threshold')) == 68.0, d
+              assert 'PACED_VOLUME_V1' in str(d.get('source')), d
+              vp=d.get('volume_pacing') or {}
+              dprogress=float(vp['candle_progress'])
+              draw=float(vp['raw_relative_volume'])
+              dpaced=float(vp['paced_relative_volume'])
+              assert 0.10 <= dprogress <= 1.0, d
+              assert draw >= 0 and dpaced >= 0, d
+              dexpected=min(4.0, draw/dprogress)
+              assert math.isclose(dpaced, dexpected, rel_tol=2e-5, abs_tol=2e-5), (d, dexpected)
+              indicators=d.get('indicators') or {}
+              assert math.isclose(float(indicators['volume_ratio']), dpaced, rel_tol=2e-5, abs_tol=2e-5), d
+              assert math.isclose(float(indicators['raw_volume_ratio']), draw, rel_tol=2e-5, abs_tol=2e-5), d
+              assert math.isclose(float(indicators['candle_progress']), dprogress, rel_tol=2e-5, abs_tol=2e-5), d
+              assert math.isclose(float(d['relative_volume']), dpaced, rel_tol=0, abs_tol=0.0015), d
               direction=d.get('candidate_direction')
               score=d.get('score')
               if direction in ('LONG','SHORT'):
@@ -78,6 +93,11 @@ jobs:
           assert 'PARTIAL_VOLUME_TIME_FIX_V1' in str(vol.get('scoring_version')), vol
           assert float(vol.get('production_threshold')) == 68.0, vol
           assert vol.get('research_only') is True and vol.get('live_execution') is False, vol
+          # Decision and diagnostic are separate live requests; values may move,
+          # but both must be using the same paced-volume formula and same hour.
+          bvp=btc['volume_pacing']
+          assert abs(float(bvp['candle_progress'])-progress) <= 0.05, (btc,vol)
           print('RENDER_WEB_ONLY_PRODUCTION_UI_OK')
+          print('LIVE_DECISION_VOLUME_PACING', bvp)
           print('LIVE_VOLUME_DIAGNOSTIC', vol)
           PY
