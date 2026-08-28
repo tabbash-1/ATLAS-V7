@@ -1,0 +1,37 @@
+name: ATLAS LONG V7 Favorable Regime Stability
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'long_v7_favorable_regime_stability.py'
+      - 'tests/test_long_v7_favorable_regime_stability.py'
+      - '.github/workflows/long-v7-favorable-regime-stability.yml'
+      - 'status/history/production-snapshots.jsonl'
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax and regression test
+        run: |
+          python -m py_compile long_v7_favorable_regime_stability.py tests/test_long_v7_favorable_regime_stability.py
+          PYTHONPATH=. python tests/test_long_v7_favorable_regime_stability.py
+      - name: Run stability audit
+        run: python long_v7_favorable_regime_stability.py
+      - name: Persist report
+        run: |
+          if [ -n "$(git status --porcelain -- status/long-v7-favorable-regime-stability.json)" ]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add status/long-v7-favorable-regime-stability.json
+            git commit -m 'data: refresh long v7 favorable regime stability'
+            git push
+          fi
