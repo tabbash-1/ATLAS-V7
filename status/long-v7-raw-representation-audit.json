@@ -1,11 +1,13 @@
 {
   "coverage": {
-    "cutoff_at": "2026-08-26T05:00:00+00:00",
+    "cutoff_at": "2026-08-26T10:55:07.208047+00:00",
+    "episode_split_order": "FULL_DECORELATE_THEN_SPLIT",
     "full_mature_independent_12h_episodes": 25,
-    "holdout_mature_independent_12h_episodes": 11,
+    "holdout_mature_independent_12h_episodes": 10,
     "hourly_v6_long_rows_with_raw_features": 135,
     "snapshots": 87,
-    "train_mature_independent_12h_episodes": 15
+    "train_mature_independent_12h_episodes": 15,
+    "train_plus_holdout_equals_full": true
   },
   "feature_definitions": {
     "atr_pct": "atr14 / entry * 100",
@@ -16,7 +18,7 @@
     "price_vs_ema20_pct": "(entry / ema20 - 1) * 100",
     "rsi14": "stored raw RSI14"
   },
-  "generated_at": "2026-08-28T16:06:38.762969+00:00",
+  "generated_at": "2026-08-28T16:16:07.699738+00:00",
   "guardrails": {
     "auto_promotion_enabled": false,
     "can_override_production": false,
@@ -95,70 +97,70 @@
       }
     },
     "holdout": {
-      "episode_n": 11,
+      "episode_n": 10,
       "features": {
         "atr_pct": {
-          "loser_mean": 0.878229,
-          "loser_n": 6,
-          "n": 11,
-          "spearman": 0.436364,
+          "loser_mean": 0.745238,
+          "loser_n": 5,
+          "n": 10,
+          "spearman": 0.636364,
           "winner_mean": 1.359764,
           "winner_n": 5
         },
         "ema20_vs_ema50_pct": {
-          "loser_mean": 0.231161,
-          "loser_n": 6,
-          "n": 11,
-          "spearman": -0.145455,
+          "loser_mean": 0.117102,
+          "loser_n": 5,
+          "n": 10,
+          "spearman": 0.006061,
           "winner_mean": 0.111179,
           "winner_n": 5
         },
         "momentum_24h_pct": {
-          "loser_mean": 2.508264,
-          "loser_n": 6,
-          "n": 11,
-          "spearman": -0.272727,
+          "loser_mean": 2.734718,
+          "loser_n": 5,
+          "n": 10,
+          "spearman": -0.369697,
           "winner_mean": 2.479242,
           "winner_n": 5
         },
         "paced_relative_volume": {
-          "loser_mean": 2.814855,
-          "loser_n": 6,
-          "n": 11,
-          "spearman": -0.6,
+          "loser_mean": 2.577826,
+          "loser_n": 5,
+          "n": 10,
+          "spearman": -0.478788,
           "winner_mean": 1.83016,
           "winner_n": 5
         },
         "price_extension_atr": {
-          "loser_mean": 2.035526,
-          "loser_n": 6,
-          "n": 11,
-          "spearman": -0.290909,
+          "loser_mean": 2.307273,
+          "loser_n": 5,
+          "n": 10,
+          "spearman": -0.442424,
           "winner_mean": 1.320431,
           "winner_n": 5
         },
         "price_vs_ema20_pct": {
-          "loser_mean": 1.611546,
-          "loser_n": 6,
-          "n": 11,
-          "spearman": -0.063636,
+          "loser_mean": 1.722768,
+          "loser_n": 5,
+          "n": 10,
+          "spearman": -0.224242,
           "winner_mean": 1.919814,
           "winner_n": 5
         },
         "rsi14": {
-          "loser_mean": 71.390321,
-          "loser_n": 6,
-          "n": 11,
-          "spearman": -0.063636,
+          "loser_mean": 75.449661,
+          "loser_n": 5,
+          "n": 10,
+          "spearman": -0.333333,
           "winner_mean": 66.747731,
           "winner_n": 5
         }
       },
       "outcomes": {
-        "mean_pct": 0.9318,
-        "median_pct": -0.0693,
-        "n": 11,
-        "win_rate_pct": 45.45
+        "mean_pct": 1.1355,
+        "median_pct": 0.5518,
+        "n": 10,
+        "win_rate_pct": 50.0
       }
     },
     "train": {
@@ -575,9 +577,9 @@
     }
   },
   "production_change_recommended": false,
-  "purpose": "Determine whether raw market-state representation carries stable LONG quality signal that is missing from the V6 aggregate score.",
+  "purpose": "Determine whether raw market-state representation carries stable LONG quality signal missing from the V6 aggregate score, using fixed independent episodes.",
   "research_decision": "RAW_REPRESENTATION_HAS_STABLE_SIGNAL",
-  "schema": "ATLAS_LONG_V7_RAW_REPRESENTATION_AUDIT_V1",
+  "schema": "ATLAS_LONG_V7_RAW_REPRESENTATION_AUDIT_V2_FIXED_EPISODES",
   "stable_negative_raw_predictors": [
     "momentum_24h_pct"
   ],
