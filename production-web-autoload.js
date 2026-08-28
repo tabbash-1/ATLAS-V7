@@ -8,6 +8,12 @@
     tile.classList.add(`tone-${kind}`);
   };
   const finite = v => v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v));
+  const fmt = (v, d=2) => finite(v) ? Number(v).toLocaleString(undefined,{maximumFractionDigits:d}) : '—';
+  const setText = (id, value) => {
+    const el = $(id);
+    const next = value == null ? '—' : String(value);
+    if (el && el.textContent !== next) el.textContent = next;
+  };
   function consensusText(d) {
     const l = Number(d?.direction_votes_long);
     const s = Number(d?.direction_votes_short);
@@ -17,13 +23,55 @@
     }
     return d?.candidate_direction || 'MIXED';
   }
+  function canonicalState(d) {
+    const p = d?.trade_plan || {};
+    const qualified = !!d?.production_signal_qualified;
+    const ready = !!d?.execution_ready;
+    if (p.status === 'ACTIONABLE' && qualified && ready && (p.direction === 'LONG' || p.direction === 'SHORT')) return 'ACTIONABLE';
+    if (p.status === 'CONDITIONAL' && qualified) return 'ARMED';
+    return d?.candidate_direction ? 'WATCH' : 'NO_SETUP';
+  }
+  function directional(dir) {
+    return dir === 'LONG' ? 'UP / LONG' : dir === 'SHORT' ? 'DOWN / SHORT' : 'WAIT';
+  }
+  function syncProductShell(d) {
+    if (!d || !d.ok) return;
+    const p = d.trade_plan || {};
+    const state = canonicalState(d);
+    const dir = p.direction || d.candidate_direction;
+    const isActionable = state === 'ACTIONABLE';
+    const isArmed = state === 'ARMED';
+    const finalDecision = isActionable ? dir : 'WAIT';
+    const action = p.action || 'WAIT';
+    const score = finite(d.score) ? Math.round(Number(d.score)) : null;
+    const threshold = finite(d.signal_threshold) ? Math.round(Number(d.signal_threshold)) : 68;
+
+    // One Production snapshot owns BOTH the top cards and the AI action card.
+    setText('apsDecision', finalDecision);
+    const decisionEl = $('apsDecision');
+    if (decisionEl) decisionEl.className = `aps-value ${String(finalDecision).toLowerCase()}`;
+    setText('apsConfidence', `${score === null ? '—' : score}/${threshold}`);
+    setText('apsEntry', isActionable ? fmt(p.entry) : '—');
+    setText('apsStop', isActionable ? fmt(p.stop_loss) : '—');
+    setText('apsTarget', isActionable ? `${fmt(p.tp2)}${finite(p.rr_tp2) ? ` · R:R ${fmt(p.rr_tp2,2)}` : ''}` : '—');
+    setText('apsStatus', isActionable ? 'Canonical Production trade plan ready' : isArmed ? 'ARMED = wait for Production trigger' : 'WAIT = no trade now');
+
+    const dirText = directional(dir);
+    setText('apsAiProd', isActionable ? `${dirText}${score === null ? '' : ` · ${score}/${threshold}`}` : isArmed ? `ARMED · ${dirText}${score === null ? '' : ` · ${score}/${threshold}`}` : `${state}${score === null ? '' : ` · ${score}/${threshold}`}`);
+    setText('apsAiBest', isActionable ? `${action} NOW → ${dirText}` : isArmed ? `ARMED · ${String(action).replaceAll('_',' ')} → ${dirText}` : 'WAIT');
+    setText('apsAiGeometry', p.entry == null ? 'No canonical Production trade geometry' : `${isActionable ? 'Verified Production plan' : isArmed ? 'Armed conditional Production plan' : 'Production plan'} · Entry ${fmt(p.entry)} · Stop ${fmt(p.stop_loss)} · TP1 ${fmt(p.tp1)} · TP2 ${fmt(p.tp2)} · R:R ${fmt(p.rr_tp2,2)}`);
+    setText('apsAiTrigger', p.entry_trigger || p.invalidation || 'Reassess if the verified Production structure changes.');
+    setText('apsAiState', isActionable ? 'Production canonical decision' : isArmed ? 'ARMED — verified trigger defined' : state);
+  }
+
   function render(d) {
     if (!d || !d.ok) return;
-    const state = d.opportunity_state || (d.execution_ready ? 'ACTIONABLE' : d.production_signal_qualified ? 'ARMED' : d.candidate_direction ? 'WATCH' : 'NO_SETUP');
+    const state = canonicalState(d);
     const score = finite(d.score) ? Math.round(Number(d.score)) : null;
     const threshold = finite(d.signal_threshold) ? Math.round(Number(d.signal_threshold)) : 68;
     const direction = d.candidate_direction || 'NONE';
-    const decision = d.actionable_decision && d.actionable_decision !== 'WAIT' ? d.actionable_decision : state;
+    const p = d.trade_plan || {};
+    const decision = state === 'ACTIONABLE' ? direction : state;
 
     const master = $('cmdMasterValue');
     const masterSub = $('cmdMasterSub');
@@ -38,7 +86,6 @@
     if (regime) regime.textContent = d.regime || consensusText(d);
     tone(regime, d.candidate_direction === 'LONG' ? 'positive' : d.candidate_direction === 'SHORT' ? 'negative' : 'neutral');
 
-    const p = d.trade_plan || {};
     const plan = $('cmdPlanValue');
     const planSub = $('cmdPlanSub');
     if (plan) plan.textContent = p.status || (d.execution_ready ? 'ACTIONABLE' : 'WAITING');
@@ -50,11 +97,10 @@
       if (p.rr_tp2 != null) parts.push(`R:R ${p.rr_tp2}`);
       planSub.textContent = parts.length ? parts.join(' · ') : (p.entry_trigger || (state === 'NO_SETUP' ? 'No directional setup — no geometry by design' : 'No executable geometry yet'));
     }
-    tone(plan, d.execution_ready ? 'positive' : state === 'ARMED' ? 'warning' : 'neutral');
+    tone(plan, state === 'ACTIONABLE' ? 'positive' : state === 'ARMED' ? 'warning' : 'neutral');
 
-    // This script is injected only by the Render web-only boot patch. Scheduled
-    // research remains alive in GitHub Actions; it is intentionally not resident
-    // in the Render web process after the OOM incident.
+    syncProductShell(d);
+
     const cloud = $('cmdCloudValue');
     if (cloud) {
       cloud.textContent = 'OFF-WEB';
@@ -101,6 +147,21 @@
     }).observe(title, {subtree:true, childList:true, characterData:true});
   }
 
+  let shellSyncQueued = false;
+  function watchProductShellConsistency() {
+    const shell = $('atlasProductShell');
+    if (!shell || shell.dataset.productionSnapshotGuard === '1') return;
+    shell.dataset.productionSnapshotGuard = '1';
+    new MutationObserver(() => {
+      if (shellSyncQueued) return;
+      shellSyncQueued = true;
+      requestAnimationFrame(() => {
+        shellSyncQueued = false;
+        if (window.ATLAS_PRODUCTION_DECISION) syncProductShell(window.ATLAS_PRODUCTION_DECISION);
+      });
+    }).observe(shell,{subtree:true,childList:true,characterData:true});
+  }
+
   async function boot(attempt = 0) {
     const ui = window.ATLAS_PRODUCTION_DECISION_UI;
     if (!ui || typeof ui.verify !== 'function') {
@@ -111,14 +172,18 @@
     }
     hookVerify(ui);
     watchAssetChanges();
+    watchProductShellConsistency();
     const sub = $('cmdMasterSub');
     if (sub) sub.textContent = 'Verifying live Production…';
     const ok = await ui.verify();
     if (ok && window.ATLAS_PRODUCTION_DECISION) render(window.ATLAS_PRODUCTION_DECISION);
     else if (sub) sub.textContent = 'Production API unavailable — retry Analyze Live';
+    setTimeout(watchProductShellConsistency, 900);
   }
 
   window.ATLAS_RENDER_PRODUCTION_STATUS = render;
+  window.ATLAS_SYNC_PRODUCT_SHELL = syncProductShell;
+  window.ATLAS_CANONICAL_STATE = canonicalState;
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(boot, 350), {once:true});
   else setTimeout(boot, 350);
 })();
