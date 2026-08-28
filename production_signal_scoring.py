@@ -9,7 +9,7 @@ rather than the current candle's own high/low.
 
 import time
 
-VERSION = "PROD_SIGNAL_SCORING_V6_BREAKOUT_AWARE"
+VERSION = "PROD_SIGNAL_SCORING_V6_BREAKOUT_AWARE+PARTIAL_VOLUME_TIME_FIX_V1"
 LOOKBACK_BARS = 96
 RANGE_BARS = 24
 
@@ -22,8 +22,15 @@ def _f(v, default=None):
 
 
 def candle_progress(row, now_ms=None):
-    """Return elapsed fraction of the current 1h candle, bounded for stability."""
-    open_ms = int((row or {}).get('open_time') or 0)
+    """Return elapsed fraction of the current 1h candle, bounded for stability.
+
+    ``collector_server._spot_klines`` exposes Binance's candle open timestamp as
+    ``time``. Older/test callers may use ``open_time``. Supporting both keeps the
+    intended partial-hour normalization active in live Production without
+    changing completed-candle behavior.
+    """
+    r = row or {}
+    open_ms = int(r.get('open_time') or r.get('time') or 0)
     if not open_ms:
         return 1.0
     now_ms = int(now_ms or time.time() * 1000)
