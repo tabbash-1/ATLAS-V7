@@ -28,6 +28,19 @@ jobs:
           grep -q 'requires_requalification' production_reliability.py
           grep -q 'futures_evidence_validated.*False' production_reliability.py
           grep -q 'cloud_web_only.py' cloud_start.py
-          grep -q 'production_reliability' cloud_web_only.py && exit 1 || true
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          tree = ast.parse(Path('cloud_web_only.py').read_text())
+          bad = []
+          for node in ast.walk(tree):
+              if isinstance(node, ast.Import):
+                  bad.extend(a.name for a in node.names if a.name == 'production_reliability')
+              elif isinstance(node, ast.ImportFrom) and node.module == 'production_reliability':
+                  bad.append(node.module)
+          assert not bad, f'web-only runtime imports production_reliability: {bad}'
+          print('web-only reliability import guard: ok')
+          PY
           grep -q 'PARTIAL_VOLUME_TIME_FIX_V1' production_signal_scoring.py
           grep -q "r.get('open_time') or r.get('time')" production_signal_scoring.py
