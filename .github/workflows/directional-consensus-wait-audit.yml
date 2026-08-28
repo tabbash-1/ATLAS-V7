@@ -1,0 +1,47 @@
+name: ATLAS Directional Consensus WAIT Audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'directional_consensus_wait_audit.py'
+      - 'tests/test_directional_consensus_wait_audit.py'
+      - 'status/wait-outcomes.json'
+      - '.github/workflows/directional-consensus-wait-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atlas-directional-consensus-wait-audit
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Regression tests
+        run: PYTHONPATH=. python tests/test_directional_consensus_wait_audit.py
+      - name: Analyze existing WAIT outcomes
+        run: python directional_consensus_wait_audit.py
+      - name: Guard research-only contract
+        run: |
+          grep -q 'production_changed.*False' directional_consensus_wait_audit.py
+          grep -q 'production_threshold.*68' directional_consensus_wait_audit.py
+          grep -q 'auto_promotion.*False' directional_consensus_wait_audit.py
+      - name: Commit compact audit report
+        shell: bash
+        run: |
+          git config user.name "atlas-research-bot"
+          git config user.email "atlas-research@users.noreply.github.com"
+          git add status/directional-consensus-wait-audit.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "data: refresh directional consensus wait audit [skip ci]"
+          git pull --rebase origin main
+          git push
