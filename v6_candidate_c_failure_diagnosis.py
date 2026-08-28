@@ -12,42 +12,41 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
-from v6_shadow_replay import independent, ret, baseline
+from v6_shadow_replay import (
+    independent, ret, baseline,
+    rv as replay_rv, votes as replay_votes,
+    future_adj, obstacle as replay_obstacle, rs_reason as replay_rs_reason,
+)
 
 SRC = Path('status/wait-outcomes.json')
 OUT = Path('status/v6-candidate-c-failure-diagnosis.json')
 H = '12h'
 
 
-def f(v):
-    try: return float(v)
-    except (TypeError, ValueError): return None
-
-
 def attrs(r):
-    a = r.get('score_attribution') or {}
-    rv = f(r.get('relative_volume'))
-    votes = f(r.get('direction_votes'))
-    fut = f(a.get('futures_adjustment')) or 0.0
-    obs = str(r.get('obstacle') or r.get('obstacle_reason') or a.get('obstacle_reason') or '').upper()
-    rs = str(a.get('relative_strength_reason') or r.get('relative_strength_reason') or '').upper()
-    return rv, votes, fut, obs, rs
+    """Use exactly the same field extraction as the frozen replay."""
+    return (
+        replay_rv(r),
+        replay_votes(r),
+        future_adj(r),
+        replay_obstacle(r),
+        replay_rs_reason(r),
+    )
 
 
 def flags(r):
     rv, votes, fut, obs, rs = attrs(r)
     return {
-        'VOLUME_070_099': rv is not None and 0.70 <= rv < 1.0,
-        'VOLUME_050_069': rv is not None and 0.50 <= rv < 0.70,
-        'VOLUME_030_049': rv is not None and 0.30 <= rv < 0.50,
-        'VOLUME_015_029': rv is not None and 0.15 <= rv < 0.30,
-        'VOLUME_GTE_100': rv is not None and rv >= 1.0,
-        'FOUR_DIRECTION_VOTES': votes is not None and votes >= 4,
-        'FUTURES_ABS_GT_2': abs(fut) > 2,
-        'OBSTACLE_CLOSE': 'CLOSE_PRIOR_STRUCTURE' in obs and 'VERY_CLOSE' not in obs,
-        'OBSTACLE_VERY_CLOSE': 'VERY_CLOSE_PRIOR_STRUCTURE' in obs,
+        'VOLUME_LT_015': rv < 0.15,
+        'VOLUME_015_029': 0.15 <= rv < 0.30,
+        'VOLUME_030_059': 0.30 <= rv < 0.60,
+        'VOLUME_060_099': 0.60 <= rv < 1.00,
+        'VOLUME_GTE_100': rv >= 1.00,
+        'FOUR_DIRECTION_VOTES': votes >= 4,
+        'FUTURES_ABS_GT_1': abs(fut) > 1,
+        'OBSTACLE_CLOSE': obs == 'CLOSE_PRIOR_STRUCTURE',
+        'OBSTACLE_VERY_CLOSE': obs == 'VERY_CLOSE_PRIOR_STRUCTURE',
         'RS_ALIGNED_STRONG': rs == 'ALIGNED_STRONG',
-        'RS_OPPOSED_STRONG': rs == 'OPPOSED_STRONG',
     }
 
 
@@ -99,7 +98,7 @@ def main():
             'coverage_removed_pct': round(100*len(bad)/len(top),2) if top else 0,
         }
 
-    # Only nominate a component for a future PREDECLARED veto test; do not apply it.
+    # Nomination only: the next test must be separately predeclared.
     nominees=[]
     for name,d in veto_diag.items():
         bad=d['would_veto']; keep=d['would_keep']
@@ -111,14 +110,15 @@ def main():
     nominees.sort(reverse=True)
 
     report={
-      'schema':'ATLAS_V6_CANDIDATE_C_FAILURE_DIAGNOSIS_V1',
+      'schema':'ATLAS_V6_CANDIDATE_C_FAILURE_DIAGNOSIS_V2_CANONICAL_FIELDS',
       'generated_at':datetime.now(timezone.utc).isoformat(),
       'holdout_12h_n':len(test),
       'candidate_c_status':'REJECTED_AS_RANKER_AND_GENERAL_OVERLAY',
+      'field_extraction':'USES_V6_SHADOW_REPLAY_CANONICAL_HELPERS',
       'component_outcome_diagnostics':diag,
       'baseline_top_half_veto_diagnostics':veto_diag,
       'future_veto_test_nominee': nominees[0][2] if nominees else None,
-      'nominee_rule':'Nomination only. A separate predeclared equal-coverage veto replay is required before any prospective shadow use.',
+      'nominee_rule':'Nomination only. A separate predeclared stability/equal-coverage veto replay is required before any prospective shadow use.',
       'guardrails':{'research_only':True,'production_threshold_changed':False,'production_score_changed':False,'auto_promotion_enabled':False,'candidate_c_promoted':False},
     }
     OUT.write_text(json.dumps(report,indent=2,sort_keys=True)+'\n')
