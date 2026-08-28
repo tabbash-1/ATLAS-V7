@@ -12,10 +12,7 @@ sides of the Train/Holdout cutoff. Invariant: train_n + holdout_n == full_n.
 """
 from __future__ import annotations
 
-from datetime import datetime
-
 import qualified_false_confidence_audit as base
-import long_v7_raw_representation_audit as raw
 
 H = 12
 
@@ -40,10 +37,3 @@ def split_fixed_60_40(episodes):
     if train_keys & holdout_keys:
         raise AssertionError('train/holdout episode overlap detected')
     return train, holdout, cutoff
-
-
-def load_fixed(path=base.SRC):
-    snaps, hourly = raw.load_rows(path)
-    eps = full_fixed_episodes(hourly)
-    train, holdout, cutoff = split_fixed_60_40(eps)
-    return snaps, hourly, eps, train, holdout, cutoff
