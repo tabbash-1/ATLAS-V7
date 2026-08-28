@@ -1,0 +1,41 @@
+name: ATLAS Paired Residual Candidate Scan
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'paired_residual_candidate_scan.py'
+      - 'tests/test_paired_residual_candidate_scan.py'
+      - 'counterfactual_episode_evaluation.py'
+      - 'post_combined_shadow_residual_autopsy.py'
+      - '.github/workflows/paired-residual-candidate-scan.yml'
+      - 'status/**'
+
+permissions:
+  contents: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax and regression test
+        run: |
+          python -m py_compile paired_residual_candidate_scan.py tests/test_paired_residual_candidate_scan.py
+          PYTHONPATH=. python tests/test_paired_residual_candidate_scan.py
+      - name: Run paired residual candidate scan
+        run: python paired_residual_candidate_scan.py
+      - name: Persist report
+        run: |
+          if [ -n "$(git status --porcelain -- status/paired-residual-candidate-scan.json)" ]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add status/paired-residual-candidate-scan.json
+            git commit -m 'data: refresh paired residual candidate scan'
+            git push
+          else
+            echo 'No report change to persist.'
+          fi
