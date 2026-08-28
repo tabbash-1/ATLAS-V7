@@ -1,0 +1,40 @@
+name: ATLAS V6 LONG Representation Audit
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'v6_long_representation_audit.py'
+      - 'tests/test_v6_long_representation_audit.py'
+      - '.github/workflows/v6-long-representation-audit.yml'
+      - 'status/**'
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax and regression test
+        run: |
+          python -m py_compile v6_long_representation_audit.py tests/test_v6_long_representation_audit.py
+          PYTHONPATH=. python tests/test_v6_long_representation_audit.py
+      - name: Run full V6 LONG representation audit
+        run: python v6_long_representation_audit.py
+      - name: Persist report
+        run: |
+          if [ -n "$(git status --porcelain -- status/v6-long-representation-audit.json)" ]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add status/v6-long-representation-audit.json
+            git commit -m 'data: refresh v6 long representation audit'
+            git push
+          else
+            echo 'No report change to persist.'
+          fi
+# registered
