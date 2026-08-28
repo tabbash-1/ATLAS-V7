@@ -16,6 +16,7 @@ current historical Production threshold of 68.
 
 HORIZONS = (1, 4, 12, 24)
 LEGACY_PRODUCTION_THRESHOLD = 68.0
+UNKNOWN_VERSION = 'UNKNOWN'
 
 
 def _fnum(value):
@@ -149,6 +150,14 @@ def _bucket(rows):
     }
 
 
+def _version_buckets(ledger, field):
+    grouped = {}
+    for item in ledger:
+        key = str(item.get(field) or UNKNOWN_VERSION)
+        grouped.setdefault(key, []).append(item)
+    return {key: _bucket(rows) for key, rows in sorted(grouped.items())}
+
+
 def summarize(rows, horizon=24, scope='signals'):
     ledger = build_ledger(rows, horizon=horizon, scope=scope, limit=2000)
     by_symbol = {}
@@ -157,7 +166,7 @@ def summarize(rows, horizon=24, scope='signals'):
         by_symbol.setdefault(item.get('symbol') or 'UNKNOWN', []).append(item)
         by_direction.setdefault(item.get('direction') or 'UNKNOWN', []).append(item)
     return {
-        'schema': 'ATLAS_TRADE_OUTCOME_SUMMARY_V1',
+        'schema': 'ATLAS_TRADE_OUTCOME_SUMMARY_V2_VERSION_COHORTS',
         'horizon_h': int(horizon),
         'scope': scope,
         'scope_semantics': {
@@ -168,6 +177,10 @@ def summarize(rows, horizon=24, scope='signals'):
         'overall': _bucket(ledger),
         'by_symbol': {k: _bucket(v) for k, v in sorted(by_symbol.items())},
         'by_direction': {k: _bucket(v) for k, v in sorted(by_direction.items())},
+        'by_scoring_version': _version_buckets(ledger, 'scoring_version'),
+        'by_decision_version': _version_buckets(ledger, 'decision_version'),
+        'by_trade_plan_version': _version_buckets(ledger, 'trade_plan_version'),
+        'version_cohort_methodology': 'Cohorts are computed only from frozen observation provenance; missing legacy provenance is grouped under UNKNOWN and never inferred.',
         'methodology': 'WIN/LOSS is based on frozen canonical forward return in the signaled direction at the selected horizon. It is not TP/SL path settlement.',
         'r_multiple_available': False,
         'research_only': True,
