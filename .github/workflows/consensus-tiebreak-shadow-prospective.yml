@@ -1,0 +1,94 @@
+name: ATLAS Consensus Tie-Break Shadow Prospective
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'consensus_tiebreak_shadow.py'
+      - 'consensus_tiebreak_shadow_tracker.py'
+      - 'tests/test_consensus_tiebreak_shadow.py'
+      - 'tests/test_consensus_tiebreak_shadow_tracker.py'
+      - '.github/workflows/consensus-tiebreak-shadow-prospective.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atlas-consensus-tiebreak-shadow-prospective
+  cancel-in-progress: false
+
+jobs:
+  sample-and-settle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Regression tests
+        run: |
+          PYTHONPATH=. python tests/test_consensus_tiebreak_shadow.py
+          PYTHONPATH=. python tests/test_consensus_tiebreak_shadow_tracker.py
+      - name: Fetch live research shadow for full universe
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://atlas-v7.onrender.com'
+          mkdir -p /tmp/atlas-shadow
+          for s in BTCUSDT ETHUSDT SOLUSDT XRPUSDT BNBUSDT DOGEUSDT ZECUSDT HYPEUSDT; do
+            curl -fsSL --retry 8 --retry-delay 8 --retry-all-errors --connect-timeout 10 --max-time 60 \
+              "$base/api/research/consensus-tiebreak-shadow?symbol=$s" > "/tmp/atlas-shadow/$s.json"
+          done
+          python3 - <<'PY'
+          import datetime as dt, json, pathlib
+          signals={}
+          for p in sorted(pathlib.Path('/tmp/atlas-shadow').glob('*.json')):
+              x=json.loads(p.read_text())
+              assert x.get('ok') is True, x
+              assert x.get('shadow_only') is True, x
+              assert x.get('can_override_production') is False, x
+              assert x.get('can_execute') is False, x
+              assert float(x.get('production_threshold')) == 68.0, x
+              assert x.get('rule') == 'EXACT_2_2_FOLLOW_24H_MOMENTUM_SIGN', x
+              assert x.get('horizons_hours') == [1,3], x
+              signals[x['symbol']]=x
+          snap={
+              'schema':'ATLAS_CONSENSUS_TIEBREAK_SHADOW_SNAPSHOT_V1',
+              'captured_at':dt.datetime.now(dt.timezone.utc).isoformat(),
+              'signals':signals,
+              'research_only':True,
+              'production_changed':False,
+              'production_threshold':68,
+              'live_execution':False,
+          }
+          pathlib.Path('/tmp/current-shadow-snapshot.json').write_text(json.dumps(snap,sort_keys=True))
+          print(json.dumps({s:{'status':x['status'],'direction':x.get('direction'),'momentum_24h_pct':x.get('momentum_24h_pct')} for s,x in signals.items()},indent=2))
+          PY
+      - name: Append prospective snapshot and settle 1h/3h
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p status/history
+          cat /tmp/current-shadow-snapshot.json >> status/history/consensus-tiebreak-shadow-snapshots.jsonl
+          echo >> status/history/consensus-tiebreak-shadow-snapshots.jsonl
+          python consensus_tiebreak_shadow_tracker.py
+      - name: Guard immutable research contract
+        run: |
+          grep -q 'can_override_production.*False' consensus_tiebreak_shadow.py
+          grep -q 'production_threshold_changed.*False' consensus_tiebreak_shadow.py
+          grep -q 'production_changed.*False' consensus_tiebreak_shadow_tracker.py
+          grep -q 'auto_promotion.*False' consensus_tiebreak_shadow_tracker.py
+      - name: Commit prospective research data
+        shell: bash
+        run: |
+          git config user.name "atlas-research-bot"
+          git config user.email "atlas-research@users.noreply.github.com"
+          git add status/history/consensus-tiebreak-shadow-snapshots.jsonl status/consensus-tiebreak-shadow-prospective.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "data: sample consensus tie-break shadow [skip ci]"
+          git pull --rebase origin main
+          git push
