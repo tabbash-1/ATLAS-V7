@@ -15,21 +15,17 @@ from http.server import ThreadingHTTPServer
 os.environ.setdefault('ATLAS_CLOUD_FORWARD_ENABLED','0')
 os.environ.setdefault('ATLAS_CLOUD_FORWARD_MIN_SCORE','68')
 
-# Always prepare the ephemeral Render UI even when this file is used directly as
-# the dashboard Start Command or Docker CMD. This avoids relying on render.yaml.
 from render_boot_patch import apply as apply_render_boot_patch
 apply_render_boot_patch()
 
 import collector_server as atlas
 
-# Keep HYPE in the API universe, but do not run any boot-wide warm-up scan.
 if 'HYPEUSDT' not in atlas.ON_DEMAND_SYMBOLS:
     atlas.ON_DEMAND_SYMBOLS = tuple(atlas.ON_DEMAND_SYMBOLS) + ('HYPEUSDT',)
 from hype_market_data import install as install_hype_market_data
 install_hype_market_data(atlas)
 atlas.SYMBOLS = tuple(atlas.ON_DEMAND_SYMBOLS)
 
-# No-cache for decision/status responses after deploys.
 _original_end_headers = atlas.Handler.end_headers
 def _no_cache(self):
     self.send_header('Cache-Control','no-store, no-cache, must-revalidate, max-age=0')
@@ -38,9 +34,6 @@ def _no_cache(self):
     _original_end_headers(self)
 atlas.Handler.end_headers = _no_cache
 
-# Minimal Production stack only. Intentionally omitted:
-# production_reliability (concurrent universe warm-up), production_opportunity_runtime
-# (background scans), profit_engine_runtime, outcome/calibration workers, cloud/news loops.
 from production_signal_scoring import (
     VERSION as PRODUCTION_SCORING_VERSION,
     candle_progress,
@@ -61,15 +54,16 @@ install_execution_risk(atlas)
 from ai_trade_council import install as install_ai_council
 install_ai_council(atlas)
 
-# Research-only prospective shadows. They are deliberately installed after the
-# Production decision function and only expose separate endpoints. Neither can
-# override Production, lower threshold 68, or execute orders.
+# Research-only prospective shadows. Installed after Production and exposed only
+# through separate endpoints. None can override Production, lower threshold 68,
+# or execute orders.
 from consensus_tiebreak_shadow import install as install_consensus_tiebreak_shadow
 CONSENSUS_TIEBREAK_SHADOW = install_consensus_tiebreak_shadow(atlas)
 from prospective_fourth_vote_shadow import install as install_fourth_vote_shadow
 FOURTH_VOTE_SHADOW = install_fourth_vote_shadow(atlas)
+from prospective_long_close_shadow import install as install_long_close_shadow
+LONG_CLOSE_STRUCTURE_SHADOW = install_long_close_shadow(atlas)
 
-# Expose explicit web-safe mode for UI/ops diagnostics.
 atlas.WEB_SAFE_MODE = {
     'enabled': True,
     'background_workers': False,
@@ -78,6 +72,7 @@ atlas.WEB_SAFE_MODE = {
     'research_execution_location': 'GITHUB_ACTIONS',
     'consensus_tiebreak_shadow': CONSENSUS_TIEBREAK_SHADOW,
     'fourth_vote_shadow': FOURTH_VOTE_SHADOW,
+    'long_close_structure_shadow': LONG_CLOSE_STRUCTURE_SHADOW,
 }
 
 
@@ -167,5 +162,6 @@ if __name__ == '__main__':
     print(f'Production scoring: {PRODUCTION_SCORING_VERSION}', flush=True)
     print(f'Consensus tie-break shadow: {CONSENSUS_TIEBREAK_SHADOW["version"]}', flush=True)
     print(f'Fourth-vote prospective shadow: {FOURTH_VOTE_SHADOW["version"]}', flush=True)
+    print(f'LONG+CLOSE prospective shadow: {LONG_CLOSE_STRUCTURE_SHADOW["version"]}', flush=True)
     print(f'Listening on {port}', flush=True)
     Server(('0.0.0.0',port), WebOnlyHandler).serve_forever(poll_interval=0.5)
