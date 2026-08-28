@@ -1,10 +1,10 @@
-"""ATLAS Decision Engine V10: continuation-aware geometry + explicit opportunity states."""
+"""ATLAS Decision Engine V11: canonical public geometry + explicit opportunity states."""
 
 import production_signal_scoring as scoring
 import futures_provider_chain
 import production_trade_plan
 
-VERSION = 'DECISION_ENGINE_V10_OPPORTUNITY_STATE'
+VERSION = 'DECISION_ENGINE_V11_CANONICAL_PUBLIC_GEOMETRY'
 
 
 def opportunity_state(direction, qualified, execution_ready, plan_status=None):
@@ -22,6 +22,57 @@ def opportunity_state(direction, qualified, execution_ready, plan_status=None):
     if qualified and plan_status == 'CONDITIONAL':
         return 'ARMED'
     return 'WATCH'
+
+
+def sync_public_geometry(result, plan):
+    """Expose one user-facing Entry/SL/TP/RR contract without changing qualification.
+
+    The structural geometry that decided whether current execution is allowed is
+    preserved separately for audit. Public execution fields mirror the canonical
+    Production trade_plan so old and new UIs cannot display conflicting levels.
+    """
+    if not isinstance(result, dict) or not isinstance(plan, dict):
+        return result
+    if plan.get('status') not in ('ACTIONABLE', 'CONDITIONAL'):
+        return result
+    required = ('entry', 'stop_loss', 'tp2', 'rr_tp2')
+    if any(plan.get(key) is None for key in required):
+        return result
+
+    prior_gate = dict(result.get('geometry_gate') or {})
+    result['qualification_geometry'] = {
+        'entry': result.get('entry'),
+        'stop_loss': result.get('stop_loss'),
+        'take_profit': result.get('take_profit'),
+        'risk_reward': result.get('risk_reward'),
+        'geometry_gate': prior_gate,
+        'purpose': 'QUALIFICATION_ONLY_NOT_USER_FACING_TRADE_PLAN',
+    }
+    result['entry'] = plan.get('entry')
+    result['stop_loss'] = plan.get('stop_loss')
+    result['take_profit'] = plan.get('tp2')
+    result['risk_reward'] = plan.get('rr_tp2')
+    result['public_geometry_source'] = 'production_trade_plan'
+    result['trade_plan_version'] = plan.get('version')
+
+    gate = dict(prior_gate)
+    gate['qualification_risk_reward'] = prior_gate.get('risk_reward')
+    gate['risk_reward'] = plan.get('rr_tp2')
+    gate['public_geometry_source'] = 'production_trade_plan'
+    result['geometry_gate'] = gate
+
+    matrix = result.get('timeframe_matrix') or {}
+    swing = matrix.get('swing') or {}
+    swing.update({
+        'risk_reward': plan.get('rr_tp2'),
+        'entry': plan.get('entry'),
+        'stop_loss': plan.get('stop_loss'),
+        'take_profit': plan.get('tp2'),
+        'public_geometry_source': 'production_trade_plan',
+    })
+    matrix['swing'] = swing
+    result['timeframe_matrix'] = matrix
+    return result
 
 
 def install(atlas):
@@ -70,11 +121,12 @@ def install(atlas):
             'DIRECTIONAL_CANDIDATE_NOT_YET_PRODUCTION_QUALIFIED' if state=='WATCH' else
             'NO_DIRECTIONAL_CANDIDATE'
         )
+        sync_public_geometry(result, plan)
         matrix=result.get('timeframe_matrix') or {}; swing=matrix.get('swing') or {}; swing['opportunity_state']=state; matrix['swing']=swing; result['timeframe_matrix']=matrix
         lane='PRODUCTION_SWING' if state=='ACTIONABLE' else 'ARMED_PRODUCTION' if state=='ARMED' else 'WATCH_PRODUCTION' if state=='WATCH' else 'NO_SETUP'
         result['best_available_action']={'action':plan.get('action'),'direction':plan.get('direction'),'lane':lane,'status':plan.get('status'),'opportunity_state':state,'entry_mode':plan.get('entry_mode'),'entry':plan.get('entry'),'entry_trigger':plan.get('entry_trigger'),'stop_loss':plan.get('stop_loss'),'tp1':plan.get('tp1'),'tp2':plan.get('tp2'),'rr_tp1':plan.get('rr_tp1'),'rr_tp2':plan.get('rr_tp2'),'can_execute':False,'research_only':True}
         result['decision_engine_version']=VERSION
         return result
     atlas.production_decision=build
-    atlas.DECISION_ENGINE_V7_STATE={'enabled':True,'version':VERSION,'production_threshold_unchanged':True,'futures_provider_chain':futures_provider_chain.VERSION,'continuation_aware':True,'complete_trade_plan':True,'explicit_opportunity_states':['ACTIONABLE','ARMED','WATCH','NO_SETUP']}
+    atlas.DECISION_ENGINE_V7_STATE={'enabled':True,'version':VERSION,'production_threshold_unchanged':True,'futures_provider_chain':futures_provider_chain.VERSION,'continuation_aware':True,'complete_trade_plan':True,'canonical_public_geometry':True,'explicit_opportunity_states':['ACTIONABLE','ARMED','WATCH','NO_SETUP']}
     return atlas.DECISION_ENGINE_V7_STATE
