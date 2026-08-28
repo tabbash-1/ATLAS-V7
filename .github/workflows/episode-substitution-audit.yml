@@ -1,0 +1,39 @@
+name: ATLAS Episode Substitution Audit
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'episode_substitution_audit.py'
+      - 'tests/test_episode_substitution_audit.py'
+      - '.github/workflows/episode-substitution-audit.yml'
+      - 'status/**'
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax and regression test
+        run: |
+          python -m py_compile episode_substitution_audit.py tests/test_episode_substitution_audit.py
+          PYTHONPATH=. python tests/test_episode_substitution_audit.py
+      - name: Run substitution audit
+        run: python episode_substitution_audit.py
+      - name: Persist report
+        run: |
+          if [ -n "$(git status --porcelain -- status/episode-substitution-audit.json)" ]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add status/episode-substitution-audit.json
+            git commit -m 'data: refresh episode substitution audit'
+            git push
+          else
+            echo 'No report change to persist.'
+          fi
