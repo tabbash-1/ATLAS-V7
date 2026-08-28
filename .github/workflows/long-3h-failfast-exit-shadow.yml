@@ -1,0 +1,40 @@
+name: ATLAS Long 3h Failfast Exit Shadow
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'long_3h_failfast_exit_shadow.py'
+      - 'tests/test_long_3h_failfast_exit_shadow.py'
+      - '.github/workflows/long-3h-failfast-exit-shadow.yml'
+      - 'status/**'
+
+permissions:
+  contents: write
+
+jobs:
+  shadow:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax and regression test
+        run: |
+          python -m py_compile long_3h_failfast_exit_shadow.py tests/test_long_3h_failfast_exit_shadow.py
+          PYTHONPATH=. python tests/test_long_3h_failfast_exit_shadow.py
+      - name: Run fail-fast exit replay
+        run: python long_3h_failfast_exit_shadow.py
+      - name: Persist report
+        run: |
+          if [ -n "$(git status --porcelain -- status/long-3h-failfast-exit-shadow.json)" ]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add status/long-3h-failfast-exit-shadow.json
+            git commit -m 'data: refresh long 3h failfast exit shadow'
+            git push
+          else
+            echo 'No report change to persist.'
+          fi
+# registered
