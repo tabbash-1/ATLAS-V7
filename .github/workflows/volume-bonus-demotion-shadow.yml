@@ -1,0 +1,42 @@
+name: ATLAS Volume Bonus Demotion Shadow
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - volume_bonus_demotion_shadow.py
+      - qualified_false_confidence_audit.py
+      - tests/test_volume_bonus_demotion_shadow.py
+      - .github/workflows/volume-bonus-demotion-shadow.yml
+      - status/history/production-snapshots.jsonl
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  shadow:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax and regression test
+        run: |
+          python -m py_compile volume_bonus_demotion_shadow.py tests/test_volume_bonus_demotion_shadow.py
+          PYTHONPATH=. python tests/test_volume_bonus_demotion_shadow.py
+      - name: Run isolated shadow replay
+        run: python volume_bonus_demotion_shadow.py
+      - name: Persist report
+        run: |
+          if [ -n "$(git status --porcelain -- status/volume-bonus-demotion-shadow.json)" ]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add status/volume-bonus-demotion-shadow.json
+            git commit -m 'data: refresh volume bonus demotion shadow'
+            git push
+          else
+            echo 'No report change to persist.'
+          fi
