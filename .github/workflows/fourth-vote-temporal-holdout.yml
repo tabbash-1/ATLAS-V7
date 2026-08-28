@@ -1,0 +1,43 @@
+name: ATLAS Fourth Vote Temporal Holdout
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - fourth_vote_temporal_holdout.py
+      - fourth_vote_demotion_shadow.py
+      - qualified_false_confidence_audit.py
+      - tests/test_fourth_vote_temporal_holdout.py
+      - .github/workflows/fourth-vote-temporal-holdout.yml
+      - status/history/production-snapshots.jsonl
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  holdout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax and regression test
+        run: |
+          python -m py_compile fourth_vote_temporal_holdout.py tests/test_fourth_vote_temporal_holdout.py
+          PYTHONPATH=. python tests/test_fourth_vote_temporal_holdout.py
+      - name: Run chronological holdout
+        run: python fourth_vote_temporal_holdout.py
+      - name: Persist report
+        run: |
+          if [ -n "$(git status --porcelain -- status/fourth-vote-temporal-holdout.json)" ]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add status/fourth-vote-temporal-holdout.json
+            git commit -m 'data: refresh fourth vote temporal holdout'
+            git push
+          else
+            echo 'No report change to persist.'
+          fi
