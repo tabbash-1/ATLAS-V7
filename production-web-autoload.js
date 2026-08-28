@@ -24,6 +24,7 @@
     const threshold = finite(d.signal_threshold) ? Math.round(Number(d.signal_threshold)) : 68;
     const direction = d.candidate_direction || 'NONE';
     const decision = d.actionable_decision && d.actionable_decision !== 'WAIT' ? d.actionable_decision : state;
+
     const master = $('cmdMasterValue');
     const masterSub = $('cmdMasterSub');
     if (master) master.textContent = `${decision} · ${score === null ? '—' : score}/${threshold}`;
@@ -51,14 +52,18 @@
     }
     tone(plan, d.execution_ready ? 'positive' : state === 'ARMED' ? 'warning' : 'neutral');
 
+    // This script is injected only by the Render web-only boot patch. Scheduled
+    // research remains alive in GitHub Actions; it is intentionally not resident
+    // in the Render web process after the OOM incident.
     const cloud = $('cmdCloudValue');
-    if (cloud && String(cloud.textContent || '').toUpperCase() === 'DISABLED') {
+    if (cloud) {
       cloud.textContent = 'OFF-WEB';
       const small = cloud.closest('.command-tile')?.querySelector('small');
-      if (small) small.textContent = 'Scheduled research runs in GitHub Actions';
+      if (small) small.textContent = 'Scheduled research: GitHub Actions';
       tone(cloud, 'neutral');
     }
   }
+
   function hookVerify(ui) {
     if (!ui || typeof ui.verify !== 'function' || ui.__commandStripHooked) return;
     const original = ui.verify.bind(ui);
@@ -69,6 +74,33 @@
     };
     ui.__commandStripHooked = true;
   }
+
+  let refreshTimer = null;
+  function scheduleCurrentAssetVerify(delay = 140) {
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(async () => {
+      const ui = window.ATLAS_PRODUCTION_DECISION_UI;
+      if (!ui || typeof ui.verify !== 'function') return;
+      await ui.verify();
+    }, delay);
+  }
+
+  function watchAssetChanges() {
+    const title = $('activeTitle');
+    if (!title || title.dataset.productionAssetWatcher === '1') return;
+    title.dataset.productionAssetWatcher = '1';
+    let previous = title.textContent.trim();
+    new MutationObserver(() => {
+      const current = title.textContent.trim();
+      if (current && current !== previous) {
+        previous = current;
+        const sub = $('cmdMasterSub');
+        if (sub) sub.textContent = `Verifying ${current}…`;
+        scheduleCurrentAssetVerify();
+      }
+    }).observe(title, {subtree:true, childList:true, characterData:true});
+  }
+
   async function boot(attempt = 0) {
     const ui = window.ATLAS_PRODUCTION_DECISION_UI;
     if (!ui || typeof ui.verify !== 'function') {
@@ -78,12 +110,14 @@
       return;
     }
     hookVerify(ui);
+    watchAssetChanges();
     const sub = $('cmdMasterSub');
     if (sub) sub.textContent = 'Verifying live Production…';
     const ok = await ui.verify();
     if (ok && window.ATLAS_PRODUCTION_DECISION) render(window.ATLAS_PRODUCTION_DECISION);
     else if (sub) sub.textContent = 'Production API unavailable — retry Analyze Live';
   }
+
   window.ATLAS_RENDER_PRODUCTION_STATUS = render;
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(boot, 350), {once:true});
   else setTimeout(boot, 350);
