@@ -1,0 +1,39 @@
+name: ATLAS Horizon Transition Gap Analysis
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'horizon_transition_gap_analysis.py'
+      - 'tests/test_horizon_transition_gap_analysis.py'
+      - '.github/workflows/horizon-transition-gap-analysis.yml'
+      - 'status/**'
+
+permissions:
+  contents: write
+
+jobs:
+  analyze:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax and regression test
+        run: |
+          python -m py_compile horizon_transition_gap_analysis.py tests/test_horizon_transition_gap_analysis.py
+          PYTHONPATH=. python tests/test_horizon_transition_gap_analysis.py
+      - name: Run horizon transition analysis
+        run: python horizon_transition_gap_analysis.py
+      - name: Persist report
+        run: |
+          if [ -n "$(git status --porcelain -- status/horizon-transition-gap-analysis.json)" ]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add status/horizon-transition-gap-analysis.json
+            git commit -m 'data: refresh horizon transition gap analysis'
+            git push
+          else
+            echo 'No report change to persist.'
+          fi
