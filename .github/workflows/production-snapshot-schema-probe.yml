@@ -1,0 +1,43 @@
+name: ATLAS Production Snapshot Schema Probe
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/production-snapshot-schema-probe.yml
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Print compact schema only
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('status/history/production-snapshots.jsonl')
+          rows=[]
+          with p.open() as f:
+              for line in f:
+                  line=line.strip()
+                  if not line: continue
+                  try: rows.append(json.loads(line))
+                  except Exception: pass
+                  if len(rows)>=2: break
+          def desc(x,depth=0):
+              if depth>=3: return type(x).__name__
+              if isinstance(x,dict):
+                  return {k:desc(v,depth+1) for k,v in list(x.items())[:30]}
+              if isinstance(x,list):
+                  return {'list_len':len(x),'first':desc(x[0],depth+1) if x else None}
+              return type(x).__name__
+          print('nonblank_sample_rows=',len(rows))
+          for i,r in enumerate(rows):
+              print('ROW',i,json.dumps(desc(r),sort_keys=True))
+          PY
