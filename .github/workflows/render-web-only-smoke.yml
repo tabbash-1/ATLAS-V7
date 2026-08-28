@@ -10,7 +10,9 @@ on:
       - 'render_boot_patch.py'
       - 'production_signal_scoring.py'
       - 'production_decision_api.py'
+      - 'consensus_tiebreak_shadow.py'
       - 'tests/test_partial_hour_volume_progress.py'
+      - 'tests/test_consensus_tiebreak_shadow.py'
       - 'production-web-autoload.js'
       - 'atlas-production-decision.js'
       - '.github/workflows/render-web-only-smoke.yml'
@@ -22,7 +24,7 @@ jobs:
     steps:
       - name: Wait for Render deploy
         run: sleep 90
-      - name: Verify web-safe runtime, Production UI, and live volume pacing
+      - name: Verify web-safe runtime, Production UI, live volume pacing, and shadow isolation
         shell: bash
         run: |
           set -euo pipefail
@@ -32,6 +34,7 @@ jobs:
           curl -fsSL --retry 5 --retry-delay 8 --retry-all-errors --connect-timeout 10 --max-time 45 "$base/api/cloud-forward/status" | tee /tmp/cloud.json
           curl -fsSL --retry 5 --retry-delay 8 --retry-all-errors --connect-timeout 10 --max-time 60 "$base/api/decision/current?symbol=BTCUSDT" | tee /tmp/btc.json
           curl -fsSL --retry 5 --retry-delay 8 --retry-all-errors --connect-timeout 10 --max-time 60 "$base/api/decision/current?symbol=HYPEUSDT" | tee /tmp/hype.json
+          curl -fsSL --retry 5 --retry-delay 8 --retry-all-errors --connect-timeout 10 --max-time 60 "$base/api/research/consensus-tiebreak-shadow?symbol=BTCUSDT" | tee /tmp/shadow.json
           curl -fsSL --retry 5 --retry-delay 8 --retry-all-errors --connect-timeout 10 --max-time 45 "$base/api/web/volume-diagnostic?symbol=BTCUSDT" | tee /tmp/vol.json
           curl -fsSL --retry 5 --retry-delay 8 --retry-all-errors --connect-timeout 10 --max-time 30 "$base/" | tee /tmp/index.html >/dev/null
           grep -q 'atlas-production-decision.js' /tmp/index.html
@@ -47,12 +50,17 @@ jobs:
           c=json.load(open('/tmp/cloud.json'))
           btc=json.load(open('/tmp/btc.json'))
           hype=json.load(open('/tmp/hype.json'))
+          shadow=json.load(open('/tmp/shadow.json'))
           vol=json.load(open('/tmp/vol.json'))
           assert h.get('status')=='ok', h
           assert w.get('ok') is True and w.get('enabled') is True, w
           assert w.get('background_workers') is False, w
           assert w.get('cloud_forward_in_web_process') is False, w
           assert float(w.get('production_threshold')) == 68.0, w
+          shadow_mode=w.get('consensus_tiebreak_shadow') or {}
+          assert shadow_mode.get('shadow_only') is True, w
+          assert shadow_mode.get('can_override_production') is False, w
+          assert shadow_mode.get('production_threshold_changed') is False, w
           assert c.get('enabled') is False, c
           for d in (btc,hype):
               assert d.get('ok') is True, d
@@ -81,6 +89,23 @@ jobs:
                   assert d.get('wait_reason') in ('NO_DIRECTIONAL_CONSENSUS','SCORER_RETURNED_NO_CANDIDATE'), d
                   assert isinstance(d.get('direction_votes_long'), int), d
                   assert isinstance(d.get('direction_votes_short'), int), d
+          assert shadow.get('ok') is True, shadow
+          assert 'CONSENSUS_TIEBREAK_SHADOW_V1' in str(shadow.get('source')), shadow
+          assert shadow.get('shadow_only') is True, shadow
+          assert shadow.get('can_override_production') is False, shadow
+          assert shadow.get('can_execute') is False, shadow
+          assert shadow.get('research_only') is True and shadow.get('live_execution') is False, shadow
+          assert float(shadow.get('production_threshold')) == 68.0, shadow
+          assert shadow.get('horizons_hours') == [1,3], shadow
+          assert shadow.get('rule') == 'EXACT_2_2_FOLLOW_24H_MOMENTUM_SIGN', shadow
+          if shadow.get('status') == 'SHADOW_SIGNAL':
+              assert shadow.get('production_decision') == 'WAIT', shadow
+              assert shadow.get('production_wait_reason') == 'NO_DIRECTIONAL_CONSENSUS', shadow
+              assert shadow.get('direction_votes_long') == 2 and shadow.get('direction_votes_short') == 2, shadow
+              mom=float(shadow.get('momentum_24h_pct'))
+              assert shadow.get('direction') == ('LONG' if mom >= 0 else 'SHORT'), shadow
+          else:
+              assert shadow.get('status') == 'INACTIVE', shadow
           assert vol.get('ok') is True, vol
           assert vol.get('symbol') == 'BTCUSDT', vol
           progress=float(vol['candle_progress'])
@@ -98,6 +123,7 @@ jobs:
           bvp=btc['volume_pacing']
           assert abs(float(bvp['candle_progress'])-progress) <= 0.05, (btc,vol)
           print('RENDER_WEB_ONLY_PRODUCTION_UI_OK')
+          print('LIVE_CONSENSUS_TIEBREAK_SHADOW', shadow)
           print('LIVE_DECISION_VOLUME_PACING', bvp)
           print('LIVE_VOLUME_DIAGNOSTIC', vol)
           PY
