@@ -43,13 +43,15 @@ jobs:
       - name: Verify delegated production entrypoints
         run: |
           set -euo pipefail
-          grep -q 'cloud_start.py' Procfile
-          grep -q 'cloud_start.py' render.yaml
+          # Each deployment surface intentionally uses the runtime suited to it:
+          # Procfile -> full web stack, Render/Docker -> ultra-light web-only stack.
+          grep -q 'cloud_start_web.py' Procfile
+          grep -q 'cloud_web_only.py' render.yaml
           grep -q 'cloud_web_only.py' Dockerfile
           grep -q 'mountPath: /var/data' render.yaml
           ! grep -q 'OPENAI_API_KEY' render.yaml
 
-          # Compatibility entrypoint explicitly routes Render and local/manual starts.
+          # Compatibility entrypoint remains safe for manual/legacy invocations.
           grep -q 'cloud_web_only.py' cloud_start.py
           grep -q 'cloud_start_web.py' cloud_start.py
           grep -q 'ATLAS_CLOUD_FORWARD_ENABLED.*0' cloud_start.py
