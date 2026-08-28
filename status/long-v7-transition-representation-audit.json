@@ -1,0 +1,948 @@
+{
+  "coverage": {
+    "cutoff_at": "2026-08-26T10:55:07.208047+00:00",
+    "episode_split_order": "FULL_DECORELATE_THEN_SPLIT",
+    "full_episode_n": 25,
+    "holdout_episode_n": 10,
+    "hourly_v6_long_rows": 135,
+    "snapshots": 87,
+    "train_episode_n": 15,
+    "train_plus_holdout_equals_full": true
+  },
+  "feature_definitions": {
+    "atr_over_ema20_pct": "ATR14 / EMA20 * 100",
+    "delta_*": "current state minus strictly-prior same-symbol state at the named lag",
+    "ema20_change_pct_*": "(current EMA20 / prior EMA20 - 1) * 100",
+    "ema_spread_pct": "(EMA20 / EMA50 - 1) * 100",
+    "paced_relative_volume": "partial-hour-safe relative volume at each historical timestamp"
+  },
+  "generated_at": "2026-08-28T16:32:25.825304+00:00",
+  "guardrails": {
+    "auto_promotion_enabled": false,
+    "can_override_production": false,
+    "live_execution": false,
+    "production_scoring_changed": false,
+    "production_threshold": 68.0,
+    "production_threshold_changed": false,
+    "research_only": true
+  },
+  "lag_rules": {
+    "1h": {
+      "strictly_prior": true,
+      "target_minutes": 60,
+      "tolerance_minutes": 35
+    },
+    "3h": {
+      "strictly_prior": true,
+      "target_minutes": 180,
+      "tolerance_minutes": 75
+    }
+  },
+  "lanes": {
+    "full": {
+      "episode_n": 25,
+      "features": {
+        "delta_atr_over_ema20_pct_1h": {
+          "coverage_pct": 60.0,
+          "loser_mean": -0.030356,
+          "loser_n": 9,
+          "n": 15,
+          "spearman": 0.639286,
+          "winner_mean": -0.029044,
+          "winner_n": 6
+        },
+        "delta_atr_over_ema20_pct_3h": {
+          "coverage_pct": 68.0,
+          "loser_mean": -0.013067,
+          "loser_n": 11,
+          "n": 17,
+          "spearman": 0.056373,
+          "winner_mean": -0.04831,
+          "winner_n": 6
+        },
+        "delta_ema_spread_pct_1h": {
+          "coverage_pct": 60.0,
+          "loser_mean": 0.009418,
+          "loser_n": 9,
+          "n": 15,
+          "spearman": 0.335714,
+          "winner_mean": 0.053482,
+          "winner_n": 6
+        },
+        "delta_ema_spread_pct_3h": {
+          "coverage_pct": 68.0,
+          "loser_mean": 0.012993,
+          "loser_n": 11,
+          "n": 17,
+          "spearman": 0.112745,
+          "winner_mean": 0.082046,
+          "winner_n": 6
+        },
+        "delta_momentum_24h_pct_1h": {
+          "coverage_pct": 60.0,
+          "loser_mean": -0.145378,
+          "loser_n": 9,
+          "n": 15,
+          "spearman": 0.582143,
+          "winner_mean": 1.010431,
+          "winner_n": 6
+        },
+        "delta_momentum_24h_pct_3h": {
+          "coverage_pct": 68.0,
+          "loser_mean": 0.541301,
+          "loser_n": 11,
+          "n": 17,
+          "spearman": 0.267157,
+          "winner_mean": 1.578632,
+          "winner_n": 6
+        },
+        "delta_paced_relative_volume_1h": {
+          "coverage_pct": 60.0,
+          "loser_mean": -0.517354,
+          "loser_n": 9,
+          "n": 15,
+          "spearman": -0.117857,
+          "winner_mean": -0.497518,
+          "winner_n": 6
+        },
+        "delta_paced_relative_volume_3h": {
+          "coverage_pct": 68.0,
+          "loser_mean": 0.19326,
+          "loser_n": 11,
+          "n": 17,
+          "spearman": 0.053922,
+          "winner_mean": 0.117716,
+          "winner_n": 6
+        },
+        "delta_rsi14_1h": {
+          "coverage_pct": 60.0,
+          "loser_mean": 4.002762,
+          "loser_n": 9,
+          "n": 15,
+          "spearman": 0.392857,
+          "winner_mean": 7.758679,
+          "winner_n": 6
+        },
+        "delta_rsi14_3h": {
+          "coverage_pct": 68.0,
+          "loser_mean": 2.668634,
+          "loser_n": 11,
+          "n": 17,
+          "spearman": 0.362745,
+          "winner_mean": 8.738593,
+          "winner_n": 6
+        },
+        "ema20_change_pct_1h": {
+          "coverage_pct": 60.0,
+          "loser_mean": 0.062882,
+          "loser_n": 9,
+          "n": 15,
+          "spearman": 0.182143,
+          "winner_mean": 0.120788,
+          "winner_n": 6
+        },
+        "ema20_change_pct_3h": {
+          "coverage_pct": 68.0,
+          "loser_mean": 0.120092,
+          "loser_n": 11,
+          "n": 17,
+          "spearman": -0.026961,
+          "winner_mean": 0.22772,
+          "winner_n": 6
+        }
+      },
+      "outcomes": {
+        "mean_pct": -0.2534,
+        "median_pct": -0.1907,
+        "n": 25,
+        "win_rate_pct": 40.0
+      }
+    },
+    "holdout": {
+      "episode_n": 10,
+      "features": {
+        "delta_atr_over_ema20_pct_1h": {
+          "coverage_pct": 20.0,
+          "n": 2,
+          "spearman": null
+        },
+        "delta_atr_over_ema20_pct_3h": {
+          "coverage_pct": 20.0,
+          "n": 2,
+          "spearman": null
+        },
+        "delta_ema_spread_pct_1h": {
+          "coverage_pct": 20.0,
+          "n": 2,
+          "spearman": null
+        },
+        "delta_ema_spread_pct_3h": {
+          "coverage_pct": 20.0,
+          "n": 2,
+          "spearman": null
+        },
+        "delta_momentum_24h_pct_1h": {
+          "coverage_pct": 20.0,
+          "n": 2,
+          "spearman": null
+        },
+        "delta_momentum_24h_pct_3h": {
+          "coverage_pct": 20.0,
+          "n": 2,
+          "spearman": null
+        },
+        "delta_paced_relative_volume_1h": {
+          "coverage_pct": 20.0,
+          "n": 2,
+          "spearman": null
+        },
+        "delta_paced_relative_volume_3h": {
+          "coverage_pct": 20.0,
+          "n": 2,
+          "spearman": null
+        },
+        "delta_rsi14_1h": {
+          "coverage_pct": 20.0,
+          "n": 2,
+          "spearman": null
+        },
+        "delta_rsi14_3h": {
+          "coverage_pct": 20.0,
+          "n": 2,
+          "spearman": null
+        },
+        "ema20_change_pct_1h": {
+          "coverage_pct": 20.0,
+          "n": 2,
+          "spearman": null
+        },
+        "ema20_change_pct_3h": {
+          "coverage_pct": 20.0,
+          "n": 2,
+          "spearman": null
+        }
+      },
+      "outcomes": {
+        "mean_pct": 1.1355,
+        "median_pct": 0.5518,
+        "n": 10,
+        "win_rate_pct": 50.0
+      }
+    },
+    "train": {
+      "episode_n": 15,
+      "features": {
+        "delta_atr_over_ema20_pct_1h": {
+          "coverage_pct": 86.67,
+          "loser_mean": -0.041757,
+          "loser_n": 8,
+          "n": 13,
+          "spearman": 0.631868,
+          "winner_mean": -0.041665,
+          "winner_n": 5
+        },
+        "delta_atr_over_ema20_pct_3h": {
+          "coverage_pct": 100.0,
+          "loser_mean": -0.024908,
+          "loser_n": 10,
+          "n": 15,
+          "spearman": -0.167857,
+          "winner_mean": -0.082663,
+          "winner_n": 5
+        },
+        "delta_ema_spread_pct_1h": {
+          "coverage_pct": 86.67,
+          "loser_mean": -0.000364,
+          "loser_n": 8,
+          "n": 13,
+          "spearman": 0.302198,
+          "winner_mean": 0.057047,
+          "winner_n": 5
+        },
+        "delta_ema_spread_pct_3h": {
+          "coverage_pct": 100.0,
+          "loser_mean": 0.00713,
+          "loser_n": 10,
+          "n": 15,
+          "spearman": 0.060714,
+          "winner_mean": 0.098581,
+          "winner_n": 5
+        },
+        "delta_momentum_24h_pct_1h": {
+          "coverage_pct": 86.67,
+          "loser_mean": -0.361783,
+          "loser_n": 8,
+          "n": 13,
+          "spearman": 0.527473,
+          "winner_mean": 0.86257,
+          "winner_n": 5
+        },
+        "delta_momentum_24h_pct_3h": {
+          "coverage_pct": 100.0,
+          "loser_mean": 0.465457,
+          "loser_n": 10,
+          "n": 15,
+          "spearman": 0.235714,
+          "winner_mean": 1.670639,
+          "winner_n": 5
+        },
+        "delta_paced_relative_volume_1h": {
+          "coverage_pct": 86.67,
+          "loser_mean": -0.467095,
+          "loser_n": 8,
+          "n": 13,
+          "spearman": 0.027473,
+          "winner_mean": -0.032951,
+          "winner_n": 5
+        },
+        "delta_paced_relative_volume_3h": {
+          "coverage_pct": 100.0,
+          "loser_mean": -0.070545,
+          "loser_n": 10,
+          "n": 15,
+          "spearman": -0.160714,
+          "winner_mean": -0.089078,
+          "winner_n": 5
+        },
+        "delta_rsi14_1h": {
+          "coverage_pct": 86.67,
+          "loser_mean": 1.352437,
+          "loser_n": 8,
+          "n": 13,
+          "spearman": 0.263736,
+          "winner_mean": 4.202313,
+          "winner_n": 5
+        },
+        "delta_rsi14_3h": {
+          "coverage_pct": 100.0,
+          "loser_mean": 0.745768,
+          "loser_n": 10,
+          "n": 15,
+          "spearman": 0.225,
+          "winner_mean": 6.266361,
+          "winner_n": 5
+        },
+        "ema20_change_pct_1h": {
+          "coverage_pct": 86.67,
+          "loser_mean": 0.05481,
+          "loser_n": 8,
+          "n": 13,
+          "spearman": 0.153846,
+          "winner_mean": 0.135507,
+          "winner_n": 5
+        },
+        "ema20_change_pct_3h": {
+          "coverage_pct": 100.0,
+          "loser_mean": 0.12209,
+          "loser_n": 10,
+          "n": 15,
+          "spearman": 0.053571,
+          "winner_mean": 0.276163,
+          "winner_n": 5
+        }
+      },
+      "outcomes": {
+        "mean_pct": -1.1793,
+        "median_pct": -1.2439,
+        "n": 15,
+        "win_rate_pct": 33.33
+      }
+    }
+  },
+  "leave_one_symbol_out_full": {
+    "delta_atr_over_ema20_pct_1h": {
+      "all_negative": false,
+      "all_positive": true,
+      "eligible_tests": 8,
+      "negative_tests": 0,
+      "positive_tests": 8,
+      "tests": [
+        {
+          "left_out_symbol": "BNBUSDT",
+          "n": 13,
+          "spearman": 0.71978
+        },
+        {
+          "left_out_symbol": "BTCUSDT",
+          "n": 12,
+          "spearman": 0.566434
+        },
+        {
+          "left_out_symbol": "DOGEUSDT",
+          "n": 14,
+          "spearman": 0.608791
+        },
+        {
+          "left_out_symbol": "ETHUSDT",
+          "n": 13,
+          "spearman": 0.626374
+        },
+        {
+          "left_out_symbol": "HYPEUSDT",
+          "n": 13,
+          "spearman": 0.82967
+        },
+        {
+          "left_out_symbol": "SOLUSDT",
+          "n": 12,
+          "spearman": 0.475524
+        },
+        {
+          "left_out_symbol": "XRPUSDT",
+          "n": 15,
+          "spearman": 0.639286
+        },
+        {
+          "left_out_symbol": "ZECUSDT",
+          "n": 13,
+          "spearman": 0.637363
+        }
+      ]
+    },
+    "delta_atr_over_ema20_pct_3h": {
+      "all_negative": false,
+      "all_positive": false,
+      "eligible_tests": 8,
+      "negative_tests": 2,
+      "positive_tests": 6,
+      "tests": [
+        {
+          "left_out_symbol": "BNBUSDT",
+          "n": 15,
+          "spearman": 0.046429
+        },
+        {
+          "left_out_symbol": "BTCUSDT",
+          "n": 14,
+          "spearman": 0.059341
+        },
+        {
+          "left_out_symbol": "DOGEUSDT",
+          "n": 16,
+          "spearman": -0.076471
+        },
+        {
+          "left_out_symbol": "ETHUSDT",
+          "n": 15,
+          "spearman": 0.110714
+        },
+        {
+          "left_out_symbol": "HYPEUSDT",
+          "n": 14,
+          "spearman": 0.032967
+        },
+        {
+          "left_out_symbol": "SOLUSDT",
+          "n": 14,
+          "spearman": -0.024176
+        },
+        {
+          "left_out_symbol": "XRPUSDT",
+          "n": 16,
+          "spearman": 0.088235
+        },
+        {
+          "left_out_symbol": "ZECUSDT",
+          "n": 15,
+          "spearman": 0.217857
+        }
+      ]
+    },
+    "delta_ema_spread_pct_1h": {
+      "all_negative": false,
+      "all_positive": true,
+      "eligible_tests": 8,
+      "negative_tests": 0,
+      "positive_tests": 8,
+      "tests": [
+        {
+          "left_out_symbol": "BNBUSDT",
+          "n": 13,
+          "spearman": 0.291209
+        },
+        {
+          "left_out_symbol": "BTCUSDT",
+          "n": 12,
+          "spearman": 0.251748
+        },
+        {
+          "left_out_symbol": "DOGEUSDT",
+          "n": 14,
+          "spearman": 0.547253
+        },
+        {
+          "left_out_symbol": "ETHUSDT",
+          "n": 13,
+          "spearman": 0.285714
+        },
+        {
+          "left_out_symbol": "HYPEUSDT",
+          "n": 13,
+          "spearman": 0.313187
+        },
+        {
+          "left_out_symbol": "SOLUSDT",
+          "n": 12,
+          "spearman": 0.272727
+        },
+        {
+          "left_out_symbol": "XRPUSDT",
+          "n": 15,
+          "spearman": 0.335714
+        },
+        {
+          "left_out_symbol": "ZECUSDT",
+          "n": 13,
+          "spearman": 0.39011
+        }
+      ]
+    },
+    "delta_ema_spread_pct_3h": {
+      "all_negative": false,
+      "all_positive": true,
+      "eligible_tests": 8,
+      "negative_tests": 0,
+      "positive_tests": 8,
+      "tests": [
+        {
+          "left_out_symbol": "BNBUSDT",
+          "n": 15,
+          "spearman": 0.071429
+        },
+        {
+          "left_out_symbol": "BTCUSDT",
+          "n": 14,
+          "spearman": 0.098901
+        },
+        {
+          "left_out_symbol": "DOGEUSDT",
+          "n": 16,
+          "spearman": 0.258824
+        },
+        {
+          "left_out_symbol": "ETHUSDT",
+          "n": 15,
+          "spearman": 0.064286
+        },
+        {
+          "left_out_symbol": "HYPEUSDT",
+          "n": 14,
+          "spearman": 0.098901
+        },
+        {
+          "left_out_symbol": "SOLUSDT",
+          "n": 14,
+          "spearman": 0.046154
+        },
+        {
+          "left_out_symbol": "XRPUSDT",
+          "n": 16,
+          "spearman": 0.202941
+        },
+        {
+          "left_out_symbol": "ZECUSDT",
+          "n": 15,
+          "spearman": 0.075
+        }
+      ]
+    },
+    "delta_momentum_24h_pct_1h": {
+      "all_negative": false,
+      "all_positive": true,
+      "eligible_tests": 8,
+      "negative_tests": 0,
+      "positive_tests": 8,
+      "tests": [
+        {
+          "left_out_symbol": "BNBUSDT",
+          "n": 13,
+          "spearman": 0.527473
+        },
+        {
+          "left_out_symbol": "BTCUSDT",
+          "n": 12,
+          "spearman": 0.531469
+        },
+        {
+          "left_out_symbol": "DOGEUSDT",
+          "n": 14,
+          "spearman": 0.767033
+        },
+        {
+          "left_out_symbol": "ETHUSDT",
+          "n": 13,
+          "spearman": 0.538462
+        },
+        {
+          "left_out_symbol": "HYPEUSDT",
+          "n": 13,
+          "spearman": 0.598901
+        },
+        {
+          "left_out_symbol": "SOLUSDT",
+          "n": 12,
+          "spearman": 0.552448
+        },
+        {
+          "left_out_symbol": "XRPUSDT",
+          "n": 15,
+          "spearman": 0.582143
+        },
+        {
+          "left_out_symbol": "ZECUSDT",
+          "n": 13,
+          "spearman": 0.5
+        }
+      ]
+    },
+    "delta_momentum_24h_pct_3h": {
+      "all_negative": false,
+      "all_positive": true,
+      "eligible_tests": 8,
+      "negative_tests": 0,
+      "positive_tests": 8,
+      "tests": [
+        {
+          "left_out_symbol": "BNBUSDT",
+          "n": 15,
+          "spearman": 0.253571
+        },
+        {
+          "left_out_symbol": "BTCUSDT",
+          "n": 14,
+          "spearman": 0.265934
+        },
+        {
+          "left_out_symbol": "DOGEUSDT",
+          "n": 16,
+          "spearman": 0.444118
+        },
+        {
+          "left_out_symbol": "ETHUSDT",
+          "n": 15,
+          "spearman": 0.225
+        },
+        {
+          "left_out_symbol": "HYPEUSDT",
+          "n": 14,
+          "spearman": 0.23956
+        },
+        {
+          "left_out_symbol": "SOLUSDT",
+          "n": 14,
+          "spearman": 0.178022
+        },
+        {
+          "left_out_symbol": "XRPUSDT",
+          "n": 16,
+          "spearman": 0.411765
+        },
+        {
+          "left_out_symbol": "ZECUSDT",
+          "n": 15,
+          "spearman": 0.089286
+        }
+      ]
+    },
+    "delta_paced_relative_volume_1h": {
+      "all_negative": false,
+      "all_positive": false,
+      "eligible_tests": 8,
+      "negative_tests": 6,
+      "positive_tests": 2,
+      "tests": [
+        {
+          "left_out_symbol": "BNBUSDT",
+          "n": 13,
+          "spearman": -0.115385
+        },
+        {
+          "left_out_symbol": "BTCUSDT",
+          "n": 12,
+          "spearman": -0.293706
+        },
+        {
+          "left_out_symbol": "DOGEUSDT",
+          "n": 14,
+          "spearman": 0.063736
+        },
+        {
+          "left_out_symbol": "ETHUSDT",
+          "n": 13,
+          "spearman": -0.153846
+        },
+        {
+          "left_out_symbol": "HYPEUSDT",
+          "n": 13,
+          "spearman": -0.137363
+        },
+        {
+          "left_out_symbol": "SOLUSDT",
+          "n": 12,
+          "spearman": 0.020979
+        },
+        {
+          "left_out_symbol": "XRPUSDT",
+          "n": 15,
+          "spearman": -0.117857
+        },
+        {
+          "left_out_symbol": "ZECUSDT",
+          "n": 13,
+          "spearman": -0.186813
+        }
+      ]
+    },
+    "delta_paced_relative_volume_3h": {
+      "all_negative": false,
+      "all_positive": false,
+      "eligible_tests": 8,
+      "negative_tests": 2,
+      "positive_tests": 6,
+      "tests": [
+        {
+          "left_out_symbol": "BNBUSDT",
+          "n": 15,
+          "spearman": 0.042857
+        },
+        {
+          "left_out_symbol": "BTCUSDT",
+          "n": 14,
+          "spearman": 0.138462
+        },
+        {
+          "left_out_symbol": "DOGEUSDT",
+          "n": 16,
+          "spearman": 0.126471
+        },
+        {
+          "left_out_symbol": "ETHUSDT",
+          "n": 15,
+          "spearman": 0.035714
+        },
+        {
+          "left_out_symbol": "HYPEUSDT",
+          "n": 14,
+          "spearman": -0.010989
+        },
+        {
+          "left_out_symbol": "SOLUSDT",
+          "n": 14,
+          "spearman": -0.068132
+        },
+        {
+          "left_out_symbol": "XRPUSDT",
+          "n": 16,
+          "spearman": 0.082353
+        },
+        {
+          "left_out_symbol": "ZECUSDT",
+          "n": 15,
+          "spearman": 0.028571
+        }
+      ]
+    },
+    "delta_rsi14_1h": {
+      "all_negative": false,
+      "all_positive": true,
+      "eligible_tests": 8,
+      "negative_tests": 0,
+      "positive_tests": 8,
+      "tests": [
+        {
+          "left_out_symbol": "BNBUSDT",
+          "n": 13,
+          "spearman": 0.373626
+        },
+        {
+          "left_out_symbol": "BTCUSDT",
+          "n": 12,
+          "spearman": 0.475524
+        },
+        {
+          "left_out_symbol": "DOGEUSDT",
+          "n": 14,
+          "spearman": 0.534066
+        },
+        {
+          "left_out_symbol": "ETHUSDT",
+          "n": 13,
+          "spearman": 0.368132
+        },
+        {
+          "left_out_symbol": "HYPEUSDT",
+          "n": 13,
+          "spearman": 0.472527
+        },
+        {
+          "left_out_symbol": "SOLUSDT",
+          "n": 12,
+          "spearman": 0.181818
+        },
+        {
+          "left_out_symbol": "XRPUSDT",
+          "n": 15,
+          "spearman": 0.392857
+        },
+        {
+          "left_out_symbol": "ZECUSDT",
+          "n": 13,
+          "spearman": 0.247253
+        }
+      ]
+    },
+    "delta_rsi14_3h": {
+      "all_negative": false,
+      "all_positive": true,
+      "eligible_tests": 8,
+      "negative_tests": 0,
+      "positive_tests": 8,
+      "tests": [
+        {
+          "left_out_symbol": "BNBUSDT",
+          "n": 15,
+          "spearman": 0.346429
+        },
+        {
+          "left_out_symbol": "BTCUSDT",
+          "n": 14,
+          "spearman": 0.507692
+        },
+        {
+          "left_out_symbol": "DOGEUSDT",
+          "n": 16,
+          "spearman": 0.494118
+        },
+        {
+          "left_out_symbol": "ETHUSDT",
+          "n": 15,
+          "spearman": 0.367857
+        },
+        {
+          "left_out_symbol": "HYPEUSDT",
+          "n": 14,
+          "spearman": 0.362637
+        },
+        {
+          "left_out_symbol": "SOLUSDT",
+          "n": 14,
+          "spearman": 0.125275
+        },
+        {
+          "left_out_symbol": "XRPUSDT",
+          "n": 16,
+          "spearman": 0.385294
+        },
+        {
+          "left_out_symbol": "ZECUSDT",
+          "n": 15,
+          "spearman": 0.221429
+        }
+      ]
+    },
+    "ema20_change_pct_1h": {
+      "all_negative": false,
+      "all_positive": false,
+      "eligible_tests": 8,
+      "negative_tests": 1,
+      "positive_tests": 7,
+      "tests": [
+        {
+          "left_out_symbol": "BNBUSDT",
+          "n": 13,
+          "spearman": 0.115385
+        },
+        {
+          "left_out_symbol": "BTCUSDT",
+          "n": 12,
+          "spearman": 0.188811
+        },
+        {
+          "left_out_symbol": "DOGEUSDT",
+          "n": 14,
+          "spearman": 0.358242
+        },
+        {
+          "left_out_symbol": "ETHUSDT",
+          "n": 13,
+          "spearman": 0.065934
+        },
+        {
+          "left_out_symbol": "HYPEUSDT",
+          "n": 13,
+          "spearman": 0.076923
+        },
+        {
+          "left_out_symbol": "SOLUSDT",
+          "n": 12,
+          "spearman": 0.412587
+        },
+        {
+          "left_out_symbol": "XRPUSDT",
+          "n": 15,
+          "spearman": 0.182143
+        },
+        {
+          "left_out_symbol": "ZECUSDT",
+          "n": 13,
+          "spearman": -0.016484
+        }
+      ]
+    },
+    "ema20_change_pct_3h": {
+      "all_negative": false,
+      "all_positive": false,
+      "eligible_tests": 8,
+      "negative_tests": 5,
+      "positive_tests": 3,
+      "tests": [
+        {
+          "left_out_symbol": "BNBUSDT",
+          "n": 15,
+          "spearman": -0.075
+        },
+        {
+          "left_out_symbol": "BTCUSDT",
+          "n": 14,
+          "spearman": -0.112088
+        },
+        {
+          "left_out_symbol": "DOGEUSDT",
+          "n": 16,
+          "spearman": 0.102941
+        },
+        {
+          "left_out_symbol": "ETHUSDT",
+          "n": 15,
+          "spearman": -0.067857
+        },
+        {
+          "left_out_symbol": "HYPEUSDT",
+          "n": 14,
+          "spearman": -0.076923
+        },
+        {
+          "left_out_symbol": "SOLUSDT",
+          "n": 14,
+          "spearman": 0.002198
+        },
+        {
+          "left_out_symbol": "XRPUSDT",
+          "n": 16,
+          "spearman": 0.044118
+        },
+        {
+          "left_out_symbol": "ZECUSDT",
+          "n": 15,
+          "spearman": -0.025
+        }
+      ]
+    }
+  },
+  "production_change_recommended": false,
+  "purpose": "Test whether pre-decision indicator transitions contain stable LONG quality signal beyond static V6 state.",
+  "research_decision": "TRANSITION_REPRESENTATION_NOT_YET_STABLE",
+  "schema": "ATLAS_LONG_V7_TRANSITION_REPRESENTATION_AUDIT_V1_FIXED_EPISODES",
+  "stable_negative_transition_predictors": [],
+  "stable_positive_transition_predictors": []
+}
