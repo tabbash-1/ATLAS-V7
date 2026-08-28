@@ -61,6 +61,12 @@ install_execution_risk(atlas)
 from ai_trade_council import install as install_ai_council
 install_ai_council(atlas)
 
+# Research-only prospective tie-break shadow. It is deliberately installed after
+# the Production decision function and only exposes a separate endpoint. It
+# cannot override Production, lower threshold 68, or execute orders.
+from consensus_tiebreak_shadow import install as install_consensus_tiebreak_shadow
+CONSENSUS_TIEBREAK_SHADOW = install_consensus_tiebreak_shadow(atlas)
+
 # Expose explicit web-safe mode for UI/ops diagnostics.
 atlas.WEB_SAFE_MODE = {
     'enabled': True,
@@ -68,6 +74,7 @@ atlas.WEB_SAFE_MODE = {
     'cloud_forward_in_web_process': False,
     'production_threshold': float(atlas.CLOUD_FORWARD_MIN_SCORE),
     'research_execution_location': 'GITHUB_ACTIONS',
+    'consensus_tiebreak_shadow': CONSENSUS_TIEBREAK_SHADOW,
 }
 
 
@@ -125,6 +132,22 @@ class WebOnlyHandler(atlas.Handler):
             q = urllib.parse.parse_qs(parsed.query)
             symbol = q.get('symbol', ['BTCUSDT'])[0]
             return self._json(volume_diagnostic(symbol))
+        if parsed.path == '/api/research/consensus-tiebreak-shadow':
+            q = urllib.parse.parse_qs(parsed.query)
+            symbol = q.get('symbol', ['BTCUSDT'])[0]
+            try:
+                result = atlas.consensus_tiebreak_shadow(symbol)
+                return self._json(result, 200 if result.get('ok') else 400)
+            except Exception as exc:
+                return self._json({
+                    'ok': False,
+                    'error': f'{type(exc).__name__}: {exc}',
+                    'source': atlas.CONSENSUS_TIEBREAK_SHADOW_VERSION,
+                    'shadow_only': True,
+                    'can_override_production': False,
+                    'research_only': True,
+                    'live_execution': False,
+                }, 500)
         return super().do_GET()
 
 class Server(ThreadingHTTPServer):
@@ -139,5 +162,6 @@ if __name__ == '__main__':
     print('Background workers: OFF (GitHub Actions owns scheduled research)', flush=True)
     print('Production decision UI: ON + autoload', flush=True)
     print(f'Production scoring: {PRODUCTION_SCORING_VERSION}', flush=True)
+    print(f'Consensus tie-break shadow: {CONSENSUS_TIEBREAK_SHADOW["version"]}', flush=True)
     print(f'Listening on {port}', flush=True)
     Server(('0.0.0.0',port), WebOnlyHandler).serve_forever(poll_interval=0.5)
