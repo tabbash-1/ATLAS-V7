@@ -1,0 +1,42 @@
+name: ATLAS Fourth Vote Demotion Shadow
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - fourth_vote_demotion_shadow.py
+      - qualified_false_confidence_audit.py
+      - tests/test_fourth_vote_demotion_shadow.py
+      - .github/workflows/fourth-vote-demotion-shadow.yml
+      - status/history/production-snapshots.jsonl
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  shadow:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax and regression test
+        run: |
+          python -m py_compile fourth_vote_demotion_shadow.py tests/test_fourth_vote_demotion_shadow.py
+          PYTHONPATH=. python tests/test_fourth_vote_demotion_shadow.py
+      - name: Run isolated shadow replay
+        run: python fourth_vote_demotion_shadow.py
+      - name: Persist report
+        run: |
+          if [ -n "$(git status --porcelain -- status/fourth-vote-demotion-shadow.json)" ]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add status/fourth-vote-demotion-shadow.json
+            git commit -m 'data: refresh fourth vote demotion shadow'
+            git push
+          else
+            echo 'No report change to persist.'
+          fi
