@@ -1,0 +1,43 @@
+name: ATLAS Post Fourth Vote Residual Autopsy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - post_fourth_vote_residual_autopsy.py
+      - fourth_vote_demotion_shadow.py
+      - qualified_false_confidence_audit.py
+      - tests/test_post_fourth_vote_residual_autopsy.py
+      - .github/workflows/post-fourth-vote-residual-autopsy.yml
+      - status/history/production-snapshots.jsonl
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  autopsy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax and regression test
+        run: |
+          python -m py_compile post_fourth_vote_residual_autopsy.py tests/test_post_fourth_vote_residual_autopsy.py
+          PYTHONPATH=. python tests/test_post_fourth_vote_residual_autopsy.py
+      - name: Run residual autopsy
+        run: python post_fourth_vote_residual_autopsy.py
+      - name: Persist report
+        run: |
+          if [ -n "$(git status --porcelain -- status/post-fourth-vote-residual-autopsy.json)" ]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add status/post-fourth-vote-residual-autopsy.json
+            git commit -m 'data: refresh post fourth vote residual autopsy'
+            git push
+          else
+            echo 'No report change to persist.'
+          fi
