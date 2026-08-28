@@ -1,0 +1,585 @@
+{
+  "coverage": {
+    "cutoff_at": "2026-08-26T05:00:00+00:00",
+    "full_mature_independent_12h_episodes": 25,
+    "holdout_mature_independent_12h_episodes": 11,
+    "hourly_v6_long_rows_with_raw_features": 135,
+    "snapshots": 87,
+    "train_mature_independent_12h_episodes": 15
+  },
+  "feature_definitions": {
+    "atr_pct": "atr14 / entry * 100",
+    "ema20_vs_ema50_pct": "(ema20 / ema50 - 1) * 100",
+    "momentum_24h_pct": "stored raw 24h momentum",
+    "paced_relative_volume": "historically replayed partial-hour-safe relative volume",
+    "price_extension_atr": "(entry - ema20) / atr14",
+    "price_vs_ema20_pct": "(entry / ema20 - 1) * 100",
+    "rsi14": "stored raw RSI14"
+  },
+  "generated_at": "2026-08-28T16:06:38.762969+00:00",
+  "guardrails": {
+    "auto_promotion_enabled": false,
+    "can_override_production": false,
+    "live_execution": false,
+    "production_scoring_changed": false,
+    "production_threshold": 68.0,
+    "production_threshold_changed": false,
+    "research_only": true
+  },
+  "lanes": {
+    "full": {
+      "episode_n": 25,
+      "features": {
+        "atr_pct": {
+          "loser_mean": 1.122375,
+          "loser_n": 15,
+          "n": 25,
+          "spearman": 0.006154,
+          "winner_mean": 1.452497,
+          "winner_n": 10
+        },
+        "ema20_vs_ema50_pct": {
+          "loser_mean": 0.635016,
+          "loser_n": 15,
+          "n": 25,
+          "spearman": -0.123846,
+          "winner_mean": 0.499024,
+          "winner_n": 10
+        },
+        "momentum_24h_pct": {
+          "loser_mean": 1.835575,
+          "loser_n": 15,
+          "n": 25,
+          "spearman": -0.086923,
+          "winner_mean": 1.840651,
+          "winner_n": 10
+        },
+        "paced_relative_volume": {
+          "loser_mean": 1.240284,
+          "loser_n": 15,
+          "n": 25,
+          "spearman": 0.203846,
+          "winner_mean": 1.495605,
+          "winner_n": 10
+        },
+        "price_extension_atr": {
+          "loser_mean": 1.037904,
+          "loser_n": 15,
+          "n": 25,
+          "spearman": 0.259231,
+          "winner_mean": 1.059983,
+          "winner_n": 10
+        },
+        "price_vs_ema20_pct": {
+          "loser_mean": 0.991196,
+          "loser_n": 15,
+          "n": 25,
+          "spearman": 0.24,
+          "winner_mean": 1.515268,
+          "winner_n": 10
+        },
+        "rsi14": {
+          "loser_mean": 64.06749,
+          "loser_n": 15,
+          "n": 25,
+          "spearman": 0.212308,
+          "winner_mean": 64.480046,
+          "winner_n": 10
+        }
+      },
+      "outcomes": {
+        "mean_pct": -0.2534,
+        "median_pct": -0.1907,
+        "n": 25,
+        "win_rate_pct": 40.0
+      }
+    },
+    "holdout": {
+      "episode_n": 11,
+      "features": {
+        "atr_pct": {
+          "loser_mean": 0.878229,
+          "loser_n": 6,
+          "n": 11,
+          "spearman": 0.436364,
+          "winner_mean": 1.359764,
+          "winner_n": 5
+        },
+        "ema20_vs_ema50_pct": {
+          "loser_mean": 0.231161,
+          "loser_n": 6,
+          "n": 11,
+          "spearman": -0.145455,
+          "winner_mean": 0.111179,
+          "winner_n": 5
+        },
+        "momentum_24h_pct": {
+          "loser_mean": 2.508264,
+          "loser_n": 6,
+          "n": 11,
+          "spearman": -0.272727,
+          "winner_mean": 2.479242,
+          "winner_n": 5
+        },
+        "paced_relative_volume": {
+          "loser_mean": 2.814855,
+          "loser_n": 6,
+          "n": 11,
+          "spearman": -0.6,
+          "winner_mean": 1.83016,
+          "winner_n": 5
+        },
+        "price_extension_atr": {
+          "loser_mean": 2.035526,
+          "loser_n": 6,
+          "n": 11,
+          "spearman": -0.290909,
+          "winner_mean": 1.320431,
+          "winner_n": 5
+        },
+        "price_vs_ema20_pct": {
+          "loser_mean": 1.611546,
+          "loser_n": 6,
+          "n": 11,
+          "spearman": -0.063636,
+          "winner_mean": 1.919814,
+          "winner_n": 5
+        },
+        "rsi14": {
+          "loser_mean": 71.390321,
+          "loser_n": 6,
+          "n": 11,
+          "spearman": -0.063636,
+          "winner_mean": 66.747731,
+          "winner_n": 5
+        }
+      },
+      "outcomes": {
+        "mean_pct": 0.9318,
+        "median_pct": -0.0693,
+        "n": 11,
+        "win_rate_pct": 45.45
+      }
+    },
+    "train": {
+      "episode_n": 15,
+      "features": {
+        "atr_pct": {
+          "loser_mean": 1.310944,
+          "loser_n": 10,
+          "n": 15,
+          "spearman": -0.192857,
+          "winner_mean": 1.545231,
+          "winner_n": 5
+        },
+        "ema20_vs_ema50_pct": {
+          "loser_mean": 0.893973,
+          "loser_n": 10,
+          "n": 15,
+          "spearman": 0.142857,
+          "winner_mean": 0.886868,
+          "winner_n": 5
+        },
+        "momentum_24h_pct": {
+          "loser_mean": 1.386003,
+          "loser_n": 10,
+          "n": 15,
+          "spearman": -0.132143,
+          "winner_mean": 1.20206,
+          "winner_n": 5
+        },
+        "paced_relative_volume": {
+          "loser_mean": 0.571513,
+          "loser_n": 10,
+          "n": 15,
+          "spearman": -0.239286,
+          "winner_mean": 1.161051,
+          "winner_n": 5
+        },
+        "price_extension_atr": {
+          "loser_mean": 0.403219,
+          "loser_n": 10,
+          "n": 15,
+          "spearman": 0.185714,
+          "winner_mean": 0.799534,
+          "winner_n": 5
+        },
+        "price_vs_ema20_pct": {
+          "loser_mean": 0.625411,
+          "loser_n": 10,
+          "n": 15,
+          "spearman": 0.15,
+          "winner_mean": 1.110722,
+          "winner_n": 5
+        },
+        "rsi14": {
+          "loser_mean": 58.376405,
+          "loser_n": 10,
+          "n": 15,
+          "spearman": 0.132143,
+          "winner_mean": 62.212361,
+          "winner_n": 5
+        }
+      },
+      "outcomes": {
+        "mean_pct": -1.1793,
+        "median_pct": -1.2439,
+        "n": 15,
+        "win_rate_pct": 33.33
+      }
+    }
+  },
+  "leave_one_symbol_out_full": {
+    "atr_pct": {
+      "all_negative": false,
+      "all_positive": false,
+      "eligible_tests": 8,
+      "negative_tests": 5,
+      "positive_tests": 3,
+      "tests": [
+        {
+          "left_out_symbol": "BNBUSDT",
+          "n": 22,
+          "spearman": -0.04009
+        },
+        {
+          "left_out_symbol": "BTCUSDT",
+          "n": 21,
+          "spearman": -0.071429
+        },
+        {
+          "left_out_symbol": "DOGEUSDT",
+          "n": 23,
+          "spearman": 0.072134
+        },
+        {
+          "left_out_symbol": "ETHUSDT",
+          "n": 22,
+          "spearman": -0.084133
+        },
+        {
+          "left_out_symbol": "HYPEUSDT",
+          "n": 21,
+          "spearman": -0.011688
+        },
+        {
+          "left_out_symbol": "SOLUSDT",
+          "n": 21,
+          "spearman": 0.049351
+        },
+        {
+          "left_out_symbol": "XRPUSDT",
+          "n": 23,
+          "spearman": 0.097826
+        },
+        {
+          "left_out_symbol": "ZECUSDT",
+          "n": 22,
+          "spearman": -0.016375
+        }
+      ]
+    },
+    "ema20_vs_ema50_pct": {
+      "all_negative": true,
+      "all_positive": false,
+      "eligible_tests": 8,
+      "negative_tests": 8,
+      "positive_tests": 0,
+      "tests": [
+        {
+          "left_out_symbol": "BNBUSDT",
+          "n": 22,
+          "spearman": -0.115754
+        },
+        {
+          "left_out_symbol": "BTCUSDT",
+          "n": 21,
+          "spearman": -0.133766
+        },
+        {
+          "left_out_symbol": "DOGEUSDT",
+          "n": 23,
+          "spearman": -0.205534
+        },
+        {
+          "left_out_symbol": "ETHUSDT",
+          "n": 22,
+          "spearman": -0.128176
+        },
+        {
+          "left_out_symbol": "HYPEUSDT",
+          "n": 21,
+          "spearman": -0.128571
+        },
+        {
+          "left_out_symbol": "SOLUSDT",
+          "n": 21,
+          "spearman": -0.214286
+        },
+        {
+          "left_out_symbol": "XRPUSDT",
+          "n": 23,
+          "spearman": -0.057312
+        },
+        {
+          "left_out_symbol": "ZECUSDT",
+          "n": 22,
+          "spearman": -0.022021
+        }
+      ]
+    },
+    "momentum_24h_pct": {
+      "all_negative": true,
+      "all_positive": false,
+      "eligible_tests": 8,
+      "negative_tests": 8,
+      "positive_tests": 0,
+      "tests": [
+        {
+          "left_out_symbol": "BNBUSDT",
+          "n": 22,
+          "spearman": -0.086392
+        },
+        {
+          "left_out_symbol": "BTCUSDT",
+          "n": 21,
+          "spearman": -0.083117
+        },
+        {
+          "left_out_symbol": "DOGEUSDT",
+          "n": 23,
+          "spearman": -0.043478
+        },
+        {
+          "left_out_symbol": "ETHUSDT",
+          "n": 22,
+          "spearman": -0.07397
+        },
+        {
+          "left_out_symbol": "HYPEUSDT",
+          "n": 21,
+          "spearman": -0.144156
+        },
+        {
+          "left_out_symbol": "SOLUSDT",
+          "n": 21,
+          "spearman": -0.049351
+        },
+        {
+          "left_out_symbol": "XRPUSDT",
+          "n": 23,
+          "spearman": -0.061265
+        },
+        {
+          "left_out_symbol": "ZECUSDT",
+          "n": 22,
+          "spearman": -0.123659
+        }
+      ]
+    },
+    "paced_relative_volume": {
+      "all_negative": false,
+      "all_positive": true,
+      "eligible_tests": 8,
+      "negative_tests": 0,
+      "positive_tests": 8,
+      "tests": [
+        {
+          "left_out_symbol": "BNBUSDT",
+          "n": 22,
+          "spearman": 0.21965
+        },
+        {
+          "left_out_symbol": "BTCUSDT",
+          "n": 21,
+          "spearman": 0.237662
+        },
+        {
+          "left_out_symbol": "DOGEUSDT",
+          "n": 23,
+          "spearman": 0.214427
+        },
+        {
+          "left_out_symbol": "ETHUSDT",
+          "n": 22,
+          "spearman": 0.294184
+        },
+        {
+          "left_out_symbol": "HYPEUSDT",
+          "n": 21,
+          "spearman": 0.153247
+        },
+        {
+          "left_out_symbol": "SOLUSDT",
+          "n": 21,
+          "spearman": 0.125974
+        },
+        {
+          "left_out_symbol": "XRPUSDT",
+          "n": 23,
+          "spearman": 0.147233
+        },
+        {
+          "left_out_symbol": "ZECUSDT",
+          "n": 22,
+          "spearman": 0.232072
+        }
+      ]
+    },
+    "price_extension_atr": {
+      "all_negative": false,
+      "all_positive": true,
+      "eligible_tests": 8,
+      "negative_tests": 0,
+      "positive_tests": 8,
+      "tests": [
+        {
+          "left_out_symbol": "BNBUSDT",
+          "n": 22,
+          "spearman": 0.270469
+        },
+        {
+          "left_out_symbol": "BTCUSDT",
+          "n": 21,
+          "spearman": 0.228571
+        },
+        {
+          "left_out_symbol": "DOGEUSDT",
+          "n": 23,
+          "spearman": 0.337945
+        },
+        {
+          "left_out_symbol": "ETHUSDT",
+          "n": 22,
+          "spearman": 0.295313
+        },
+        {
+          "left_out_symbol": "HYPEUSDT",
+          "n": 21,
+          "spearman": 0.298701
+        },
+        {
+          "left_out_symbol": "SOLUSDT",
+          "n": 21,
+          "spearman": 0.193506
+        },
+        {
+          "left_out_symbol": "XRPUSDT",
+          "n": 23,
+          "spearman": 0.205534
+        },
+        {
+          "left_out_symbol": "ZECUSDT",
+          "n": 22,
+          "spearman": 0.259176
+        }
+      ]
+    },
+    "price_vs_ema20_pct": {
+      "all_negative": false,
+      "all_positive": true,
+      "eligible_tests": 8,
+      "negative_tests": 0,
+      "positive_tests": 8,
+      "tests": [
+        {
+          "left_out_symbol": "BNBUSDT",
+          "n": 22,
+          "spearman": 0.223038
+        },
+        {
+          "left_out_symbol": "BTCUSDT",
+          "n": 21,
+          "spearman": 0.207792
+        },
+        {
+          "left_out_symbol": "DOGEUSDT",
+          "n": 23,
+          "spearman": 0.371542
+        },
+        {
+          "left_out_symbol": "ETHUSDT",
+          "n": 22,
+          "spearman": 0.280632
+        },
+        {
+          "left_out_symbol": "HYPEUSDT",
+          "n": 21,
+          "spearman": 0.250649
+        },
+        {
+          "left_out_symbol": "SOLUSDT",
+          "n": 21,
+          "spearman": 0.190909
+        },
+        {
+          "left_out_symbol": "XRPUSDT",
+          "n": 23,
+          "spearman": 0.193676
+        },
+        {
+          "left_out_symbol": "ZECUSDT",
+          "n": 22,
+          "spearman": 0.225296
+        }
+      ]
+    },
+    "rsi14": {
+      "all_negative": false,
+      "all_positive": true,
+      "eligible_tests": 8,
+      "negative_tests": 0,
+      "positive_tests": 8,
+      "tests": [
+        {
+          "left_out_symbol": "BNBUSDT",
+          "n": 22,
+          "spearman": 0.215133
+        },
+        {
+          "left_out_symbol": "BTCUSDT",
+          "n": 21,
+          "spearman": 0.167532
+        },
+        {
+          "left_out_symbol": "DOGEUSDT",
+          "n": 23,
+          "spearman": 0.222332
+        },
+        {
+          "left_out_symbol": "ETHUSDT",
+          "n": 22,
+          "spearman": 0.258046
+        },
+        {
+          "left_out_symbol": "HYPEUSDT",
+          "n": 21,
+          "spearman": 0.215584
+        },
+        {
+          "left_out_symbol": "SOLUSDT",
+          "n": 21,
+          "spearman": 0.120779
+        },
+        {
+          "left_out_symbol": "XRPUSDT",
+          "n": 23,
+          "spearman": 0.120553
+        },
+        {
+          "left_out_symbol": "ZECUSDT",
+          "n": 22,
+          "spearman": 0.39808
+        }
+      ]
+    }
+  },
+  "production_change_recommended": false,
+  "purpose": "Determine whether raw market-state representation carries stable LONG quality signal that is missing from the V6 aggregate score.",
+  "research_decision": "RAW_REPRESENTATION_HAS_STABLE_SIGNAL",
+  "schema": "ATLAS_LONG_V7_RAW_REPRESENTATION_AUDIT_V1",
+  "stable_negative_raw_predictors": [
+    "momentum_24h_pct"
+  ],
+  "stable_positive_raw_predictors": []
+}
