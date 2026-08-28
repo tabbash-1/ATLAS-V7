@@ -45,6 +45,18 @@ def _is_research_champion(row):
     return trade_outcome_ledger.is_research_champion(row or {})
 
 
+def _provenance(row):
+    """Return immutable model/decision identifiers carried by a forward row."""
+    x = row or {}
+    return {
+        'scoring_version': x.get('scoring_version'),
+        'decision_version': x.get('decision_version'),
+        'trade_plan_version': x.get('trade_plan_version'),
+        'policy_version': x.get('policy_version'),
+        'generation_id': x.get('generation_id'),
+    }
+
+
 def derive_geometry(payload):
     """Derive immutable SL/TP geometry only from already-existing ATLAS fields."""
     x = dict(payload or {})
@@ -142,13 +154,14 @@ def _persist_geometry(collector, forward_row, geometry):
         if any(str(x.get('forward_observation_id') or '') == forward_id for x in existing):
             return {'stored': False, 'reason': 'DEDUP_FORWARD_ID'}
         rec = {
-            'schema': 'ATLAS_FROZEN_TRADE_GEOMETRY_V3_VERSIONED_COHORT',
+            'schema': 'ATLAS_FROZEN_TRADE_GEOMETRY_V4_DECISION_PROVENANCE',
             'geometry_generation': geometry.get('geometry_version'),
             'forward_observation_id': forward_id,
             'captured_at': forward_row.get('captured_at'),
             'captured_at_ms': forward_row.get('captured_at_ms'),
             'symbol': forward_row.get('symbol'),
             'direction': forward_row.get('direction'),
+            **_provenance(forward_row),
             'signal_qualified': _is_production_signal(forward_row),
             'production_signal_qualified': _is_production_signal(forward_row),
             'research_champion': _is_research_champion(forward_row),
@@ -259,16 +272,24 @@ def _resolve_same_candle(symbol, candle, geometry):
 
 
 def settle_row(row, geometry_record=None, now_ms=None, candle_loader=None):
-    geometry = (geometry_record or {}).get('geometry') if geometry_record else None
+    geometry_record = geometry_record or {}
+    geometry = geometry_record.get('geometry')
+    row_provenance = _provenance(row)
+    frozen_provenance = _provenance(geometry_record)
+    provenance = {
+        key: row_provenance.get(key) if row_provenance.get(key) is not None else frozen_provenance.get(key)
+        for key in row_provenance
+    }
     base = {
         'id': row.get('id'), 'symbol': row.get('symbol'), 'direction': row.get('direction'),
         'captured_at': row.get('captured_at'), 'captured_at_ms': row.get('captured_at_ms'),
         'score': _fnum(row.get('final_score')) if row.get('final_score') is not None else _fnum(row.get('champion_score')),
         'entry': _fnum(row.get('entry')), 'source': row.get('auto_source'),
+        **provenance,
         'signal_qualified': _is_production_signal(row),
         'production_signal_qualified': _is_production_signal(row),
         'research_champion': _is_research_champion(row),
-        'geometry_generation': (geometry or {}).get('geometry_version') or (geometry_record or {}).get('geometry_generation'),
+        'geometry_generation': (geometry or {}).get('geometry_version') or geometry_record.get('geometry_generation'),
         'geometry': geometry, 'geometry_status': 'FROZEN' if geometry else 'UNAVAILABLE',
         'research_only': True, 'live_execution': False,
     }
