@@ -4,7 +4,7 @@ services:
     runtime: python
     plan: starter
     buildCommand: pip install -r requirements.txt
-    startCommand: python3 render_boot_patch.py && python3 cloud_start_web.py
+    startCommand: python3 render_boot_patch.py && python3 cloud_web_only.py
     healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
@@ -12,9 +12,9 @@ services:
       - key: ATLAS_DATA_DIR
         value: /var/data
       - key: ATLAS_RELEASE
-        value: "V7-QUICK-TRADE-SHADOW-RC4"
+        value: "V7-WEB-ONLY-SAFE-RC1"
       - key: ATLAS_CLOUD_FORWARD_ENABLED
-        value: "1"
+        value: "0"
       - key: ATLAS_CLOUD_FORWARD_INTERVAL_SECONDS
         value: "3000"
       - key: ATLAS_CLOUD_FORWARD_MIN_SCORE
