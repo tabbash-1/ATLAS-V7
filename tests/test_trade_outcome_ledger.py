@@ -83,6 +83,23 @@ def test_version_provenance_is_preserved_in_outcome_rows():
     assert x['generation_id'] == 'gen-20260828-001'
 
 
+def test_summary_builds_frozen_version_cohorts_without_inference():
+    rows = [
+        row(id='v6-win', scoring_version='V6', decision_version='D2', trade_plan_version='P2', forward_return_pct={'24': 2}),
+        row(id='v6-loss', captured_at_ms=1100, scoring_version='V6', decision_version='D2', trade_plan_version='P2', forward_return_pct={'24': -1}),
+        row(id='v7-win', captured_at_ms=1200, scoring_version='V7', decision_version='D3', trade_plan_version='P3', forward_return_pct={'24': 4}),
+        row(id='legacy', captured_at_ms=1300, scoring_version=None, decision_version=None, trade_plan_version=None, forward_return_pct={'24': 1}),
+    ]
+    s = ledger.summarize(rows, 24, 'signals')
+    assert s['schema'] == 'ATLAS_TRADE_OUTCOME_SUMMARY_V2_VERSION_COHORTS'
+    assert s['by_scoring_version']['V6']['win_rate_pct'] == 50.0
+    assert s['by_scoring_version']['V6']['average_directional_return_pct'] == 0.5
+    assert s['by_scoring_version']['V7']['win_rate_pct'] == 100.0
+    assert s['by_scoring_version']['UNKNOWN']['total'] == 1
+    assert s['by_decision_version']['D2']['total'] == 2
+    assert s['by_trade_plan_version']['P3']['total'] == 1
+
+
 if __name__ == '__main__':
     test_long_positive_is_win_and_negative_is_loss()
     test_short_inverts_market_return()
@@ -91,4 +108,5 @@ if __name__ == '__main__':
     test_explicit_production_flag_wins_over_legacy_score_fallback()
     test_summary_win_rate_uses_decisive_closed_only()
     test_version_provenance_is_preserved_in_outcome_rows()
+    test_summary_builds_frozen_version_cohorts_without_inference()
     print('trade outcome ledger tests: ok')
