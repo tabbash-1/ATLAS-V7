@@ -17,6 +17,7 @@ Pairwise regimes are limited to Momentum×RSI and Momentum×Extension to avoid a
 combinatorial search.
 
 Research-only; Production is untouched.
+Evaluation trigger note: V1 bins and pair set are frozen.
 """
 from __future__ import annotations
 
