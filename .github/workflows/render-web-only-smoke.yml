@@ -52,6 +52,15 @@ jobs:
           for d in (btc,hype):
               assert d.get('ok') is True, d
               assert float(d.get('signal_threshold')) == 68.0, d
-              assert d.get('score') is not None, d
+              direction=d.get('candidate_direction')
+              score=d.get('score')
+              if direction in ('LONG','SHORT'):
+                  assert score is not None, d
+                  assert d.get('scoring_version'), d
+              else:
+                  assert score is None, d
+                  assert d.get('wait_reason') in ('NO_DIRECTIONAL_CONSENSUS','SCORER_RETURNED_NO_CANDIDATE'), d
+                  assert isinstance(d.get('direction_votes_long'), int), d
+                  assert isinstance(d.get('direction_votes_short'), int), d
           print('RENDER_WEB_ONLY_PRODUCTION_UI_OK')
           PY
