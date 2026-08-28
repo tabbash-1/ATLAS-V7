@@ -45,12 +45,11 @@ jobs:
           set -euo pipefail
           grep -q 'cloud_start.py' Procfile
           grep -q 'cloud_start.py' render.yaml
-          grep -q 'cloud_start.py' Dockerfile
+          grep -q 'cloud_web_only.py' Dockerfile
           grep -q 'mountPath: /var/data' render.yaml
           ! grep -q 'OPENAI_API_KEY' render.yaml
 
-          # Compatibility entrypoint must explicitly route Render and local/manual
-          # starts into their real runtime files instead of owning hidden installers.
+          # Compatibility entrypoint explicitly routes Render and local/manual starts.
           grep -q 'cloud_web_only.py' cloud_start.py
           grep -q 'cloud_start_web.py' cloud_start.py
           grep -q 'ATLAS_CLOUD_FORWARD_ENABLED.*0' cloud_start.py
@@ -63,8 +62,7 @@ jobs:
           grep -q '_install_trade_outcome_runtime' cloud_start_web.py
           grep -q 'trade_geometry.jsonl' cloud_start_web.py
 
-          # Render web-only stack must retain Production scoring/decision/risk while
-          # keeping the research tie-break isolated from Production.
+          # Render/Docker web-only stack retains Production decision safety and isolated research shadow.
           grep -q 'install_scoring(atlas)' cloud_web_only.py
           grep -q 'install_continuation(atlas)' cloud_web_only.py
           grep -q 'install_decision_api(atlas)' cloud_web_only.py
