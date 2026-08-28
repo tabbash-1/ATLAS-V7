@@ -1,0 +1,47 @@
+name: ATLAS Partial-Hour Volume Bias Audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'partial_hour_volume_bias_audit.py'
+      - 'tests/test_partial_hour_volume_bias_audit.py'
+      - 'status/history/production-snapshots.jsonl'
+      - '.github/workflows/partial-hour-volume-bias-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atlas-partial-hour-volume-bias-audit
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Regression tests
+        run: PYTHONPATH=. python tests/test_partial_hour_volume_bias_audit.py
+      - name: Replay existing Production history
+        run: python partial_hour_volume_bias_audit.py
+      - name: Guard research-only contract
+        run: |
+          grep -q 'production_threshold_changed.*False' partial_hour_volume_bias_audit.py
+          grep -q 'scoring_weights_changed.*False' partial_hour_volume_bias_audit.py
+          grep -q 'auto_promotion.*False' partial_hour_volume_bias_audit.py
+      - name: Commit compact audit report
+        shell: bash
+        run: |
+          git config user.name "atlas-research-bot"
+          git config user.email "atlas-research@users.noreply.github.com"
+          git add status/partial-hour-volume-bias-audit.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "data: refresh partial-hour volume bias audit [skip ci]"
+          git pull --rebase origin main
+          git push
