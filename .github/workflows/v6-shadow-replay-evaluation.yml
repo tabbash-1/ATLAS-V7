@@ -1,0 +1,41 @@
+name: ATLAS V6 Shadow Replay Evaluation
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'v6_shadow_replay_evaluator.py'
+      - 'status/v6-shadow-replay.json'
+      - '.github/workflows/v6-shadow-replay-evaluation.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Evaluate replay robustness
+        run: python v6_shadow_replay_evaluator.py
+      - name: Guard Production
+        run: |
+          python - <<'PY'
+          import json
+          p=json.load(open('status/v6-shadow-replay-evaluation.json'))
+          g=p['guardrails']
+          assert g['research_only'] is True
+          assert g['production_threshold_changed'] is False
+          assert g['production_score_changed'] is False
+          assert g['auto_promotion_enabled'] is False
+          print('guardrails: ok')
+          PY
+      - name: Commit evaluation
+        run: |
+          if [ -z "$(git status --porcelain -- status/v6-shadow-replay-evaluation.json)" ]; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add status/v6-shadow-replay-evaluation.json
+          git commit -m 'data: refresh V6 shadow replay evaluation'
+          git push
