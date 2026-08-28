@@ -85,14 +85,18 @@ def run(path=base.SRC):
     train_cmp = compare_metrics(tr_bm, tr_cm)
     hold_cmp = compare_metrics(ho_bm, ho_cm)
 
-    # Predeclared gate: this hypothesis came from stable 24h evidence, so 24h
-    # must improve in full and holdout. It may not materially damage 12h, our
-    # currently strongest horizon, nor degrade holdout 3h by >0.10 pp.
+    # Tight gate: because the harmful bucket itself was required to be stable in
+    # train and holdout, the counterfactual must also improve 24h in BOTH lanes,
+    # not only in aggregate/full and holdout. This prevents a composition effect
+    # from looking like a robust improvement. Shorter horizons may not materially
+    # degrade in holdout.
     h3, h12, h24 = hold_cmp['3h'], hold_cmp['12h'], hold_cmp['24h']
+    train24 = train_cmp['24h']
     enough = h24['baseline_n'] >= 6 and base.stats(base.independent(ho_v, 24), 24)['n'] >= 3
     passed = bool(
         enough
         and full_cmp['24h']['mean_delta_pct'] is not None and full_cmp['24h']['mean_delta_pct'] > 0
+        and train24['mean_delta_pct'] is not None and train24['mean_delta_pct'] > 0
         and hold_cmp['24h']['mean_delta_pct'] is not None and hold_cmp['24h']['mean_delta_pct'] > 0
         and h12['mean_delta_pct'] is not None and h12['mean_delta_pct'] >= -0.10
         and h3['mean_delta_pct'] is not None and h3['mean_delta_pct'] >= -0.10
@@ -101,7 +105,7 @@ def run(path=base.SRC):
     return {
         'schema': SCHEMA,
         'generated_at': datetime.now(timezone.utc).isoformat(),
-        'hypothesis': 'After the combined shadow, NEUTRAL relative-strength context is a persistent 24h false-confidence bucket and should be vetoed only if shorter horizons are not materially harmed.',
+        'hypothesis': 'After the combined shadow, NEUTRAL relative-strength context is a persistent 24h false-confidence bucket and should be vetoed only if the counterfactual improves train, holdout, and full while shorter horizons are not materially harmed.',
         'coverage': {
             'snapshots': len(snapshots), 'hourly_v6_rows': len(hourly),
             'cutoff_at': cutoff.isoformat() if cutoff else None,
@@ -131,6 +135,7 @@ def main():
     print(json.dumps({
         'schema':r['schema'],'coverage':r['coverage'],
         'full_comparison':r['full']['comparison'],
+        'train_comparison':r['train']['comparison'],
         'holdout_comparison':r['holdout']['comparison'],
         'holdout_vetoed':r['holdout']['vetoed'],
         'research_decision':r['research_decision'],'guardrails':r['guardrails'],
