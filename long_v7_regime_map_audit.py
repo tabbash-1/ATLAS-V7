@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
-"""ATLAS LONG V7 regime-map audit.
+"""ATLAS LONG V7 regime-map audit (fixed-episode V2).
 
 Global monotonic LONG rankers failed out of sample. This audit therefore tests
 pre-registered market-state buckets using raw historical features already stored
 in Production snapshots. It does NOT optimize cut points on outcomes.
+
+Method correction in V2: mature independent 12h LONG episodes are built ONCE on
+the full history, then those fixed episodes are split chronologically 60/40.
+This guarantees Train + Holdout == Full and prevents boundary re-anchoring.
 
 Natural trading bins:
 - 24h momentum: <=0, 0-1, 1-2, 2-4, >4 %
@@ -12,12 +16,11 @@ Natural trading bins:
 - paced RV: <0.7, 0.7-1, 1-1.5, 1.5-2.5, >=2.5
 
 A bucket is called stable helpful/harmful only when Train and Holdout have at
-least 2 mature independent 12h episodes each and both means share the sign.
-Pairwise regimes are limited to Momentum×RSI and Momentum×Extension to avoid a
-combinatorial search.
+least 2 fixed mature independent 12h episodes each and both means share the
+sign. Pairwise regimes are limited to Momentum×RSI and Momentum×Extension to
+avoid a combinatorial search.
 
 Research-only; Production is untouched.
-Evaluation trigger note: V1 bins and pair set are frozen.
 """
 from __future__ import annotations
 
@@ -27,11 +30,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import qualified_false_confidence_audit as base
-import counterfactual_episode_evaluation as paired
 import long_v7_raw_representation_audit as raw
+import long_v7_fixed_episode_split as fixed
 
 OUT = Path('status/long-v7-regime-map-audit.json')
-SCHEMA = 'ATLAS_LONG_V7_REGIME_MAP_AUDIT_V1'
+SCHEMA = 'ATLAS_LONG_V7_REGIME_MAP_AUDIT_V2_FIXED_EPISODES'
 H = 12
 MIN_LANE_N = 2
 
@@ -79,10 +82,6 @@ BUCKETERS = {
 }
 
 
-def episodes(rows):
-    return raw.mature_episodes(rows)
-
-
 def summarize(rows):
     return base.stats(rows, H)
 
@@ -92,7 +91,8 @@ def group_single(eps, feature_name):
     groups = defaultdict(list)
     for r in eps:
         v = r.get(field)
-        if v is None: continue
+        if v is None:
+            continue
         groups[fn(v)].append(r)
     return {k: summarize(v) for k, v in sorted(groups.items())}
 
@@ -103,7 +103,8 @@ def group_pair(eps, a, b):
     groups = defaultdict(list)
     for r in eps:
         va, vb = r.get(fa), r.get(fb)
-        if va is None or vb is None: continue
+        if va is None or vb is None:
+            continue
         groups[f'{fna(va)}|{fnb(vb)}'].append(r)
     return {k: summarize(v) for k, v in sorted(groups.items())}
 
@@ -116,7 +117,8 @@ def stable_compare(train_map, holdout_map):
         if tr.get('n', 0) < MIN_LANE_N or ho.get('n', 0) < MIN_LANE_N:
             continue
         tm, hm = tr.get('mean_pct'), ho.get('mean_pct')
-        if tm is None or hm is None: continue
+        if tm is None or hm is None:
+            continue
         row = {'bucket': k, 'train': tr, 'holdout': ho}
         if tm > 0 and hm > 0:
             helpful.append(row)
@@ -129,10 +131,10 @@ def stable_compare(train_map, holdout_map):
 
 def run(path=base.SRC):
     snaps, hourly = raw.load_rows(path)
-    train_rows, holdout_rows, cutoff = paired.split_60_40(hourly)
-    full_eps = episodes(hourly)
-    train_eps = episodes(train_rows)
-    holdout_eps = episodes(holdout_rows)
+    full_eps = fixed.full_fixed_episodes(hourly)
+    train_eps, holdout_eps, cutoff = fixed.split_fixed_60_40(full_eps)
+    if len(train_eps) + len(holdout_eps) != len(full_eps):
+        raise AssertionError('fixed episode split count invariant violated')
 
     singles = {}
     stable_helpful, stable_harmful = [], []
@@ -146,7 +148,7 @@ def run(path=base.SRC):
         stable_harmful += [{'regime': name, **x} for x in hm]
 
     pairs = {}
-    for a, b in [('momentum','rsi'), ('momentum','extension')]:
+    for a, b in [('momentum', 'rsi'), ('momentum', 'extension')]:
         key = f'{a}_x_{b}'
         tr = group_pair(train_eps, a, b)
         ho = group_pair(holdout_eps, a, b)
@@ -164,18 +166,20 @@ def run(path=base.SRC):
         'generated_at': datetime.now(timezone.utc).isoformat(),
         'coverage': {
             'snapshots': len(snaps),
-            'cutoff_at': cutoff.isoformat() if cutoff else None,
+            'cutoff_at': cutoff.isoformat() if hasattr(cutoff, 'isoformat') else (str(cutoff) if cutoff else None),
             'full_episode_n': len(full_eps),
             'train_episode_n': len(train_eps),
             'holdout_episode_n': len(holdout_eps),
+            'train_plus_holdout_equals_full': len(train_eps) + len(holdout_eps) == len(full_eps),
+            'episode_split_order': 'FULL_DECORELATE_THEN_SPLIT',
             'minimum_per_lane_bucket_n': MIN_LANE_N,
         },
         'pre_registered_bins': {
-            'momentum_pct': ['<=0','0_1','1_2','2_4','>4'],
-            'rsi14': ['<55','55_62','62_68','68_72','>=72'],
-            'extension_atr': ['<0','0_0.5','0.5_1','1_1.5','>=1.5'],
-            'paced_rv': ['<0.7','0.7_1','1_1.5','1.5_2.5','>=2.5'],
-            'pairwise_only': ['momentum_x_rsi','momentum_x_extension'],
+            'momentum_pct': ['<=0', '0_1', '1_2', '2_4', '>4'],
+            'rsi14': ['<55', '55_62', '62_68', '68_72', '>=72'],
+            'extension_atr': ['<0', '0_0.5', '0.5_1', '1_1.5', '>=1.5'],
+            'paced_rv': ['<0.7', '0.7_1', '1_1.5', '1.5_2.5', '>=2.5'],
+            'pairwise_only': ['momentum_x_rsi', 'momentum_x_extension'],
         },
         'single_regimes': singles,
         'pair_regimes': pairs,
