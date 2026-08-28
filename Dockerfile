@@ -2,5 +2,7 @@ FROM python:3.12-slim
 WORKDIR /app
 COPY . /app
 ENV PYTHONUNBUFFERED=1
+ENV ATLAS_WEB_ONLY=1
+ENV ATLAS_CLOUD_FORWARD_ENABLED=0
 EXPOSE 8080
-CMD ["python3", "cloud_start_web.py"]
+CMD ["python3", "cloud_web_only.py"]
