@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ATLAS LONG V7 Candidate A: volume-quality ranking at equal coverage.
+"""ATLAS LONG V7 Candidate A: volume-quality ranking at equal matured coverage.
 
 Purpose
 -------
@@ -9,15 +9,16 @@ holdout, and leave-one-symbol-out, while the total V6 score is not positively
 discriminative.
 
 This candidate deliberately avoids choosing a new threshold. On a fixed set of
-independent LONG episodes it compares:
+independent, already-settled LONG episodes it compares:
 
 * V6 baseline ranking: corrected_score descending
 * Candidate ranking: volume_bonus descending
 
-For each lane the candidate selects exactly the same number of episodes as V6
-would qualify at score >= 68. This isolates ranking quality from opportunity
-count. Ties are resolved only by timestamp/symbol for determinism, not by V6
-score.
+For each lane the candidate selects exactly the same number of mature episodes
+as V6 would qualify at score >= 68. Maturity is filtered BEFORE independence so
+an unfinished anchor cannot suppress a later settled episode. This isolates
+ranking quality from opportunity count and outcome availability. Ties are
+resolved only by timestamp/symbol for determinism, not by V6 score.
 
 Research-only. No Production score, threshold, execution, or shadow endpoint is
 changed by this module.
@@ -30,10 +31,9 @@ from pathlib import Path
 
 import qualified_false_confidence_audit as base
 import counterfactual_episode_evaluation as paired
-import v6_long_representation_audit as audit
 
 OUT = Path('status/long-v7-volume-quality-candidate.json')
-SCHEMA = 'ATLAS_LONG_V7_VOLUME_QUALITY_CANDIDATE_V1'
+SCHEMA = 'ATLAS_LONG_V7_VOLUME_QUALITY_CANDIDATE_V2_MATURED_FIXED_POOL'
 H = 12
 
 
@@ -49,9 +49,14 @@ def _iso(v):
 
 
 def _episode_pool(rows):
-    # Fixed anchors first; both baseline and candidate are evaluated on the exact
-    # same independent episode set to prevent episode-substitution contamination.
-    return audit.episodes(rows)
+    # Maturity is fixed BEFORE de-correlation. Both rankers then operate on the
+    # exact same settled independent episode pool, eliminating outcome-coverage
+    # leakage and immature-anchor suppression.
+    settled_long = [
+        r for r in rows
+        if r.get('direction') == 'LONG' and r.get('return_12h_pct') is not None
+    ]
+    return base.independent(settled_long, H)
 
 
 def _k_from_v6(pool):
@@ -83,11 +88,15 @@ def lane(rows):
     candidate, _ = _select(pool, _rank_candidate)
     bs = base.stats(baseline, H)
     cs = base.stats(candidate, H)
+    # A strict fairness invariant: every selected row is mature, therefore
+    # reported outcome n must equal K for both rankers.
+    if bs.get('n') != k or cs.get('n') != k:
+        raise AssertionError(f'equal matured coverage violated: k={k} baseline_n={bs.get("n")} candidate_n={cs.get("n")}')
     bkeys = {(r.get('symbol'), _iso(r.get('captured_at'))) for r in baseline}
     ckeys = {(r.get('symbol'), _iso(r.get('captured_at'))) for r in candidate}
     return {
-        'independent_long_episode_pool': len(pool),
-        'equal_coverage_k': k,
+        'independent_mature_long_episode_pool': len(pool),
+        'equal_mature_coverage_k': k,
         'baseline_v6_topk': bs,
         'candidate_volume_topk': cs,
         'comparison': {
@@ -117,8 +126,8 @@ def leave_one_symbol_out(rows):
         x = lane(subset)
         tests.append({
             'left_out_symbol': sym,
-            'pool_n': x['independent_long_episode_pool'],
-            'k': x['equal_coverage_k'],
+            'pool_n': x['independent_mature_long_episode_pool'],
+            'k': x['equal_mature_coverage_k'],
             'mean_delta_pct': x['comparison']['mean_delta_pct'],
             'win_rate_delta_pct': x['comparison']['win_rate_delta_pct'],
         })
@@ -151,14 +160,14 @@ def run(path=base.SRC):
         d = lanes[name]['comparison']['mean_delta_pct']
         return d is not None and d > 0
 
-    enough = lanes['train']['equal_coverage_k'] >= 3 and lanes['holdout']['equal_coverage_k'] >= 3
+    enough = lanes['train']['equal_mature_coverage_k'] >= 3 and lanes['holdout']['equal_mature_coverage_k'] >= 3
     advance = enough and positive('train') and positive('holdout') and positive('full') and loo['all_mean_non_worse']
 
     decision = 'ADVANCE_LONG_V7_VOLUME_RANKING_TO_PAIRED_REPLAY' if advance else 'REJECT_LONG_V7_VOLUME_RANKING'
     return {
         'schema': SCHEMA,
         'generated_at': datetime.now(timezone.utc).isoformat(),
-        'hypothesis': 'At equal opportunity count, ranking LONG by the only stable positive V6 component (volume_bonus) selects better 12h episodes than ranking by total V6 score.',
+        'hypothesis': 'At equal mature opportunity count, ranking LONG by the only stable positive V6 component (volume_bonus) selects better 12h episodes than ranking by total V6 score.',
         'coverage': {
             'snapshots': len(snaps),
             'hourly_v6_rows': len(hourly),
@@ -168,7 +177,8 @@ def run(path=base.SRC):
         'lanes': lanes,
         'leave_one_symbol_out': loo,
         'gate': {
-            'equal_coverage_required': True,
+            'maturity_filtered_before_independence': True,
+            'equal_mature_coverage_required': True,
             'train_mean_delta_must_be_positive': True,
             'holdout_mean_delta_must_be_positive': True,
             'full_mean_delta_must_be_positive': True,
@@ -198,7 +208,7 @@ def main():
     print(json.dumps({
         'schema': result['schema'],
         'coverage': result['coverage'],
-        'lanes': {k: {'equal_coverage_k': v['equal_coverage_k'], 'baseline': v['baseline_v6_topk'], 'candidate': v['candidate_volume_topk'], 'comparison': v['comparison']} for k, v in result['lanes'].items()},
+        'lanes': {k: {'equal_mature_coverage_k': v['equal_mature_coverage_k'], 'baseline': v['baseline_v6_topk'], 'candidate': v['candidate_volume_topk'], 'comparison': v['comparison']} for k, v in result['lanes'].items()},
         'leave_one_symbol_out': result['leave_one_symbol_out'],
         'gate': result['gate'],
         'research_decision': result['research_decision'],
