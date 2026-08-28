@@ -4,39 +4,54 @@ on:
     branches: [main]
     paths:
       - 'render.yaml'
+      - 'Dockerfile'
+      - 'cloud_start.py'
       - 'cloud_web_only.py'
       - 'render_boot_patch.py'
+      - 'production-web-autoload.js'
+      - 'atlas-production-decision.js'
       - '.github/workflows/render-web-only-smoke.yml'
   workflow_dispatch:
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 10
     steps:
       - name: Wait for Render deploy
         run: sleep 90
-      - name: Verify web-safe runtime
+      - name: Verify web-safe runtime and Production UI
         shell: bash
         run: |
           set -euo pipefail
           base='https://atlas-v7.onrender.com'
-          curl -fsSL --retry 8 --retry-delay 10 --retry-all-errors --connect-timeout 10 --max-time 30 "$base/health" | tee /tmp/health.json
+          curl -fsSL --retry 10 --retry-delay 10 --retry-all-errors --connect-timeout 10 --max-time 30 "$base/health" | tee /tmp/health.json
           curl -fsSL --retry 8 --retry-delay 10 --retry-all-errors --connect-timeout 10 --max-time 30 "$base/api/web-mode" | tee /tmp/web.json
           curl -fsSL --retry 5 --retry-delay 8 --retry-all-errors --connect-timeout 10 --max-time 45 "$base/api/cloud-forward/status" | tee /tmp/cloud.json
+          curl -fsSL --retry 5 --retry-delay 8 --retry-all-errors --connect-timeout 10 --max-time 60 "$base/api/decision/current?symbol=BTCUSDT" | tee /tmp/btc.json
           curl -fsSL --retry 5 --retry-delay 8 --retry-all-errors --connect-timeout 10 --max-time 60 "$base/api/decision/current?symbol=HYPEUSDT" | tee /tmp/hype.json
+          curl -fsSL --retry 5 --retry-delay 8 --retry-all-errors --connect-timeout 10 --max-time 30 "$base/" | tee /tmp/index.html >/dev/null
+          grep -q 'atlas-production-decision.js' /tmp/index.html
+          grep -q 'production-web-autoload.js' /tmp/index.html
+          curl -fsSL --retry 3 --retry-delay 5 --retry-all-errors --connect-timeout 10 --max-time 30 "$base/atlas-production-decision.js" >/tmp/prod-ui.js
+          curl -fsSL --retry 3 --retry-delay 5 --retry-all-errors --connect-timeout 10 --max-time 30 "$base/production-web-autoload.js" >/tmp/prod-autoload.js
+          test -s /tmp/prod-ui.js
+          test -s /tmp/prod-autoload.js
           python3 - <<'PY'
           import json
           h=json.load(open('/tmp/health.json'))
           w=json.load(open('/tmp/web.json'))
           c=json.load(open('/tmp/cloud.json'))
-          d=json.load(open('/tmp/hype.json'))
+          btc=json.load(open('/tmp/btc.json'))
+          hype=json.load(open('/tmp/hype.json'))
           assert h.get('status')=='ok', h
           assert w.get('ok') is True and w.get('enabled') is True, w
           assert w.get('background_workers') is False, w
           assert w.get('cloud_forward_in_web_process') is False, w
           assert float(w.get('production_threshold')) == 68.0, w
           assert c.get('enabled') is False, c
-          assert d.get('ok') is True, d
-          assert float(d.get('signal_threshold')) == 68.0, d
-          print('RENDER_WEB_ONLY_SAFE_MODE_OK')
+          for d in (btc,hype):
+              assert d.get('ok') is True, d
+              assert float(d.get('signal_threshold')) == 68.0, d
+              assert d.get('score') is not None, d
+          print('RENDER_WEB_ONLY_PRODUCTION_UI_OK')
           PY
