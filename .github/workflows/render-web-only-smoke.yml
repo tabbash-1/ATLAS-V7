@@ -8,6 +8,8 @@ on:
       - 'cloud_start.py'
       - 'cloud_web_only.py'
       - 'render_boot_patch.py'
+      - 'production_signal_scoring.py'
+      - 'tests/test_partial_hour_volume_progress.py'
       - 'production-web-autoload.js'
       - 'atlas-production-decision.js'
       - '.github/workflows/render-web-only-smoke.yml'
@@ -19,7 +21,7 @@ jobs:
     steps:
       - name: Wait for Render deploy
         run: sleep 90
-      - name: Verify web-safe runtime and Production UI
+      - name: Verify web-safe runtime, Production UI, and live volume pacing
         shell: bash
         run: |
           set -euo pipefail
@@ -29,6 +31,7 @@ jobs:
           curl -fsSL --retry 5 --retry-delay 8 --retry-all-errors --connect-timeout 10 --max-time 45 "$base/api/cloud-forward/status" | tee /tmp/cloud.json
           curl -fsSL --retry 5 --retry-delay 8 --retry-all-errors --connect-timeout 10 --max-time 60 "$base/api/decision/current?symbol=BTCUSDT" | tee /tmp/btc.json
           curl -fsSL --retry 5 --retry-delay 8 --retry-all-errors --connect-timeout 10 --max-time 60 "$base/api/decision/current?symbol=HYPEUSDT" | tee /tmp/hype.json
+          curl -fsSL --retry 5 --retry-delay 8 --retry-all-errors --connect-timeout 10 --max-time 45 "$base/api/web/volume-diagnostic?symbol=BTCUSDT" | tee /tmp/vol.json
           curl -fsSL --retry 5 --retry-delay 8 --retry-all-errors --connect-timeout 10 --max-time 30 "$base/" | tee /tmp/index.html >/dev/null
           grep -q 'atlas-production-decision.js' /tmp/index.html
           grep -q 'production-web-autoload.js' /tmp/index.html
@@ -37,12 +40,13 @@ jobs:
           test -s /tmp/prod-ui.js
           test -s /tmp/prod-autoload.js
           python3 - <<'PY'
-          import json
+          import json, math
           h=json.load(open('/tmp/health.json'))
           w=json.load(open('/tmp/web.json'))
           c=json.load(open('/tmp/cloud.json'))
           btc=json.load(open('/tmp/btc.json'))
           hype=json.load(open('/tmp/hype.json'))
+          vol=json.load(open('/tmp/vol.json'))
           assert h.get('status')=='ok', h
           assert w.get('ok') is True and w.get('enabled') is True, w
           assert w.get('background_workers') is False, w
@@ -62,5 +66,18 @@ jobs:
                   assert d.get('wait_reason') in ('NO_DIRECTIONAL_CONSENSUS','SCORER_RETURNED_NO_CANDIDATE'), d
                   assert isinstance(d.get('direction_votes_long'), int), d
                   assert isinstance(d.get('direction_votes_short'), int), d
+          assert vol.get('ok') is True, vol
+          assert vol.get('symbol') == 'BTCUSDT', vol
+          progress=float(vol['candle_progress'])
+          raw=float(vol['raw_relative_volume'])
+          paced=float(vol['paced_relative_volume'])
+          assert 0.10 <= progress <= 1.0, vol
+          assert raw >= 0 and paced >= 0, vol
+          expected=min(4.0, raw/progress)
+          assert math.isclose(paced, expected, rel_tol=2e-5, abs_tol=2e-5), (vol, expected)
+          assert 'PARTIAL_VOLUME_TIME_FIX_V1' in str(vol.get('scoring_version')), vol
+          assert float(vol.get('production_threshold')) == 68.0, vol
+          assert vol.get('research_only') is True and vol.get('live_execution') is False, vol
           print('RENDER_WEB_ONLY_PRODUCTION_UI_OK')
+          print('LIVE_VOLUME_DIAGNOSTIC', vol)
           PY
