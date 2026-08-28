@@ -1,0 +1,55 @@
+name: ATLAS Scored WAIT Attribution Audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - scored_wait_attribution_audit.py
+      - tests/test_scored_wait_attribution_audit.py
+      - status/wait-outcomes.json
+      - .github/workflows/scored-wait-attribution-audit.yml
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax and regression tests
+        run: |
+          python -m py_compile scored_wait_attribution_audit.py tests/test_scored_wait_attribution_audit.py
+          PYTHONPATH=. python tests/test_scored_wait_attribution_audit.py
+      - name: Analyze existing V6 scored WAIT outcomes
+        run: python scored_wait_attribution_audit.py
+      - name: Guard research-only contract
+        run: |
+          python - <<'PY'
+          import json
+          r=json.load(open('status/scored-wait-attribution-audit.json'))
+          g=r['guardrails']
+          assert g['research_only'] is True
+          assert float(g['production_threshold']) == 68.0
+          assert g['production_threshold_changed'] is False
+          assert g['production_score_changed'] is False
+          assert g['auto_promotion_enabled'] is False
+          assert g['live_execution'] is False
+          print('Scored WAIT audit guardrails: OK')
+          PY
+      - name: Persist audit report
+        run: |
+          git config user.name "atlas-research-bot"
+          git config user.email "atlas-research@users.noreply.github.com"
+          git add status/scored-wait-attribution-audit.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "data: refresh scored WAIT attribution audit [skip ci]"
+          git pull --rebase origin main
+          git push
