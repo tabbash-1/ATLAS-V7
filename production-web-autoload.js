@@ -71,11 +71,22 @@
     setText('apsAiTrigger', p.entry_trigger || p.invalidation || 'Reassess if the verified Production structure changes.');
     setText('apsAiState', isActionable ? 'Production canonical decision' : isArmed ? 'ARMED — verified trigger defined' : 'WAIT');
   }
+  function acceptSnapshot(d, symbol=currentUiSymbol()) {
+    const normalized = normalizedSymbol(symbol);
+    if (!d || !d.ok || !normalized || normalized !== currentUiSymbol()) return false;
+    acceptedDecision = d;
+    acceptedSymbol = normalized;
+    window.ATLAS_PRODUCTION_DECISION = d;
+    return true;
+  }
+  function invalidateSnapshot(){
+    verifyEpoch++;
+    acceptedDecision = null;
+    acceptedSymbol = '';
+  }
   function render(d) {
     if (!d || !d.ok) return;
-    acceptedDecision = d;
-    acceptedSymbol = currentUiSymbol();
-    window.ATLAS_PRODUCTION_DECISION = d;
+    if (!acceptSnapshot(d)) return;
     const state = canonicalState(d);
     const score = finite(d.score) ? Math.round(Number(d.score)) : null;
     const threshold = finite(d.signal_threshold) ? Math.round(Number(d.signal_threshold)) : 68;
@@ -155,9 +166,7 @@
       const current = title.textContent.trim();
       if (current && current !== previous) {
         previous = current;
-        verifyEpoch++;
-        acceptedDecision=null;
-        acceptedSymbol='';
+        invalidateSnapshot();
         const sub = $('cmdMasterSub');
         if (sub) sub.textContent = `Verifying ${current}…`;
         scheduleCurrentAssetVerify();
@@ -199,7 +208,7 @@
   window.ATLAS_RENDER_PRODUCTION_STATUS = render;
   window.ATLAS_SYNC_PRODUCT_SHELL = syncProductShell;
   window.ATLAS_CANONICAL_STATE = canonicalState;
-  window.ATLAS_PRODUCTION_SNAPSHOT_GUARD={restore:restoreAcceptedSnapshot,current:()=>acceptedDecision,symbol:()=>acceptedSymbol};
+  window.ATLAS_PRODUCTION_SNAPSHOT_GUARD={restore:restoreAcceptedSnapshot,current:()=>acceptedDecision,symbol:()=>acceptedSymbol,accept:acceptSnapshot,invalidate:invalidateSnapshot};
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(boot, 350), {once:true});
   else setTimeout(boot, 350);
 })();
