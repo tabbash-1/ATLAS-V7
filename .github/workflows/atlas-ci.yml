@@ -134,8 +134,6 @@ jobs:
           ATLAS_DATA_DIR: /tmp/atlas-ci-data
           ATLAS_CLOUD_FORWARD_ENABLED: '0'
         run: |
-          # Do not use pipefail here: grep -q may intentionally close a successful
-          # curl response early, which makes curl report SIGPIPE/write error 23.
           set -eu
           rm -rf "$ATLAS_DATA_DIR"
           legacy_file=champion_challenger_forward.jsonl
@@ -174,7 +172,7 @@ jobs:
           curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"storage_hardening"'
           curl --fail --silent http://127.0.0.1:18080/production-status.html | grep -q 'Research Progress'
           curl --fail --silent http://127.0.0.1:18080/trade-outcomes.html | grep -q 'Trade Outcomes'
-          curl --fail --silent 'http://127.0.0.1:18080/api/outcomes/summary?horizon=24&scope=signals' | grep -q 'ATLAS_TRADE_OUTCOME_SUMMARY_V1'
+          curl --fail --silent 'http://127.0.0.1:18080/api/outcomes/summary?horizon=24&scope=signals' | grep -q 'ATLAS_TRADE_OUTCOME_SUMMARY_V2_VERSION_COHORTS'
           curl --fail --silent 'http://127.0.0.1:18080/api/outcomes/geometry-status' | grep -q 'ATLAS_TRADE_GEOMETRY_STATUS_V2_EXECUTION_SCOPE'
           curl --fail --silent http://127.0.0.1:18080/api/system/readiness | grep -q '"persistent_data_dir": "/tmp/atlas-ci-data"'
           curl --fail --silent http://127.0.0.1:18080/api/production/readiness | grep -q '"ready_for_live_execution": false'
