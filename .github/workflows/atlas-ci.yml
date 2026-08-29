@@ -45,28 +45,20 @@ jobs:
       - name: Verify delegated production entrypoints
         run: |
           set -euo pipefail
-          # Each deployment surface intentionally uses the runtime suited to it:
-          # Procfile -> full web stack, Render/Docker -> ultra-light web-only stack.
           grep -q 'cloud_start_web.py' Procfile
           grep -q 'cloud_web_only.py' render.yaml
           grep -q 'cloud_web_only.py' Dockerfile
           grep -q 'mountPath: /var/data' render.yaml
           ! grep -q 'OPENAI_API_KEY' render.yaml
-
-          # Compatibility entrypoint remains safe for manual/legacy invocations.
           grep -q 'cloud_web_only.py' cloud_start.py
           grep -q 'cloud_start_web.py' cloud_start.py
           grep -q 'ATLAS_CLOUD_FORWARD_ENABLED.*0' cloud_start.py
           grep -q 'ATLAS_WEB_ONLY.*1' cloud_start.py
-
-          # Full web stack retains persistence/outcome/risk wiring.
           grep -q '_install_storage_hardening' cloud_start_web.py
           grep -q '_install_execution_risk_management' cloud_start_web.py
           grep -q '_install_trade_geometry_freezer' cloud_start_web.py
           grep -q '_install_trade_outcome_runtime' cloud_start_web.py
           grep -q 'trade_geometry.jsonl' cloud_start_web.py
-
-          # Render/Docker web-only stack retains Production decision safety and isolated research shadows.
           grep -q 'install_scoring(atlas)' cloud_web_only.py
           grep -q 'install_continuation(atlas)' cloud_web_only.py
           grep -q 'install_decision_api(atlas)' cloud_web_only.py
@@ -126,7 +118,6 @@ jobs:
           set -euo pipefail
           grep -q 'atlasProductShell' atlas-product-shell.js
           grep -q "\$('analyzeBtn')?.click" atlas-product-shell.js
-          # Product shell may request AI explanation, but Production is fetched only by the canonical verifier.
           ! grep -q '/api/decision/current' atlas-product-shell.js
           grep -q '/api/ai/council' atlas-product-shell.js
           grep -q 'ATLAS_PRODUCTION_SNAPSHOT_GUARD' atlas-product-shell.js
@@ -143,7 +134,9 @@ jobs:
           ATLAS_DATA_DIR: /tmp/atlas-ci-data
           ATLAS_CLOUD_FORWARD_ENABLED: '0'
         run: |
-          set -euo pipefail
+          # Do not use pipefail here: grep -q may intentionally close a successful
+          # curl response early, which makes curl report SIGPIPE/write error 23.
+          set -eu
           rm -rf "$ATLAS_DATA_DIR"
           legacy_file=champion_challenger_forward.jsonl
           printf '%s\n' '{"schema":"ATLAS_FORWARD_V1","id":"ci-legacy-seed","captured_at":"2026-01-01T00:00:00+00:00","captured_at_ms":1767225600000,"symbol":"BTCUSDT","direction":"LONG","entry":99,"champion_score":70,"champion_take":true,"challenger_score":70,"challenger_take":true,"challenger_threshold":60,"playbook_all":[],"auto_source":"CI_LEGACY_MIGRATION_TEST","forward_return_pct":{}}' > "$legacy_file"
