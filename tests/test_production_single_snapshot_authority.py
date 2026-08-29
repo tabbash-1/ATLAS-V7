@@ -30,3 +30,10 @@ def test_snapshot_guard_is_the_only_acceptance_surface():
     assert 'function invalidateSnapshot' in src
     assert 'accept:acceptSnapshot' in src
     assert 'invalidate:invalidateSnapshot' in src
+
+
+if __name__ == '__main__':
+    test_product_shell_does_not_fetch_or_publish_production_decision()
+    test_production_decision_rejects_stale_responses()
+    test_snapshot_guard_is_the_only_acceptance_surface()
+    print('production single snapshot authority tests: ok')
