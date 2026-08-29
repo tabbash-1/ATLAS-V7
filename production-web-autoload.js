@@ -57,11 +57,11 @@
     setText('apsStatus', isActionable ? 'Canonical Production trade plan ready' : isArmed ? 'ARMED = wait for Production trigger' : 'WAIT = no trade now');
 
     const dirText = directional(dir);
-    setText('apsAiProd', isActionable ? `${dirText}${score === null ? '' : ` · ${score}/${threshold}`}` : isArmed ? `ARMED · ${dirText}${score === null ? '' : ` · ${score}/${threshold}`}` : `${state}${score === null ? '' : ` · ${score}/${threshold}`}`);
+    setText('apsAiProd', isActionable ? `${dirText}${score === null ? '' : ` · ${score}/${threshold}`}` : isArmed ? `ARMED · ${dirText}${score === null ? '' : ` · ${score}/${threshold}`}` : `WAIT${score === null ? '' : ` · ${score}/${threshold}`}`);
     setText('apsAiBest', isActionable ? `${action} NOW → ${dirText}` : isArmed ? `ARMED · ${String(action).replaceAll('_',' ')} → ${dirText}` : 'WAIT');
     setText('apsAiGeometry', p.entry == null ? 'No canonical Production trade geometry' : `${isActionable ? 'Verified Production plan' : isArmed ? 'Armed conditional Production plan' : 'Production plan'} · Entry ${fmt(p.entry)} · Stop ${fmt(p.stop_loss)} · TP1 ${fmt(p.tp1)} · TP2 ${fmt(p.tp2)} · R:R ${fmt(p.rr_tp2,2)}`);
     setText('apsAiTrigger', p.entry_trigger || p.invalidation || 'Reassess if the verified Production structure changes.');
-    setText('apsAiState', isActionable ? 'Production canonical decision' : isArmed ? 'ARMED — verified trigger defined' : state);
+    setText('apsAiState', isActionable ? 'Production canonical decision' : isArmed ? 'ARMED — verified trigger defined' : 'WAIT');
   }
 
   function render(d) {
