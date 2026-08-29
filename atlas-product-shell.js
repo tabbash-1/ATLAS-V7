@@ -19,7 +19,7 @@
   const normalizedSymbol=v=>String(v||'').toUpperCase().replace('BINANCE:','').replace(/[^A-Z0-9]/g,'');
 
   function master(){return window.ATLAS_MASTER&&typeof window.ATLAS_MASTER==='object'?window.ATLAS_MASTER:null;}
-  function production(){return window.ATLAS_PRODUCTION_DECISION&&typeof window.ATLAS_PRODUCTION_DECISION==='object'?window.ATLAS_PRODUCTION_DECISION:null;}
+  function production(){const guarded=window.ATLAS_PRODUCTION_SNAPSHOT_GUARD?.current?.();if(guarded&&typeof guarded==='object')return guarded;return window.ATLAS_PRODUCTION_DECISION&&typeof window.ATLAS_PRODUCTION_DECISION==='object'?window.ATLAS_PRODUCTION_DECISION:null;}
   function currentSymbol(){
     const s=window.ATLAS_APP_STATE,a=s?.assets?.[s.active],raw=normalizedSymbol(a?.symbol);
     if(raw)return raw;
@@ -81,7 +81,7 @@
     const bits=[],plan=p.trade_plan||{};
     if(p.geometry_gate?.status==='BLOCK')bits.push(`Current geometry blocked: ${humanize(p.geometry_gate.reason)}`);
     const rr=plan.rr_tp2??p.risk_reward;
-    if(Number.isFinite(Number(rr)))bits.push(`Current Production R:R ${fmt(rr,2)}`);
+    if(Number.isFinite(Number(rr)))bits.push(`${plan.rr_tp2!=null?'Canonical Production':'Candidate / qualification'} R:R ${fmt(rr,2)}`);
     const obstacle=Number(p.score_attribution?.obstacle_adjustment);
     if(Number.isFinite(obstacle)&&obstacle<0)bits.push(`Obstacle penalty ${fmt(obstacle,0)}`);
     if(p.futures_available===false)bits.push('Futures confirmation unavailable');
@@ -99,12 +99,21 @@
     const symbol=currentSymbol();if(!symbol)return;
     $('apsAiState').textContent='Analyzing…';
     try{
-      const [pd,ai]=await Promise.all([
-        fetch(`/api/decision/current?symbol=${encodeURIComponent(symbol)}&t=${Date.now()}`,{cache:'no-store'}).then(async r=>{const j=await r.json();if(!r.ok||j?.ok===false)throw new Error(j?.error||`Decision HTTP ${r.status}`);return j;}),
-        fetch(`/api/ai/council?symbol=${encodeURIComponent(symbol)}&t=${Date.now()}`,{cache:'no-store'}).then(async r=>{const j=await r.json();if(!r.ok||j?.error)throw new Error(j?.error||`AI HTTP ${r.status}`);return j;})
-      ]);
-      window.ATLAS_PRODUCTION_DECISION=pd;
-      renderAi(ai,pd);
+      let pd=window.ATLAS_PRODUCTION_SNAPSHOT_GUARD?.current?.();
+      if(!pd||normalizedSymbol(window.ATLAS_PRODUCTION_SNAPSHOT_GUARD?.symbol?.())!==symbol){
+        const ui=window.ATLAS_PRODUCTION_DECISION_UI;
+        if(!ui||typeof ui.verify!=='function')throw new Error('Production verifier unavailable');
+        const ok=await ui.verify();
+        if(!ok)throw new Error('Production verification failed');
+        pd=window.ATLAS_PRODUCTION_SNAPSHOT_GUARD?.current?.()||window.ATLAS_PRODUCTION_DECISION;
+      }
+      if(!pd||currentSymbol()!==symbol)throw new Error('No accepted Production snapshot');
+      const accepted=pd;
+      const r=await fetch(`/api/ai/council?symbol=${encodeURIComponent(symbol)}&t=${Date.now()}`,{cache:'no-store'});
+      const ai=await r.json();
+      if(!r.ok||ai?.error)throw new Error(ai?.error||`AI HTTP ${r.status}`);
+      if(currentSymbol()!==symbol||window.ATLAS_PRODUCTION_SNAPSHOT_GUARD?.current?.()!==accepted)return;
+      renderAi(ai,accepted);
       update();
     }catch(e){
       $('apsAiState').textContent='AI analysis unavailable';
@@ -149,7 +158,6 @@
   async function runAnalysisAndCouncil(){
     const button=$('analyzeBtn');if(!button)return;
     window.ATLAS_MASTER=null;
-    window.ATLAS_PRODUCTION_DECISION=null;
     $('apsAnalyze').disabled=true;
     $('apsStatus').textContent='Analysis running…';
     $('apsAiState').textContent='Waiting for ATLAS analysis…';
@@ -166,5 +174,5 @@
   ensureHypeAsset();
   update();
   setTimeout(refreshAi,1200);
-  window.ATLAS_PRODUCT_SHELL={refresh:update,refreshAi,canonicalProductionPlan:true};
+  window.ATLAS_PRODUCT_SHELL={refresh:update,refreshAi,canonicalProductionPlan:true,acceptedSnapshotOnly:true};
 })();
