@@ -1,15 +1,14 @@
-"""ATLAS Production Trade Plan V2.
+"""ATLAS Production Trade Plan V3.
 
-Builds a complete, auditable plan from the verified decision: entry mode,
-entry trigger, structural/ATR stop, TP1/TP2 and risk/reward. It does not lower
-qualification thresholds and does not execute trades.
-
-V2 makes conditional breakout plans clear the full verified blocking structure,
-not just the nearest swing. This prevents a BUY_ONLY_IF/SELL_ONLY_IF plan from
-triggering before the prior 24h range boundary has actually been cleared.
+Builds a complete, auditable quick-trade plan from the verified decision and
+also attaches a separate structure-aware 12-24H swing target lane. The legacy
+Production TP1/TP2 geometry is preserved for compatibility; swing targets never
+silently replace the quick-trade plan.
 """
 
-VERSION = 'PRODUCTION_TRADE_PLAN_V2_RANGE_ALIGNED'
+from swing_target_engine import build as build_swing_targets
+
+VERSION = 'PRODUCTION_TRADE_PLAN_V3_SWING_LANE'
 
 
 def _num(v):
@@ -102,12 +101,29 @@ def build(decision):
     if d=='LONG' and tp2<=tp1: tp2=tp1+max(risk,atr*.8)
     if d=='SHORT' and tp2>=tp1: tp2=tp1-max(risk,atr*.8)
     rr1=_rr(entry,stop,tp1); rr2=_rr(entry,stop,tp2)
+
+    swing_plan=build_swing_targets(
+        direction=d,
+        entry=entry,
+        stop=stop,
+        atr=atr,
+        structural_geometry=geom,
+        continuation_strong=continuation,
+        breakout_confirmed=breakout,
+    )
+
     status='ACTIONABLE' if execution and qualified else 'CONDITIONAL'
     action=('BUY' if d=='LONG' else 'SELL') if status=='ACTIONABLE' else ('BUY_ONLY_IF' if d=='LONG' else 'SELL_ONLY_IF')
     return {
         'version':VERSION,'status':status,'action':action,'direction':d,'entry_mode':mode,
         'entry':round(entry,10),'entry_trigger':trigger,'stop_loss':round(stop,10),
         'tp1':round(tp1,10),'tp2':round(tp2,10),'rr_tp1':round(rr1,3),'rr_tp2':round(rr2,3),
+        'quick_plan':{
+            'horizon':'1-3H','tp1':round(tp1,10),'tp2':round(tp2,10),
+            'rr_tp1':round(rr1,3),'rr_tp2':round(rr2,3)
+        },
+        'swing_plan':swing_plan,
+        'preferred_target_lane':'SWING_12_24H' if swing_plan.get('status')=='SWING_READY' else 'QUICK_1_3H',
         'reference_structure':round(reference,10) if reference is not None else None,
         'reference_structure_source':reference_source,
         'continuation_strong':continuation,'breakout_confirmed':breakout,
