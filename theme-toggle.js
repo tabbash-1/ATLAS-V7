@@ -49,9 +49,10 @@
     .then(()=>window.ATLAS_DECISION_EXPLANATION?.refresh?.())
     .catch(err=>console.error('ATLAS decision explanation layer failed:',err));
 
-  // Keep the product shell additive: it loads after the existing decision/AI
-  // layers and delegates to their APIs/state rather than replacing any engine.
-  const scripts=['atlas-timeframe-engine.js','atlas-ai-analysis-layer.js','atlas-decision-quality.js','atlas-ai-ui.js','atlas-product-shell.js','production-null-display-fix.js','production-semantics-labels.js'];
+  // Load research/UI layers first, then install one final Production authority.
+  // The authority prevents local/research timeframe output from overwriting the
+  // canonical Production cards and labels the fixed 1H Production lane clearly.
+  const scripts=['atlas-timeframe-engine.js','atlas-ai-analysis-layer.js','atlas-decision-quality.js','atlas-ai-ui.js','atlas-product-shell.js','production-null-display-fix.js','production-semantics-labels.js','atlas-production-ui-authority.js'];
   (async()=>{
     for(const src of scripts){
       try{ await loadScript(src,src); }
