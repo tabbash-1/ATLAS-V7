@@ -1,0 +1,112 @@
+name: ATLAS Swing Targets
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/atlas-swing-targets.yml'
+      - 'swing_target_engine.py'
+      - 'production_trade_plan.py'
+      - 'status/atlas-production-latest.json'
+      - 'status/raw/decision_*.json'
+  schedule:
+    - cron: '12,32,52 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atlas-swing-targets
+  cancel-in-progress: true
+
+jobs:
+  build-swing-targets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build swing targets from latest Production decisions
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, pathlib, datetime
+          from swing_target_engine import build
+
+          symbols=['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT','HYPEUSDT']
+          root=pathlib.Path('status/raw')
+          rows=[]
+          for symbol in symbols:
+              p=root/f'decision_{symbol}.json'
+              if not p.exists():
+                  rows.append({'symbol':symbol,'status':'UNAVAILABLE','reason':'DECISION_FILE_MISSING'})
+                  continue
+              try:
+                  d=json.loads(p.read_text())
+              except Exception as e:
+                  rows.append({'symbol':symbol,'status':'UNAVAILABLE','reason':f'INVALID_JSON:{e}'})
+                  continue
+              direction=d.get('candidate_direction')
+              entry=d.get('entry')
+              atr=((d.get('indicators') or {}).get('atr14'))
+              stop=d.get('stop_loss')
+              if stop is None and direction in ('LONG','SHORT') and entry is not None and atr:
+                  stop=float(entry) + (-1 if direction=='LONG' else 1)*float(atr)*1.2
+              geom=d.get('structural_geometry') or {}
+              if not geom:
+                  attr=d.get('score_attribution') or {}
+                  obstacle=None
+                  target=d.get('take_profit')
+                  if target is not None:
+                      obstacle=target
+                  geom={
+                      'obstacle_price': obstacle,
+                      'obstacle_distance_pct': attr.get('obstacle_distance_pct'),
+                      'continuation_strong': 'CONTINUATION' in str(d.get('playbook') or '').upper(),
+                      'breakout': {'confirmed': 'BREAKOUT' in str(d.get('playbook') or '').upper() or 'BREAKDOWN' in str(d.get('playbook') or '').upper()}
+                  }
+              swing=build(
+                  direction=direction, entry=entry, stop=stop, atr=atr,
+                  structural_geometry=geom,
+                  continuation_strong=bool(geom.get('continuation_strong')),
+                  breakout_confirmed=bool((geom.get('breakout') or {}).get('confirmed')),
+              )
+              swing.update({
+                  'symbol':symbol,
+                  'production_score':d.get('score'),
+                  'production_threshold':d.get('signal_threshold'),
+                  'production_qualified':bool(d.get('production_signal_qualified')),
+                  'execution_ready':bool(d.get('execution_ready')),
+                  'production_decision':d.get('decision'),
+                  'playbook':d.get('playbook'),
+                  'decision_generated_at':d.get('generated_at'),
+              })
+              rows.append(swing)
+
+          captured=datetime.datetime.now(datetime.timezone.utc).isoformat()
+          ready=[r for r in rows if r.get('status')=='SWING_READY']
+          executable=[r for r in ready if r.get('production_qualified') and r.get('execution_ready')]
+          payload={
+              'schema':'ATLAS_SWING_TARGETS_V1',
+              'generated_at':captured,
+              'source':'LATEST_PRODUCTION_DECISION_FILES',
+              'research_only':True,
+              'minimum_swing_move_pct':1.5,
+              'minimum_swing_rr':2.5,
+              'swing_ready_count':len(ready),
+              'production_executable_swing_count':len(executable),
+              'production_executable_swings':executable,
+              'assets':rows,
+          }
+          pathlib.Path('status/swing-targets-latest.json').write_text(json.dumps(payload,indent=2,sort_keys=True))
+          PY
+      - name: Commit swing target snapshot
+        shell: bash
+        run: |
+          git config user.name "atlas-swing-target-monitor"
+          git config user.email "atlas-swing@users.noreply.github.com"
+          git add status/swing-targets-latest.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "chore: update ATLAS swing targets [skip ci]"
+          git pull --rebase origin main
+          git push
