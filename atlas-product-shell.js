@@ -1,178 +1,45 @@
 (() => {
+  const VERSION='ATLAS_PRODUCT_SHELL_V2_SINGLE_AUTHORITY';
   const $=id=>document.getElementById(id);
   const main=document.querySelector('main.main');
-  if(!main||$('atlasProductShell')) return;
+  if(!main||$('atlasProductShell'))return;
+  const norm=v=>String(v||'').toUpperCase().replace('BINANCE:','').replace(/[^A-Z0-9]/g,'');
+  const finite=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v));
+  const fmt=(v,d=2)=>finite(v)?Number(v).toLocaleString(undefined,{maximumFractionDigits:d}):'—';
+  const human=v=>String(v||'').replace(/_/g,' ').replace(/\s+/g,' ').trim();
+  const set=(id,v)=>{const el=$(id);if(el&&el.textContent!==String(v))el.textContent=String(v);};
 
   const style=document.createElement('style');
-  style.textContent=`body.atlas-product-focus .topbar,body.atlas-product-focus .command-strip,body.atlas-product-focus .signal-card{display:none!important}body.atlas-product-focus:not(.atlas-advanced-open) .atlas-workspace-nav,body.atlas-product-focus:not(.atlas-advanced-open) .atlas-workspace-panels{display:none!important}#atlasProductShell{margin:18px 0;padding:18px;border:1px solid #253047;border-radius:20px;background:#0a0e16}.aps-top,.aps-controls,.aps-actions{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}.aps-eyebrow,.aps-label{font-size:10px;letter-spacing:.12em;color:#9d7cff;text-transform:uppercase}.aps-title{font-size:clamp(25px,5vw,40px);margin:5px 0}.aps-sub,.aps-note{color:#8c9ab3;font-size:12px}.aps-control,.aps-secondary{border:1px solid #2a3851;background:#0d1320;color:#dce5f4;border-radius:11px;padding:10px}.aps-grid{display:grid;grid-template-columns:1.15fr repeat(4,minmax(0,1fr));gap:10px;margin-top:16px}.aps-card,.aps-packet{border:1px solid #253047;border-radius:15px;padding:13px;background:#0d1320}.aps-value{font-size:20px;font-weight:800}.long{color:#55d68b}.short{color:#ff6b7a}.wait{color:#f4c95d}.aps-analyze{border:1px solid #2d8f69;background:#0e2a20;color:#6fe5ad;border-radius:12px;padding:12px 18px;font-weight:800}.aps-summary-grid,.aps-packet-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px}.aps-summary,.aps-packet-item{border-top:1px solid #253047;padding-top:11px;color:#c9d4e7;font-size:12px;line-height:1.55}.aps-summary strong,.aps-packet-item strong{display:block;color:#9d7cff;font-size:10px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px}.aps-hidden-noncrypto{display:none!important}.aps-wait-geometry{opacity:.5}.aps-ai{margin-top:16px;border:1px solid #513d83;background:#0f1320;border-radius:16px;padding:14px}.aps-ai-title{font-weight:900;font-size:18px}.aps-ai-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-top:12px}.aps-ai-card,.aps-ai-best{border:1px solid #28364d;background:#0b111b;border-radius:11px;padding:12px}.aps-ai-card span{display:block;color:#8c9ab3;font-size:10px;margin-bottom:6px}.aps-ai-card b{font-size:15px}.aps-ai-best{margin-top:10px;border-color:#385d52;background:#0a1714}.aps-ai-best b{font-size:18px}.aps-ai-best .meta{margin-top:7px;color:#b6c2d5;font-size:12px;line-height:1.55}.aps-ai-reason{margin-top:10px;color:#c9d4e7;font-size:12px;line-height:1.6}.aps-rr-tag{display:inline-block;margin-right:5px;color:#9d7cff;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}@media(max-width:820px){.aps-grid{grid-template-columns:repeat(2,1fr)}.aps-grid .primary{grid-column:1/-1}.aps-summary-grid,.aps-packet-grid,.aps-ai-grid{grid-template-columns:1fr}}`;
+  style.textContent=`body.atlas-product-focus .topbar,body.atlas-product-focus .command-strip,body.atlas-product-focus .signal-card{display:none!important}body.atlas-product-focus:not(.atlas-advanced-open) .atlas-workspace-nav,body.atlas-product-focus:not(.atlas-advanced-open) .atlas-workspace-panels{display:none!important}#atlasProductShell{margin:18px 0;padding:18px;border:1px solid #253047;border-radius:20px;background:#0a0e16}.aps-top,.aps-controls,.aps-actions{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}.aps-eyebrow,.aps-label{font-size:10px;letter-spacing:.12em;color:#9d7cff;text-transform:uppercase}.aps-title{font-size:clamp(25px,5vw,40px);margin:5px 0}.aps-note{color:#8c9ab3;font-size:12px}.aps-control,.aps-secondary{border:1px solid #2a3851;background:#0d1320;color:#dce5f4;border-radius:11px;padding:10px}.aps-grid{display:grid;grid-template-columns:1.15fr repeat(4,minmax(0,1fr));gap:10px;margin-top:16px}.aps-card,.aps-packet{border:1px solid #253047;border-radius:15px;padding:13px;background:#0d1320}.aps-value{font-size:20px;font-weight:800}.long{color:#55d68b}.short{color:#ff6b7a}.wait{color:#f4c95d}.aps-analyze{border:1px solid #2d8f69;background:#0e2a20;color:#6fe5ad;border-radius:12px;padding:12px 18px;font-weight:800}.aps-summary-grid,.aps-packet-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px}.aps-summary,.aps-packet-item{border-top:1px solid #253047;padding-top:11px;color:#c9d4e7;font-size:12px;line-height:1.55}.aps-summary strong,.aps-packet-item strong{display:block;color:#9d7cff;font-size:10px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px}.aps-ai{margin-top:16px;border:1px solid #513d83;background:#0f1320;border-radius:16px;padding:14px}.aps-ai-title{font-weight:900;font-size:18px}.aps-ai-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-top:12px}.aps-ai-card,.aps-ai-best{border:1px solid #28364d;background:#0b111b;border-radius:11px;padding:12px}.aps-ai-card span{display:block;color:#8c9ab3;font-size:10px;margin-bottom:6px}.aps-ai-card b{font-size:15px}.aps-ai-best{margin-top:10px;border-color:#385d52;background:#0a1714}.aps-ai-best b{font-size:18px}.aps-ai-best .meta{margin-top:7px;color:#b6c2d5;font-size:12px;line-height:1.55}.aps-ai-reason{margin-top:10px;color:#c9d4e7;font-size:12px;line-height:1.6}@media(max-width:820px){.aps-grid{grid-template-columns:repeat(2,1fr)}.aps-grid .primary{grid-column:1/-1}.aps-summary-grid,.aps-packet-grid,.aps-ai-grid{grid-template-columns:1fr}}`;
   document.head.appendChild(style);
 
   const shell=document.createElement('section');
   shell.id='atlasProductShell';
-  shell.innerHTML=`<div class="aps-top"><div><div class="aps-eyebrow">ATLAS · CRYPTO TRADE INTELLIGENCE</div><div id="apsAsset" class="aps-title">Current asset</div></div><div class="aps-controls"><select id="apsTimeframe" class="aps-control"></select><button id="apsAdvanced" class="aps-secondary">Advanced Research</button></div></div><div class="aps-grid"><div class="aps-card primary"><div class="aps-label">Decision</div><div id="apsDecision" class="aps-value wait">WAIT</div></div><div class="aps-card"><div class="aps-label">Production score</div><div id="apsConfidence" class="aps-value">—</div></div><div id="apsEntryCard" class="aps-card"><div class="aps-label">Production Entry</div><div id="apsEntry" class="aps-value">—</div></div><div id="apsStopCard" class="aps-card"><div class="aps-label">Production Stop</div><div id="apsStop" class="aps-value">—</div></div><div id="apsTargetCard" class="aps-card"><div class="aps-label">Production Target / R:R</div><div id="apsTarget" class="aps-value">—</div></div></div><div class="aps-actions" style="margin-top:14px"><button id="apsAnalyze" class="aps-analyze">▶ ANALYZE</button><div id="apsStatus" class="aps-note">Ready</div></div><div class="aps-packet"><div class="aps-label">Market Analysis</div><div class="aps-packet-grid"><div class="aps-packet-item"><strong>Regime</strong><span id="apsRegime">—</span></div><div class="aps-packet-item"><strong>Trend</strong><span id="apsTrend">—</span></div><div class="aps-packet-item"><strong>Momentum</strong><span id="apsMomentum">—</span></div><div class="aps-packet-item"><strong>Volume</strong><span id="apsVolume">—</span></div><div class="aps-packet-item"><strong>Structure</strong><span id="apsStructure">—</span></div><div class="aps-packet-item"><strong>Liquidity / Smart Money</strong><span id="apsLiquidity">—</span></div></div></div><div class="aps-ai"><div class="aps-label">ATLAS AI</div><div class="aps-ai-title">What should I do?</div><div id="apsAiState" class="aps-note">Waiting for analysis</div><div class="aps-ai-grid"><div class="aps-ai-card"><span>ATLAS decision</span><b id="apsAiProd">—</b></div><div class="aps-ai-card"><span>AI view</span><b id="apsAiJudge">—</b></div><div class="aps-ai-card"><span>Conditional 1–3H opportunity</span><b id="apsAiTactical">—</b></div></div><div class="aps-ai-best"><span class="aps-label">Best action now</span><br><b id="apsAiBest">—</b><div id="apsAiGeometry" class="meta">—</div><div id="apsAiTrigger" class="meta">—</div></div><div id="apsAiReason" class="aps-ai-reason">Run analysis to see the reason.</div></div><div class="aps-summary-grid"><div class="aps-summary"><strong>Why</strong><div id="apsWhy">Run analysis to see evidence.</div></div><div class="aps-summary"><strong>Current Production Risks</strong><div id="apsRisks">Risk context will appear here.</div></div><div class="aps-summary"><strong>What changes</strong><div id="apsChanges">Missing confirmation will appear here.</div></div></div>`;
+  shell.innerHTML=`<div class="aps-top"><div><div class="aps-eyebrow">ATLAS · CRYPTO TRADE INTELLIGENCE</div><div id="apsAsset" class="aps-title">Current asset</div></div><div class="aps-controls"><select id="apsTimeframe" class="aps-control" aria-label="Research chart timeframe"></select><button id="apsAdvanced" class="aps-secondary">Advanced Research</button><div id="apsContextAuthority" class="aps-note" style="flex-basis:100%">Research chart: — · Canonical Production: 1H</div></div></div><div class="aps-grid"><div class="aps-card primary"><div class="aps-label">Decision</div><div id="apsDecision" class="aps-value wait">WAIT</div></div><div class="aps-card"><div class="aps-label">Production score · 1H</div><div id="apsConfidence" class="aps-value">—/68</div></div><div class="aps-card"><div class="aps-label">Production Entry</div><div id="apsEntry" class="aps-value">—</div></div><div class="aps-card"><div class="aps-label">Production Stop</div><div id="apsStop" class="aps-value">—</div></div><div class="aps-card"><div class="aps-label">Production Target / R:R</div><div id="apsTarget" class="aps-value">—</div></div></div><div class="aps-actions" style="margin-top:14px"><button id="apsAnalyze" class="aps-analyze">▶ ANALYZE</button><div id="apsStatus" class="aps-note">Verifying canonical Production…</div></div><div class="aps-packet"><div class="aps-label">Canonical Production Analysis · 1H</div><div class="aps-packet-grid"><div class="aps-packet-item"><strong>Regime</strong><span id="apsRegime">—</span></div><div class="aps-packet-item"><strong>Trend</strong><span id="apsTrend">—</span></div><div class="aps-packet-item"><strong>Momentum</strong><span id="apsMomentum">—</span></div><div class="aps-packet-item"><strong>Volume</strong><span id="apsVolume">—</span></div><div class="aps-packet-item"><strong>Structure</strong><span id="apsStructure">—</span></div><div class="aps-packet-item"><strong>Liquidity / Smart Money</strong><span id="apsLiquidity">Research context only</span></div></div></div><div class="aps-ai"><div class="aps-label">ATLAS AI · SHADOW EXPLANATION</div><div class="aps-ai-title">What should I do?</div><div id="apsAiState" class="aps-note">Waiting for canonical Production</div><div class="aps-ai-grid"><div class="aps-ai-card"><span>ATLAS Production</span><b id="apsAiProd">WAIT</b></div><div class="aps-ai-card"><span>AI view</span><b id="apsAiJudge">—</b></div><div class="aps-ai-card"><span>Conditional 1–3H research</span><b id="apsAiTactical">—</b></div></div><div class="aps-ai-best"><span class="aps-label">Best action now</span><br><b id="apsAiBest">WAIT</b><div id="apsAiGeometry" class="meta">No canonical Production trade geometry</div><div id="apsAiTrigger" class="meta">Reassess after verification.</div></div><div id="apsAiReason" class="aps-ai-reason">AI can explain Production but cannot override it.</div></div><div class="aps-summary-grid"><div class="aps-summary"><strong>Why</strong><div id="apsWhy">Waiting for canonical Production.</div></div><div class="aps-summary"><strong>Current Production Risks</strong><div id="apsRisks">—</div></div><div class="aps-summary"><strong>What changes</strong><div id="apsChanges">Wait for verification.</div></div></div>`;
   main.insertBefore(shell,document.querySelector('.command-strip')||document.querySelector('.chart-grid')||main.firstElementChild);
   document.body.classList.add('atlas-product-focus');
 
-  const text=(id,f='—')=>($(id)?.textContent||'').trim()||f;
-  const humanize=v=>String(v||'').replace(/_/g,' ').replace(/\s+/g,' ').trim();
-  const fmt=(v,d=2)=>Number.isFinite(Number(v))?Number(v).toLocaleString(undefined,{maximumFractionDigits:d}):'—';
-  const normalizedSymbol=v=>String(v||'').toUpperCase().replace('BINANCE:','').replace(/[^A-Z0-9]/g,'');
+  function currentSymbol(){const s=window.ATLAS_APP_STATE,a=s?.assets?.[s.active],raw=norm(a?.symbol);if(raw)return raw;const t=($('activeTitle')?.textContent||'').toUpperCase();for(const x of ['BTC','ETH','SOL','XRP','BNB','DOGE','ZEC','HYPE'])if(t.includes(x))return x+'USDT';return'';}
+  function production(){const g=window.ATLAS_PRODUCTION_SNAPSHOT_GUARD,d=g?.current?.();return d&&d.ok&&norm(g?.symbol?.())===currentSymbol()?d:null;}
+  function canonicalState(d){const p=d?.trade_plan||{};if(p.status==='ACTIONABLE'&&d?.production_signal_qualified&&d?.execution_ready)return'ACTIONABLE';if(p.status==='CONDITIONAL'&&d?.production_signal_qualified)return'ARMED';return'WAIT';}
+  function syncTimeframe(){const src=$('intervalSelect'),tf=$('apsTimeframe');if(src&&tf&&!tf.options.length)[...src.options].forEach(o=>tf.add(new Option(o.textContent,o.value)));if(src&&tf)tf.value=src.value;const label=tf?.options[tf.selectedIndex]?.textContent||tf?.value||'—';set('apsContextAuthority',`Research chart: ${label} · Canonical Production: 1H`);}
+  function render(d=production()){
+    syncTimeframe();set('apsAsset',$('activeTitle')?.textContent||'Current asset');
+    if(!d){set('apsDecision','WAIT');set('apsConfidence','—/68');set('apsEntry','—');set('apsStop','—');set('apsTarget','—');set('apsRegime','VERIFYING');set('apsTrend','—');set('apsMomentum','—');set('apsVolume','—');set('apsStructure','Production verification pending');set('apsStatus','Verifying canonical Production…');set('apsWhy','No accepted Production snapshot for this asset yet.');set('apsRisks','Research/local output is not a Production decision.');set('apsChanges','Wait for canonical verification.');return;}
+    const p=d.trade_plan||{},st=canonicalState(d),dir=p.direction||d.candidate_direction||'NONE',score=finite(d.score)?Math.round(Number(d.score)):null,threshold=finite(d.signal_threshold)?Math.round(Number(d.signal_threshold)):68,actionable=st==='ACTIONABLE',armed=st==='ARMED',reason=d.wait_reason||d.actionable_reason||d.playbook||'Production verified';
+    set('apsDecision',actionable?dir:'WAIT');const de=$('apsDecision');if(de)de.className='aps-value '+(actionable?dir.toLowerCase():'wait');set('apsConfidence',`${score===null?'—':score}/${threshold}`);set('apsEntry',actionable?fmt(p.entry,8):'—');set('apsStop',actionable?fmt(p.stop_loss,8):'—');set('apsTarget',actionable?`${fmt(p.tp2,8)}${finite(p.rr_tp2)?` · R:R ${fmt(p.rr_tp2,2)}`:''}`:'—');set('apsRegime',d.regime||'MIXED');set('apsTrend',d.candidate_direction||'NONE');set('apsMomentum',`Votes L${d.direction_votes_long??'—'}/S${d.direction_votes_short??'—'}`);set('apsVolume',d.relative_volume==null?'—':`RV ${fmt(d.relative_volume,2)}`);set('apsStructure',`${human(reason)} · score ${score===null?'—':score}/${threshold}`);set('apsStatus',actionable?'Canonical Production trade plan ready':armed?'ARMED = wait for Production trigger':'WAIT = no trade now');
+    set('apsAiProd',actionable?`${dir} · ${score}/${threshold}`:armed?`ARMED · ${dir} · ${score}/${threshold}`:`WAIT${score===null?'':` · ${score}/${threshold}`}`);set('apsAiBest',actionable?`${p.action||dir} NOW → ${dir}`:armed?`ARMED · ${human(p.action||'WAIT')} → ${dir}`:'WAIT');set('apsAiGeometry',p.entry==null?'No canonical Production trade geometry':`${actionable?'Verified':'Conditional'} Production plan · Entry ${fmt(p.entry,8)} · Stop ${fmt(p.stop_loss,8)} · TP1 ${fmt(p.tp1,8)} · TP2 ${fmt(p.tp2,8)} · R:R ${fmt(p.rr_tp2,2)}`);set('apsAiTrigger',p.entry_trigger||p.invalidation||'Reassess if verified Production structure changes.');set('apsAiState',actionable?'Production canonical decision':armed?'ARMED — verified trigger defined':'WAIT');
+    if(actionable){set('apsWhy',`Production ${dir} qualified and execution geometry passed.`);set('apsChanges','Manage the canonical plan; reassess on invalidation.');}else if(armed){set('apsWhy',`Production ${dir} reached ${score}/${threshold}, but entry remains conditional.`);set('apsChanges',p.entry_trigger||'Wait for the defined trigger.');}else{set('apsWhy',score===null?'Production WAIT: no directional consensus.':`Production WAIT. Score ${score}/${threshold}. Reason: ${human(reason)}.`);const gap=Number(d.score_gap_to_signal);set('apsChanges',Number.isFinite(gap)&&gap>0?`Needs ${fmt(gap,0)} more score points or stronger geometry/evidence.`:'Wait for a qualified and executable setup.');}
+    const risks=[];if(d.geometry_gate?.status==='BLOCK')risks.push(`Geometry: ${human(d.geometry_gate.reason)}`);if(finite(d.risk_reward))risks.push(`Candidate R:R ${fmt(d.risk_reward,2)}`);if(Number(d.score_attribution?.obstacle_adjustment)<0)risks.push(`Obstacle ${fmt(d.score_attribution.obstacle_adjustment,0)}`);set('apsRisks',risks.length?risks.join(' · '):'No additional canonical Production block.');
+  }
+  async function refreshAi(){const symbol=currentSymbol(),d=production();if(!symbol||!d)return;try{const r=await fetch(`/api/ai/council?symbol=${encodeURIComponent(symbol)}&t=${Date.now()}`,{cache:'no-store'}),a=await r.json();if(!r.ok||a?.error||currentSymbol()!==symbol||production()!==d)return;set('apsAiJudge',`${a.direction||'WAIT'}${a.confidence!=null?` · ${a.confidence}% confidence`:''}`);const tac=d.tactical_opportunity||{};set('apsAiTactical',tac.direction?`${tac.direction} · 1–3H${finite(tac.risk_reward)?` · R:R ${fmt(tac.risk_reward,2)}`:''}`:'No clear short-term research setup');const bull=(a.bull_analyst?.best_case||[])[0],bear=(a.bear_analyst?.best_case||[])[0];set('apsAiReason',`${bull?`Research support: ${human(bull)}. `:''}${bear?`Research risk: ${human(bear)}.`:''}`||'AI explanation available; Production remains authoritative.');}catch(e){set('apsAiJudge','Unavailable');set('apsAiReason','AI explanation unavailable; Production remains authoritative.');}}
+  async function verify(){const ui=window.ATLAS_PRODUCTION_DECISION_UI;if(!ui||typeof ui.verify!=='function'){set('apsStatus','Production verifier unavailable');return false;}set('apsStatus','Verifying canonical Production…');const ok=await ui.verify();render();if(ok)await refreshAi();return ok;}
+  async function analyze(){const b=$('apsAnalyze');if(b)b.disabled=true;try{if(typeof window.analyzeActive==='function')await window.analyzeActive();await verify();}finally{if(b)b.disabled=false;render();}}
 
-  function master(){return window.ATLAS_MASTER&&typeof window.ATLAS_MASTER==='object'?window.ATLAS_MASTER:null;}
-  function production(){const guarded=window.ATLAS_PRODUCTION_SNAPSHOT_GUARD?.current?.();if(guarded&&typeof guarded==='object')return guarded;return window.ATLAS_PRODUCTION_DECISION&&typeof window.ATLAS_PRODUCTION_DECISION==='object'?window.ATLAS_PRODUCTION_DECISION:null;}
-  function currentSymbol(){
-    const s=window.ATLAS_APP_STATE,a=s?.assets?.[s.active],raw=normalizedSymbol(a?.symbol);
-    if(raw)return raw;
-    const t=text('activeTitle','').toUpperCase();
-    for(const x of ['BTC','ETH','SOL','XRP','BNB','DOGE','ZEC','HYPE'])if(t.includes(x))return x+'USDT';
-    return'';
-  }
-  function decision(){
-    const p=production();
-    const plan=p?.trade_plan||{};
-    if(plan.status==='ACTIONABLE'&&p?.execution_ready&&plan.direction)return plan.direction;
-    if(p)return 'WAIT';
-    const d=String(master()?.decision||'').toUpperCase();
-    return d==='LONG_CANDIDATE'?'LONG':d==='SHORT_CANDIDATE'?'SHORT':'WAIT';
-  }
-  function setupScore(){
-    const p=production();
-    if(Number.isFinite(Number(p?.score))&&Number.isFinite(Number(p?.signal_threshold)))return `${Number(p.score).toFixed(0)}/${Number(p.signal_threshold).toFixed(0)}`;
-    const m=master();
-    return Number.isFinite(Number(m?.score))?`${Number(m.score).toFixed(0)}/100 local`:'—';
-  }
-  function ensureHypeAsset(){
-    const s=window.ATLAS_APP_STATE;
-    if(!s||!Array.isArray(s.assets))return false;
-    if(s.assets.some(a=>normalizedSymbol(a?.symbol)==='HYPEUSDT'))return false;
-    s.assets.push({name:'HYPE / USDT',symbol:'BINANCE:HYPEUSDT',cls:'Crypto'});
-    try{localStorage.setItem('atlas.assets',JSON.stringify(s.assets));}catch(_e){}
-    if(typeof window.renderAll==='function')window.renderAll();
-    return true;
-  }
-
-  const simpleDir=d=>String(d||'').toUpperCase()==='LONG'?'UP / LONG':String(d||'').toUpperCase()==='SHORT'?'DOWN / SHORT':'WAIT';
-  function renderAi(ai,prod){
-    const tac=prod?.tactical_opportunity||{},plan=prod?.trade_plan||{},canonical=Object.keys(plan).length?plan:(ai?.canonical_action||{});
-    const actionable=canonical.status==='ACTIONABLE'&&!!prod?.execution_ready;
-    const armed=canonical.status==='CONDITIONAL'&&!!prod?.production_signal_qualified;
-    const dir=canonical.direction||prod?.candidate_direction;
-    $('apsAiProd').textContent=actionable?`${simpleDir(dir)}${prod.score!=null?` · ${prod.score}/${prod.signal_threshold}`:''}`:armed?`ARMED · ${simpleDir(dir)}${prod.score!=null?` · ${prod.score}/${prod.signal_threshold}`:''}`:`WAIT${prod?.score!=null?` · ${prod.score}/${prod.signal_threshold}`:''}`;
-    $('apsAiJudge').textContent=`${simpleDir(ai?.direction)}${ai?.confidence!=null?` · ${ai.confidence}% confidence`:''}`;
-    $('apsAiTactical').textContent=tac?.direction?`${simpleDir(tac.direction)} · 1–3H${Number.isFinite(Number(tac.risk_reward))?` · Tactical R:R ${fmt(tac.risk_reward,2)}`:''}`:'No clear conditional short-term setup';
-    const action=canonical.action||'WAIT';
-    $('apsAiBest').textContent=actionable?`${action} NOW → ${simpleDir(dir)}`:armed?`ARMED · ${humanize(action)} → ${simpleDir(dir)}`:'WAIT';
-    const entry=canonical.entry,stop=canonical.stop_loss,tp1=canonical.tp1,tp2=canonical.tp2,rr2=canonical.rr_tp2;
-    $('apsAiGeometry').textContent=entry==null?'No canonical Production trade levels yet':`${actionable?'Verified Production plan':armed?'Armed conditional Production plan':'Production plan'} · Entry ${fmt(entry)} · Stop ${fmt(stop)} · TP1 ${fmt(tp1)} · TP2 ${fmt(tp2)} · R:R ${fmt(rr2,2)}`;
-    $('apsAiTrigger').textContent=canonical.entry_trigger||canonical.invalidation||'Reassess if the verified Production structure changes.';
-    const bull=(ai?.bull_analyst?.best_case||[])[0],bear=(ai?.bear_analyst?.best_case||[])[0];
-    $('apsAiReason').textContent=`Why: ${bull?humanize(bull)+'. ':''}${bear?'Main risk: '+humanize(bear)+'.':''}`||'AI evidence is still limited.';
-    $('apsAiState').textContent=actionable?'Production canonical decision':armed?'ARMED — verified trigger defined':'AI analysis ready';
-  }
-  function productionWhy(p){
-    if(!p)return null;
-    const candidate=p.candidate_direction&&p.candidate_direction!=='NONE'?` Candidate: ${p.candidate_direction}.`:'';
-    if(p.production_signal_qualified&&p.execution_ready)return `Production signal qualified and current execution geometry passed.${candidate}`;
-    if(p.production_signal_qualified&&!p.execution_ready)return `Production score qualified at ${fmt(p.score,0)}/${fmt(p.signal_threshold,0)}, but current execution is blocked by ${humanize(p.actionable_reason||p.geometry_gate?.reason||'geometry')}.${candidate}`;
-    return `Production WAIT. Score ${fmt(p.score,0)}/${fmt(p.signal_threshold,0)}. Reason: ${humanize(p.wait_reason||'waiting for stronger confirmation')}.${candidate}`;
-  }
-  function productionRisk(p){
-    if(!p)return text('cmdRiskValue','Risk context unavailable.');
-    const bits=[],plan=p.trade_plan||{};
-    if(p.geometry_gate?.status==='BLOCK')bits.push(`Current geometry blocked: ${humanize(p.geometry_gate.reason)}`);
-    const rr=plan.rr_tp2??p.risk_reward;
-    if(Number.isFinite(Number(rr)))bits.push(`${plan.rr_tp2!=null?'Canonical Production':'Candidate / qualification'} R:R ${fmt(rr,2)}`);
-    const obstacle=Number(p.score_attribution?.obstacle_adjustment);
-    if(Number.isFinite(obstacle)&&obstacle<0)bits.push(`Obstacle penalty ${fmt(obstacle,0)}`);
-    if(p.futures_available===false)bits.push('Futures confirmation unavailable');
-    return bits.length?bits.join(' · '):'No additional current Production risk block.';
-  }
-  function productionChange(p){
-    if(!p)return 'Wait for stronger direction, structure and risk/reward confirmation.';
-    if(p.production_signal_qualified&&!p.execution_ready)return `Current Production execution needs valid Entry/SL/TP geometry and R:R of at least ${fmt(p.geometry_gate?.min_risk_reward??1,1)}. Conditional AI research does not override this gate.`;
-    const gap=Number(p.score_gap_to_signal);
-    if(!p.production_signal_qualified&&Number.isFinite(gap)&&gap>0)return `Needs ${fmt(gap,0)} more score points or stronger evidence / more room from the obstacle to reach Production qualification.`;
-    if(p.execution_ready)return 'Exit or reassess if the Production trade structure is invalidated.';
-    return 'Wait for the next Production confirmation.';
-  }
-  async function refreshAi(){
-    const symbol=currentSymbol();if(!symbol)return;
-    $('apsAiState').textContent='Analyzing…';
-    try{
-      let pd=window.ATLAS_PRODUCTION_SNAPSHOT_GUARD?.current?.();
-      if(!pd||normalizedSymbol(window.ATLAS_PRODUCTION_SNAPSHOT_GUARD?.symbol?.())!==symbol){
-        const ui=window.ATLAS_PRODUCTION_DECISION_UI;
-        if(!ui||typeof ui.verify!=='function')throw new Error('Production verifier unavailable');
-        const ok=await ui.verify();
-        if(!ok)throw new Error('Production verification failed');
-        pd=window.ATLAS_PRODUCTION_SNAPSHOT_GUARD?.current?.()||window.ATLAS_PRODUCTION_DECISION;
-      }
-      if(!pd||currentSymbol()!==symbol)throw new Error('No accepted Production snapshot');
-      const accepted=pd;
-      const r=await fetch(`/api/ai/council?symbol=${encodeURIComponent(symbol)}&t=${Date.now()}`,{cache:'no-store'});
-      const ai=await r.json();
-      if(!r.ok||ai?.error)throw new Error(ai?.error||`AI HTTP ${r.status}`);
-      if(currentSymbol()!==symbol||window.ATLAS_PRODUCTION_SNAPSHOT_GUARD?.current?.()!==accepted)return;
-      renderAi(ai,accepted);
-      update();
-    }catch(e){
-      $('apsAiState').textContent='AI analysis unavailable';
-      $('apsAiBest').textContent='WAIT';
-    }
-  }
-  function update(){
-    ensureHypeAsset();
-    const p=production(),plan=p?.trade_plan||{},d=decision(),de=$('apsDecision');
-    de.textContent=d;de.className='aps-value '+d.toLowerCase();
-    $('apsAsset').textContent=text('activeTitle','Current asset');
-    $('apsConfidence').textContent=setupScore();
-    const w=d==='WAIT';
-    $('apsEntry').textContent=w?'—':fmt(plan.entry);
-    $('apsStop').textContent=w?'—':fmt(plan.stop_loss);
-    $('apsTarget').textContent=w?'—':`${fmt(plan.tp2)}${Number.isFinite(Number(plan.rr_tp2))?` · R:R ${fmt(plan.rr_tp2,2)}`:''}`;
-    $('apsRegime').textContent=p?.regime||text('cmdRegimeValue','—');
-    $('apsTrend').textContent=p?.candidate_direction||text('trendState','—');
-    $('apsMomentum').textContent=p?`Votes L${p.direction_votes_long??'—'}/S${p.direction_votes_short??'—'}`:text('momentumState','—');
-    $('apsVolume').textContent=p?.relative_volume==null?text('volumeState','—'):`RV ${fmt(p.relative_volume,2)}`;
-    $('apsStructure').textContent=p?(p.production_signal_qualified&&!p.execution_ready?`SCORE QUALIFIED · ${humanize(p.actionable_reason||p.geometry_gate?.reason)}`:`${humanize(p.wait_reason||p.playbook||'Production verified')} · score ${fmt(p.score,0)}/${fmt(p.signal_threshold,0)}`):text('structureState','—');
-    $('apsLiquidity').textContent=text('liquidityNotes','No special liquidity condition.');
-    $('apsWhy').textContent=productionWhy(p)||text('masterNotes',d==='WAIT'?'Waiting for stronger confirmation.':'Trade conditions aligned.');
-    $('apsRisks').textContent=productionRisk(p);
-    $('apsChanges').textContent=productionChange(p);
-    $('apsStatus').textContent=$('analyzeBtn')?.disabled?'Analysis running…':w?'WAIT = no trade now':plan.status==='ACTIONABLE'?'Canonical Production trade plan ready':'Production plan not actionable';
-    const s=$('intervalSelect'),tf=$('apsTimeframe');
-    if(s&&tf&&!tf.options.length){[...s.options].forEach(o=>tf.add(new Option(o.textContent,o.value)));tf.onchange=()=>{s.value=tf.value;s.dispatchEvent(new Event('change',{bubbles:true}));};}
-    if(s&&tf)tf.value=s.value;
-  }
-  async function waitForAnalysisReady(){
-    $('apsAiState').textContent='Waiting for ATLAS analysis…';
-    for(let i=0;i<48;i++){
-      await new Promise(r=>setTimeout(r,250));
-      const badge=text('engineBadge','').toUpperCase();
-      const button=$('analyzeBtn');
-      const ready=badge==='ANALYZED'||badge==='VERIFIED'||(!button?.disabled&&i>4);
-      if(ready)return true;
-    }
-    return false;
-  }
-  async function runAnalysisAndCouncil(){
-    const button=$('analyzeBtn');if(!button)return;
-    window.ATLAS_MASTER=null;
-    $('apsAnalyze').disabled=true;
-    $('apsStatus').textContent='Analysis running…';
-    $('apsAiState').textContent='Waiting for ATLAS analysis…';
-    $('analyzeBtn')?.click();
-    await waitForAnalysisReady();
-    await refreshAi();
-    update();
-    $('apsAnalyze').disabled=false;
-  }
-
-  $('apsAnalyze').onclick=runAnalysisAndCouncil;
-  $('apsAdvanced').onclick=()=>{document.body.classList.toggle('atlas-advanced-open');};
-  new MutationObserver(()=>requestAnimationFrame(update)).observe(document.body,{subtree:true,childList:true,characterData:true});
-  ensureHypeAsset();
-  update();
-  setTimeout(refreshAi,1200);
-  window.ATLAS_PRODUCT_SHELL={refresh:update,refreshAi,canonicalProductionPlan:true,acceptedSnapshotOnly:true};
+  $('apsAnalyze').onclick=analyze;$('apsAdvanced').onclick=()=>document.body.classList.toggle('atlas-advanced-open');
+  const tf=$('apsTimeframe'),src=$('intervalSelect');if(tf)tf.onchange=()=>{if(src){src.value=tf.value;src.dispatchEvent(new Event('change',{bubbles:true}));}syncTimeframe();};src?.addEventListener('change',syncTimeframe);
+  const title=$('activeTitle');if(title)new MutationObserver(()=>{render();setTimeout(verify,100);}).observe(title,{subtree:true,childList:true,characterData:true});
+  window.addEventListener('atlas:ai-ready',()=>setTimeout(()=>{render();verify();},100));
+  syncTimeframe();render();setTimeout(verify,700);
+  window.ATLAS_PRODUCT_SHELL={version:VERSION,refresh:render,refreshAi,verify,canonicalProductionPlan:true,singleAuthority:true,productionTimeframe:'1H'};
 })();
