@@ -81,7 +81,45 @@ jobs:
               try:return json.loads(p.read_text())
               except Exception as e:return {'ok':False,'error':f'invalid_json:{e}'}
           symbols=['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT','HYPEUSDT']
-          decisions={s:load('decision_'+s) for s in symbols}; councils={s:load('ai_'+s) for s in symbols}
+          decisions={s:load('decision_'+s) for s in symbols}
+          raw_councils={s:load('ai_'+s) for s in symbols}
+          def canonical_ref(d):
+              return {
+                  'source':'/api/decision/current',
+                  'symbol':d.get('symbol'),
+                  'generated_at':d.get('generated_at'),
+                  'decision':d.get('decision'),
+                  'candidate_direction':d.get('candidate_direction'),
+                  'score':d.get('score'),
+                  'threshold':d.get('signal_threshold'),
+                  'signal_qualified':bool(d.get('signal_qualified')),
+                  'execution_ready':bool(d.get('execution_ready')),
+                  'trade_plan':d.get('trade_plan') or {},
+              }
+          councils={}
+          consistency=[]
+          for s,a0 in raw_councils.items():
+              a=dict(a0) if isinstance(a0,dict) else {'ok':False,'error':'invalid_ai_snapshot'}
+              d=decisions.get(s) or {}
+              ai_observed={
+                  'production_decision':a.pop('production_decision',None),
+                  'production_score':a.pop('production_score',None),
+                  'production_qualified':a.pop('production_qualified',None),
+                  'generated_at':a.get('generated_at'),
+              }
+              a['snapshot_role']='SHADOW_RESEARCH_ONLY'
+              a['production_reference_authoritative']=False
+              a['research_observed_production_reference']=ai_observed
+              a['canonical_production_reference']=canonical_ref(d)
+              mismatch=(
+                  ai_observed.get('production_score') != d.get('score') or
+                  ai_observed.get('production_decision') != d.get('decision') or
+                  bool(ai_observed.get('production_qualified')) != bool(d.get('signal_qualified'))
+              )
+              a['production_reference_mismatch']=mismatch
+              if mismatch:
+                  consistency.append({'symbol':s,'canonical':canonical_ref(d),'ai_research_observed':ai_observed})
+              councils[s]=a
           qualified=[]; waits=[]; failures=[]; ai_actions=[]; ai_failures=[]
           def wait_context(d):
               ind=d.get('indicators') or {}; geom=d.get('structural_geometry') or {}; br=geom.get('breakout') or {}
@@ -91,12 +129,13 @@ jobs:
               elif d.get('signal_qualified'): qualified.append({'symbol':s,'decision':d.get('decision'),'score':d.get('score'),'threshold':d.get('signal_threshold'),'rr':d.get('risk_reward'),'playbook':d.get('playbook'),'generated_at':d.get('generated_at')})
               else: waits.append({'symbol':s,'candidate':d.get('candidate_direction'),'score':d.get('score'),'threshold':d.get('signal_threshold'),'reason':d.get('wait_reason'),'score_gap_to_signal':d.get('score_gap_to_signal'),'score_attribution':d.get('score_attribution'),'decision_context':wait_context(d)})
           for s,a in councils.items():
+              d=decisions.get(s) or {}; observed=a.get('research_observed_production_reference') or {}
               if a.get('error') or a.get('ok') is False: ai_failures.append({'symbol':s,'error':a.get('error'),'http_code':a.get('http_code')})
-              else: ai_actions.append({'symbol':s,'direction':a.get('direction'),'verdict':a.get('verdict'),'confidence':a.get('confidence'),'reason':a.get('reason'),'production_decision':a.get('production_decision'),'production_score':a.get('production_score'),'judge':a.get('judge')})
+              else: ai_actions.append({'symbol':s,'direction':a.get('direction'),'verdict':a.get('verdict'),'confidence':a.get('confidence'),'reason':a.get('reason'),'canonical_production_decision':d.get('decision'),'canonical_production_score':d.get('score'),'canonical_production_qualified':bool(d.get('signal_qualified')),'ai_research_observed_production_score':observed.get('production_score'),'production_reference_mismatch':a.get('production_reference_mismatch'),'judge':a.get('judge')})
           path_summary=load('path_summary'); path_overall=(path_summary.get('overall') or {}) if isinstance(path_summary,dict) else {}
           realized_r={'available':path_overall.get('net_r') is not None,'terminal':path_overall.get('terminal'),'open':path_overall.get('open'),'wins':path_overall.get('wins'),'losses':path_overall.get('losses'),'expired':path_overall.get('expired'),'net_r':path_overall.get('net_r'),'average_r':path_overall.get('average_r'),'profit_factor_r':path_overall.get('profit_factor_r'),'win_rate_pct':path_overall.get('win_rate_pct'),'geometry_available':path_overall.get('geometry_available'),'geometry_unavailable':path_overall.get('geometry_unavailable'),'ambiguous':path_overall.get('ambiguous'),'source':'CANONICAL_FROZEN_TP_SL_PATH_SETTLEMENT'}
           captured=datetime.datetime.now(datetime.timezone.utc)
-          summary={'schema':'ATLAS_PRODUCTION_SNAPSHOT_V9_TRADER_RELEASE','captured_at':captured.isoformat(),'source':'https://atlas-v7.onrender.com','monitor_mode':'PACED_PER_SYMBOL_READ_ONLY','runtime':load('runtime'),'readiness':load('readiness'),'outcomes':load('outcomes'),'geometry_status':load('geometry'),'path_summary':path_summary,'realized_r':realized_r,'settlement_status':load('settlement_status'),'ai_status':load('ai_status'),'decisions':decisions,'ai_council':councils,'decision_summary':{'supported_assets':symbols,'qualified_count':len(qualified),'qualified':qualified,'wait_count':len(waits),'waits':waits,'failed_count':len(failures),'failures':failures},'ai_summary':{'analyzed_count':len(ai_actions),'analyses':ai_actions,'failed_count':len(ai_failures),'failures':ai_failures}}
+          summary={'schema':'ATLAS_PRODUCTION_SNAPSHOT_V10_CANONICAL_AUTHORITY','captured_at':captured.isoformat(),'source':'https://atlas-v7.onrender.com','monitor_mode':'PACED_PER_SYMBOL_READ_ONLY','production_authority':'/api/decision/current','ai_role':'SHADOW_RESEARCH_ONLY','snapshot_consistency':{'ok':len(consistency)==0,'mismatch_count':len(consistency),'mismatches':consistency},'runtime':load('runtime'),'readiness':load('readiness'),'outcomes':load('outcomes'),'geometry_status':load('geometry'),'path_summary':path_summary,'realized_r':realized_r,'settlement_status':load('settlement_status'),'ai_status':load('ai_status'),'decisions':decisions,'ai_council':councils,'decision_summary':{'supported_assets':symbols,'qualified_count':len(qualified),'qualified':qualified,'wait_count':len(waits),'waits':waits,'failed_count':len(failures),'failures':failures},'ai_summary':{'analyzed_count':len(ai_actions),'analyses':ai_actions,'failed_count':len(ai_failures),'failures':ai_failures}}
           pathlib.Path('status/atlas-production-latest.json').write_text(json.dumps(summary,indent=2,sort_keys=True))
           history=pathlib.Path('status/history/production-snapshots.jsonl')
           with history.open('a') as f:f.write(json.dumps(summary,separators=(',',':'))+'\n')
