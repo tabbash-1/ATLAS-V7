@@ -219,7 +219,7 @@ def install(atlas):
         if u.path=='/api/decision/current':
             q=urllib.parse.parse_qs(u.query); symbol=q.get('symbol',['BTCUSDT'])[0]
             try:
-                result=build_decision(symbol); return self._json(result,200 if result.get('ok') else 400)
+                result=atlas.production_decision(symbol); return self._json(result,200 if result.get('ok') else 400)
             except Exception as exc:
                 return self._json({'ok':False,'error':f'{type(exc).__name__}: {exc}','source':VERSION,'research_only':True,'live_execution':False},500)
         return original_get(self)
