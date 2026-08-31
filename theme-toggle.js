@@ -34,8 +34,9 @@
     .then(()=>window.ATLAS_DECISION_EXPLANATION?.refresh?.())
     .catch(err=>console.error('ATLAS decision explanation layer failed:',err));
 
-  // Research helpers load first. The rebuilt product shell loads last and is the
-  // only user-facing writer for the canonical Production card.
-  const scripts=['atlas-timeframe-engine.js','atlas-ai-analysis-layer.js','atlas-decision-quality.js','atlas-ai-ui.js','production-null-display-fix.js','production-semantics-labels.js','atlas-product-shell.js'];
+  // Canonical Production surface has exactly one optional writer. Research
+  // engines remain available in Advanced Research through their original page
+  // scripts, but they cannot rewrite the Product Shell decision state.
+  const scripts=['atlas-product-shell.js'];
   (async()=>{for(const src of scripts){try{await loadScript(src,src);}catch(err){console.error('ATLAS optional layer failed:',src,err);}}window.dispatchEvent(new CustomEvent('atlas:ai-ready'));})();
 })();
