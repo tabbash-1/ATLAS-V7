@@ -1,0 +1,51 @@
+name: RC10.1 Live Site Smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cloud_start_web.py'
+      - 'rc10_1_deep_analysis_overlay.py'
+      - 'atlas-deep-analysis-ui.js'
+      - 'atlas-product-shell.js'
+      - '.github/workflows/rc10-site-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Verify Render RC10.1 endpoint and UI asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='https://atlas-v7.onrender.com'
+          ok=0
+          for i in $(seq 1 30); do
+            code=$(curl -L -sS --connect-timeout 10 --max-time 45 -o /tmp/deep.json -w '%{http_code}' "$BASE/api/deep-analysis/current?symbol=BTCUSDT" || true)
+            ui=$(curl -L -sS --connect-timeout 10 --max-time 45 -o /tmp/deep-ui.js -w '%{http_code}' "$BASE/atlas-deep-analysis-ui.js" || true)
+            if [ "$code" = "200" ] && [ "$ui" = "200" ] && grep -q 'RC10_1_SITE_DEEP_ANALYSIS_V1' /tmp/deep.json && grep -q 'ATLAS_RC10_1_DEEP_UI_V1' /tmp/deep-ui.js; then
+              python3 - <<'PY'
+          import json
+          d=json.load(open('/tmp/deep.json'))
+          assert d.get('ok') is True, d
+          assert d.get('version')=='RC10_1_SITE_DEEP_ANALYSIS_V1', d.get('version')
+          assert d.get('live_execution') is False
+          assert 'decision_audit' in d
+          assert 'entry_plan' in d
+          print('RC10.1 LIVE OK', d.get('symbol'), d.get('decision'), d.get('technical_score'), d.get('scenario',{}).get('name'))
+          PY
+              ok=1
+              break
+            fi
+            sleep 10
+          done
+          if [ "$ok" != "1" ]; then
+            echo 'RC10.1 endpoint/UI did not become live'
+            cat /tmp/deep.json 2>/dev/null || true
+            exit 1
+          fi
