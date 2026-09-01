@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
-      - name: Verify Render RC10.1 endpoint and UI asset
+      - name: Verify Render RC10.1 endpoint and primary 4-12H UI
         shell: bash
         run: |
           set -euo pipefail
@@ -30,7 +30,13 @@ jobs:
           for i in $(seq 1 30); do
             code=$(curl -L -sS --connect-timeout 10 --max-time 45 -o /tmp/deep.json -w '%{http_code}' "$BASE/api/deep-analysis/current?symbol=BTCUSDT" || true)
             ui=$(curl -L -sS --connect-timeout 10 --max-time 45 -o /tmp/deep-ui.js -w '%{http_code}' "$BASE/atlas-deep-analysis-ui.js" || true)
-            if [ "$code" = "200" ] && [ "$ui" = "200" ] && grep -q 'RC10_1_SITE_DEEP_ANALYSIS_V1' /tmp/deep.json && grep -q 'ATLAS_RC10_1_DEEP_UI_V1' /tmp/deep-ui.js; then
+            index=$(curl -L -sS --connect-timeout 10 --max-time 45 -o /tmp/index.html -w '%{http_code}' "$BASE/" || true)
+            if [ "$code" = "200" ] && [ "$ui" = "200" ] && [ "$index" = "200" ] \
+              && grep -q 'RC10_1_SITE_DEEP_ANALYSIS_V1' /tmp/deep.json \
+              && grep -q 'ATLAS_RC10_1_DEEP_UI_V2_PRIMARY_4_12H' /tmp/deep-ui.js \
+              && grep -q "'apsAnalyze'" /tmp/deep-ui.js \
+              && grep -q "primaryHorizon:'4-12H'" /tmp/deep-ui.js \
+              && grep -q 'rc10-1-deep-v2-primary-4-12h' /tmp/index.html; then
               python3 - <<'PY'
           import json
           d=json.load(open('/tmp/deep.json'))
@@ -39,7 +45,8 @@ jobs:
           assert d.get('live_execution') is False
           assert 'decision_audit' in d
           assert 'entry_plan' in d
-          print('RC10.1 LIVE OK', d.get('symbol'), d.get('decision'), d.get('technical_score'), d.get('scenario',{}).get('name'))
+          assert 'mtf_states' in d
+          print('RC10.1 LIVE V2 OK', d.get('symbol'), d.get('decision'), d.get('technical_score'), d.get('scenario',{}).get('name'))
           PY
               ok=1
               break
@@ -47,7 +54,9 @@ jobs:
             sleep 10
           done
           if [ "$ok" != "1" ]; then
-            echo 'RC10.1 endpoint/UI did not become live'
-            cat /tmp/deep.json 2>/dev/null || true
+            echo 'RC10.1 V2 primary 4-12H UI did not become live'
+            echo '--- deep endpoint ---'; cat /tmp/deep.json 2>/dev/null || true
+            echo '--- ui markers ---'; grep -E 'ATLAS_RC10_1|apsAnalyze|primaryHorizon' /tmp/deep-ui.js 2>/dev/null | head -20 || true
+            echo '--- index marker ---'; grep -o 'atlas-deep-analysis-ui.js[^"<]*' /tmp/index.html 2>/dev/null || true
             exit 1
           fi
