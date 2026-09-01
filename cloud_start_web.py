@@ -86,9 +86,12 @@ if index_path.exists():
 
     decision_script = f'<script src="atlas-production-decision.js?v={release_token}"></script>'
     calibration_script = f'<script src="outcome-calibration-ui.js?v={release_token}"></script>'
+    deep_script = f'<script src="atlas-deep-analysis-ui.js?v={release_token}"></script>'
     html = re.sub(r'<script[^>]+src=["\']atlas-production-decision\.js(?:\?[^"\']*)?["\'][^>]*></script>', '', html)
     html = re.sub(r'<script[^>]+src=["\']outcome-calibration-ui\.js(?:\?[^"\']*)?["\'][^>]*></script>', '', html)
-    html = html.replace('</body>', f'  {decision_script}\n  {calibration_script}\n</body>', 1) if '</body>' in html else html + '\n' + decision_script + '\n' + calibration_script + '\n'
+    html = re.sub(r'<script[^>]+src=["\']atlas-deep-analysis-ui\.js(?:\?[^"\']*)?["\'][^>]*></script>', '', html)
+    scripts = f'  {decision_script}\n  {calibration_script}\n  {deep_script}\n'
+    html = html.replace('</body>', scripts + '</body>', 1) if '</body>' in html else html + '\n' + scripts
     index_path.write_text(html, encoding="utf-8")
 
 app_path = BASE / "app.js"
@@ -145,6 +148,8 @@ from production_opportunity_runtime import install as _install_production_opport
 _install_production_opportunity_runtime(_collector)
 from profit_engine_runtime import install as _install_profit_engine_runtime
 _install_profit_engine_runtime(_collector)
+from rc10_1_deep_analysis_overlay import install as _install_rc10_1_deep_analysis
+_install_rc10_1_deep_analysis(_collector)
 
 # IMPORTANT: microstructure, volatility walk-forward, interaction validation and
 # historical audit runtimes are intentionally NOT installed in the Render web
@@ -154,4 +159,5 @@ _install_profit_engine_runtime(_collector)
 entrypoint = "atlas_runtime_server.py"
 print(f"ATLAS production boot: data={DATA_DIR} runtime=memory-safe-web release={release_token}")
 print("ATLAS web memory policy: heavy research/shadow runtimes isolated from Render web process")
+print(f"ATLAS deep analysis: {_collector.RC10_1_DEEP_ANALYSIS_VERSION}")
 runpy.run_path(str(BASE / entrypoint), run_name="__main__")
