@@ -3,7 +3,8 @@
 
 1) Keeps ATLAS internal HYPEUSDT mapping intact while using a valid TradingView
    market for the visual chart.
-2) Ensures the Production decision UI is actually loaded in web-only mode.
+2) Ensures the Production decision UI and RC10.1 deep-analysis UI are loaded in
+   web-only mode.
 3) Prevents the legacy workspace observer from overwriting Production-owned
    Command Center regime/cloud status after Production renders.
 
@@ -38,11 +39,13 @@ def patch_production_ui():
     html = INDEX.read_text(encoding="utf-8")
     scripts = []
     if "atlas-production-decision.js" not in html:
-        scripts.append('  <script src="atlas-production-decision.js?v=web-only-prod-v2"></script>')
+        scripts.append('  <script src="atlas-production-decision.js?v=web-only-prod-v3"></script>')
     if "production-web-autoload.js" not in html:
-        scripts.append('  <script src="production-web-autoload.js?v=web-only-prod-v2"></script>')
+        scripts.append('  <script src="production-web-autoload.js?v=web-only-prod-v3"></script>')
+    if "atlas-deep-analysis-ui.js" not in html:
+        scripts.append('  <script src="atlas-deep-analysis-ui.js?v=rc10-1-deep-v1"></script>')
     if not scripts:
-        print("ATLAS Render boot patch: Production UI scripts already present", flush=True)
+        print("ATLAS Render boot patch: Production/RC10.1 UI scripts already present", flush=True)
         return
     injection = "\n" + "\n".join(scripts) + "\n"
     if "</body>" in html:
@@ -50,7 +53,7 @@ def patch_production_ui():
     else:
         html += injection
     INDEX.write_text(html, encoding="utf-8")
-    print("ATLAS Render boot patch: Production decision UI enabled", flush=True)
+    print("ATLAS Render boot patch: Production + RC10.1 deep UI enabled", flush=True)
 
 
 def patch_legacy_command_mirrors():
