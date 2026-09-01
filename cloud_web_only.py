@@ -7,6 +7,7 @@ forward loops, research replays, opportunity scans, reliability warm-up, or
 profit-engine background jobs are started here.
 
 Scheduled research remains on GitHub Actions. Production threshold is unchanged.
+RC10.1 deep analysis is on-demand only and cannot override Production.
 """
 import os
 import urllib.parse
@@ -54,6 +55,11 @@ install_execution_risk(atlas)
 from ai_trade_council import install as install_ai_council
 install_ai_council(atlas)
 
+# RC10.1 deep trade analysis: on-demand website enrichment only. It is isolated
+# from the canonical Production authority and never lowers threshold 68.
+from rc10_1_deep_analysis_overlay import install as install_rc10_1_deep_analysis
+install_rc10_1_deep_analysis(atlas)
+
 # Research-only prospective shadows. Installed after Production and exposed only
 # through separate endpoints. None can override Production, lower threshold 68,
 # or execute orders.
@@ -70,6 +76,7 @@ atlas.WEB_SAFE_MODE = {
     'cloud_forward_in_web_process': False,
     'production_threshold': float(atlas.CLOUD_FORWARD_MIN_SCORE),
     'research_execution_location': 'GITHUB_ACTIONS',
+    'rc10_1_deep_analysis': getattr(atlas, 'RC10_1_DEEP_ANALYSIS_VERSION', None),
     'consensus_tiebreak_shadow': CONSENSUS_TIEBREAK_SHADOW,
     'fourth_vote_shadow': FOURTH_VOTE_SHADOW,
     'long_close_structure_shadow': LONG_CLOSE_STRUCTURE_SHADOW,
@@ -160,6 +167,7 @@ if __name__ == '__main__':
     print('Background workers: OFF (GitHub Actions owns scheduled research)', flush=True)
     print('Production decision UI: ON + autoload', flush=True)
     print(f'Production scoring: {PRODUCTION_SCORING_VERSION}', flush=True)
+    print(f'RC10.1 deep analysis: {atlas.RC10_1_DEEP_ANALYSIS_VERSION}', flush=True)
     print(f'Consensus tie-break shadow: {CONSENSUS_TIEBREAK_SHADOW["version"]}', flush=True)
     print(f'Fourth-vote prospective shadow: {FOURTH_VOTE_SHADOW["version"]}', flush=True)
     print(f'LONG+CLOSE prospective shadow: {LONG_CLOSE_STRUCTURE_SHADOW["version"]}', flush=True)
