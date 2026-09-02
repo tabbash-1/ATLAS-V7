@@ -1,0 +1,55 @@
+name: ATLAS Render Cached Research Smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cloud_web_only.py'
+      - 'status/historical-evaluation-latest.json'
+      - 'status/prospective-microstructure-latest.json'
+      - '.github/workflows/render-cached-research-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Wait for Render deploy
+        run: sleep 90
+      - name: Verify cached research endpoints are safe and available
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://atlas-v7.onrender.com'
+          curl -fsSL --retry 10 --retry-delay 10 --retry-all-errors --connect-timeout 10 --max-time 30 \
+            "$base/api/research/historical-evaluation" -o /tmp/historical.json
+          curl -fsSL --retry 10 --retry-delay 10 --retry-all-errors --connect-timeout 10 --max-time 30 \
+            "$base/api/research/prospective-microstructure-validation" -o /tmp/prospective.json
+          python3 - <<'PY'
+          import json
+
+          h=json.load(open('/tmp/historical.json'))
+          p=json.load(open('/tmp/prospective.json'))
+
+          assert h.get('version') == 'ATLAS_HISTORICAL_EVALUATION_RUNTIME_V1_BACKGROUND_ONLY', h
+          assert p.get('version') == 'ATLAS_PROSPECTIVE_MICROSTRUCTURE_VALIDATION_RUNTIME_V1', p
+          for row in (h,p):
+              assert row.get('ok') is True, row
+              assert row.get('cached_only') is True, row
+              assert row.get('background_refresh_triggered') is False, row
+              assert row.get('outcome_read_triggered_by_request') is False, row
+              assert row.get('web_process_refresh_triggered') is False, row
+              assert row.get('research_only') is True, row
+              assert row.get('live_execution') is False, row
+              assert row.get('can_override_production') is False, row
+              assert row.get('served_from') == 'COMMITTED_GITHUB_ACTIONS_SNAPSHOT', row
+              assert isinstance(row.get('evaluation'), dict), row
+              runtime=row.get('runtime') or {}
+              assert runtime.get('web_process_background_worker') is False, row
+              assert int(runtime.get('refreshes') or 0) >= 1, row
+          assert p.get('archive_read_triggered_by_request') is False, p
+          assert p['evaluation'].get('forward_proof_cohort') is True, p
+          assert p['evaluation'].get('historical_rows_allowed') is False, p
+          print('RENDER_CACHED_RESEARCH_SAFE_OK')
+          PY
