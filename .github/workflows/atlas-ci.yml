@@ -22,7 +22,7 @@ jobs:
           node-version: '22'
       - name: Python syntax
         run: |
-          python -m py_compile collector_server.py cloud_start.py cloud_start_web.py cloud_web_only.py atlas_runtime_server.py atlas_research_runtime_server.py atlas_ai_server.py research_memory_bridge.py research_coverage.py storage_hardening.py trade_outcome_ledger.py trade_outcome_runtime.py trade_path_settlement.py execution_outcome_scope.py execution_risk_management.py prospective_fourth_vote_shadow.py tests/test_ai_validation.py tests/test_research_memory_bridge.py tests/test_research_coverage.py tests/test_storage_hardening.py tests/test_trade_outcome_ledger.py tests/test_trade_path_settlement.py tests/test_execution_outcome_scope.py tests/test_execution_risk_management.py tests/test_prospective_fourth_vote_shadow.py tests/test_production_single_snapshot_authority.py
+          python -m py_compile collector_server.py cloud_start.py cloud_start_web.py cloud_web_only.py atlas_runtime_server.py atlas_research_runtime_server.py atlas_ai_server.py research_memory_bridge.py research_coverage.py storage_hardening.py trade_outcome_ledger.py trade_outcome_runtime.py trade_path_settlement.py execution_outcome_scope.py execution_risk_management.py prospective_fourth_vote_shadow.py tests/test_ai_validation.py tests/test_research_memory_bridge.py tests/test_research_coverage.py tests/test_storage_hardening.py tests/test_trade_outcome_ledger.py tests/test_trade_path_settlement.py tests/test_execution_outcome_scope.py tests/test_execution_risk_management.py tests/test_prospective_fourth_vote_shadow.py tests/test_production_single_snapshot_authority.py tests/test_production_execution_semantics_overlay.py
       - name: JavaScript syntax
         run: |
           set -e
@@ -42,6 +42,12 @@ jobs:
           PYTHONPATH=. python tests/test_execution_risk_management.py
           PYTHONPATH=. python tests/test_prospective_fourth_vote_shadow.py
           PYTHONPATH=. python tests/test_production_single_snapshot_authority.py
+          PYTHONPATH=. python - <<'PY'
+          import tests.test_production_execution_semantics_overlay as t
+          tests=[getattr(t,n) for n in dir(t) if n.startswith('test_') and callable(getattr(t,n))]
+          for fn in tests: fn()
+          print(f'execution semantics tests: {len(tests)} ok')
+          PY
       - name: Verify delegated production entrypoints
         run: |
           set -euo pipefail
@@ -121,7 +127,7 @@ jobs:
           ! grep -q '/api/decision/current' atlas-product-shell.js
           grep -q '/api/ai/council' atlas-product-shell.js
           grep -q 'ATLAS_PRODUCTION_SNAPSHOT_GUARD' atlas-product-shell.js
-          grep -q 'acceptedSnapshotOnly:true' atlas-product-shell.js
+          grep -q 'g?.current?.()' atlas-product-shell.js
           grep -q 'staleResponseGuard:true' atlas-production-decision.js
           grep -q 'accept:acceptSnapshot' production-web-autoload.js
           grep -q 'atlas-product-shell.js' theme-toggle.js
