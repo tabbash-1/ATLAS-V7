@@ -11,6 +11,7 @@ from pathlib import Path
 
 SCHEMA='ATLAS_PROSPECTIVE_DIRECTION_GUARDRAIL_V1_4H'
 MANIFEST_SCHEMA='ATLAS_PROSPECTIVE_DIRECTION_GUARDRAIL_MANIFEST_V1'
+START_POLICY='MANIFEST_CREATION_TIME_ONLY_NO_PRESTART_ROWS'
 MIN_MATURED=30
 TARGET_HOURS=4
 MAX_LAG_MIN=50
@@ -25,7 +26,8 @@ RULES={
   'long_caution_thresholds':{'mean_pct_max':0.0,'positive_rate_pct_max':45.0},
   'sampling':'AT_MOST_ONE_ENTRY_PER_GROUP_SYMBOL_PER_60_MINUTES',
   'missing_outcome_policy':'EXCLUDE_NEVER_ZERO_FILL',
-  'promotion_policy':'NO_PRODUCTION_CHANGE_FROM_THIS REPORT ALONE',
+  'start_policy':START_POLICY,
+  'promotion_policy':'NO_PRODUCTION_CHANGE_FROM_THIS_REPORT_ALONE',
 }
 
 def now():return dt.datetime.now(dt.timezone.utc)
@@ -77,6 +79,7 @@ def freeze_entries(rows,manifest,cohort_path):
         for line in cohort_path.read_text(errors='replace').splitlines():
             try:existing.append(json.loads(line))
             except Exception:pass
+    if any(x.get('manifest_hash')!=manifest['manifest_hash'] for x in existing):raise RuntimeError('COHORT_MANIFEST_HASH_MISMATCH')
     ids={x.get('id') for x in existing}; last={}
     for x in existing:
         t=parse_ts(x.get('captured_at'))
