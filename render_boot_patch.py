@@ -30,12 +30,12 @@ def patch_production_ui():
         '  <script src="production-web-autoload.js?v=web-only-prod-v4"></script>',
         '  <script src="atlas-deep-analysis-ui.js?v=rc10-1-deep-v2-primary-4-12h"></script>',
         '  <script src="atlas-unified-terminal.js?v=unified-terminal-v1"></script>',
-        '  <script src="atlas-unified-terminal-polish.js?v=unified-terminal-polish-v1"></script>',
+        '  <script src="atlas-unified-terminal-polish.js?v=unified-terminal-polish-v2-execution-semantics"></script>',
     ])
     injection="\n"+scripts+"\n"
     html=html.replace("</body>",injection+"</body>",1) if "</body>" in html else html+injection
     INDEX.write_text(html,encoding="utf-8")
-    print("ATLAS Render boot patch: unified terminal + mobile polish + Production + RC10.1 enabled",flush=True)
+    print("ATLAS Render boot patch: unified terminal + execution semantics v2 + Production + RC10.1 enabled",flush=True)
 
 
 def patch_legacy_command_mirrors():
