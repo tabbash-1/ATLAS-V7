@@ -33,7 +33,13 @@ jobs:
       - name: Unit contract
         run: |
           set -euo pipefail
-          python -m pytest -q tests/test_production_execution_semantics_overlay.py
+          PYTHONPATH=. python - <<'PY'
+          import tests.test_production_execution_semantics_overlay as t
+          tests=[getattr(t,n) for n in dir(t) if n.startswith('test_') and callable(getattr(t,n))]
+          if not tests: raise SystemExit('no execution semantics tests discovered')
+          for fn in tests: fn()
+          print(f'execution semantics tests: {len(tests)} ok')
+          PY
       - name: Wait for Render and verify final decision contract
         run: |
           set -euo pipefail
