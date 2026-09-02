@@ -8,11 +8,16 @@ profit-engine background jobs are started here.
 
 Scheduled research remains on GitHub Actions. Production threshold is unchanged.
 RC10.1 deep analysis is on-demand only and cannot override Production.
+Research validation endpoints serve only the latest committed GitHub snapshot;
+they never trigger forward/outcome reads or refresh work inside Render.
 """
+import json
 import os
 import urllib.parse
 from http.server import ThreadingHTTPServer
+from pathlib import Path
 
+BASE = Path(__file__).resolve().parent
 os.environ.setdefault('ATLAS_CLOUD_FORWARD_ENABLED','0')
 os.environ.setdefault('ATLAS_CLOUD_FORWARD_MIN_SCORE','68')
 
@@ -70,12 +75,67 @@ FOURTH_VOTE_SHADOW = install_fourth_vote_shadow(atlas)
 from prospective_long_close_shadow import install as install_long_close_shadow
 LONG_CLOSE_STRUCTURE_SHADOW = install_long_close_shadow(atlas)
 
+
+def _load_committed_snapshot(filename, expected_version):
+    path = BASE / 'status' / filename
+    try:
+        payload = json.loads(path.read_text(encoding='utf-8'))
+        if payload.get('version') != expected_version:
+            raise ValueError(f'unexpected snapshot version: {payload.get("version")}')
+        if not isinstance(payload.get('evaluation'), dict):
+            raise ValueError('snapshot evaluation is not an object')
+        payload['cached_only'] = True
+        payload['background_refresh_triggered'] = False
+        payload['outcome_read_triggered_by_request'] = False
+        payload['research_only'] = True
+        payload['live_execution'] = False
+        payload['can_override_production'] = False
+        payload['served_from'] = 'COMMITTED_GITHUB_ACTIONS_SNAPSHOT'
+        payload['web_process_refresh_triggered'] = False
+        runtime = dict(payload.get('runtime') or {})
+        runtime['web_process_background_worker'] = False
+        payload['runtime'] = runtime
+        return payload
+    except Exception as exc:
+        return {
+            'ok': False,
+            'version': expected_version,
+            'cached_only': True,
+            'background_refresh_triggered': False,
+            'outcome_read_triggered_by_request': False,
+            'research_only': True,
+            'live_execution': False,
+            'can_override_production': False,
+            'served_from': 'COMMITTED_GITHUB_ACTIONS_SNAPSHOT',
+            'web_process_refresh_triggered': False,
+            'runtime': {
+                'enabled': False,
+                'background_only': True,
+                'refreshes': 0,
+                'last_error': f'{type(exc).__name__}: {exc}',
+                'web_process_background_worker': False,
+            },
+            'evaluation': None,
+        }
+
+
+HISTORICAL_EVALUATION_SNAPSHOT = _load_committed_snapshot(
+    'historical-evaluation-latest.json',
+    'ATLAS_HISTORICAL_EVALUATION_RUNTIME_V1_BACKGROUND_ONLY',
+)
+PROSPECTIVE_MICROSTRUCTURE_SNAPSHOT = _load_committed_snapshot(
+    'prospective-microstructure-latest.json',
+    'ATLAS_PROSPECTIVE_MICROSTRUCTURE_VALIDATION_RUNTIME_V1',
+)
+PROSPECTIVE_MICROSTRUCTURE_SNAPSHOT['archive_read_triggered_by_request'] = False
+
 atlas.WEB_SAFE_MODE = {
     'enabled': True,
     'background_workers': False,
     'cloud_forward_in_web_process': False,
     'production_threshold': float(atlas.CLOUD_FORWARD_MIN_SCORE),
     'research_execution_location': 'GITHUB_ACTIONS',
+    'research_snapshot_serving': 'COMMITTED_SNAPSHOT_ONLY',
     'rc10_1_deep_analysis': getattr(atlas, 'RC10_1_DEEP_ANALYSIS_VERSION', None),
     'consensus_tiebreak_shadow': CONSENSUS_TIEBREAK_SHADOW,
     'fourth_vote_shadow': FOURTH_VOTE_SHADOW,
@@ -137,6 +197,10 @@ class WebOnlyHandler(atlas.Handler):
             q = urllib.parse.parse_qs(parsed.query)
             symbol = q.get('symbol', ['BTCUSDT'])[0]
             return self._json(volume_diagnostic(symbol))
+        if parsed.path == '/api/research/historical-evaluation':
+            return self._json(HISTORICAL_EVALUATION_SNAPSHOT)
+        if parsed.path == '/api/research/prospective-microstructure-validation':
+            return self._json(PROSPECTIVE_MICROSTRUCTURE_SNAPSHOT)
         if parsed.path == '/api/research/consensus-tiebreak-shadow':
             q = urllib.parse.parse_qs(parsed.query)
             symbol = q.get('symbol', ['BTCUSDT'])[0]
@@ -165,6 +229,7 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT','8080'))
     print('ATLAS Render WEB-ONLY safe mode', flush=True)
     print('Background workers: OFF (GitHub Actions owns scheduled research)', flush=True)
+    print('Research validation API: committed snapshots only; no request-time refresh', flush=True)
     print('Production decision UI: ON + autoload', flush=True)
     print(f'Production scoring: {PRODUCTION_SCORING_VERSION}', flush=True)
     print(f'RC10.1 deep analysis: {atlas.RC10_1_DEEP_ANALYSIS_VERSION}', flush=True)
