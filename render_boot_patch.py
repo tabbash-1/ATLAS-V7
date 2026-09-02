@@ -22,7 +22,7 @@ def patch_hype_chart():
 def patch_production_ui():
     if not INDEX.exists(): return
     html = INDEX.read_text(encoding="utf-8")
-    names=("atlas-production-decision.js","production-web-autoload.js","atlas-deep-analysis-ui.js","atlas-unified-terminal.js","atlas-unified-terminal-polish.js")
+    names=("atlas-production-decision.js","production-web-autoload.js","atlas-deep-analysis-ui.js","atlas-unified-terminal.js","atlas-unified-terminal-polish.js","atlas-research-validation-ui.js")
     for name in names:
         html = re.sub(rf'<script[^>]+src=["\']{re.escape(name)}(?:\?[^"\']*)?["\'][^>]*></script>', '', html)
     scripts = "\n".join([
@@ -31,11 +31,12 @@ def patch_production_ui():
         '  <script src="atlas-deep-analysis-ui.js?v=rc10-1-deep-v2-primary-4-12h"></script>',
         '  <script src="atlas-unified-terminal.js?v=unified-terminal-v1"></script>',
         '  <script src="atlas-unified-terminal-polish.js?v=unified-terminal-polish-v2-execution-semantics"></script>',
+        '  <script src="atlas-research-validation-ui.js?v=research-validation-v1"></script>',
     ])
     injection="\n"+scripts+"\n"
     html=html.replace("</body>",injection+"</body>",1) if "</body>" in html else html+injection
     INDEX.write_text(html,encoding="utf-8")
-    print("ATLAS Render boot patch: unified terminal + execution semantics v2 + Production + RC10.1 enabled",flush=True)
+    print("ATLAS Render boot patch: unified terminal + isolated research validation + Production + RC10.1 enabled",flush=True)
 
 
 def patch_legacy_command_mirrors():
