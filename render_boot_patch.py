@@ -7,6 +7,7 @@ BASE = Path(__file__).resolve().parent
 APP = BASE / "app.js"
 INDEX = BASE / "index.html"
 V7_UI = BASE / "v7-ui-redesign.js"
+EXEC_RISK = BASE / "execution_risk_management.py"
 
 
 def patch_hype_chart():
@@ -50,7 +51,32 @@ def patch_legacy_command_mirrors():
     if changed:V7_UI.write_text(text,encoding="utf-8")
 
 
+def patch_execution_semantics_install():
+    """Install final permission semantics immediately after risk management.
+
+    execution_risk_management is imported after this boot patch runs. Patching its
+    install() tail here guarantees that every Render boot activates the final
+    response contract without changing score/direction/threshold code.
+    """
+    if not EXEC_RISK.exists(): return
+    text=EXEC_RISK.read_text(encoding="utf-8")
+    marker="PRODUCTION_EXECUTION_SEMANTICS_BOOT_PATCH_V1"
+    if marker in text: return
+    needle="    atlas._EXECUTION_RISK_MANAGEMENT_INSTALLED = True\n    return state"
+    replacement=(
+        "    atlas._EXECUTION_RISK_MANAGEMENT_INSTALLED = True\n"
+        "    # PRODUCTION_EXECUTION_SEMANTICS_BOOT_PATCH_V1\n"
+        "    from production_execution_semantics_overlay import install as _install_execution_semantics\n"
+        "    state['execution_semantics'] = _install_execution_semantics(atlas)\n"
+        "    return state"
+    )
+    if needle not in text:
+        raise RuntimeError("execution risk install tail changed; refusing silent semantics patch")
+    EXEC_RISK.write_text(text.replace(needle,replacement,1),encoding="utf-8")
+    print("ATLAS Render boot patch: explicit execution permission semantics enabled",flush=True)
+
+
 def apply():
-    patch_hype_chart();patch_production_ui();patch_legacy_command_mirrors()
+    patch_hype_chart();patch_production_ui();patch_legacy_command_mirrors();patch_execution_semantics_install()
 
 if __name__ == "__main__": apply()
