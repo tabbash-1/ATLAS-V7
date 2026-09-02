@@ -3,17 +3,23 @@ import types
 import production_execution_semantics_overlay as overlay
 
 
-class Handler:
-    def __init__(self):
-        self.sent = None
+def make_handler_class():
+    class Handler:
+        def __init__(self):
+            self.sent = None
 
-    def _json(self, payload, status=200):
-        self.sent = (payload, status)
-        return payload
+        def _json(self, payload, status=200):
+            self.sent = (payload, status)
+            return payload
+
+    return Handler
 
 
 def install_handler():
-    atlas = types.SimpleNamespace(Handler=Handler)
+    # Each test gets a brand-new Handler class. The overlay monkey-patches
+    # Handler._json, so reusing one global class would stack wrappers across
+    # tests and corrupt the legacy geometry_ready input.
+    atlas = types.SimpleNamespace(Handler=make_handler_class())
     overlay.install(atlas)
     return atlas
 
