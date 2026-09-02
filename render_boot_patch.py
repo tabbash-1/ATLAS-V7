@@ -22,7 +22,7 @@ def patch_hype_chart():
 def patch_production_ui():
     if not INDEX.exists(): return
     html = INDEX.read_text(encoding="utf-8")
-    names=("atlas-production-decision.js","production-web-autoload.js","atlas-deep-analysis-ui.js","atlas-unified-terminal.js")
+    names=("atlas-production-decision.js","production-web-autoload.js","atlas-deep-analysis-ui.js","atlas-unified-terminal.js","atlas-unified-terminal-polish.js")
     for name in names:
         html = re.sub(rf'<script[^>]+src=["\']{re.escape(name)}(?:\?[^"\']*)?["\'][^>]*></script>', '', html)
     scripts = "\n".join([
@@ -30,11 +30,12 @@ def patch_production_ui():
         '  <script src="production-web-autoload.js?v=web-only-prod-v4"></script>',
         '  <script src="atlas-deep-analysis-ui.js?v=rc10-1-deep-v2-primary-4-12h"></script>',
         '  <script src="atlas-unified-terminal.js?v=unified-terminal-v1"></script>',
+        '  <script src="atlas-unified-terminal-polish.js?v=unified-terminal-polish-v1"></script>',
     ])
     injection="\n"+scripts+"\n"
     html=html.replace("</body>",injection+"</body>",1) if "</body>" in html else html+injection
     INDEX.write_text(html,encoding="utf-8")
-    print("ATLAS Render boot patch: unified terminal + Production + RC10.1 enabled",flush=True)
+    print("ATLAS Render boot patch: unified terminal + mobile polish + Production + RC10.1 enabled",flush=True)
 
 
 def patch_legacy_command_mirrors():
