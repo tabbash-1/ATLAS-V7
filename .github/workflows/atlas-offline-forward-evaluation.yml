@@ -1,0 +1,60 @@
+name: ATLAS Offline Forward Evaluation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'offline_forward_evaluation.py'
+      - 'status/history/production-snapshots.jsonl'
+      - '.github/workflows/atlas-offline-forward-evaluation.yml'
+  schedule:
+    - cron: '15,35,55 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atlas-offline-forward-evaluation
+  cancel-in-progress: true
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Build offline forward evaluation
+        run: |
+          set -euo pipefail
+          python3 -m py_compile offline_forward_evaluation.py
+          python3 offline_forward_evaluation.py \
+            --history status/history/production-snapshots.jsonl \
+            --output status/offline-forward-evaluation-latest.json
+          python3 - <<'PY'
+          import json
+          p='status/offline-forward-evaluation-latest.json'
+          x=json.load(open(p))
+          assert x['schema']=='ATLAS_OFFLINE_FORWARD_EVALUATION_V1'
+          assert x['research_only'] is True
+          assert x['live_execution'] is False
+          assert x['can_override_production'] is False
+          assert x['production_threshold_changed'] is False
+          assert x['source']['snapshot_rows'] >= 1
+          print('12H',json.dumps(x['overall']['12'],sort_keys=True))
+          print('SOURCE',json.dumps(x['source'],sort_keys=True))
+          PY
+      - name: Commit evaluation only when data changed
+        run: |
+          git config user.name 'atlas-offline-research-bot'
+          git config user.email 'atlas-offline-research-bot@users.noreply.github.com'
+          git add status/offline-forward-evaluation-latest.json
+          if git diff --cached --quiet; then
+            echo 'Offline evaluation unchanged'
+            exit 0
+          fi
+          git commit -m 'chore: update offline forward evaluation [skip ci]'
+          git pull --rebase origin main
+          git push
