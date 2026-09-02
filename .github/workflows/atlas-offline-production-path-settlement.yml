@@ -1,0 +1,58 @@
+name: ATLAS Offline Production Path Settlement
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'offline_production_path_settlement.py'
+      - '.github/workflows/atlas-offline-production-path-settlement.yml'
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atlas-offline-production-path-settlement
+  cancel-in-progress: true
+
+jobs:
+  settle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax and isolation contract
+        run: |
+          set -euo pipefail
+          python -m py_compile offline_production_path_settlement.py
+          grep -q 'research_only.*True' offline_production_path_settlement.py
+          grep -q 'can_override_production.*False' offline_production_path_settlement.py
+          grep -q 'can_change_threshold.*False' offline_production_path_settlement.py
+          grep -q 'production_threshold_unchanged.*68' offline_production_path_settlement.py
+      - name: Settle canonical Production episodes offline
+        run: |
+          set -euo pipefail
+          python offline_production_path_settlement.py
+          jq -e '
+            .schema == "ATLAS_OFFLINE_PRODUCTION_PATH_SETTLEMENT_V1_12H" and
+            .research_only == true and .live_execution == false and
+            .can_override_production == false and .can_change_threshold == false and
+            .production_threshold_unchanged == 68 and
+            .episode_semantics == "FIRST_QUALIFIED_OBSERVATION_PER_CONTIGUOUS_SYMBOL_DIRECTION_EPISODE"
+          ' status/production-path-settlement-latest.json >/dev/null
+          jq '{generated_at,horizon_hours,summary}' status/production-path-settlement-latest.json
+      - name: Commit settlement report
+        run: |
+          set -euo pipefail
+          git config user.name "atlas-path-settlement"
+          git config user.email "atlas-path-settlement@users.noreply.github.com"
+          git add status/production-path-settlement-latest.json status/history/production-path-settlement.jsonl
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "chore: update offline Production path settlement [skip ci]"
+          git pull --rebase origin main
+          git push
