@@ -1,0 +1,66 @@
+name: ATLAS Execution Semantics Live Smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'production_execution_semantics_overlay.py'
+      - 'render_boot_patch.py'
+      - 'execution_risk_management.py'
+      - 'production_decision_api.py'
+      - 'tests/test_production_execution_semantics_overlay.py'
+      - '.github/workflows/atlas-execution-semantics-live-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlas-execution-semantics-live-smoke
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BASE_URL: https://atlas-v7.onrender.com
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Unit contract
+        run: |
+          set -euo pipefail
+          python -m pytest -q tests/test_production_execution_semantics_overlay.py
+      - name: Wait for Render and verify final decision contract
+        run: |
+          set -euo pipefail
+          for symbol in BTCUSDT HYPEUSDT; do
+            tmp="$(mktemp)"; ok=0
+            for attempt in $(seq 1 35); do
+              code="$(curl -L --connect-timeout 20 --max-time 90 -sS -w '%{http_code}' -o "$tmp" "${BASE_URL}/api/decision/current?symbol=${symbol}" || true)"
+              if [[ "$code" =~ ^2 ]] && jq -e '
+                .ok == true and
+                .signal_threshold == 68 and
+                (.geometry_ready | type) == "boolean" and
+                (.execution_permission_ready | type) == "boolean" and
+                .execution_permission_source == "canonical_trade_plan.can_execute" and
+                .execution_semantics_version == "PRODUCTION_EXECUTION_SEMANTICS_V1_EXPLICIT_PERMISSION" and
+                (.execution_ready == false or (.trade_plan.can_execute == true and .geometry_ready == true)) and
+                (.execution_ready == true or .actionable_decision == "WAIT")
+              ' "$tmp" >/dev/null 2>&1; then
+                echo "PASS ${symbol} explicit execution contract"
+                jq '{symbol,decision,candidate_direction,score,signal_threshold,geometry_ready,execution_permission_ready,execution_ready,actionable_decision,actionable_reason,trade_plan:{status:.trade_plan.status,can_execute:.trade_plan.can_execute}}' "$tmp"
+                ok=1; break
+              fi
+              echo "Waiting ${symbol} attempt ${attempt}/35 HTTP=${code:-none}"
+              sleep 12
+            done
+            if [[ "$ok" != 1 ]]; then
+              echo "FAILED ${symbol} execution semantics" >&2
+              cat "$tmp" >&2 || true
+              exit 1
+            fi
+          done
