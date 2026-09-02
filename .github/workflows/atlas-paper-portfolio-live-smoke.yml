@@ -1,0 +1,40 @@
+name: ATLAS $10K Paper Portfolio Live Smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'committed_research_api.py'
+      - 'atlas-paper-portfolio-ui.js'
+      - 'render_boot_patch.py'
+      - 'status/paper-portfolio-10k-latest.json'
+      - '.github/workflows/atlas-paper-portfolio-live-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      BASE_URL: https://atlas-v7.onrender.com
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for Render and verify paper API/UI
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 18); do
+            API=$(curl -L --connect-timeout 10 --max-time 35 -fsS "$BASE_URL/api/research/paper-portfolio-10k" || true)
+            HTML=$(curl -L --connect-timeout 10 --max-time 35 -fsS "$BASE_URL/" || true)
+            JS=$(curl -L --connect-timeout 10 --max-time 35 -fsS "$BASE_URL/atlas-paper-portfolio-ui.js" || true)
+            if printf '%s' "$API" | jq -e '.ok == true and .schema == "ATLAS_PAPER_PORTFOLIO_10K_V1_PROSPECTIVE" and .paper_only == true and .live_execution == false and .can_override_production == false and .portfolio.starting_equity_usd == 10000' >/dev/null 2>&1 \
+              && printf '%s' "$HTML" | grep -q 'atlas-paper-portfolio-ui.js' \
+              && printf '%s' "$JS" | grep -q 'ATLAS_PAPER_PORTFOLIO_UI_V1' \
+              && printf '%s' "$JS" | grep -q 'can_override_production:false'; then
+              echo "PASS live 10K paper portfolio API/UI"
+              exit 0
+            fi
+            echo "Render not ready attempt $i/18"
+            sleep 10
+          done
+          echo "Live 10K paper portfolio contract did not become ready"
+          exit 1
