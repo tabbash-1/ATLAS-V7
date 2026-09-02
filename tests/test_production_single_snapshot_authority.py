@@ -12,12 +12,13 @@ def test_product_shell_does_not_fetch_or_publish_production_decision():
     refresh = src.split('async function refreshAi()', 1)[1].split('function update()', 1)[0]
     assert '/api/decision/current' not in refresh
     assert 'window.ATLAS_PRODUCTION_DECISION=pd' not in src
-    # The product shell may bind the guard to a local variable; what matters is
-    # that it reads the accepted snapshot from the single guard and never owns
-    # a second Production fetch/acceptance path.
+    # The product shell is a consumer only: it reads the accepted snapshot from
+    # the single guard and never owns a second Production fetch/acceptance path.
     assert 'window.ATLAS_PRODUCTION_SNAPSHOT_GUARD' in src
     assert 'g?.current?.()' in src or 'ATLAS_PRODUCTION_SNAPSHOT_GUARD?.current?.()' in src
-    assert 'acceptedSnapshotOnly:true' in src
+    assert 'norm(g?.symbol?.())===currentSymbol()' in src
+    # Actionable state must still require the accepted Production execution flag.
+    assert "p.status==='ACTIONABLE'&&d?.production_signal_qualified&&d?.execution_ready" in src
 
 
 def test_production_decision_rejects_stale_responses():
