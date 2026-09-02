@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'prospective_direction_guardrail.py'
+      - 'prospective_cohort_integrity.py'
       - '.github/workflows/atlas-prospective-direction-guardrail.yml'
   schedule:
     - cron: '18,38,58 * * * *'
@@ -28,18 +29,24 @@ jobs:
       - name: Freeze new decision-time cohort rows and evaluate matured 4H rows
         run: |
           set -euo pipefail
-          python3 -m py_compile prospective_direction_guardrail.py
+          python3 -m py_compile prospective_direction_guardrail.py prospective_cohort_integrity.py
           python3 prospective_direction_guardrail.py \
             --history status/history/production-snapshots.jsonl \
             --manifest status/prospective-direction-guardrail-manifest.json \
             --cohort status/history/prospective-direction-guardrail-cohort.jsonl \
             --report status/prospective-direction-guardrail-latest.json
+          python3 prospective_cohort_integrity.py \
+            --manifest status/prospective-direction-guardrail-manifest.json \
+            --cohort status/history/prospective-direction-guardrail-cohort.jsonl \
+            --ledger status/prospective-direction-guardrail-integrity.json
           python3 - <<'PY'
           import json
           m=json.load(open('status/prospective-direction-guardrail-manifest.json'))
           r=json.load(open('status/prospective-direction-guardrail-latest.json'))
+          i=json.load(open('status/prospective-direction-guardrail-integrity.json'))
           assert m['schema']=='ATLAS_PROSPECTIVE_DIRECTION_GUARDRAIL_MANIFEST_V1'
           assert r['schema']=='ATLAS_PROSPECTIVE_DIRECTION_GUARDRAIL_V1_4H'
+          assert i['schema']=='ATLAS_PROSPECTIVE_DIRECTION_COHORT_INTEGRITY_V1'
           assert m['research_only'] is True and m['shadow_only'] is True
           assert m['live_execution'] is False and m['can_override_production'] is False
           assert r['research_only'] is True and r['shadow_only'] is True
@@ -48,12 +55,15 @@ jobs:
           assert r['target_horizon_hours']==4
           assert m['rules']['minimum_matured_per_group']==30
           assert m['rules']['target_horizon_hours']==4
-          assert r['manifest_hash']==m['manifest_hash']
+          assert r['manifest_hash']==m['manifest_hash']==i['manifest_hash']
+          assert i['append_only_verified'] is True
+          assert i['can_override_production'] is False
           print('COHORT_START',m['cohort_start_at'])
+          print('INTEGRITY',json.dumps({k:i[k] for k in ('append_only_verified','previous_row_count','row_count','new_row_count','ordered_chain_sha256')},sort_keys=True))
           print('PROGRESS',json.dumps(r['sample_progress'],sort_keys=True))
           print('CLAIMS',json.dumps(r['claims'],sort_keys=True))
           PY
-      - name: Commit immutable manifest, cohort and report
+      - name: Commit immutable manifest, cohort, integrity and report
         run: |
           set -euo pipefail
           git config user.name 'atlas-prospective-guardrail-bot'
@@ -61,6 +71,7 @@ jobs:
           git add \
             status/prospective-direction-guardrail-manifest.json \
             status/history/prospective-direction-guardrail-cohort.jsonl \
+            status/prospective-direction-guardrail-integrity.json \
             status/prospective-direction-guardrail-latest.json
           if git diff --cached --quiet; then
             echo 'No prospective guardrail changes'
