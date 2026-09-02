@@ -43,7 +43,11 @@ jobs:
           assert x['can_override_production'] is False
           assert x['production_threshold_changed'] is False
           assert x['source']['snapshot_rows'] >= 1
-          print('12H',json.dumps(x['overall']['12'],sort_keys=True))
+          print('OVERALL_12H',json.dumps(x['overall']['12'],sort_keys=True))
+          print('QUALIFIED_12H',json.dumps(x['qualified']['12'],sort_keys=True))
+          print('WAIT_DIRECTIONAL_12H',json.dumps(x['wait_directional']['12'],sort_keys=True))
+          print('QUALIFIED_6H',json.dumps(x['qualified']['6'],sort_keys=True))
+          print('WAIT_DIRECTIONAL_6H',json.dumps(x['wait_directional']['6'],sort_keys=True))
           print('SOURCE',json.dumps(x['source'],sort_keys=True))
           PY
       - name: Commit evaluation only when data changed
