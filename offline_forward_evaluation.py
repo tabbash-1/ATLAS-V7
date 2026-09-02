@@ -2,14 +2,15 @@
 """Offline evaluation of committed ATLAS Production snapshots.
 
 Research-only. Reads historical snapshots, computes later directional returns,
-and writes a report. It cannot modify Production or execution state.
+and writes diagnostic aggregates. It cannot modify Production or execution state.
 """
 from __future__ import annotations
 import argparse, datetime as dt, json, math, statistics
+from collections import Counter
 from pathlib import Path
 
-SCHEMA='ATLAS_OFFLINE_FORWARD_EVALUATION_V1'
-HORIZONS=(1,3,6,12,24)
+SCHEMA='ATLAS_OFFLINE_FORWARD_EVALUATION_V2_DIAGNOSTICS'
+HORIZONS=(1,3,4,6,12,24)
 
 
 def f(v):
@@ -35,6 +36,17 @@ def direction(d):
         v=str((d or {}).get(k) or '').upper()
         if v in ('LONG','SHORT'):return v
     return None
+
+
+def score_band(v):
+    x=f(v)
+    if x is None:return 'UNKNOWN'
+    if x<50:return 'LT50'
+    if x<60:return '50_59'
+    if x<68:return '60_67'
+    if x<75:return '68_74'
+    if x<82:return '75_81'
+    return '82_PLUS'
 
 
 def metrics(vals):
@@ -64,6 +76,15 @@ def nearest(rows,i,symbol,target):
     return None
 
 
+def aggregate(items):
+    return {str(h):metrics([((x.get('horizons') or {}).get(str(h)) or {}).get('directional_return_pct') for x in items]) for h in HORIZONS}
+
+
+def grouped(obs,keyfn):
+    keys=sorted({str(keyfn(x)) for x in obs})
+    return {k:aggregate([x for x in obs if str(keyfn(x))==k]) for k in keys}
+
+
 def build(rows):
     obs=[]; last={}
     for i,(t0,r0) in enumerate(rows):
@@ -75,24 +96,48 @@ def build(rows):
             key=(symbol,klass,side)
             if key in last and (t0-last[key]).total_seconds()<3600:continue
             last[key]=t0
-            x={'symbol':symbol,'captured_at':t0.isoformat(),'classification':klass,'direction':side,'score':f(d0.get('score')),'wait_reason':d0.get('wait_reason'),'horizons':{}}
+            score=f(d0.get('score'))
+            x={
+                'symbol':symbol,'captured_at':t0.isoformat(),'classification':klass,
+                'direction':side,'score':score,'score_band':score_band(score),
+                'wait_reason':d0.get('wait_reason'),'execution_ready':bool(d0.get('execution_ready')),
+                'playbook':d0.get('playbook'),'regime':d0.get('regime'),'horizons':{}
+            }
             for h in HORIZONS:
                 hit=nearest(rows,i,symbol,t0+dt.timedelta(hours=h))
                 if not hit:continue
                 t1,p1=hit; market=(p1/p0-1)*100; dr=market if side=='LONG' else -market
                 x['horizons'][str(h)]={'observed_at':t1.isoformat(),'directional_return_pct':round(dr,6)}
             obs.append(x)
-    def agg(items):
-        return {str(h):metrics([((x.get('horizons') or {}).get(str(h)) or {}).get('directional_return_pct') for x in items]) for h in HORIZONS}
+
     now=dt.datetime.now(dt.timezone.utc); latest=rows[-1][0] if rows else None
     age=((now-latest).total_seconds()/60) if latest else None
     q=[x for x in obs if x['classification']=='QUALIFIED']; w=[x for x in obs if x['classification']=='WAIT_DIRECTIONAL']
-    return {'schema':SCHEMA,'generated_at':now.isoformat(),'research_only':True,'live_execution':False,'can_override_production':False,'production_threshold_changed':False,'source':{'file':'status/history/production-snapshots.jsonl','snapshot_rows':len(rows),'latest_snapshot_at':latest.isoformat() if latest else None,'latest_snapshot_age_minutes':round(age,2) if age is not None else None,'stale':age is None or age>90},'sampling':'max one row per symbol/class/direction per hour','overall':agg(obs),'qualified':agg(q),'wait_directional':agg(w),'observation_count':len(obs),'latest_observations':obs[-80:]}
+    q_exec=[x for x in q if x['execution_ready']]
+    q_not_exec=[x for x in q if not x['execution_ready']]
+    wait_counts=Counter(str(x.get('wait_reason') or 'UNSPECIFIED') for x in w)
+    return {
+        'schema':SCHEMA,'generated_at':now.isoformat(),'research_only':True,'live_execution':False,
+        'can_override_production':False,'production_threshold_changed':False,
+        'source':{'file':'status/history/production-snapshots.jsonl','snapshot_rows':len(rows),'latest_snapshot_at':latest.isoformat() if latest else None,'latest_snapshot_age_minutes':round(age,2) if age is not None else None,'stale':age is None or age>90},
+        'sampling':'max one row per symbol/class/direction per hour',
+        'overall':aggregate(obs),'qualified':aggregate(q),'wait_directional':aggregate(w),
+        'qualified_execution_ready':aggregate(q_exec),'qualified_not_execution_ready':aggregate(q_not_exec),
+        'by_symbol':grouped(obs,lambda x:x['symbol']),
+        'qualified_by_symbol':grouped(q,lambda x:x['symbol']),
+        'by_direction':grouped(obs,lambda x:x['direction']),
+        'qualified_by_direction':grouped(q,lambda x:x['direction']),
+        'by_score_band':grouped(obs,lambda x:x['score_band']),
+        'qualified_by_score_band':grouped(q,lambda x:x['score_band']),
+        'wait_reason_counts':dict(wait_counts.most_common()),
+        'observation_count':len(obs),'qualified_count':len(q),'wait_directional_count':len(w),
+        'latest_observations':obs[-80:]
+    }
 
 
 def main():
     ap=argparse.ArgumentParser(); ap.add_argument('--history',default='status/history/production-snapshots.jsonl'); ap.add_argument('--output',default='status/offline-forward-evaluation-latest.json'); a=ap.parse_args()
     report=build(load(Path(a.history))); p=Path(a.output); p.parent.mkdir(parents=True,exist_ok=True); p.write_text(json.dumps(report,indent=2,sort_keys=True))
-    print(json.dumps({'schema':report['schema'],'snapshots':report['source']['snapshot_rows'],'observations':report['observation_count'],'12h':report['overall']['12']},sort_keys=True))
+    print(json.dumps({'schema':report['schema'],'snapshots':report['source']['snapshot_rows'],'observations':report['observation_count'],'qualified':report['qualified_count'],'4h':report['qualified']['4'],'12h':report['qualified']['12']},sort_keys=True))
 
 if __name__=='__main__':main()
