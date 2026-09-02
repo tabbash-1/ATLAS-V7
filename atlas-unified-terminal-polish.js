@@ -18,25 +18,31 @@
   };
   const prettyState=s=>({
     'WAIT TRIGGER':'Waiting for trigger',
+    'WAITING FOR TRIGGER':'Waiting for trigger',
     'READY ON TRIGGER':'Trigger ready',
+    'TRIGGER READY':'Trigger ready',
     'READY':'Execution ready',
+    'EXECUTION READY':'Execution ready',
     'BLOCKED':'Blocked',
-    'WAIT':'Waiting'
+    'WAIT':'Waiting',
+    'WAITING':'Waiting'
   }[s]||s);
   const titleCase=s=>String(s||'').toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());
 
+  function setTextIfChanged(el,next){ if(el && el.textContent!==next) el.textContent=next; }
   function polishScalar(id){
     const el=$(id); if(!el) return;
     const n=parseNumber(el.textContent.trim());
-    if(n!==null) el.textContent=smartPrice(n);
+    if(n!==null) setTextIfChanged(el,smartPrice(n));
   }
   function polishTextNumbers(id){
     const el=$(id); if(!el) return;
-    const text=el.textContent;
-    el.textContent=text.replace(/-?\d{1,6}(?:\.\d{3,10})/g,m=>smartPrice(m));
+    const next=el.textContent.replace(/-?\d{1,6}(?:\.\d{3,10})/g,m=>smartPrice(m));
+    setTextIfChanged(el,next);
   }
   function polishTargets(){
     const el=$('auTargets'); if(!el) return;
+    if(el.querySelector('span') && el.querySelector('small')) return;
     const nums=(el.textContent.match(/-?[\d,.]+/g)||[]).map(parseNumber).filter(v=>v!==null);
     if(nums.length<2) return;
     el.classList.add('au-target-stack');
@@ -53,7 +59,8 @@
     const scenario=titleCase(parts[0]);
     const score=(parts[1].match(/\d+/)||[])[0];
     const state=prettyState((parts[2]||'').toUpperCase());
-    el.textContent=[scenario,score?`${score}%`:null,state||null].filter(Boolean).join(' · ');
+    const next=[scenario,score?`${score}%`:null,state||null].filter(Boolean).join(' · ');
+    setTextIfChanged(el,next);
   }
   function polish(){
     polishScalar('auEntry'); polishScalar('auStop'); polishScalar('auTp1');
