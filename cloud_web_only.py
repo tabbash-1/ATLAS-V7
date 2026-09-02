@@ -72,6 +72,12 @@ FOURTH_VOTE_SHADOW = install_fourth_vote_shadow(atlas)
 from prospective_long_close_shadow import install as install_long_close_shadow
 LONG_CLOSE_STRUCTURE_SHADOW = install_long_close_shadow(atlas)
 
+# Committed research reports are loaded once at boot. This adds read-only cached
+# endpoints without any background worker, market fetch, outcome read, threshold
+# change, or authority over the unified Production decision.
+from committed_research_api import install as install_committed_research_api
+COMMITTED_RESEARCH_API = install_committed_research_api(atlas, BASE)
+
 
 def _snapshot_freshness(payload):
     captured = payload.get('_snapshot_captured_at') or (payload.get('runtime') or {}).get('last_finished_at')
@@ -161,6 +167,7 @@ atlas.WEB_SAFE_MODE = {
     'research_execution_location': 'GITHUB_ACTIONS',
     'research_snapshot_serving': 'COMMITTED_SNAPSHOT_ONLY',
     'research_snapshot_stale_hours': RESEARCH_SNAPSHOT_STALE_HOURS,
+    'committed_research_api': COMMITTED_RESEARCH_API,
     'rc10_1_deep_analysis': getattr(atlas, 'RC10_1_DEEP_ANALYSIS_VERSION', None),
     'consensus_tiebreak_shadow': CONSENSUS_TIEBREAK_SHADOW,
     'fourth_vote_shadow': FOURTH_VOTE_SHADOW,
@@ -225,6 +232,7 @@ if __name__ == '__main__':
     print('ATLAS Render WEB-ONLY safe mode', flush=True)
     print('Background workers: OFF (GitHub Actions owns scheduled research)', flush=True)
     print('Research validation API: committed snapshots only; stale snapshots are explicitly labelled', flush=True)
+    print(f'Committed research API: {COMMITTED_RESEARCH_API["version"]}', flush=True)
     print('Production decision UI: ON + autoload', flush=True)
     print(f'Production scoring: {PRODUCTION_SCORING_VERSION}', flush=True)
     print(f'RC10.1 deep analysis: {atlas.RC10_1_DEEP_ANALYSIS_VERSION}', flush=True)
