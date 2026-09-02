@@ -22,7 +22,7 @@ jobs:
           node-version: '22'
       - name: Python syntax
         run: |
-          python -m py_compile collector_server.py cloud_start.py cloud_start_web.py cloud_web_only.py atlas_runtime_server.py atlas_research_runtime_server.py atlas_ai_server.py research_memory_bridge.py research_coverage.py storage_hardening.py trade_outcome_ledger.py trade_outcome_runtime.py trade_path_settlement.py execution_outcome_scope.py execution_risk_management.py prospective_fourth_vote_shadow.py tests/test_ai_validation.py tests/test_research_memory_bridge.py tests/test_research_coverage.py tests/test_storage_hardening.py tests/test_trade_outcome_ledger.py tests/test_trade_path_settlement.py tests/test_execution_outcome_scope.py tests/test_execution_risk_management.py tests/test_prospective_fourth_vote_shadow.py tests/test_production_single_snapshot_authority.py tests/test_production_execution_semantics_overlay.py
+          python -m py_compile collector_server.py cloud_start.py cloud_start_web.py cloud_web_only.py atlas_runtime_server.py atlas_research_runtime_server.py atlas_ai_server.py research_memory_bridge.py research_coverage.py storage_hardening.py trade_outcome_ledger.py trade_outcome_runtime.py trade_path_settlement.py execution_outcome_scope.py execution_risk_management.py prospective_fourth_vote_shadow.py production_execution_semantics_overlay.py tests/test_ai_validation.py tests/test_research_memory_bridge.py tests/test_research_coverage.py tests/test_storage_hardening.py tests/test_trade_outcome_ledger.py tests/test_trade_path_settlement.py tests/test_execution_outcome_scope.py tests/test_execution_risk_management.py tests/test_prospective_fourth_vote_shadow.py tests/test_production_single_snapshot_authority.py tests/test_production_execution_semantics_overlay.py
       - name: JavaScript syntax
         run: |
           set -e
@@ -45,7 +45,10 @@ jobs:
           PYTHONPATH=. python - <<'PY'
           import tests.test_production_execution_semantics_overlay as t
           tests=[getattr(t,n) for n in dir(t) if n.startswith('test_') and callable(getattr(t,n))]
-          for fn in tests: fn()
+          if not tests:
+              raise SystemExit('no execution semantics tests discovered')
+          for fn in tests:
+              fn()
           print(f'execution semantics tests: {len(tests)} ok')
           PY
       - name: Verify delegated production entrypoints
@@ -80,6 +83,7 @@ jobs:
           grep -q 'production_threshold_changed.*False' prospective_fourth_vote_shadow.py
       - name: Verify resilient provider chain and safety invariants
         run: |
+          set -euo pipefail
           grep -q 'KRAKEN_FUTURES_PUBLIC' atlas_runtime_server.py
           grep -q 'futures.kraken.com' atlas_runtime_server.py
           grep -q 'Binance USD-M -> Bybit -> Kraken Futures' atlas_runtime_server.py
@@ -122,18 +126,13 @@ jobs:
       - name: Verify product shell single-authority invariants
         run: |
           set -euo pipefail
-          grep -q 'atlasProductShell' atlas-product-shell.js
-          grep -q "\$('analyzeBtn')?.click" atlas-product-shell.js
-          ! grep -q '/api/decision/current' atlas-product-shell.js
-          grep -q '/api/ai/council' atlas-product-shell.js
-          grep -q 'ATLAS_PRODUCTION_SNAPSHOT_GUARD' atlas-product-shell.js
-          grep -q 'g?.current?.()' atlas-product-shell.js
-          grep -q 'staleResponseGuard:true' atlas-production-decision.js
-          grep -q 'accept:acceptSnapshot' production-web-autoload.js
-          grep -q 'atlas-product-shell.js' theme-toggle.js
-          ! grep -q '\.remove(' atlas-product-shell.js
-          ! grep -q 'CLOUD_FORWARD_MIN_SCORE' atlas-product-shell.js
-          ! grep -q 'ATLAS_ALERT_MIN_SCORE' atlas-product-shell.js
+          PYTHONPATH=. python tests/test_production_single_snapshot_authority.py
+          grep -Fq 'ATLAS_PRODUCTION_SNAPSHOT_GUARD' atlas-product-shell.js
+          grep -Fq 'staleResponseGuard:true' atlas-production-decision.js
+          grep -Fq 'accept:acceptSnapshot' production-web-autoload.js
+          ! grep -Fq '/api/decision/current' atlas-product-shell.js
+          ! grep -Fq 'CLOUD_FORWARD_MIN_SCORE' atlas-product-shell.js
+          ! grep -Fq 'ATLAS_ALERT_MIN_SCORE' atlas-product-shell.js
       - name: Free core production runtime, migration and persistence smoke test
         env:
           PORT: '18080'
