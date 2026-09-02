@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'offline_forward_evaluation.py'
+      - 'forward_robustness_guardrails.py'
       - 'status/history/production-snapshots.jsonl'
       - '.github/workflows/atlas-offline-forward-evaluation.yml'
   schedule:
@@ -26,32 +27,36 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Build offline forward evaluation
+      - name: Build offline forward evaluation and shadow guardrails
         run: |
           set -euo pipefail
-          python3 -m py_compile offline_forward_evaluation.py
+          python3 -m py_compile offline_forward_evaluation.py forward_robustness_guardrails.py
           python3 offline_forward_evaluation.py --history status/history/production-snapshots.jsonl --output status/offline-forward-evaluation-latest.json
+          python3 forward_robustness_guardrails.py --input status/offline-forward-evaluation-latest.json --output status/forward-robustness-guardrails-latest.json
           python3 - <<'PY'
           import json
           x=json.load(open('status/offline-forward-evaluation-latest.json'))
+          g=json.load(open('status/forward-robustness-guardrails-latest.json'))
           assert x['schema']=='ATLAS_OFFLINE_FORWARD_EVALUATION_V3_ROBUSTNESS'
           assert x['research_only'] is True and x['live_execution'] is False
           assert x['can_override_production'] is False and x['production_threshold_changed'] is False
           assert len(x['qualified_chronological_folds']) == 3
+          assert g['schema']=='ATLAS_FORWARD_ROBUSTNESS_GUARDRAILS_V1_SHADOW_ONLY'
+          assert g['research_only'] is True and g['shadow_only'] is True
+          assert g['can_override_production'] is False and g['can_change_threshold'] is False
           print('QUALIFIED_4H',json.dumps(x['qualified']['4'],sort_keys=True))
           print('QUALIFIED_12H',json.dumps(x['qualified']['12'],sort_keys=True))
           print('QUALIFIED_BY_DIRECTION',json.dumps(x['qualified_by_direction'],sort_keys=True))
-          print('QUALIFIED_BY_REGIME',json.dumps(x['qualified_by_regime'],sort_keys=True))
-          print('QUALIFIED_BY_PLAYBOOK',json.dumps(x['qualified_by_playbook'],sort_keys=True))
           print('CHRONOLOGICAL_FOLDS',json.dumps(x['qualified_chronological_folds'],sort_keys=True))
+          print('SHADOW_GUARDRAILS',json.dumps(g,sort_keys=True))
           print('SOURCE',json.dumps(x['source'],sort_keys=True))
           PY
-      - name: Commit evaluation only when data changed
+      - name: Commit research reports only when data changed
         run: |
           git config user.name 'atlas-offline-research-bot'
           git config user.email 'atlas-offline-research-bot@users.noreply.github.com'
-          git add status/offline-forward-evaluation-latest.json
+          git add status/offline-forward-evaluation-latest.json status/forward-robustness-guardrails-latest.json
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'chore: update offline forward evaluation [skip ci]'
+          git commit -m 'chore: update offline forward research [skip ci]'
           git pull --rebase origin main
           git push
