@@ -1,0 +1,80 @@
+name: ATLAS Committed Research Live Smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cloud_web_only.py'
+      - 'committed_research_api.py'
+      - 'status/offline-forward-evaluation-latest.json'
+      - 'status/forward-robustness-guardrails-latest.json'
+      - 'status/prospective-direction-guardrail-latest.json'
+      - '.github/workflows/atlas-committed-research-live-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlas-committed-research-live-smoke
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BASE_URL: https://atlas-v7.onrender.com
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for Render and verify cached research endpoints
+        run: |
+          set -euo pipefail
+          declare -A expected
+          expected[/api/research/offline-forward-evaluation]='ATLAS_OFFLINE_FORWARD_EVALUATION_V3_ROBUSTNESS'
+          expected[/api/research/forward-robustness-guardrails]='ATLAS_FORWARD_ROBUSTNESS_GUARDRAILS_V1_SHADOW_ONLY'
+          expected[/api/research/prospective-direction-guardrail]='ATLAS_PROSPECTIVE_DIRECTION_GUARDRAIL_V1_4H'
+          for path in "${!expected[@]}"; do
+            schema="${expected[$path]}"
+            tmp="$(mktemp)"
+            ok=0
+            for attempt in $(seq 1 30); do
+              code="$(curl -L --connect-timeout 20 --max-time 60 -sS -w '%{http_code}' -o "$tmp" "${BASE_URL}${path}" || true)"
+              if [[ "$code" =~ ^2 ]] && jq -e --arg s "$schema" '
+                .ok == true and
+                .schema == $s and
+                .cached_only == true and
+                .served_from == "COMMITTED_GITHUB_ACTIONS_REPORT" and
+                .web_process_refresh_triggered == false and
+                .request_time_outcome_read == false and
+                .request_time_market_fetch == false and
+                .web_process_background_worker == false and
+                .research_only == true and
+                .live_execution == false and
+                .can_override_production == false
+              ' "$tmp" >/dev/null 2>&1; then
+                echo "PASS ${path} schema=${schema}"
+                jq '{schema,generated_at,report_age_hours,cached_only,research_only,live_execution,can_override_production}' "$tmp"
+                ok=1
+                break
+              fi
+              echo "Waiting for ${path} attempt ${attempt}/30 HTTP=${code:-none}"
+              sleep 12
+            done
+            if [[ "$ok" != "1" ]]; then
+              echo "FAILED ${path}" >&2
+              cat "$tmp" >&2 || true
+              exit 1
+            fi
+          done
+          mode="$(mktemp)"
+          curl -L --connect-timeout 20 --max-time 60 -fsS "${BASE_URL}/api/web-mode" -o "$mode"
+          jq -e '
+            .ok == true and
+            .background_workers == false and
+            .cloud_forward_in_web_process == false and
+            .production_threshold == 68 and
+            .committed_research_api.cached_only == true and
+            .committed_research_api.background_workers == false
+          ' "$mode" >/dev/null
+          echo 'PASS web safe-mode contract'
