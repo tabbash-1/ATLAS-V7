@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """ATLAS prospective $10K paper portfolio.
 
-This is a causal, paper-only portfolio. It observes committed Production snapshots
-*after* a frozen cohort start and enrolls only canonical TRADE READY transitions.
-It never sends orders, changes Production, backfills pre-start trades, guesses
-ambiguous paths, or zero-fills missing market data.
+Causal, paper-only portfolio. It observes committed Production snapshots after a
+frozen cohort start and enrolls only canonical TRADE READY transitions. It never
+sends orders, changes Production, backfills pre-start trades, guesses ambiguous
+paths, or zero-fills missing market data.
 """
 from __future__ import annotations
 
@@ -132,7 +132,6 @@ def enroll_new(manifest, cohort, snapshots, observed_through, sizing_equity):
     risk_pct = float(manifest["risk_per_trade_pct"]) / 100.0
     ids = {r["id"] for r in cohort}
     active_state: dict[str, str | None] = {}
-    # Reconstruct readiness immediately before the cursor so transitions are causal.
     for t, snap in snapshots:
         if t > observed_through: break
         for symbol, d in (snap.get("decisions") or {}).items():
@@ -151,7 +150,7 @@ def enroll_new(manifest, cohort, snapshots, observed_through, sizing_equity):
             if not ready or prior == direction: continue
             captured = t.isoformat(); eid = event_id(symbol, captured, g)
             if eid in ids: continue
-            conservative_open = [r for r in cohort + added if parse_time(r["captured_at"]) <= t < parse_time(r["captured_at"]) + horizon]
+            conservative_open = [r for r in cohort if parse_time(r["captured_at"]) <= t < parse_time(r["captured_at"]) + horizon]
             if len(conservative_open) >= max_positions:
                 continue
             risk_usd = round(sizing_equity * risk_pct, 2)
@@ -189,7 +188,8 @@ def settle_entry(row: dict[str, Any], horizon_h: float, now_ms: int):
         elif ev == "TP2": status,r,terminal,exit_ms="WIN_TP2",float(g["rr_tp2"]),True,int(candle["open_time"] if candle else maturity)
         elif ev == "AMBIGUOUS": status,r,terminal,exit_ms="AMBIGUOUS",None,False,None
         else:
-            last=candles[-1]["close"]; directional=(last-g["entry"]) if g["direction"]=="LONG" else (g["entry"]-last)
+            last=candles[-1]["close"]
+            directional=(last-g["entry"]) if g["direction"]=="LONG" else (g["entry"]-last)
             r=directional/g["risk_abs"]; status="EXPIRED_TP1" if tp1_seen else "EXPIRED"; terminal=True; exit_ms=maturity
         return {"id":row["id"],"status":status,"terminal":terminal,"r_multiple":None if r is None else round(float(r),4),
                 "exit_at_ms":exit_ms,"tp1_reached":bool(tp1_seen),"mfe_r":mfe,"mae_r":mae,"market_source":provider}
@@ -208,15 +208,14 @@ def portfolio_report(manifest, cohort, settlements, generated_at, observed_throu
     closed.sort(key=lambda x:(x["settlement"].get("exit_at_ms") or 10**30,x["row"]["captured_at_ms"]))
     equity_curve=[]
     for x in closed:
-        equity=round(equity+x["pnl_usd"],2); peak=max(peak,equity); dd=(peak-equity)/peak*100 if peak else 0.0; max_dd=max(max_dd,dd)
-        x["equity_after_usd"]=equity; x["drawdown_pct"]=round(dd,4)
+        equity=round(equity+x["pnl_usd"],2); peak=max(peak,equity)
+        dd=(peak-equity)/peak*100 if peak else 0.0; max_dd=max(max_dd,dd)
         equity_curve.append({"trade_id":x["row"]["id"],"exit_at_ms":x["settlement"]["exit_at_ms"],"pnl_usd":x["pnl_usd"],"equity_usd":equity,"drawdown_pct":round(dd,4)})
     rs=[float(x["settlement"]["r_multiple"]) for x in closed]; wins=[x for x in closed if x["pnl_usd"]>0]; losses=[x for x in closed if x["pnl_usd"]<0]
     def direction_stats(direction):
         z=[x for x in closed if x["row"]["direction"]==direction]; p=sum(x["pnl_usd"] for x in z)
         return {"closed":len(z),"pnl_usd":round(p,2),"win_rate_pct":round(100*sum(x["pnl_usd"]>0 for x in z)/len(z),2) if z else None}
-    detail=[]
-    eq_after={x["trade_id"]:x for x in equity_curve}
+    detail=[]; eq_after={x["trade_id"]:x for x in equity_curve}
     for row in cohort:
         s=by_id.get(row["id"],{"status":"OPEN","terminal":False,"r_multiple":None}); e=eq_after.get(row["id"])
         detail.append({**row,"settlement":s,"pnl_usd":e["pnl_usd"] if e else None,"equity_after_usd":e["equity_usd"] if e else None,"drawdown_after_pct":e["drawdown_pct"] if e else None})
