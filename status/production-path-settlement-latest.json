@@ -33,7 +33,8 @@
     "wins": 12
   },
   "episode_semantics": "FIRST_QUALIFIED_OBSERVATION_PER_CONTIGUOUS_SYMBOL_DIRECTION_EPISODE",
-  "execution_ready_summary": {
+  "execution_ready_shadow_is_realized_r": false,
+  "execution_ready_shadow_summary": {
     "ambiguous": 0,
     "average_r": -0.4423,
     "by_direction": {
@@ -64,7 +65,7 @@
     "win_rate_pct": 16.0,
     "wins": 4
   },
-  "generated_at": "2026-09-02T11:27:43.553137+00:00",
+  "generated_at": "2026-09-02T11:30:10.998533+00:00",
   "horizon_hours": 12,
   "live_execution": false,
   "methodology": "Canonical Production entry/SL/TP2 frozen at episode start; public provider chain; first 5m touch, 1m refinement for same-5m ambiguity; expired positions marked to market at 12h.",
@@ -101,7 +102,8 @@
     "wins": 16
   },
   "production_threshold_unchanged": 68,
-  "realized_r_scope": "EXECUTION_READY_ONLY",
+  "realized_r_available": false,
+  "realized_r_scope": "ACTUAL_LIVE_FILL_LEDGER_ONLY",
   "records": [
     {
       "can_override_production": false,
@@ -2660,44 +2662,43 @@
     }
   ],
   "research_only": true,
-  "schema": "ATLAS_OFFLINE_PRODUCTION_PATH_SETTLEMENT_V3_EXECUTION_SCOPED",
+  "schema": "ATLAS_OFFLINE_PRODUCTION_PATH_SETTLEMENT_V4_NO_FAKE_REALIZED_R",
   "scope_semantics": {
-    "execution_ready": "PRODUCTION_QUALIFIED AND execution_ready_at_capture=true",
-    "plan_shadow": "ALL_PRODUCTION_QUALIFIED_CANONICAL_PLANS; NOT REALIZED TRADES",
-    "realized_r_authority": "EXECUTION_READY_ONLY"
+    "execution_ready_shadow": "PRODUCTION_QUALIFIED AND execution_ready_at_capture=true; MODELLED PATH, NOT A FILL",
+    "plan_shadow": "ALL_PRODUCTION_QUALIFIED_CANONICAL_PLANS; RESEARCH ONLY",
+    "realized_r_authority": "ACTUAL_LIVE_FILL_LEDGER_ONLY"
   },
-  "scoped_at": "2026-09-02T11:27:43.593141+00:00",
+  "scoped_at": "2026-09-02T11:30:11.043875+00:00",
   "source_history": "status/history/production-snapshots.jsonl",
   "summary": {
     "ambiguous": 0,
-    "average_r": -0.4423,
+    "available": false,
+    "average_r": null,
     "by_direction": {
       "LONG": {
-        "avg_r": -0.6033,
-        "n": 17,
-        "net_r": -10.2569,
-        "win_rate_pct": 11.76
+        "avg_r": null,
+        "n": 0,
+        "net_r": null,
+        "win_rate_pct": null
       },
       "SHORT": {
-        "avg_r": -0.1001,
-        "n": 8,
-        "net_r": -0.8005,
-        "win_rate_pct": 25.0
+        "avg_r": null,
+        "n": 0,
+        "net_r": null,
+        "win_rate_pct": null
       }
     },
-    "episodes": 25,
-    "losses": 21,
+    "episodes": 0,
+    "losses": 0,
     "market_data_errors": 0,
-    "net_r": -11.0574,
+    "net_r": null,
     "open_or_error": 0,
-    "profit_factor_r": 0.4198,
-    "provider_counts": {
-      "BINANCE_DATA_API_SPOT": 23,
-      "HYPERLIQUID_PUBLIC": 2
-    },
-    "terminal": 25,
-    "win_rate_pct": 16.0,
-    "wins": 4
+    "profit_factor_r": null,
+    "provider_counts": {},
+    "reason": "LIVE_EXECUTION_DISABLED_NO_ACTUAL_FILL_LEDGER",
+    "terminal": 0,
+    "win_rate_pct": null,
+    "wins": 0
   },
   "upstream_schema": "ATLAS_OFFLINE_PRODUCTION_PATH_SETTLEMENT_V2_PROVIDER_CHAIN"
 }
