@@ -1,0 +1,75 @@
+name: ATLAS $10K Paper Portfolio
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'paper_portfolio_10k.py'
+      - 'offline_production_path_settlement.py'
+      - 'status/paper-portfolio-10k-manifest.json'
+      - 'tests/test_paper_portfolio_10k.py'
+      - '.github/workflows/atlas-paper-portfolio-10k.yml'
+      - 'status/history/production-snapshots.jsonl'
+  schedule:
+    - cron: '12,32,52 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atlas-paper-portfolio-10k
+  cancel-in-progress: false
+
+jobs:
+  portfolio:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Contract tests
+        run: |
+          set -euo pipefail
+          PYTHONPATH=. python tests/test_paper_portfolio_10k.py
+          python -m py_compile paper_portfolio_10k.py
+      - name: Run prospective paper portfolio
+        run: |
+          set -euo pipefail
+          python paper_portfolio_10k.py | tee /tmp/atlas-paper-10k.log
+          jq -e '.schema == "ATLAS_PAPER_PORTFOLIO_10K_V1_PROSPECTIVE"' status/paper-portfolio-10k-latest.json >/dev/null
+          jq -e '.paper_only == true and .live_execution == false and .can_override_production == false and .production_threshold_unchanged == 68' status/paper-portfolio-10k-latest.json >/dev/null
+          jq -e '.starting_equity_usd == 10000 and .equity_usd >= 0' status/paper-portfolio-10k-latest.json >/dev/null
+          jq -e '.append_only_verified == true and .paper_only == true and .live_execution == false' status/paper-portfolio-10k-integrity.json >/dev/null
+      - name: Verify no retrospective backfill
+        run: |
+          set -euo pipefail
+          START=$(jq -r '.cohort_start_at' status/paper-portfolio-10k-manifest.json)
+          if [ -s status/history/paper-portfolio-10k-cohort.jsonl ]; then
+            python - "$START" <<'PY'
+          import json,sys,datetime,pathlib
+          start=datetime.datetime.fromisoformat(sys.argv[1].replace('Z','+00:00'))
+          for line in pathlib.Path('status/history/paper-portfolio-10k-cohort.jsonl').read_text().splitlines():
+              if not line.strip(): continue
+              r=json.loads(line); t=datetime.datetime.fromisoformat(r['captured_at'].replace('Z','+00:00'))
+              assert t>=start, (t,start)
+              assert r['decision_action']=='TRADE_READY'
+              assert r['outcome_known_at_entry'] is False
+              assert r['paper_only'] is True and r['live_execution'] is False
+          print('prospective cohort contract: ok')
+          PY
+          fi
+      - name: Commit paper evidence
+        run: |
+          set -euo pipefail
+          git config user.name "atlas-paper-portfolio"
+          git config user.email "atlas-paper@users.noreply.github.com"
+          git add status/history/paper-portfolio-10k-cohort.jsonl status/paper-portfolio-10k-latest.json status/paper-portfolio-10k-integrity.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "paper: update prospective 10k portfolio [skip ci]"
+          git pull --rebase origin main
+          git push
