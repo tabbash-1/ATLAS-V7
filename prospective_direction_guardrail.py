@@ -11,7 +11,6 @@ from pathlib import Path
 
 SCHEMA='ATLAS_PROSPECTIVE_DIRECTION_GUARDRAIL_V1_4H'
 MANIFEST_SCHEMA='ATLAS_PROSPECTIVE_DIRECTION_GUARDRAIL_MANIFEST_V1'
-START_POLICY='MANIFEST_CREATION_TIME_ONLY_NO_PRESTART_ROWS'
 MIN_MATURED=30
 TARGET_HOURS=4
 MAX_LAG_MIN=50
@@ -26,8 +25,7 @@ RULES={
   'long_caution_thresholds':{'mean_pct_max':0.0,'positive_rate_pct_max':45.0},
   'sampling':'AT_MOST_ONE_ENTRY_PER_GROUP_SYMBOL_PER_60_MINUTES',
   'missing_outcome_policy':'EXCLUDE_NEVER_ZERO_FILL',
-  'start_policy':START_POLICY,
-  'promotion_policy':'NO_PRODUCTION_CHANGE_FROM_THIS_REPORT_ALONE',
+  'promotion_policy':'NO_PRODUCTION_CHANGE_FROM_THIS REPORT ALONE',
 }
 
 def now():return dt.datetime.now(dt.timezone.utc)
