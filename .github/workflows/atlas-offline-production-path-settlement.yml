@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'offline_production_path_settlement.py'
+      - 'scope_production_path_settlement.py'
       - '.github/workflows/atlas-offline-production-path-settlement.yml'
   schedule:
     - cron: '17 * * * *'
@@ -29,23 +30,29 @@ jobs:
       - name: Syntax and isolation contract
         run: |
           set -euo pipefail
-          python -m py_compile offline_production_path_settlement.py
+          python -m py_compile offline_production_path_settlement.py scope_production_path_settlement.py
           grep -q 'research_only.*True' offline_production_path_settlement.py
           grep -q 'can_override_production.*False' offline_production_path_settlement.py
           grep -q 'can_change_threshold.*False' offline_production_path_settlement.py
           grep -q 'production_threshold_unchanged.*68' offline_production_path_settlement.py
+          grep -q "realized_r_authority.*EXECUTION_READY_ONLY" scope_production_path_settlement.py
       - name: Settle canonical Production episodes offline
         run: |
           set -euo pipefail
           python offline_production_path_settlement.py
+          jq -e '.schema == "ATLAS_OFFLINE_PRODUCTION_PATH_SETTLEMENT_V2_PROVIDER_CHAIN"' status/production-path-settlement-latest.json >/dev/null
+          python scope_production_path_settlement.py
           jq -e '
-            .schema == "ATLAS_OFFLINE_PRODUCTION_PATH_SETTLEMENT_V2_PROVIDER_CHAIN" and
+            .schema == "ATLAS_OFFLINE_PRODUCTION_PATH_SETTLEMENT_V3_EXECUTION_SCOPED" and
             .research_only == true and .live_execution == false and
             .can_override_production == false and .can_change_threshold == false and
             .production_threshold_unchanged == 68 and
-            .episode_semantics == "FIRST_QUALIFIED_OBSERVATION_PER_CONTIGUOUS_SYMBOL_DIRECTION_EPISODE"
+            .realized_r_scope == "EXECUTION_READY_ONLY" and
+            .plan_shadow_is_realized_r == false and
+            .scope_semantics.realized_r_authority == "EXECUTION_READY_ONLY" and
+            .summary == .execution_ready_summary
           ' status/production-path-settlement-latest.json >/dev/null
-          jq '{generated_at,horizon_hours,summary}' status/production-path-settlement-latest.json
+          jq '{generated_at,horizon_hours,realized_r_scope,execution_ready_summary,plan_shadow_summary,conditional_not_executed_summary}' status/production-path-settlement-latest.json
       - name: Commit settlement report
         run: |
           set -euo pipefail
@@ -57,4 +64,4 @@ jobs:
           git pull --rebase origin main
           git push
       - name: Contract complete
-        run: echo 'offline path settlement completed without web-runtime authority'
+        run: echo 'offline path settlement completed with execution-ready realized-R authority'
