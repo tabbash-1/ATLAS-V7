@@ -1,72 +1,56 @@
-name: ATLAS Forward Microstructure Freeze Snapshot
+name: ATLAS Forward Microstructure Freeze Integrity
 
 on:
   push:
     branches: [main]
     paths:
+      - 'status/forward-microstructure-freeze-latest.json'
       - 'forward_microstructure_freeze_runtime.py'
       - 'historical_evaluation_protocol.py'
-      - 'historical_source_runtime.py'
-      - 'cloud_start.py'
       - '.github/workflows/atlas-forward-microstructure-freeze-snapshot.yml'
   schedule:
     - cron: '47 * * * *'
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: atlas-forward-microstructure-freeze-snapshot
+  group: atlas-forward-microstructure-freeze-integrity
   cancel-in-progress: true
 
 jobs:
-  snapshot:
+  integrity:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
-    env:
-      BASE_URL: https://atlas-v7.onrender.com
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-      - name: Fetch deployed cached freeze state
+      - name: Verify frozen prior-only contract
         run: |
           set -euo pipefail
-          mkdir -p status/history
-          tmp="status/forward-microstructure-freeze-latest.json.tmp"
-          ok=0
-          for attempt in $(seq 1 28); do
-            code="$(curl -L --connect-timeout 20 --max-time 60 -sS -w '%{http_code}' -o "$tmp" "${BASE_URL}/api/research/forward-microstructure-freeze" || true)"
-            if [[ "$code" =~ ^2 ]] && jq -e . "$tmp" >/dev/null 2>&1 && \
-               jq -e '.version == "ATLAS_FORWARD_MICROSTRUCTURE_FREEZE_V1_PRIOR_ONLY" and .cached_only == true and .background_refresh_triggered == false and .archive_read_triggered_by_request == false and .outcome_read_triggered_by_request == false and .research_only == true and .live_execution == false and .can_override_production == false and .state.installed == true' "$tmp" >/dev/null 2>&1; then
-              ok=1
-              break
-            fi
-            echo "Waiting for deployed forward microstructure freeze (attempt ${attempt}/28, HTTP ${code:-none})"
-            sleep 15
-          done
-          if [[ "$ok" != "1" ]]; then
-            echo "Forward microstructure freeze did not become available within deployment grace period." >&2
-            echo "Last HTTP code: ${code:-none}" >&2
-            cat "$tmp" >&2 || true
-            exit 1
-          fi
-          mv "$tmp" status/forward-microstructure-freeze-latest.json
+          p='status/forward-microstructure-freeze-latest.json'
+          test -s "$p"
+          jq -e '
+            .version == "ATLAS_FORWARD_MICROSTRUCTURE_FREEZE_V1_PRIOR_ONLY" and
+            .cached_only == true and
+            .background_refresh_triggered == false and
+            .archive_read_triggered_by_request == false and
+            .outcome_read_triggered_by_request == false and
+            .research_only == true and
+            .live_execution == false and
+            .can_override_production == false and
+            .state.installed == true and
+            .prospective_cohort.registration_locked == true and
+            .prospective_cohort.status == "PREREGISTERED"
+          ' "$p" >/dev/null
           python3 - <<'PY'
-          import datetime, json, pathlib
+          import datetime,json,pathlib
           p=pathlib.Path('status/forward-microstructure-freeze-latest.json')
           row=json.loads(p.read_text())
-          row['_snapshot_captured_at']=datetime.datetime.now(datetime.timezone.utc).isoformat()
-          p.write_text(json.dumps(row,indent=2,sort_keys=True))
-          h=pathlib.Path('status/history/forward-microstructure-freeze-snapshots.jsonl')
-          with h.open('a') as f:
-              f.write(json.dumps(row,separators=(',',':'))+'\n')
+          raw=row.get('state',{}).get('last_frozen_at') or row.get('_snapshot_captured_at')
+          if not raw: raise SystemExit('missing frozen timestamp')
+          t=datetime.datetime.fromisoformat(raw.replace('Z','+00:00'))
+          age=(datetime.datetime.now(datetime.timezone.utc)-t).total_seconds()/3600
+          print(f'FROZEN_STATE_OK age_hours={age:.2f} stale={age>6}')
+          print('NOTE: stale frozen evidence is preserved as historical research and is not refreshed by web runtime.')
           PY
-      - name: Commit freeze snapshot
-        run: |
-          git config user.name "atlas-forward-microstructure-monitor"
-          git config user.email "atlas-forward-microstructure-monitor@users.noreply.github.com"
-          git add status/forward-microstructure-freeze-latest.json status/history/forward-microstructure-freeze-snapshots.jsonl
-          if git diff --cached --quiet; then exit 0; fi
-          git commit -m "chore: update forward microstructure freeze snapshot [skip ci]"
-          git pull --rebase origin main
-          git push
