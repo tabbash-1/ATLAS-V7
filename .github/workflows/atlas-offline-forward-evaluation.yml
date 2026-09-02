@@ -35,19 +35,26 @@ jobs:
             --output status/offline-forward-evaluation-latest.json
           python3 - <<'PY'
           import json
-          p='status/offline-forward-evaluation-latest.json'
-          x=json.load(open(p))
-          assert x['schema']=='ATLAS_OFFLINE_FORWARD_EVALUATION_V1'
-          assert x['research_only'] is True
-          assert x['live_execution'] is False
+          x=json.load(open('status/offline-forward-evaluation-latest.json'))
+          assert x['schema']=='ATLAS_OFFLINE_FORWARD_EVALUATION_V2_DIAGNOSTICS'
+          assert x['research_only'] is True and x['live_execution'] is False
           assert x['can_override_production'] is False
           assert x['production_threshold_changed'] is False
           assert x['source']['snapshot_rows'] >= 1
-          print('OVERALL_12H',json.dumps(x['overall']['12'],sort_keys=True))
-          print('QUALIFIED_12H',json.dumps(x['qualified']['12'],sort_keys=True))
-          print('WAIT_DIRECTIONAL_12H',json.dumps(x['wait_directional']['12'],sort_keys=True))
+          assert '4' in x['qualified'] and '12' in x['qualified']
+          assert isinstance(x['qualified_by_symbol'],dict)
+          assert isinstance(x['qualified_by_direction'],dict)
+          assert isinstance(x['qualified_by_score_band'],dict)
+          print('QUALIFIED_4H',json.dumps(x['qualified']['4'],sort_keys=True))
           print('QUALIFIED_6H',json.dumps(x['qualified']['6'],sort_keys=True))
-          print('WAIT_DIRECTIONAL_6H',json.dumps(x['wait_directional']['6'],sort_keys=True))
+          print('QUALIFIED_12H',json.dumps(x['qualified']['12'],sort_keys=True))
+          print('WAIT_4H',json.dumps(x['wait_directional']['4'],sort_keys=True))
+          print('EXEC_READY_4H',json.dumps(x['qualified_execution_ready']['4'],sort_keys=True))
+          print('EXEC_READY_12H',json.dumps(x['qualified_execution_ready']['12'],sort_keys=True))
+          print('QUALIFIED_BY_DIRECTION',json.dumps(x['qualified_by_direction'],sort_keys=True))
+          print('QUALIFIED_BY_SYMBOL',json.dumps(x['qualified_by_symbol'],sort_keys=True))
+          print('QUALIFIED_BY_SCORE_BAND',json.dumps(x['qualified_by_score_band'],sort_keys=True))
+          print('WAIT_REASONS',json.dumps(x['wait_reason_counts'],sort_keys=True))
           print('SOURCE',json.dumps(x['source'],sort_keys=True))
           PY
       - name: Commit evaluation only when data changed
