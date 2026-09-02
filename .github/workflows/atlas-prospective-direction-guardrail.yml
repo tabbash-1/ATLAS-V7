@@ -1,0 +1,71 @@
+name: ATLAS Prospective Direction Guardrail
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'prospective_direction_guardrail.py'
+      - '.github/workflows/atlas-prospective-direction-guardrail.yml'
+  schedule:
+    - cron: '18,38,58 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atlas-prospective-direction-guardrail
+  cancel-in-progress: true
+
+jobs:
+  prospective:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Freeze new decision-time cohort rows and evaluate matured 4H rows
+        run: |
+          set -euo pipefail
+          python3 -m py_compile prospective_direction_guardrail.py
+          python3 prospective_direction_guardrail.py \
+            --history status/history/production-snapshots.jsonl \
+            --manifest status/prospective-direction-guardrail-manifest.json \
+            --cohort status/history/prospective-direction-guardrail-cohort.jsonl \
+            --report status/prospective-direction-guardrail-latest.json
+          python3 - <<'PY'
+          import json
+          m=json.load(open('status/prospective-direction-guardrail-manifest.json'))
+          r=json.load(open('status/prospective-direction-guardrail-latest.json'))
+          assert m['schema']=='ATLAS_PROSPECTIVE_DIRECTION_GUARDRAIL_MANIFEST_V1'
+          assert r['schema']=='ATLAS_PROSPECTIVE_DIRECTION_GUARDRAIL_V1_4H'
+          assert m['research_only'] is True and m['shadow_only'] is True
+          assert m['live_execution'] is False and m['can_override_production'] is False
+          assert r['research_only'] is True and r['shadow_only'] is True
+          assert r['live_execution'] is False and r['can_override_production'] is False
+          assert r['can_change_threshold'] is False
+          assert r['target_horizon_hours']==4
+          assert m['rules']['minimum_matured_per_group']==30
+          assert m['rules']['target_horizon_hours']==4
+          assert r['manifest_hash']==m['manifest_hash']
+          print('COHORT_START',m['cohort_start_at'])
+          print('PROGRESS',json.dumps(r['sample_progress'],sort_keys=True))
+          print('CLAIMS',json.dumps(r['claims'],sort_keys=True))
+          PY
+      - name: Commit immutable manifest, cohort and report
+        run: |
+          set -euo pipefail
+          git config user.name 'atlas-prospective-guardrail-bot'
+          git config user.email 'atlas-prospective-guardrail-bot@users.noreply.github.com'
+          git add \
+            status/prospective-direction-guardrail-manifest.json \
+            status/history/prospective-direction-guardrail-cohort.jsonl \
+            status/prospective-direction-guardrail-latest.json
+          if git diff --cached --quiet; then
+            echo 'No prospective guardrail changes'
+            exit 0
+          fi
+          git commit -m 'chore: advance prospective direction guardrail [skip ci]'
+          git pull --rebase origin main
+          git push
