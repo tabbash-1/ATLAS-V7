@@ -43,7 +43,7 @@ jobs:
           python paper_portfolio_10k.py | tee /tmp/atlas-paper-10k.log
           jq -e '.schema == "ATLAS_PAPER_PORTFOLIO_10K_V1_PROSPECTIVE"' status/paper-portfolio-10k-latest.json >/dev/null
           jq -e '.paper_only == true and .live_execution == false and .can_override_production == false and .production_threshold_unchanged == 68' status/paper-portfolio-10k-latest.json >/dev/null
-          jq -e '.starting_equity_usd == 10000 and .equity_usd >= 0' status/paper-portfolio-10k-latest.json >/dev/null
+          jq -e '.portfolio.starting_equity_usd == 10000 and .portfolio.equity_usd >= 0' status/paper-portfolio-10k-latest.json >/dev/null
           jq -e '.append_only_verified == true and .paper_only == true and .live_execution == false' status/paper-portfolio-10k-integrity.json >/dev/null
       - name: Verify no retrospective backfill
         run: |
