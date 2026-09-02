@@ -35,7 +35,7 @@ jobs:
           grep -q 'can_override_production.*False' offline_production_path_settlement.py
           grep -q 'can_change_threshold.*False' offline_production_path_settlement.py
           grep -q 'production_threshold_unchanged.*68' offline_production_path_settlement.py
-          grep -q "realized_r_authority.*EXECUTION_READY_ONLY" scope_production_path_settlement.py
+          grep -q "ACTUAL_LIVE_FILL_LEDGER_ONLY" scope_production_path_settlement.py
       - name: Settle canonical Production episodes offline
         run: |
           set -euo pipefail
@@ -43,16 +43,18 @@ jobs:
           jq -e '.schema == "ATLAS_OFFLINE_PRODUCTION_PATH_SETTLEMENT_V2_PROVIDER_CHAIN"' status/production-path-settlement-latest.json >/dev/null
           python scope_production_path_settlement.py
           jq -e '
-            .schema == "ATLAS_OFFLINE_PRODUCTION_PATH_SETTLEMENT_V3_EXECUTION_SCOPED" and
+            .schema == "ATLAS_OFFLINE_PRODUCTION_PATH_SETTLEMENT_V4_NO_FAKE_REALIZED_R" and
             .research_only == true and .live_execution == false and
             .can_override_production == false and .can_change_threshold == false and
             .production_threshold_unchanged == 68 and
-            .realized_r_scope == "EXECUTION_READY_ONLY" and
+            .realized_r_scope == "ACTUAL_LIVE_FILL_LEDGER_ONLY" and
+            .realized_r_available == false and
+            .execution_ready_shadow_is_realized_r == false and
             .plan_shadow_is_realized_r == false and
-            .scope_semantics.realized_r_authority == "EXECUTION_READY_ONLY" and
-            .summary == .execution_ready_summary
+            .scope_semantics.realized_r_authority == "ACTUAL_LIVE_FILL_LEDGER_ONLY" and
+            .summary.available == false and .summary.net_r == null
           ' status/production-path-settlement-latest.json >/dev/null
-          jq '{generated_at,horizon_hours,realized_r_scope,execution_ready_summary,plan_shadow_summary,conditional_not_executed_summary}' status/production-path-settlement-latest.json
+          jq '{generated_at,horizon_hours,realized_r_scope,summary,execution_ready_shadow_summary,plan_shadow_summary}' status/production-path-settlement-latest.json
       - name: Commit settlement report
         run: |
           set -euo pipefail
@@ -64,4 +66,4 @@ jobs:
           git pull --rebase origin main
           git push
       - name: Contract complete
-        run: echo 'offline path settlement completed with execution-ready realized-R authority'
+        run: echo 'offline path settlement completed; shadow R cannot masquerade as realized P&L'
