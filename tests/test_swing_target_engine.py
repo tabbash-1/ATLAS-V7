@@ -35,7 +35,7 @@ def test_short_swing_ordering():
     assert x['stop_loss'] > x['entry'] > x['tp1'] > x['tp2'] > x['tp3_runner']
 
 
-def test_production_plan_keeps_quick_and_adds_swing_lane():
+def test_production_plan_keeps_extended_swing_context_but_core_is_4_12h():
     import production_trade_plan as p
     d = {
         'ok': True, 'candidate_direction': 'LONG', 'entry': 100.0,
@@ -47,8 +47,11 @@ def test_production_plan_keeps_quick_and_adds_swing_lane():
         }
     }
     x = p.build(d)
-    assert x['quick_plan']['tp1'] == x['tp1']
-    assert x['quick_plan']['tp2'] == x['tp2']
+    assert x['core_plan']['tp1'] == x['tp1']
+    assert x['core_plan']['tp2'] == x['tp2']
+    assert x['core_plan']['horizon'] == '4-12H'
+    assert x['preferred_target_lane'] == 'CORE_4_12H'
     assert x['swing_plan']['status'] == 'SWING_READY'
-    assert x['preferred_target_lane'] == 'SWING_12_24H'
+    assert x['swing_plan']['role'] == 'CONTEXT_ONLY'
+    assert x['swing_plan']['can_override_core'] is False
     assert x['swing_plan']['tp3_runner'] > x['swing_plan']['tp2']
