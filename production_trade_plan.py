@@ -114,6 +114,7 @@ def build(decision):
 
     status='ACTIONABLE' if execution and qualified else 'CONDITIONAL'
     action=('BUY' if d=='LONG' else 'SELL') if status=='ACTIONABLE' else ('BUY_ONLY_IF' if d=='LONG' else 'SELL_ONLY_IF')
+    can_execute=status=='ACTIONABLE'
     return {
         'version':VERSION,'status':status,'action':action,'direction':d,'entry_mode':mode,
         'entry':round(entry,10),'entry_trigger':trigger,'stop_loss':round(stop,10),
@@ -129,5 +130,8 @@ def build(decision):
         'continuation_strong':continuation,'breakout_confirmed':breakout,
         'qualification_required':68,'production_qualified':qualified,'execution_ready':execution,
         'invalidation':'Cancel/re-evaluate if stop/structure fails or verified direction changes.',
-        'can_execute':False,'research_only':True,
+        'can_execute':can_execute,
+        'execution_scope':'DECISION_READY_ONLY_NO_ORDER_ROUTING',
+        'live_execution':False,
+        'research_only':True,
     }
