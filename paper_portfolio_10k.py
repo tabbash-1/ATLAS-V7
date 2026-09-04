@@ -24,8 +24,10 @@ HISTORY = ROOT / "status/history/production-snapshots.jsonl"
 COHORT = ROOT / "status/history/paper-portfolio-10k-cohort.jsonl"
 LATEST = ROOT / "status/paper-portfolio-10k-latest.json"
 INTEGRITY = ROOT / "status/paper-portfolio-10k-integrity.json"
-SCHEMA = "ATLAS_PAPER_PORTFOLIO_10K_V1_PROSPECTIVE"
+SCHEMA = "ATLAS_PAPER_PORTFOLIO_10K_V2_PRODUCT_WINDOW"
 INTEGRITY_SCHEMA = "ATLAS_PAPER_PORTFOLIO_10K_INTEGRITY_V1"
+PRODUCT_HORIZON = "4-12H"
+PRODUCT_CHECKPOINT_HOURS = (4, 8, 12)
 
 
 def canonical(obj: Any) -> str:
@@ -92,7 +94,9 @@ def geometry(decision: dict[str, Any]):
     if tp1 is None: tp1 = entry + risk if direction == "LONG" else entry - risk
     rr2 = fnum(p.get("rr_tp2")) or abs(tp2-entry)/risk
     return {"direction":direction,"entry":entry,"stop_loss":stop,"tp1":tp1,"tp2":tp2,
-            "rr_tp2":rr2,"risk_abs":risk,"entry_mode":p.get("entry_mode"),"plan_version":p.get("version")}
+            "rr_tp2":rr2,"risk_abs":risk,"entry_mode":p.get("entry_mode"),"plan_version":p.get("version"),
+            "product_horizon":p.get("product_horizon") or PRODUCT_HORIZON,
+            "canonical_lane":p.get("canonical_lane") or "CORE_4_12H"}
 
 
 def trade_ready(decision: dict[str, Any]) -> bool:
@@ -156,9 +160,11 @@ def enroll_new(manifest, cohort, snapshots, observed_through, sizing_equity):
             risk_usd = round(sizing_equity * risk_pct, 2)
             qty = risk_usd / g["risk_abs"]
             row = {
-                "schema":"ATLAS_PAPER_PORTFOLIO_10K_ENTRY_V1","id":eid,"portfolio_id":manifest["portfolio_id"],
+                "schema":"ATLAS_PAPER_PORTFOLIO_10K_ENTRY_V2","id":eid,"portfolio_id":manifest["portfolio_id"],
                 "captured_at":captured,"captured_at_ms":int(t.timestamp()*1000),"symbol":symbol,"direction":direction,
                 "decision_source":"COMMITTED_PRODUCTION_SNAPSHOT","decision_action":"TRADE_READY",
+                "product_horizon":g.get("product_horizon") or PRODUCT_HORIZON,"canonical_lane":g.get("canonical_lane") or "CORE_4_12H",
+                "evaluation_horizons":["4h","8h","12h"],
                 "score":fnum(d.get("score")),"threshold":fnum(d.get("signal_threshold")),
                 "geometry":g,"sizing_equity_usd":round(sizing_equity,2),"risk_pct":float(manifest["risk_per_trade_pct"]),
                 "risk_usd":risk_usd,"paper_quantity":round(qty,12),"paper_notional_usd":round(abs(qty*g["entry"]),2),
@@ -167,6 +173,34 @@ def enroll_new(manifest, cohort, snapshots, observed_through, sizing_equity):
             }
             cohort.append(row); added.append(row); ids.add(eid)
     return added, newest
+
+
+def checkpoint_entry(row: dict[str, Any], checkpoint_h: float, now_ms: int):
+    start=int(row["captured_at_ms"]); checkpoint_ms=start+int(checkpoint_h*3600_000); g=row["geometry"]
+    if now_ms < checkpoint_ms:
+        return {"id":row["id"],"checkpoint_h":checkpoint_h,"status":"NOT_MATURED","matured":False,"r_multiple":None}
+    try:
+        candles, provider=market_klines(row["symbol"],"5",start,checkpoint_ms)
+        if not candles: raise RuntimeError("no_5m_candles")
+        ev,candle,tp1_seen=event_from(candles,g)
+        if ev=="AMBIGUOUS" and candle:
+            one,p1=market_klines(row["symbol"],"1",candle["open_time"],candle["open_time"]+5*60_000-1)
+            ev1,c1,tp1_1=event_from(one,g)
+            if ev1 in {"SL","TP2"}: ev,candle=ev1,c1 or candle
+            else: ev="AMBIGUOUS"
+            tp1_seen=tp1_seen or tp1_1; provider += "+1M:"+p1
+        if ev=="SL": status,r="LOSS_BY_CHECKPOINT",-1.0
+        elif ev=="TP2": status,r="TP2_BY_CHECKPOINT",float(g["rr_tp2"])
+        elif ev=="AMBIGUOUS": status,r="AMBIGUOUS",None
+        else:
+            last=candles[-1]["close"]
+            directional=(last-g["entry"]) if g["direction"]=="LONG" else (g["entry"]-last)
+            r=directional/g["risk_abs"]; status="MARK_TO_MARKET"
+        return {"id":row["id"],"checkpoint_h":checkpoint_h,"status":status,"matured":True,
+                "r_multiple":None if r is None else round(float(r),4),"tp1_reached":bool(tp1_seen),"market_source":provider}
+    except Exception as e:
+        return {"id":row["id"],"checkpoint_h":checkpoint_h,"status":"MARKET_DATA_ERROR","matured":True,
+                "r_multiple":None,"error":str(e)[:700]}
 
 
 def settle_entry(row: dict[str, Any], horizon_h: float, now_ms: int):
@@ -197,7 +231,8 @@ def settle_entry(row: dict[str, Any], horizon_h: float, now_ms: int):
         return {"id":row["id"],"status":"MARKET_DATA_ERROR","terminal":False,"r_multiple":None,"exit_at_ms":None,"error":str(e)[:700]}
 
 
-def portfolio_report(manifest, cohort, settlements, generated_at, observed_through):
+def portfolio_report(manifest, cohort, settlements, generated_at, observed_through, checkpoints=None):
+    checkpoints=checkpoints or {}
     by_id={s["id"]:s for s in settlements}; start=float(manifest["starting_equity_usd"]); equity=start; peak=start; max_dd=0.0
     closed=[]
     for row in cohort:
@@ -215,15 +250,27 @@ def portfolio_report(manifest, cohort, settlements, generated_at, observed_throu
     def direction_stats(direction):
         z=[x for x in closed if x["row"]["direction"]==direction]; p=sum(x["pnl_usd"] for x in z)
         return {"closed":len(z),"pnl_usd":round(p,2),"win_rate_pct":round(100*sum(x["pnl_usd"]>0 for x in z)/len(z),2) if z else None}
+    checkpoint_summary={}
+    for h in PRODUCT_CHECKPOINT_HOURS:
+        vals=[]
+        for rows in checkpoints.values():
+            for cp in rows:
+                if cp.get("checkpoint_h")==h and cp.get("matured") and fnum(cp.get("r_multiple")) is not None:
+                    vals.append(float(cp["r_multiple"]))
+        checkpoint_summary[f"{h}h"]={"matured":len(vals),"avg_r":round(sum(vals)/len(vals),4) if vals else None,
+                                          "positive_pct":round(100*sum(v>0 for v in vals)/len(vals),2) if vals else None}
     detail=[]; eq_after={x["trade_id"]:x for x in equity_curve}
     for row in cohort:
         s=by_id.get(row["id"],{"status":"OPEN","terminal":False,"r_multiple":None}); e=eq_after.get(row["id"])
-        detail.append({**row,"settlement":s,"pnl_usd":e["pnl_usd"] if e else None,"equity_after_usd":e["equity_usd"] if e else None,"drawdown_after_pct":e["drawdown_pct"] if e else None})
+        detail.append({**row,"product_window_checkpoints":checkpoints.get(row["id"],[]),"settlement":s,
+                       "pnl_usd":e["pnl_usd"] if e else None,"equity_after_usd":e["equity_usd"] if e else None,"drawdown_after_pct":e["drawdown_pct"] if e else None})
     return {
         "schema":SCHEMA,"generated_at":generated_at,"observed_through_at":observed_through.isoformat(),"manifest_hash":manifest["manifest_hash"],
+        "product_horizon":PRODUCT_HORIZON,"evaluation_horizons":["4h","8h","12h"],
         "paper_only":True,"live_execution":False,"can_override_production":False,"production_threshold_unchanged":manifest["production_threshold"],
-        "methodology":"Prospective canonical TRADE READY entries only; frozen Entry/SL/TP2; risk dollars frozen at enrollment; 5m first-touch with 1m ambiguity refinement; 12h mark-to-market expiry; gross paper P&L before fees/slippage.",
-        "cost_note":"Gross paper performance. Exchange fees, funding and slippage are not deducted in V1 and must not be described as live-account P&L.",
+        "methodology":"Prospective canonical TRADE READY entries only; frozen Entry/SL/TP2; 4h/8h/12h product-window checkpoints; 5m first-touch with 1m ambiguity refinement; 12h terminal mark-to-market expiry; gross paper P&L before fees/slippage.",
+        "cost_note":"Gross paper performance. Exchange fees, funding and slippage are not deducted and results must not be described as live-account P&L.",
+        "checkpoint_summary":checkpoint_summary,
         "portfolio":{"starting_equity_usd":start,"equity_usd":round(equity,2),"net_pnl_usd":round(equity-start,2),"return_pct":round((equity/start-1)*100,4),
                      "peak_equity_usd":round(peak,2),"max_drawdown_pct":round(max_dd,4),"entries":len(cohort),"closed":len(closed),
                      "open_or_unresolved":len(cohort)-len(closed),"wins":len(wins),"losses":len(losses),
@@ -240,11 +287,12 @@ def main():
     verify_append_only(cohort, previous_integrity)
     cursor=previous_observed_through(manifest, previous_report); sizing_equity=previous_equity(manifest, previous_report)
     added,newest=enroll_new(manifest, cohort, snapshots, cursor, sizing_equity)
-    now_ms=int(time.time()*1000); settlements=[]
+    now_ms=int(time.time()*1000); settlements=[]; checkpoints={}
     for i,row in enumerate(cohort):
+        checkpoints[row["id"]]=[checkpoint_entry(row,h,now_ms) for h in PRODUCT_CHECKPOINT_HOURS]
         settlements.append(settle_entry(row,float(manifest["holding_horizon_hours"]),now_ms))
         if i and i%12==0: time.sleep(0.25)
-    generated=dt.datetime.now(dt.timezone.utc).isoformat(); report=portfolio_report(manifest,cohort,settlements,generated,newest)
+    generated=dt.datetime.now(dt.timezone.utc).isoformat(); report=portfolio_report(manifest,cohort,settlements,generated,newest,checkpoints)
     COHORT.parent.mkdir(parents=True,exist_ok=True); COHORT.write_text("\n".join(canonical(r) for r in cohort)+("\n" if cohort else ""))
     LATEST.write_text(json.dumps(report,indent=2,sort_keys=True))
     hashes=verify_append_only(cohort, previous_integrity); chain=hashlib.sha256("".join(hashes).encode()).hexdigest()
@@ -252,7 +300,7 @@ def main():
                "row_count":len(cohort),"new_row_count":len(added),"row_hashes":hashes,"chain_sha256":chain,
                "paper_only":True,"live_execution":False,"can_override_production":False}
     INTEGRITY.write_text(json.dumps(integrity,indent=2,sort_keys=True))
-    print(json.dumps({"schema":SCHEMA,"added":len(added),"integrity":integrity,"portfolio":report["portfolio"]},indent=2))
+    print(json.dumps({"schema":SCHEMA,"added":len(added),"integrity":integrity,"portfolio":report["portfolio"],"checkpoint_summary":report["checkpoint_summary"]},indent=2))
 
 
 if __name__ == "__main__": main()
