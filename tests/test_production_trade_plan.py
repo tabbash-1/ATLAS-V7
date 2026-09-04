@@ -11,6 +11,9 @@ def test_actionable_now_has_complete_plan():
     assert x['status']=='ACTIONABLE' and x['entry_mode']=='NOW'
     assert x['stop_loss']<x['entry']<x['tp1']<x['tp2']
     assert x['rr_tp1']>=1 and x['rr_tp2']>=2
+    assert x['can_execute'] is True
+    assert x['live_execution'] is False
+    assert x['execution_scope']=='DECISION_READY_ONLY_NO_ORDER_ROUTING'
 
 
 def test_blocked_near_resistance_becomes_breakout_plan():
@@ -18,6 +21,21 @@ def test_blocked_near_resistance_becomes_breakout_plan():
     x=p.build(d)
     assert x['status']=='CONDITIONAL' and x['entry_mode']=='BREAKOUT'
     assert x['entry']>101.0 and x['stop_loss']<x['entry']<x['tp1']<x['tp2']
+    assert x['can_execute'] is False
+
+
+def test_qualified_but_geometry_blocked_never_gets_permission():
+    x=p.build(base(execution_ready=False,production_signal_qualified=True))
+    assert x['status']=='CONDITIONAL'
+    assert x['can_execute'] is False
+    assert x['live_execution'] is False
+
+
+def test_geometry_ready_but_unqualified_never_gets_permission():
+    x=p.build(base(execution_ready=True,production_signal_qualified=False))
+    assert x['status']=='CONDITIONAL'
+    assert x['can_execute'] is False
+    assert x['live_execution'] is False
 
 
 def test_conditional_long_clears_prior_24h_high_not_only_nearest_swing():
