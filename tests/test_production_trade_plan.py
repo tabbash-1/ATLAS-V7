@@ -16,18 +16,35 @@ def test_actionable_now_has_complete_plan():
     assert x['execution_scope']=='DECISION_READY_ONLY_NO_ORDER_ROUTING'
 
 
+def test_canonical_product_is_4_12h_and_legacy_lanes_cannot_override():
+    x=p.build(base())
+    assert x['product_horizon']=='4-12H'
+    assert x['evaluation_horizons']==['4h','8h','12h']
+    assert x['canonical_lane']=='CORE_4_12H'
+    assert x['preferred_target_lane']=='CORE_4_12H'
+    assert x['core_plan']['role']=='PRIMARY_PRODUCT_LANE'
+    assert x['core_plan']['horizon']=='4-12H'
+    assert x['core_plan']['can_execute'] is True
+    assert x['quick_plan']['role']=='CONTEXT_ONLY'
+    assert x['quick_plan']['can_override_core'] is False
+    assert x['swing_plan']['role']=='CONTEXT_ONLY'
+    assert x['swing_plan']['can_override_core'] is False
+
+
 def test_blocked_near_resistance_becomes_breakout_plan():
     d=base(execution_ready=False,production_signal_qualified=False,structural_geometry={'obstacle_price':101.0,'obstacle_distance_pct':1.0,'continuation_strong':True,'breakout':{'confirmed':False}})
     x=p.build(d)
     assert x['status']=='CONDITIONAL' and x['entry_mode']=='BREAKOUT'
     assert x['entry']>101.0 and x['stop_loss']<x['entry']<x['tp1']<x['tp2']
     assert x['can_execute'] is False
+    assert x['core_plan']['can_execute'] is False
 
 
 def test_qualified_but_geometry_blocked_never_gets_permission():
     x=p.build(base(execution_ready=False,production_signal_qualified=True))
     assert x['status']=='CONDITIONAL'
     assert x['can_execute'] is False
+    assert x['core_plan']['can_execute'] is False
     assert x['live_execution'] is False
 
 
@@ -35,6 +52,7 @@ def test_geometry_ready_but_unqualified_never_gets_permission():
     x=p.build(base(execution_ready=True,production_signal_qualified=False))
     assert x['status']=='CONDITIONAL'
     assert x['can_execute'] is False
+    assert x['core_plan']['can_execute'] is False
     assert x['live_execution'] is False
 
 
@@ -85,3 +103,4 @@ def test_short_ordering():
 def test_no_direction_does_not_invent_trade():
     x=p.build(base(candidate_direction=None,production_signal_qualified=False,execution_ready=False))
     assert x['status']=='WAIT' and x['entry_mode']=='NONE'
+    assert x['product_horizon']=='4-12H'
