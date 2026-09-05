@@ -1,3 +1,4 @@
+# Canonical forward evaluator for the deployed analyst_output contract.
 name: ATLAS Analyst Forward Evaluation
 
 on:
@@ -32,7 +33,6 @@ jobs:
           set -euo pipefail
           python3 -m py_compile paper_portfolio_10k_analyst_output.py
           python3 - <<'PY'
-          import json
           import paper_portfolio_10k_analyst_output as p
           good={'analyst_output':{'decision':'LONG','analysis_ready':True,'analysis_only':True,'live_execution':False,'entry':100,'stop_loss':98,'take_profit':104,'risk_reward':2,'contract_version':'TEST'}}
           wait={'analyst_output':{'decision':'WAIT','analysis_ready':False,'analysis_only':True,'live_execution':False,'entry':None,'stop_loss':None,'take_profit':None}}
