@@ -1,0 +1,59 @@
+name: ATLAS Monthly Product Audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'atlas_monthly_product_audit.py'
+      - 'tests/test_atlas_monthly_product_audit.py'
+      - 'status/history/production-snapshots.jsonl'
+      - '.github/workflows/atlas-monthly-product-audit.yml'
+  schedule:
+    - cron: '10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atlas-monthly-product-audit
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Build and validate unified 4-12H audit
+        run: |
+          set -euo pipefail
+          python3 -m py_compile atlas_monthly_product_audit.py tests/test_atlas_monthly_product_audit.py
+          python3 -m pytest -q tests/test_atlas_monthly_product_audit.py
+          python3 atlas_monthly_product_audit.py --history status/history/production-snapshots.jsonl --output status/monthly-product-audit-latest.json --days 31
+          python3 - <<'PY'
+          import json
+          x=json.load(open('status/monthly-product-audit-latest.json'))
+          assert x['schema']=='ATLAS_MONTHLY_PRODUCT_AUDIT_V1'
+          assert x['product_contract']['canonical_horizon']=='4-12H'
+          assert x['product_contract']['analyst_only'] is True
+          assert x['product_contract']['live_execution'] is False
+          assert x['can_override_production'] is False
+          assert x['production_threshold_changed'] is False
+          print('COUNTS',json.dumps(x['counts'],sort_keys=True))
+          print('QUALIFIED',json.dumps(x['qualified'],sort_keys=True))
+          print('WAIT',json.dumps(x['wait_directional'],sort_keys=True))
+          print('FAILURES',json.dumps(x['failure_attribution_12h'],sort_keys=True))
+          print('MISSED_WAIT',json.dumps(x['missed_wait_opportunities_12h_ge_1pct_by_reason'],sort_keys=True))
+          PY
+      - name: Commit audit only when evidence changed
+        run: |
+          git config user.name 'atlas-product-audit-bot'
+          git config user.email 'atlas-product-audit-bot@users.noreply.github.com'
+          git add status/monthly-product-audit-latest.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'chore: update monthly product audit [skip ci]'
+          git pull --rebase origin main
+          git push
