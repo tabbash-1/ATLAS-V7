@@ -1,0 +1,73 @@
+name: ATLAS Analyst Forward Evaluation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'paper_portfolio_10k_analyst_output.py'
+      - 'status/paper-portfolio-10k-analyst-manifest.json'
+      - 'status/history/production-snapshots.jsonl'
+      - '.github/workflows/atlas-paper-analyst-forward.yml'
+  schedule:
+    - cron: '25 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atlas-paper-analyst-forward
+  cancel-in-progress: true
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate analyst-output evaluator contract
+        run: |
+          set -euo pipefail
+          python3 -m py_compile paper_portfolio_10k_analyst_output.py
+          python3 - <<'PY'
+          import json
+          import paper_portfolio_10k_analyst_output as p
+          good={'analyst_output':{'decision':'LONG','analysis_ready':True,'analysis_only':True,'live_execution':False,'entry':100,'stop_loss':98,'take_profit':104,'risk_reward':2,'contract_version':'TEST'}}
+          wait={'analyst_output':{'decision':'WAIT','analysis_ready':False,'analysis_only':True,'live_execution':False,'entry':None,'stop_loss':None,'take_profit':None}}
+          assert p.eligible(good) is True
+          assert p.geometry(good)['rr_tp2']==2
+          assert p.eligible(wait) is False
+          m=p.load_manifest()
+          assert m['canonical_contract']=='analyst_output'
+          assert m['product_horizon']=='4-12H'
+          assert m['live_execution'] is False
+          assert m['can_override_production'] is False
+          print('ANALYST_FORWARD_SELF_TEST_OK')
+          PY
+      - name: Run prospective 4-12H evaluator
+        run: |
+          set -euo pipefail
+          python3 paper_portfolio_10k_analyst_output.py
+          python3 - <<'PY'
+          import json
+          x=json.load(open('status/paper-portfolio-10k-analyst-latest.json'))
+          assert x['canonical_contract']=='analyst_output'
+          assert x['product_horizon']=='4-12H'
+          assert x['evaluation_horizons']==['4h','8h','12h']
+          assert x['paper_only'] is True and x['live_execution'] is False
+          assert x['can_override_production'] is False
+          print('PORTFOLIO',json.dumps(x['portfolio'],sort_keys=True))
+          print('CHECKPOINTS',json.dumps(x['checkpoint_summary'],sort_keys=True))
+          PY
+      - name: Commit forward evidence when changed
+        run: |
+          set -euo pipefail
+          git config user.name 'atlas-forward-evidence-bot'
+          git config user.email 'atlas-forward-evidence-bot@users.noreply.github.com'
+          git add status/paper-portfolio-10k-analyst-latest.json status/paper-portfolio-10k-analyst-integrity.json status/history/paper-portfolio-10k-analyst-cohort.jsonl
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'chore: update analyst-output forward evidence [skip ci]'
+          git pull --rebase origin main
+          git push
