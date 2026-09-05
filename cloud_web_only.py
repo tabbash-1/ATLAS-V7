@@ -72,6 +72,13 @@ FOURTH_VOTE_SHADOW = install_fourth_vote_shadow(atlas)
 from prospective_long_close_shadow import install as install_long_close_shadow
 LONG_CLOSE_STRUCTURE_SHADOW = install_long_close_shadow(atlas)
 
+# Final canonical product guard is intentionally installed after every component
+# that can alter the live Production decision. It may demote a score-qualified
+# setup to WAIT based on committed 4-12H evidence, but never changes the score,
+# threshold, raw qualification, or live-execution policy.
+from product_quality_gate_overlay import install as install_product_quality_gate
+PRODUCT_QUALITY_GATE = install_product_quality_gate(atlas)
+
 # Committed research reports are loaded once at boot. This adds read-only cached
 # endpoints without any background worker, market fetch, outcome read, threshold
 # change, or authority over the unified Production decision.
@@ -172,6 +179,7 @@ atlas.WEB_SAFE_MODE = {
     'consensus_tiebreak_shadow': CONSENSUS_TIEBREAK_SHADOW,
     'fourth_vote_shadow': FOURTH_VOTE_SHADOW,
     'long_close_structure_shadow': LONG_CLOSE_STRUCTURE_SHADOW,
+    'product_quality_gate': PRODUCT_QUALITY_GATE,
 }
 
 
@@ -239,5 +247,6 @@ if __name__ == '__main__':
     print(f'Consensus tie-break shadow: {CONSENSUS_TIEBREAK_SHADOW["version"]}', flush=True)
     print(f'Fourth-vote prospective shadow: {FOURTH_VOTE_SHADOW["version"]}', flush=True)
     print(f'LONG+CLOSE prospective shadow: {LONG_CLOSE_STRUCTURE_SHADOW["version"]}', flush=True)
+    print(f'4-12H product quality gate: {PRODUCT_QUALITY_GATE["version"]}', flush=True)
     print(f'Listening on {port}', flush=True)
     Server(('0.0.0.0',port), WebOnlyHandler).serve_forever(poll_interval=0.5)
