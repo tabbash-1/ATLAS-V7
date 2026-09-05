@@ -50,7 +50,7 @@ jobs:
           python3 - <<'PY'
           import json
           x=json.load(open('status/monthly-product-audit-latest.json'))
-          assert x['schema']=='ATLAS_MONTHLY_PRODUCT_AUDIT_V1'
+          assert x['schema']=='ATLAS_MONTHLY_PRODUCT_AUDIT_V2_ATTRIBUTION'
           assert x['product_contract']['canonical_horizon']=='4-12H'
           assert x['product_contract']['analyst_only'] is True
           assert x['product_contract']['live_execution'] is False
@@ -59,6 +59,7 @@ jobs:
           print('COUNTS',json.dumps(x['counts'],sort_keys=True))
           print('QUALIFIED',json.dumps(x['qualified'],sort_keys=True))
           print('WAIT',json.dumps(x['wait_directional'],sort_keys=True))
+          print('WORST_12H',json.dumps(x['diagnosis_12h_worst_first'][:15],sort_keys=True))
           print('FAILURES',json.dumps(x['failure_attribution_12h'],sort_keys=True))
           print('MISSED_WAIT',json.dumps(x['missed_wait_opportunities_12h_ge_1pct_by_reason'],sort_keys=True))
           PY
