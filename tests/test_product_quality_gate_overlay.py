@@ -17,7 +17,9 @@ def base_row(**extra):
         'execution_ready':True,'analysis_only':True,'live_execution':False,
         'entry':100.0,'stop_loss':98.0,'take_profit':104.0,'risk_reward':2.0,
         'geometry_gate':{'qualified':True},
-        'trade_plan':{'entry':100.0,'stop_loss':98.0,'tp1':102.0,'tp2':104.0,'rr_tp2':2.0,'entry_trigger':'Verified setup remains valid.','invalidation':'4H structure fails.'},
+        'score_attribution':{'obstacle_reason':'ACCEPTABLE_PRIOR_STRUCTURE','futures_reason':'ALIGNED','obstacle_distance_pct':2.0},
+        'futures_available':True,'relative_volume':1.3,'indicators':{'rsi14':61.0},
+        'trade_plan':{'entry':100.0,'stop_loss':98.0,'tp1':102.0,'tp2':104.0,'rr_tp2':2.0,'entry_trigger':'Verified setup remains valid.','invalidation':'4H structure fails.','geometry_provenance':{'geometry_version':'G','entry_basis':'E','stop_basis':'S','tp1_basis':'T1','tp2_basis':'T2'}},
         'primary_analysis':{'lane':'CORE_4_12H','horizon':'4-12H','decision':'LONG','analysis_ready':True,'live_execution':False},
         'timeframe_matrix':{'core_4_12h':{'lane':'CORE_4_12H','decision':'LONG'}},
         'best_available_action':{'action':'LONG','status':'ACTIONABLE','opportunity_state':'ACTIONABLE','can_execute':False},
@@ -42,6 +44,7 @@ def test_quarantined_setup_demotes_only_product_action():
     assert r['analyst_output']['candidate_plan']['entry']==100.0
     assert r['analyst_output']['horizon']=='4-12H'
     assert r['analyst_output']['confidence_basis']=='PRODUCTION_SCORE_NOT_PROBABILITY'
+    assert r['analyst_output']['evidence_profile']['quality']=='BLOCKED'
     assert r['canonical_product_contract']=='analyst_output'
     assert r['analysis_only'] is True and r['live_execution'] is False
 
@@ -58,7 +61,31 @@ def test_non_quarantined_setup_passes_with_complete_analyst_output():
     assert out['entry']==100.0 and out['stop_loss']==98.0 and out['take_profit']==104.0
     assert out['risk_reward']==2.0
     assert out['invalidation']=='4H structure fails.'
+    assert out['analysis_profile_version']==qg.PROFILE_VERSION
+    assert out['evidence_profile']['threshold_changed'] is False
+    assert 'GEOMETRY_PROVENANCE_COMPLETE' in out['evidence_profile']['confirmations']
     assert out['analysis_only'] is True and out['live_execution'] is False
+
+
+def test_shadow_structure_risk_is_warning_not_veto():
+    row=base_row(playbook='BREAKOUT_CONFIRMED_LONG',score_attribution={'obstacle_reason':'CLOSE_PRIOR_STRUCTURE','obstacle_distance_pct':1.0,'futures_reason':'ALIGNED'})
+    a=atlas_with(row); qg.install(a)
+    r=a.production_decision('BTCUSDT')
+    assert r['setup_quality_gate']['status']=='PASS'
+    assert r['analyst_output']['decision']=='LONG'
+    codes=[x['code'] for x in r['analyst_output']['evidence_profile']['warnings']]
+    assert 'LONG_CLOSE_PRIOR_STRUCTURE_SHADOW_RISK' in codes
+    assert r['score']==75.0 and r['signal_threshold']==68.0
+
+
+def test_rejected_research_rules_never_auto_promote():
+    a=atlas_with(base_row(playbook='BREAKOUT_CONFIRMED_LONG'))
+    qg.install(a); r=a.production_decision('BTCUSDT')
+    rejected=r['analyst_output']['evidence_profile']['research_rules_explicitly_not_promoted']
+    assert 'LONG_ANTI_CHASE_VETO_REJECTED' in rejected
+    assert 'VOLUME_ONLY_RANKING_OR_DEMOTION_REJECTED' in rejected
+    assert 'NEUTRAL_RS_VETO_REJECTED' in rejected
+    assert r['analyst_output']['evidence_profile']['only_quality_gate_can_change_canonical_decision'] is True
 
 
 def test_short_is_not_blanket_blocked():
