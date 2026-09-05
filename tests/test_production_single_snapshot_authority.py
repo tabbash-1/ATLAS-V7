@@ -9,16 +9,26 @@ def text(name):
 
 def test_product_shell_does_not_fetch_or_publish_production_decision():
     src = text('atlas-product-shell.js')
-    refresh = src.split('async function refreshAi()', 1)[1].split('function update()', 1)[0]
-    assert '/api/decision/current' not in refresh
-    assert 'window.ATLAS_PRODUCTION_DECISION=pd' not in src
+    assert '/api/decision/current' not in src
+    assert 'window.ATLAS_PRODUCTION_DECISION=' not in src
     # The product shell is a consumer only: it reads the accepted snapshot from
     # the single guard and never owns a second Production fetch/acceptance path.
     assert 'window.ATLAS_PRODUCTION_SNAPSHOT_GUARD' in src
     assert 'g?.current?.()' in src or 'ATLAS_PRODUCTION_SNAPSHOT_GUARD?.current?.()' in src
     assert 'norm(g?.symbol?.())===currentSymbol()' in src
-    # Actionable state must still require the accepted Production execution flag.
-    assert "p.status==='ACTIONABLE'&&d?.production_signal_qualified&&d?.execution_ready" in src
+
+
+def test_product_shell_uses_only_canonical_analyst_output_from_guard():
+    src = text('atlas-product-shell.js')
+    assert "d.canonical_product_contract!=='analyst_output'" in src
+    assert "a.horizon!=='4-12H'" in src
+    assert "a.analysis_only!==true" in src
+    assert "a.live_execution!==false" in src
+    assert 'function failClosed()' in src
+    assert "set('apsDecision','WAIT')" in src
+    # Legacy readiness fields must not construct the visible product decision.
+    assert 'execution_ready' not in src
+    assert "p.status==='ACTIONABLE'" not in src
 
 
 def test_production_decision_rejects_stale_responses():
@@ -39,6 +49,7 @@ def test_snapshot_guard_is_the_only_acceptance_surface():
 
 if __name__ == '__main__':
     test_product_shell_does_not_fetch_or_publish_production_decision()
+    test_product_shell_uses_only_canonical_analyst_output_from_guard()
     test_production_decision_rejects_stale_responses()
     test_snapshot_guard_is_the_only_acceptance_surface()
     print('production single snapshot authority tests: ok')
