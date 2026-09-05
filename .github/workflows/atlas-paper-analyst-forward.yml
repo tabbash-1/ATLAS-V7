@@ -8,7 +8,9 @@ on:
       - 'analyst_output_forward_capture.py'
       - 'paper_portfolio_10k_analyst_output.py'
       - 'analyst_forward_attribution.py'
+      - 'atlas_product_readiness_gate.py'
       - 'tests/test_analyst_forward_attribution.py'
+      - 'tests/test_atlas_product_readiness_gate.py'
       - 'status/paper-portfolio-10k-analyst-manifest.json'
       - '.github/workflows/atlas-paper-analyst-forward.yml'
   schedule:
@@ -30,13 +32,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Validate canonical contracts and attribution safety
+      - name: Validate canonical contracts, attribution, and readiness safety
         run: |
           set -euo pipefail
-          python3 -m py_compile analyst_output_forward_capture.py paper_portfolio_10k_analyst_output.py analyst_forward_attribution.py tests/test_analyst_forward_attribution.py
+          python3 -m py_compile analyst_output_forward_capture.py paper_portfolio_10k_analyst_output.py analyst_forward_attribution.py atlas_product_readiness_gate.py tests/test_analyst_forward_attribution.py tests/test_atlas_product_readiness_gate.py
           python3 - <<'PY'
           import paper_portfolio_10k_analyst_output as p
           import analyst_forward_attribution as a
+          import atlas_product_readiness_gate as g
           good={'analyst_output':{'decision':'LONG','analysis_ready':True,'analysis_only':True,'live_execution':False,'entry':100,'stop_loss':98,'take_profit':104,'risk_reward':2,'contract_version':'TEST'}}
           wait={'analyst_output':{'decision':'WAIT','analysis_ready':False,'analysis_only':True,'live_execution':False,'entry':None,'stop_loss':None,'take_profit':None}}
           assert p.eligible(good) is True and p.geometry(good)['rr_tp2']==2
@@ -46,7 +49,13 @@ jobs:
           assert m['live_execution'] is False and m['can_override_production'] is False
           ctx={'decision':'SHORT','score':69,'threshold':68,'rsi14':45,'relative_volume':1.2,'futures_reason':'ALIGNED','futures_adjustment':1,'playbook':'TREND_SHORT','data_degraded':False}
           assert a.failure_hypothesis(ctx,{'status':'LOSS','terminal':True,'r_multiple':-1})=='MARGINAL_QUALIFICATION_RISK'
-          print('ANALYST_FORWARD_AND_ATTRIBUTION_SELF_TEST_OK')
+          bp={'canonical_contract':'analyst_output','product_horizon':'4-12H','live_execution':False,'can_override_production':False,'portfolio':{'avg_r':0.4,'net_r':12},'trades':[]}
+          bi={'append_only_verified':True}
+          ba={'analysis_only':True,'live_execution':False,'can_override_production':False,'can_change_score':False,'can_change_threshold':False,'counts':{'context_complete':0}}
+          gate=g.build(bp,bi,ba)
+          assert gate['state']=='TECHNICALLY_READY_EVIDENCE_PENDING'
+          assert gate['claim_policy']['may_claim_profitable'] is False
+          print('ANALYST_FORWARD_ATTRIBUTION_READINESS_SELF_TEST_OK')
           PY
       - name: Capture deployed analyst output
         run: |
@@ -87,12 +96,27 @@ jobs:
           print('ATTRIBUTION_COUNTS',json.dumps(x['counts'],sort_keys=True))
           print('ATTRIBUTION_METRICS',json.dumps(x['matured_12h_metrics'],sort_keys=True))
           PY
-      - name: Commit capture and forward evidence when changed
+      - name: Build fail-closed product readiness gate
+        run: |
+          set -euo pipefail
+          python3 atlas_product_readiness_gate.py
+          python3 - <<'PY'
+          import json
+          x=json.load(open('status/product-readiness-latest.json'))
+          assert x['schema']=='ATLAS_PRODUCT_READINESS_GATE_V1'
+          assert x['canonical_contract']=='analyst_output' and x['product_horizon']=='4-12H'
+          assert x['analysis_only'] is True and x['live_execution'] is False
+          assert x['can_override_production'] is False
+          assert x['production_score_threshold_changed'] is False
+          assert x['claim_policy']['may_claim_profitable'] is False
+          print('PRODUCT_READINESS',json.dumps({'state':x['state'],'technical_ready':x['technical_ready'],'forward_evidence_ready':x['forward_evidence_ready'],'blockers':[b['name'] for b in x['blockers']]},sort_keys=True))
+          PY
+      - name: Commit capture, evidence, attribution, and readiness when changed
         run: |
           set -euo pipefail
           git config user.name 'atlas-forward-evidence-bot'
           git config user.email 'atlas-forward-evidence-bot@users.noreply.github.com'
-          git add status/history/analyst-output-snapshots.jsonl status/paper-portfolio-10k-analyst-latest.json status/paper-portfolio-10k-analyst-integrity.json status/history/paper-portfolio-10k-analyst-cohort.jsonl status/analyst-forward-attribution-latest.json
+          git add status/history/analyst-output-snapshots.jsonl status/paper-portfolio-10k-analyst-latest.json status/paper-portfolio-10k-analyst-integrity.json status/history/paper-portfolio-10k-analyst-cohort.jsonl status/analyst-forward-attribution-latest.json status/product-readiness-latest.json
           if git diff --cached --quiet; then exit 0; fi
           git commit -m 'chore: update canonical analyst forward evidence [skip ci]'
           git pull --rebase origin main
