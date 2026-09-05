@@ -1,12 +1,15 @@
 """Overlay horizon-fit classification on the final ATLAS production decision.
 
-The wrapped Production decision remains authoritative. This module only narrows
-the Quick shadow lane and adds an explicit 12-24h Swing research lane.
+ATLAS is a 4-12H crypto trade analysis product. The wrapped Production decision
+remains authoritative. Short 1-3H and extended 12-24H lanes remain research
+context only and can never replace or override the canonical 4-12H product lane.
 """
 
 import horizon_fit_policy
 
-VERSION = 'HORIZON_FIT_OVERLAY_V7_PROVISIONAL_EPISODE_QUALITY'
+VERSION = 'HORIZON_FIT_OVERLAY_V8_CORE_4_12H'
+PRODUCT_HORIZON = '4-12H'
+PRODUCT_LANE = 'CORE_4_12H'
 
 
 def install(atlas):
@@ -94,22 +97,53 @@ def install(atlas):
         swing['opportunity_state'] = row.get('opportunity_state')
         swing['risk_reward'] = row.get('risk_reward')
         swing['actionable_decision'] = row.get('actionable_decision')
+        swing['context_only'] = True
+        swing['can_override_production'] = False
 
+        core = {
+            'lane': PRODUCT_LANE,
+            'horizon': PRODUCT_HORIZON,
+            'role': 'PRIMARY_PRODUCT_LANE',
+            'decision': row.get('actionable_decision') or 'WAIT',
+            'candidate_direction': row.get('candidate_direction'),
+            'score': row.get('score'),
+            'threshold': row.get('signal_threshold'),
+            'production_qualified': bool(row.get('production_signal_qualified')),
+            'geometry_ready': bool((row.get('geometry_gate') or {}).get('qualified')),
+            'analysis_ready': bool(row.get('execution_ready')),
+            'entry': row.get('entry'),
+            'stop_loss': row.get('stop_loss'),
+            'take_profit': row.get('take_profit'),
+            'risk_reward': row.get('risk_reward'),
+            'reason': row.get('actionable_reason') or row.get('wait_reason'),
+            'can_override_production': True,
+            'live_execution': False,
+        }
+
+        strict_quick['context_only'] = True
+        strict_quick['can_override_production'] = False
+        matrix['core_4_12h'] = core
         matrix['quick_1_3h'] = strict_quick
         matrix.pop('quick_1_2h', None)
         matrix['swing_12_24h'] = swing
         matrix['swing'] = swing
 
+        row['product_lane'] = PRODUCT_LANE
+        row['product_horizon'] = PRODUCT_HORIZON
+        row['primary_analysis'] = core
         row['quick_trade_shadow'] = strict_quick
         row['swing_research'] = swing
         row['swing_quality_tier'] = swing.get('swing_quality_tier')
         row['swing_quality_evidence'] = swing.get('swing_quality_evidence')
         row['horizon_fit'] = fit
-        row['preferred_horizon'] = fit['preferred_horizon']
+        row['research_preferred_horizon'] = fit.get('preferred_horizon')
+        row['preferred_horizon'] = PRODUCT_HORIZON
         row['timeframe_matrix'] = matrix
         row['horizon_policy_version'] = horizon_fit_policy.VERSION
         row['production_threshold_changed_by_horizon_policy'] = False
         row['horizon_fit_overlay_version'] = VERSION
+        row['analysis_only'] = True
+        row['live_execution'] = False
         return row
 
     atlas.production_decision = build
@@ -117,10 +151,14 @@ def install(atlas):
         'enabled': True,
         'version': VERSION,
         'policy_version': horizon_fit_policy.VERSION,
-        'quick_horizon': '1-3H',
-        'swing_horizon': '12-24H',
+        'product_lane': PRODUCT_LANE,
+        'product_horizon': PRODUCT_HORIZON,
+        'primary_role': 'PRIMARY_PRODUCT_LANE',
+        'quick_horizon': '1-3H_CONTEXT_ONLY',
+        'swing_horizon': '12-24H_CONTEXT_ONLY',
         'production_threshold_unchanged': True,
         'production_override_allowed': False,
+        'live_execution': False,
         'legacy_quick_guard_cleanup': True,
         'legacy_active_state_migration': True,
         'clean_watch_state': True,
