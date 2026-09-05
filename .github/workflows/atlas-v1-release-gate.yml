@@ -1,0 +1,121 @@
+name: ATLAS V1.0 Release Gate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'atlas_release_contract.py'
+      - 'tests/test_atlas_release_contract.py'
+      - 'ATLAS_V1_RELEASE.md'
+      - '.github/workflows/atlas-v1-release-gate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlas-v1-release-gate
+  cancel-in-progress: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      BASE_URL: https://atlas-v7.onrender.com
+      EXPECTED_GATE: PRODUCT_QUALITY_GATE_V2_CANONICAL_ANALYST_OUTPUT
+      EXPECTED_PROFILE: ATLAS_ANALYSIS_EVIDENCE_PROFILE_V1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Release contract tests
+        run: |
+          set -euo pipefail
+          python -m py_compile atlas_release_contract.py tests/test_atlas_release_contract.py
+          PYTHONPATH=. python - <<'PY'
+          import tempfile
+          from pathlib import Path
+          import tests.test_atlas_release_contract as t
+          tests=[getattr(t,n) for n in dir(t) if n.startswith('test_') and callable(getattr(t,n))]
+          for fn in tests:
+              with tempfile.TemporaryDirectory() as d:
+                  fn(Path(d))
+          print(f'ATLAS release contract tests: {len(tests)} PASS')
+          PY
+
+      - name: Verify committed technical readiness
+        run: |
+          set -euo pipefail
+          jq -e '
+            .technical_ready == true and
+            .canonical_contract == "analyst_output" and
+            .product_horizon == "4-12H" and
+            .analysis_only == true and
+            .live_execution == false and
+            .production_score_threshold_changed == false and
+            .claim_policy.may_claim_technically_operational == true
+          ' status/product-readiness-latest.json >/dev/null
+          echo "Committed readiness: TECHNICALLY READY"
+          echo "Forward evidence state: $(jq -r '.state' status/product-readiness-latest.json)"
+
+      - name: Verify live canonical runtime
+        run: |
+          set -euo pipefail
+          ok=0
+          for attempt in $(seq 1 30); do
+            code=$(curl -L --connect-timeout 15 --max-time 60 -sS -w '%{http_code}' -o /tmp/web.json "$BASE_URL/api/web-mode?t=$(date +%s%N)" || true)
+            if [[ "$code" =~ ^2 ]] && jq -e --arg g "$EXPECTED_GATE" --arg p "$EXPECTED_PROFILE" '
+              .ok == true and
+              .product_quality_gate.version == $g and
+              .product_quality_gate.analysis_profile_version == $p and
+              .product_quality_gate.canonical_contract == "analyst_output" and
+              .product_quality_gate.product_horizon == "4-12H" and
+              .product_quality_gate.analysis_only == true and
+              .product_quality_gate.live_execution == false and
+              .product_quality_gate.score_threshold_unchanged == true
+            ' /tmp/web.json >/dev/null 2>&1; then ok=1; break; fi
+            echo "runtime wait attempt=$attempt http=$code"; sleep 10
+          done
+          test "$ok" = 1
+
+      - name: Verify all eight production analyzers
+        run: |
+          set -euo pipefail
+          symbols=(BTCUSDT ETHUSDT SOLUSDT XRPUSDT BNBUSDT DOGEUSDT ZECUSDT HYPEUSDT)
+          mkdir -p /tmp/v1
+          for s in "${symbols[@]}"; do
+            success=0
+            for attempt in $(seq 1 8); do
+              code=$(curl -L --connect-timeout 20 --max-time 90 -sS -w '%{http_code}' -o "/tmp/v1/$s.json" "$BASE_URL/api/decision/current?symbol=$s&t=$(date +%s%N)" || true)
+              if [[ "$code" =~ ^2 ]] && jq -e --arg s "$s" --arg g "$EXPECTED_GATE" '
+                .ok == true and .symbol == $s and
+                .canonical_product_contract == "analyst_output" and
+                .analyst_output.contract_version == $g and
+                .analyst_output.lane == "CORE_4_12H" and
+                .analyst_output.horizon == "4-12H" and
+                (.analyst_output.decision == "LONG" or .analyst_output.decision == "SHORT" or .analyst_output.decision == "WAIT") and
+                .analyst_output.analysis_only == true and
+                .analyst_output.live_execution == false and
+                .production_threshold_changed_by_quality_gate == false
+              ' "/tmp/v1/$s.json" >/dev/null 2>&1; then success=1; break; fi
+              echo "$s retry=$attempt http=$code"; sleep 5
+            done
+            test "$success" = 1
+            echo "$s $(jq -r '.analyst_output.decision' "/tmp/v1/$s.json") PASS"
+          done
+
+      - name: Release safety assertions
+        run: |
+          set -euo pipefail
+          grep -q 'RELEASE_VERSION = "ATLAS_V1_0_RC1"' atlas_release_contract.py
+          grep -q 'CANONICAL_CONTRACT = "analyst_output"' atlas_release_contract.py
+          grep -q 'PRODUCT_HORIZON = "4-12H"' atlas_release_contract.py
+          grep -q '"order_routing": False' atlas_release_contract.py
+          grep -q '"live_execution": False' atlas_release_contract.py
+          grep -q '"score_or_threshold_changed_by_release": False' atlas_release_contract.py
+          echo 'ATLAS V1.0 RELEASE GATE: PASS — READY FOR ANALYSIS; FORWARD EVIDENCE REMAINS SEPARATE'
