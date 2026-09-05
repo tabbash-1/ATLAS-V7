@@ -31,7 +31,21 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m py_compile atlas_monthly_product_audit.py tests/test_atlas_monthly_product_audit.py
-          python3 -m pytest -q tests/test_atlas_monthly_product_audit.py
+          python3 - <<'PY'
+          import datetime as dt
+          from atlas_monthly_product_audit import build
+          def snap(t, px, qualified=True, wait_reason=None):
+              return (t, {'captured_at':t.isoformat(),'decisions':{'BTCUSDT':{'ok':True,'entry':px,'candidate_direction':'LONG','signal_qualified':qualified,'execution_ready':False,'score':72 if qualified else 64,'playbook':'MARKET_CONTINUATION_LONG','regime':'TREND_UP','wait_reason':wait_reason}}})
+          t=dt.datetime(2026,9,1,tzinfo=dt.timezone.utc)
+          r=build([snap(t,100),snap(t+dt.timedelta(hours=4),102),snap(t+dt.timedelta(hours=8),103),snap(t+dt.timedelta(hours=12),104)])
+          assert r['ok'] and r['product_contract']['canonical_horizon']=='4-12H'
+          assert r['product_contract']['analyst_only'] is True and r['product_contract']['live_execution'] is False
+          assert r['can_override_production'] is False and r['production_threshold_changed'] is False
+          w=build([snap(t,100,False,'SCORE_BELOW_SIGNAL_THRESHOLD'),snap(t+dt.timedelta(hours=4),101,False,'SCORE_BELOW_SIGNAL_THRESHOLD'),snap(t+dt.timedelta(hours=8),102,False,'SCORE_BELOW_SIGNAL_THRESHOLD'),snap(t+dt.timedelta(hours=12),103,False,'SCORE_BELOW_SIGNAL_THRESHOLD')])
+          assert w['counts']['qualified']==0
+          assert w['missed_wait_opportunities_12h_ge_1pct_by_reason']['SCORE_BELOW_SIGNAL_THRESHOLD']>=1
+          print('SELF_TEST_OK')
+          PY
           python3 atlas_monthly_product_audit.py --history status/history/production-snapshots.jsonl --output status/monthly-product-audit-latest.json --days 31
           python3 - <<'PY'
           import json
