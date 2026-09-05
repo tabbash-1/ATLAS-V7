@@ -1,0 +1,72 @@
+name: ATLAS Render Reliability Gate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'hype_market_data.py'
+      - 'cloud_web_only.py'
+      - 'production_decision_api.py'
+      - 'product_quality_gate_overlay.py'
+      - '.github/workflows/atlas-render-reliability-gate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlas-render-reliability-gate
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      BASE_URL: https://atlas-v7.onrender.com
+      EXPECTED_GATE: PRODUCT_QUALITY_GATE_V2_CANONICAL_ANALYST_OUTPUT
+      EXPECTED_PROFILE: ATLAS_ANALYSIS_EVIDENCE_PROFILE_V1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for deployed cache runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          ok=0
+          for attempt in $(seq 1 45); do
+            code=$(curl -L --connect-timeout 15 --max-time 60 -sS -w '%{http_code}' -o /tmp/web.json "$BASE_URL/api/web-mode?t=$(date +%s%N)" || true)
+            if [[ "$code" =~ ^2 ]] && jq -e --arg g "$EXPECTED_GATE" --arg p "$EXPECTED_PROFILE" '.ok==true and .product_quality_gate.version==$g and .product_quality_gate.analysis_profile_version==$p and .product_quality_gate.canonical_contract=="analyst_output" and .product_quality_gate.analysis_only==true and .product_quality_gate.live_execution==false' /tmp/web.json >/dev/null 2>&1; then ok=1; break; fi
+            echo "waiting attempt=$attempt http=$code"; sleep 10
+          done
+          test "$ok" = 1
+      - name: Warm and stress canonical decisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          symbols=(BTCUSDT ETHUSDT SOLUSDT XRPUSDT BNBUSDT DOGEUSDT ZECUSDT HYPEUSDT)
+          mkdir -p /tmp/atlas-reliability
+          failures=0; requests=0
+          for round in 1 2 3; do
+            for s in "${symbols[@]}"; do
+              requests=$((requests+1)); out="/tmp/atlas-reliability/${round}-${s}.json"
+              code=$(curl -L --connect-timeout 20 --max-time 90 -sS -w '%{http_code}' -o "$out" "$BASE_URL/api/decision/current?symbol=$s&t=$(date +%s%N)" || true)
+              if [[ ! "$code" =~ ^2 ]] || ! jq -e --arg s "$s" --arg g "$EXPECTED_GATE" '.ok==true and .symbol==$s and .canonical_product_contract=="analyst_output" and .analyst_output.contract_version==$g and .analyst_output.horizon=="4-12H" and .analyst_output.analysis_only==true and .analyst_output.live_execution==false' "$out" >/dev/null 2>&1; then
+                failures=$((failures+1)); echo "FAIL round=$round symbol=$s http=$code"
+              else
+                echo "PASS round=$round symbol=$s decision=$(jq -r '.analyst_output.decision' "$out")"
+              fi
+            done
+          done
+          echo "requests=$requests failures=$failures"
+          test "$requests" = 24
+          test "$failures" = 0
+      - name: Safety invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'ATLAS_MARKET_DATA_RESILIENCE_V4_BOUNDED_CACHE' hype_market_data.py
+          grep -q 'CACHE_TTL_SECONDS = 30.0' hype_market_data.py
+          grep -q 'STALE_IF_ERROR_SECONDS = 300.0' hype_market_data.py
+          grep -q 'changes_scoring.*False' hype_market_data.py
+          grep -q 'changes_threshold.*False' hype_market_data.py
+          echo 'ATLAS RENDER RELIABILITY GATE: PASS'
