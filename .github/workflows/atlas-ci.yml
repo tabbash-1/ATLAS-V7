@@ -22,7 +22,7 @@ jobs:
           node-version: '22'
       - name: Python syntax
         run: |
-          python -m py_compile collector_server.py cloud_start.py cloud_start_web.py cloud_web_only.py atlas_runtime_server.py atlas_research_runtime_server.py atlas_ai_server.py research_memory_bridge.py research_coverage.py storage_hardening.py trade_outcome_ledger.py trade_outcome_runtime.py trade_path_settlement.py execution_outcome_scope.py execution_risk_management.py prospective_fourth_vote_shadow.py production_execution_semantics_overlay.py tests/test_ai_validation.py tests/test_research_memory_bridge.py tests/test_research_coverage.py tests/test_storage_hardening.py tests/test_trade_outcome_ledger.py tests/test_trade_path_settlement.py tests/test_execution_outcome_scope.py tests/test_execution_risk_management.py tests/test_prospective_fourth_vote_shadow.py tests/test_production_single_snapshot_authority.py tests/test_production_execution_semantics_overlay.py
+          python -m py_compile collector_server.py cloud_start.py cloud_start_web.py cloud_web_only.py atlas_runtime_server.py atlas_research_runtime_server.py atlas_ai_server.py research_memory_bridge.py research_coverage.py storage_hardening.py trade_outcome_ledger.py trade_outcome_runtime.py trade_path_settlement.py execution_outcome_scope.py execution_risk_management.py prospective_fourth_vote_shadow.py production_execution_semantics_overlay.py atlas_monthly_product_audit.py product_quality_gate_overlay.py tests/test_ai_validation.py tests/test_research_memory_bridge.py tests/test_research_coverage.py tests/test_storage_hardening.py tests/test_trade_outcome_ledger.py tests/test_trade_path_settlement.py tests/test_execution_outcome_scope.py tests/test_execution_risk_management.py tests/test_prospective_fourth_vote_shadow.py tests/test_production_single_snapshot_authority.py tests/test_production_execution_semantics_overlay.py tests/test_atlas_monthly_product_audit.py tests/test_product_quality_gate_overlay.py
       - name: JavaScript syntax
         run: |
           set -e
@@ -51,6 +51,17 @@ jobs:
               fn()
           print(f'execution semantics tests: {len(tests)} ok')
           PY
+          PYTHONPATH=. python - <<'PY'
+          import tests.test_atlas_monthly_product_audit as monthly
+          import tests.test_product_quality_gate_overlay as gate
+          for module,label in ((monthly,'monthly product audit'),(gate,'4-12H product quality gate')):
+              tests=[getattr(module,n) for n in dir(module) if n.startswith('test_') and callable(getattr(module,n))]
+              if not tests:
+                  raise SystemExit(f'no {label} tests discovered')
+              for fn in tests:
+                  fn()
+              print(f'{label} tests: {len(tests)} ok')
+          PY
       - name: Verify delegated production entrypoints
         run: |
           set -euo pipefail
@@ -72,7 +83,10 @@ jobs:
           grep -q 'install_continuation(atlas)' cloud_web_only.py
           grep -q 'install_decision_api(atlas)' cloud_web_only.py
           grep -q 'install_decision_engine(atlas)' cloud_web_only.py
+          grep -q 'install_horizon_fit(atlas)' cloud_web_only.py
           grep -q 'install_execution_risk(atlas)' cloud_web_only.py
+          grep -q 'install_product_quality_gate(atlas)' cloud_web_only.py
+          grep -q 'PRODUCT_QUALITY_GATE' cloud_web_only.py
           grep -q 'install_consensus_tiebreak_shadow(atlas)' cloud_web_only.py
           grep -q 'install_fourth_vote_shadow(atlas)' cloud_web_only.py
           grep -q "ATLAS_CLOUD_FORWARD_MIN_SCORE','68'" cloud_web_only.py
@@ -81,6 +95,8 @@ jobs:
           grep -q '/api/research/fourth-vote-shadow' prospective_fourth_vote_shadow.py
           grep -q 'can_override_production.*False' prospective_fourth_vote_shadow.py
           grep -q 'production_threshold_changed.*False' prospective_fourth_vote_shadow.py
+          grep -q 'PRODUCT_QUALITY_GATE_V2_CANONICAL_ANALYST_OUTPUT' product_quality_gate_overlay.py
+          grep -q "canonical_product_contract.*analyst_output" product_quality_gate_overlay.py
       - name: Verify resilient provider chain and safety invariants
         run: |
           set -euo pipefail
