@@ -1,47 +1,64 @@
 from pathlib import Path
 
 
-def test_product_shell_sync_is_installed():
+def test_production_decision_ui_is_analyst_output_first():
     js=Path('atlas-production-decision.js').read_text()
-    assert 'syncProductShell' in js
-    assert 'Verified Production plan' in js
-    assert 'Conditional Production plan' in js
-    assert "canonicalPlan:true" in js
-    assert "singleDecisionAuthority:true" in js
+    assert 'analyst_output' in js
+    assert 'canonical_product_contract' in js
+    assert '4-12H' in js
+    assert 'ANALYSIS' in js
+    assert 'live_execution' in js or 'liveExecution' in js
 
 
-def test_actionable_plan_wins_over_stale_watch_state():
-    js=Path('atlas-production-decision.js').read_text()
-    assert "if(p.status==='ACTIONABLE'&&qualified&&ready)return'ACTIONABLE'" in js
-    assert "return d?.candidate_direction?'WATCH':'NO_SETUP'" in js
-    assert "return d?.opportunity_state||" not in js
-
-
-def test_visible_signal_uses_resolved_production_state():
-    js=Path('atlas-production-decision.js').read_text()
-    assert "signal=state==='ACTIONABLE'" in js
-    assert "opp==='ACTIONABLE'?(p.action||'WAIT'):'WAIT'" in js
-
-
-def test_ai_cannot_replace_production_trade_plan_geometry():
-    js=Path('atlas-production-decision.js').read_text()
-    assert 'function canonicalPlan(d,a)' in js
-    assert "return Object.keys(p).length?p:(a?.canonical_action||{})" in js
-
-
-def test_product_shell_reads_only_canonical_trade_plan_for_visible_geometry():
+def test_product_shell_requires_canonical_analyst_output():
     js=Path('atlas-product-shell.js').read_text()
-    assert "const p=production(),plan=p?.trade_plan||{},d=decision()" in js
-    assert "fmt(plan.entry)" in js
-    assert "fmt(plan.stop_loss)" in js
-    assert "fmt(plan.tp2)" in js
-    assert "fmt(plan.rr_tp2,2)" in js
-    assert "const tp=p?.take_profit" not in js
+    assert "d.canonical_product_contract!=='analyst_output'" in js
+    assert "a.horizon!=='4-12H'" in js
+    assert "a.analysis_only!==true" in js
+    assert "a.live_execution!==false" in js
+    assert "canonicalContract:'analyst_output'" in js
+    assert "productHorizon:'4-12H'" in js
 
 
-def test_product_shell_best_action_uses_canonical_plan_not_counterfactual_geometry():
+def test_product_shell_fails_closed_to_wait():
     js=Path('atlas-product-shell.js').read_text()
-    assert "canonical=Object.keys(plan).length?plan:(ai?.canonical_action||{})" in js
-    assert "Verified Production plan" in js
-    assert "best=ai?.best_counterfactual" not in js
-    assert "Conditional breakout plan · Entry" not in js
+    assert 'function failClosed()' in js
+    assert "set('apsDecision','WAIT')" in js
+    assert 'No legacy or AI fallback may create a decision.' in js
+    assert "failClosed:true" in js
+
+
+def test_visible_geometry_comes_only_from_analyst_output_when_ready():
+    js=Path('atlas-product-shell.js').read_text()
+    assert "ready=a.analysis_ready===true&&['LONG','SHORT'].includes(decision)" in js
+    assert "set('apsEntry',ready?fmt(a.entry):'—')" in js
+    assert "set('apsStop',ready?fmt(a.stop_loss):'—')" in js
+    assert 'fmt(a.take_profit)' in js
+    assert 'fmt(a.risk_reward,2)' in js
+    assert 'No user-facing Entry/SL/TP until canonical analysis is ready.' in js
+
+
+def test_legacy_trade_plan_cannot_construct_product_shell_decision():
+    js=Path('atlas-product-shell.js').read_text()
+    forbidden=("p.status==='ACTIONABLE'", "return'ACTIONABLE'", "return'ARMED'", 'trade_plan||{}', 'execution_ready')
+    for token in forbidden:
+        assert token not in js
+
+
+def test_ai_is_context_only_and_cannot_override_canonical_decision():
+    js=Path('atlas-product-shell.js').read_text()
+    assert 'Canonical decision cannot be overridden' in js
+    assert 'CONTEXT ONLY · CANNOT OVERRIDE' in js
+    assert "set('apsAiBest',a.analysis_ready?a.decision:'WAIT')" in js
+    assert 'ai?.canonical_action' not in js
+    assert 'best_counterfactual' not in js
+
+
+def test_product_shell_identity_is_analysis_only():
+    js=Path('atlas-product-shell.js').read_text()
+    assert 'ATLAS_PRODUCT_SHELL_V4_ANALYST_OUTPUT_ONLY' in js
+    assert 'CRYPTO TRADE INTELLIGENCE & ANALYSIS' in js
+    assert 'Canonical 4–12H Analysis' in js
+    assert 'Evidence quality' in js
+    assert "analysisOnly:true" in js
+    assert "liveExecution:false" in js
