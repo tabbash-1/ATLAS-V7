@@ -7,12 +7,17 @@ on:
       - 'README.md'
       - 'atlas_release_contract.py'
       - 'tests/test_atlas_release_contract.py'
+      - 'tests/test_user_facing_analyzer_semantics.py'
       - 'ATLAS_V1_RELEASE.md'
       - 'cloud_web_only.py'
       - 'decision_engine.py'
       - 'product_quality_gate_overlay.py'
       - 'production_trade_plan.py'
       - 'atlas-product-shell.js'
+      - 'atlas-unified-terminal.js'
+      - 'atlas-unified-terminal-polish.js'
+      - 'atlas-paper-portfolio-ui.js'
+      - 'atlas-research-validation-ui.js'
       - 'production-web-autoload.js'
       - 'atlas-production-decision.js'
       - 'render.yaml'
@@ -49,16 +54,22 @@ jobs:
       - name: Release contract tests
         run: |
           set -euo pipefail
-          python -m py_compile atlas_release_contract.py tests/test_atlas_release_contract.py
+          python -m py_compile atlas_release_contract.py tests/test_atlas_release_contract.py tests/test_user_facing_analyzer_semantics.py
           PYTHONPATH=. python - <<'PY'
           import tempfile
           from pathlib import Path
-          import tests.test_atlas_release_contract as t
-          tests=[getattr(t,n) for n in dir(t) if n.startswith('test_') and callable(getattr(t,n))]
+          import tests.test_atlas_release_contract as release_tests
+          import tests.test_user_facing_analyzer_semantics as ui_tests
+          tests=[]
+          for module in (release_tests, ui_tests):
+              tests += [getattr(module,n) for n in dir(module) if n.startswith('test_') and callable(getattr(module,n))]
           for fn in tests:
-              with tempfile.TemporaryDirectory() as d:
-                  fn(Path(d))
-          print(f'ATLAS release contract tests: {len(tests)} PASS')
+              if fn.__module__.endswith('test_atlas_release_contract'):
+                  with tempfile.TemporaryDirectory() as d:
+                      fn(Path(d))
+              else:
+                  fn()
+          print(f'ATLAS V1 release tests: {len(tests)} PASS')
           PY
 
       - name: Verify committed technical readiness
@@ -131,4 +142,8 @@ jobs:
           grep -q '"order_routing": False' atlas_release_contract.py
           grep -q '"live_execution": False' atlas_release_contract.py
           grep -q '"score_or_threshold_changed_by_release": False' atlas_release_contract.py
+          ! grep -q 'TRADE READY' atlas-paper-portfolio-ui.js
+          ! grep -qi 'execution stays WAIT' atlas-unified-terminal-polish.js
+          grep -q 'Research Shadow Cohorts' atlas-research-validation-ui.js
+          grep -q 'Canonical Forward Evaluation' atlas-paper-portfolio-ui.js
           echo 'ATLAS V1.0 RELEASE GATE: PASS — READY FOR ANALYSIS; FORWARD EVIDENCE REMAINS SEPARATE'
