@@ -23,6 +23,8 @@ def test_failure_label_is_hypothesis_not_production_change():
     ctx={'decision':'SHORT','score':69,'threshold':68,'rsi14':45,'relative_volume':1.2,'futures_reason':'ALIGNED','futures_adjustment':1,'playbook':'TREND_SHORT','data_degraded':False}
     assert a.failure_hypothesis(ctx,{'status':'LOSS','terminal':True,'r_multiple':-1})=='MARGINAL_QUALIFICATION_RISK'
     out=a.build()
+    assert out['canonical_contract']=='analyst_output'
+    assert out['product_horizon']=='4-12H'
     assert out['analysis_only'] is True
     assert out['live_execution'] is False
     assert out['can_override_production'] is False
