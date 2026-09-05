@@ -2,7 +2,7 @@ import production_trade_plan as p
 
 
 def base(**kw):
-    d={'ok':True,'candidate_direction':'LONG','entry':100.0,'indicators':{'atr14':2.0},'production_signal_qualified':True,'execution_ready':True,'structural_geometry':{'obstacle_price':104.0,'obstacle_distance_pct':4.0,'continuation_strong':False,'breakout':{'confirmed':False}}}
+    d={'ok':True,'candidate_direction':'LONG','entry':100.0,'indicators':{'atr14':2.0},'production_signal_qualified':True,'signal_threshold':68.0,'execution_ready':True,'structural_geometry':{'obstacle_price':104.0,'obstacle_distance_pct':4.0,'continuation_strong':False,'breakout':{'confirmed':False}}}
     d.update(kw); return d
 
 
@@ -11,8 +11,9 @@ def test_actionable_now_has_complete_plan():
     assert x['status']=='ACTIONABLE' and x['entry_mode']=='NOW'
     assert x['stop_loss']<x['entry']<x['tp1']<x['tp2']
     assert x['rr_tp1']>=1 and x['rr_tp2']>=2
+    assert x['analysis_action']=='LONG' and x['analysis_ready'] is True
     assert x['can_execute'] is True
-    assert x['live_execution'] is False
+    assert x['analysis_only'] is True and x['live_execution'] is False
     assert x['execution_scope']=='DECISION_READY_ONLY_NO_ORDER_ROUTING'
 
 
@@ -31,18 +32,34 @@ def test_canonical_product_is_4_12h_and_legacy_lanes_cannot_override():
     assert x['swing_plan']['can_override_core'] is False
 
 
+def test_geometry_provenance_is_complete_and_does_not_change_threshold():
+    x=p.build(base(signal_threshold=71.0))
+    g=x['geometry_provenance']
+    assert x['qualification_required']==71.0
+    assert g['geometry_version']==p.GEOMETRY_VERSION
+    assert g['entry_basis']=='VERIFIED_CURRENT_PRICE'
+    assert g['stop_basis']=='CURRENT_PRICE_PLUS_1_2_ATR_INVALIDATION'
+    assert g['tp1_basis'] in ('PRIOR_STRUCTURAL_OBSTACLE','MINIMUM_1R')
+    assert g['tp2_basis'].startswith('MAX_2R_OR_')
+    assert g['risk_atr']>0 and g['risk_pct']>0
+    assert g['score_or_threshold_changed'] is False
+
+
 def test_blocked_near_resistance_becomes_breakout_plan():
     d=base(execution_ready=False,production_signal_qualified=False,structural_geometry={'obstacle_price':101.0,'obstacle_distance_pct':1.0,'continuation_strong':True,'breakout':{'confirmed':False}})
     x=p.build(d)
     assert x['status']=='CONDITIONAL' and x['entry_mode']=='BREAKOUT'
     assert x['entry']>101.0 and x['stop_loss']<x['entry']<x['tp1']<x['tp2']
+    assert x['analysis_action']=='WAIT' and x['analysis_ready'] is False
     assert x['can_execute'] is False
     assert x['core_plan']['can_execute'] is False
+    assert 'analysis activates only' in x['entry_trigger']
 
 
 def test_qualified_but_geometry_blocked_never_gets_permission():
     x=p.build(base(execution_ready=False,production_signal_qualified=True))
     assert x['status']=='CONDITIONAL'
+    assert x['analysis_action']=='WAIT'
     assert x['can_execute'] is False
     assert x['core_plan']['can_execute'] is False
     assert x['live_execution'] is False
@@ -51,6 +68,7 @@ def test_qualified_but_geometry_blocked_never_gets_permission():
 def test_geometry_ready_but_unqualified_never_gets_permission():
     x=p.build(base(execution_ready=True,production_signal_qualified=False))
     assert x['status']=='CONDITIONAL'
+    assert x['analysis_action']=='WAIT'
     assert x['can_execute'] is False
     assert x['core_plan']['can_execute'] is False
     assert x['live_execution'] is False
@@ -65,6 +83,7 @@ def test_conditional_long_clears_prior_24h_high_not_only_nearest_swing():
     assert x['reference_structure']==101.2
     assert x['reference_structure_source']=='PRIOR_24H_HIGH'
     assert x['entry']>101.2
+    assert x['geometry_provenance']['entry_basis']=='STRUCTURE_BREAK_PLUS_BUFFER'
 
 
 def test_conditional_short_clears_prior_24h_low_not_only_nearest_swing():
@@ -85,6 +104,7 @@ def test_far_24h_blocker_prefers_pullback_over_chasing_breakout():
     x=p.build(d)
     assert x['entry_mode']=='PULLBACK' and x['entry']<100
     assert x['reference_structure']==103.0
+    assert x['geometry_provenance']['entry_basis']=='ATR_PULLBACK_0_35'
 
 
 def test_clear_room_wait_uses_pullback():
@@ -98,9 +118,11 @@ def test_short_ordering():
     x=p.build(d)
     assert x['stop_loss']>x['entry']>x['tp1']>x['tp2']
     assert x['rr_tp1']>=1 and x['rr_tp2']>=2
+    assert x['analysis_action']=='SHORT'
 
 
 def test_no_direction_does_not_invent_trade():
     x=p.build(base(candidate_direction=None,production_signal_qualified=False,execution_ready=False))
     assert x['status']=='WAIT' and x['entry_mode']=='NONE'
     assert x['product_horizon']=='4-12H'
+    assert x['analysis_only'] is True and x['live_execution'] is False
