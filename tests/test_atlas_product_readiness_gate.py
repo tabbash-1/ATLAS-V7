@@ -1,5 +1,8 @@
 import atlas_product_readiness_gate as g
 
+# This suite is intentionally dependency-free so the forward evidence workflow
+# can enforce readiness invariants without installing pytest.
+
 
 def base():
     p={
