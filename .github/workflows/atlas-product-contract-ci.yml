@@ -1,0 +1,83 @@
+name: ATLAS Product Contract CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'opportunity-scanner-ui.js'
+      - 'confirmed-alerts-ui.js'
+      - 'v7-ui-redesign.js'
+      - 'atlas-production-decision.js'
+      - 'product_quality_gate_overlay.py'
+      - 'analyst_forward_attribution.py'
+      - 'atlas_product_readiness_gate.py'
+      - 'tests/test_analyst_forward_attribution.py'
+      - 'tests/test_atlas_product_readiness_gate.py'
+      - '.github/workflows/atlas-product-contract-ci.yml'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax
+        run: |
+          set -euo pipefail
+          node --check opportunity-scanner-ui.js
+          node --check confirmed-alerts-ui.js
+          node --check v7-ui-redesign.js
+          node --check atlas-production-decision.js
+          python3 -m py_compile product_quality_gate_overlay.py analyst_forward_attribution.py atlas_product_readiness_gate.py tests/test_analyst_forward_attribution.py tests/test_atlas_product_readiness_gate.py
+      - name: Analyzer-only UI contract
+        run: |
+          set -euo pipefail
+          grep -q "canonical_product_contract.*analyst_output" opportunity-scanner-ui.js
+          grep -q "horizon.*4-12H" opportunity-scanner-ui.js
+          grep -q "analysis_only" opportunity-scanner-ui.js
+          grep -q "live_execution" opportunity-scanner-ui.js
+          ! grep -q 'ENTER LONG' opportunity-scanner-ui.js
+          ! grep -q 'ENTER SHORT' opportunity-scanner-ui.js
+          ! grep -q 'EXECUTABLE NOW' opportunity-scanner-ui.js
+          ! grep -q 'NO EXECUTABLE TRADE' opportunity-scanner-ui.js
+          grep -q 'ATLAS CANONICAL ANALYSIS ALERTS' confirmed-alerts-ui.js
+          grep -q 'does not place or route orders' confirmed-alerts-ui.js
+          ! grep -q 'ATLAS ENTER' confirmed-alerts-ui.js
+          grep -q 'CANONICAL ANALYSIS' v7-ui-redesign.js
+          grep -q 'ANALYSIS PLAN' v7-ui-redesign.js
+          grep -q 'NO ORDER ROUTING' v7-ui-redesign.js
+          grep -q "canonical_product_contract.*analyst_output" atlas-production-decision.js
+          grep -q "productHorizon:'4-12H'" atlas-production-decision.js
+          grep -q "analysisOnly:true" atlas-production-decision.js
+          grep -q "liveExecution:false" atlas-production-decision.js
+          ! grep -q 'BUY NOW' atlas-production-decision.js
+          ! grep -q 'SELL NOW' atlas-production-decision.js
+          ! grep -q 'ATLAS TRADE PLAN' atlas-production-decision.js
+      - name: Evidence and readiness contract
+        run: |
+          set -euo pipefail
+          PYTHONPATH=. python3 - <<'PY'
+          import analyst_forward_attribution as a
+          import atlas_product_readiness_gate as g
+          assert a.build()['analysis_only'] is True
+          assert a.build()['live_execution'] is False
+          assert a.build()['can_override_production'] is False
+          p={'canonical_contract':'analyst_output','product_horizon':'4-12H','live_execution':False,'can_override_production':False,'portfolio':{'avg_r':0.4,'net_r':12.0},'trades':[]}
+          i={'append_only_verified':True}
+          x={'analysis_only':True,'live_execution':False,'can_override_production':False,'can_change_score':False,'can_change_threshold':False,'counts':{'context_complete':0}}
+          out=g.build(p,i,x)
+          assert out['technical_ready'] is True
+          assert out['forward_evidence_ready'] is False
+          assert out['state']=='TECHNICALLY_READY_EVIDENCE_PENDING'
+          assert out['claim_policy']['may_claim_profitable'] is False
+          print('ATLAS_PRODUCT_CONTRACT_CI_OK')
+          PY
