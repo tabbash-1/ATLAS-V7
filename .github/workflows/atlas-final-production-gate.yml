@@ -52,10 +52,25 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/atlas-final-gate
+          fetch_decision() {
+            s="$1"; out="/tmp/atlas-final-gate/$s.json"; success=0
+            for attempt in $(seq 1 8); do
+              url="$BASE_URL/api/decision/current?symbol=$s&t=$(date +%s%N)"
+              code=$(curl -L --connect-timeout 20 --max-time 90 -sS -w '%{http_code}' -o "$out.tmp" "$url" || true)
+              if [[ "$code" =~ ^2 ]] && jq -e '.ok == true' "$out.tmp" >/dev/null 2>&1; then
+                mv "$out.tmp" "$out"; success=1; break
+              fi
+              echo "$s fetch attempt=$attempt http=$code body=$(head -c 280 "$out.tmp" 2>/dev/null | tr '\n' ' ' || true)"
+              rm -f "$out.tmp"
+              sleep 6
+            done
+            if [[ "$success" != 1 ]]; then
+              echo "ERROR: $s did not return a valid Production decision after retries"
+              return 1
+            fi
+          }
           for s in BTCUSDT ETHUSDT SOLUSDT XRPUSDT BNBUSDT DOGEUSDT ZECUSDT HYPEUSDT; do
-            url="$BASE_URL/api/decision/current?symbol=$s&t=$(date +%s)"
-            code=$(curl -L --retry 4 --retry-delay 4 --retry-all-errors --connect-timeout 20 --max-time 120 -sS -w '%{http_code}' -o "/tmp/atlas-final-gate/$s.json" "$url" || true)
-            [[ "$code" =~ ^2 ]]
+            fetch_decision "$s"
             jq -e --arg s "$s" --arg v "$EXPECTED_GATE" '
               .ok == true and
               .symbol == $s and
