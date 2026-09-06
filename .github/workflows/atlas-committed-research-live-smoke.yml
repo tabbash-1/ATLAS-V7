@@ -13,6 +13,13 @@ on:
       - 'status/forward-robustness-guardrails-latest.json'
       - 'status/prospective-direction-guardrail-latest.json'
       - 'status/paper-portfolio-10k-analyst-latest.json'
+      - 'status/learning-engine-latest.json'
+      - '.github/workflows/atlas-committed-research-live-smoke.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'committed_research_api.py'
+      - 'status/learning-engine-latest.json'
       - '.github/workflows/atlas-committed-research-live-smoke.yml'
   workflow_dispatch:
 
@@ -20,7 +27,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: atlas-committed-research-live-smoke
+  group: atlas-committed-research-live-smoke-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -31,7 +38,21 @@ jobs:
       BASE_URL: https://atlas-v7.onrender.com
     steps:
       - uses: actions/checkout@v4
+      - name: Verify learning contract in repository
+        run: |
+          set -euo pipefail
+          jq -e '
+            .schema == "ATLAS_LEARNING_ENGINE_V1" and
+            .canonical_contract == "analyst_output" and .product_horizon == "4-12H" and
+            .proof_status.edge_proven == false and
+            .methodology.future_leakage_allowed == false and .methodology.automatic_learning_updates == false and
+            .safety.research_only == true and .safety.paper_only == true and .safety.analysis_only == true and
+            .safety.live_execution == false and .safety.can_override_production == false and
+            .safety.can_change_score == false and .safety.can_change_threshold == false and
+            .safety.can_change_geometry == false and .safety.can_change_decision == false
+          ' status/learning-engine-latest.json >/dev/null
       - name: Wait for Render and verify cached research endpoints and UI isolation
+        if: github.event_name != 'pull_request'
         run: |
           set -euo pipefail
           declare -A expected
@@ -56,6 +77,31 @@ jobs:
             done
             if [[ "$ok" != "1" ]]; then echo "FAILED ${path}" >&2; cat "$tmp" >&2 || true; exit 1; fi
           done
+
+          learning="$(mktemp)"; learning_ok=0
+          for attempt in $(seq 1 30); do
+            code="$(curl -L --connect-timeout 20 --max-time 60 -sS -w '%{http_code}' -o "$learning" "${BASE_URL}/api/research/learning-engine?t=$(date +%s)" || true)"
+            if [[ "$code" =~ ^2 ]] && jq -e '
+              .ok == true and .schema == "ATLAS_LEARNING_ENGINE_V1" and
+              .canonical_contract == "analyst_output" and .product_horizon == "4-12H" and
+              .cached_only == true and .served_from == "COMMITTED_GITHUB_ACTIONS_REPORT" and
+              .web_process_refresh_triggered == false and .request_time_outcome_read == false and
+              .request_time_market_fetch == false and .web_process_background_worker == false and
+              .proof_status.edge_proven == false and
+              .methodology.future_leakage_allowed == false and .methodology.automatic_learning_updates == false and
+              .safety.research_only == true and .safety.paper_only == true and .safety.analysis_only == true and
+              .safety.live_execution == false and .safety.can_override_production == false and
+              .safety.can_change_score == false and .safety.can_change_threshold == false and
+              .safety.can_change_geometry == false and .safety.can_change_decision == false and
+              (.evidence.trade_entries|numbers) and (.evidence.wait_decisive_12h|numbers)
+            ' "$learning" >/dev/null 2>&1; then
+              echo 'PASS live canonical learning engine'
+              jq '{schema,canonical_contract,product_horizon,evidence,proof_status,safety,report_age_hours}' "$learning"
+              learning_ok=1; break
+            fi
+            echo "Waiting for learning engine attempt ${attempt}/30 HTTP=${code:-none}"; sleep 12
+          done
+          if [[ "$learning_ok" != "1" ]]; then echo 'FAILED canonical learning engine' >&2; cat "$learning" >&2 || true; exit 1; fi
 
           paper="$(mktemp)"; paper_ok=0
           for attempt in $(seq 1 30); do
