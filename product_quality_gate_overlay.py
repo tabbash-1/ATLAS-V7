@@ -73,12 +73,6 @@ def assess(row):
 
 
 def _evidence_profile(row, gate):
-    """Describe decision quality without changing the decision.
-
-    Only already-promoted quarantine may BLOCK. Everything else here is a
-    transparent risk/evidence annotation, including research candidates that
-    explicitly failed or remain prospective-only.
-    """
     direction = _norm(row.get('candidate_direction'))
     attr = row.get('score_attribution') or {}
     plan = row.get('trade_plan') or {}
@@ -102,24 +96,15 @@ def _evidence_profile(row, gate):
     futures_available = bool(row.get('futures_available'))
     futures_reason = _norm(attr.get('futures_reason'))
     if futures_available and futures_reason == 'OPPOSED':
-        warnings.append({
-            'code': 'DERIVATIVES_OPPOSE_DIRECTION',
-            'severity': 'MEDIUM',
-            'evidence_status': 'CONTEXT_NOT_VETO',
-        })
+        warnings.append({'code': 'DERIVATIVES_OPPOSE_DIRECTION', 'severity': 'MEDIUM', 'evidence_status': 'CONTEXT_NOT_VETO'})
     elif futures_available and futures_reason == 'ALIGNED':
         confirmations.append('DERIVATIVES_ALIGNED')
     elif not futures_available:
-        warnings.append({
-            'code': 'DERIVATIVES_NOT_VALIDATED_OR_UNAVAILABLE',
-            'severity': 'INFO',
-            'evidence_status': 'DATA_HEALTH',
-        })
+        warnings.append({'code': 'DERIVATIVES_NOT_VALIDATED_OR_UNAVAILABLE', 'severity': 'INFO', 'evidence_status': 'DATA_HEALTH'})
 
     rv = _num(row.get('relative_volume'))
     if rv is not None and rv >= 1.2:
         confirmations.append('RELATIVE_VOLUME_EXPANSION')
-    # Volume-only promotion/demotion failed research gates, so never make it a veto.
 
     rsi = _num(indicators.get('rsi14') if indicators.get('rsi14') is not None else row.get('rsi14'))
     if rsi is not None and ((direction == 'LONG' and rsi >= 75) or (direction == 'SHORT' and rsi <= 25)):
@@ -139,7 +124,6 @@ def _evidence_profile(row, gate):
     if geometry_complete:
         confirmations.append('GEOMETRY_PROVENANCE_COMPLETE')
 
-    # Explicit record of rejected research prevents accidental future promotion.
     rejected_rules = [
         'LONG_ANTI_CHASE_VETO_REJECTED',
         'VOLUME_ONLY_RANKING_OR_DEMOTION_REJECTED',
@@ -173,6 +157,8 @@ def _analyst_output(row, gate):
         decision = 'WAIT'
     plan = row.get('trade_plan') or {}
     actionable = decision in ('LONG', 'SHORT')
+    geometry_gate = dict(row.get('geometry_gate') or {})
+    geometry_blockers = list(geometry_gate.get('blocker_codes') or [])
     reason = row.get('actionable_reason') or row.get('wait_reason') or gate.get('reason')
     reasons = []
     for item in (
@@ -196,6 +182,13 @@ def _analyst_output(row, gate):
             changes.append('NEW_VERIFIED_DIRECTIONAL_EVIDENCE_REQUIRED')
     else:
         changes = ['REASSESS_IF_INVALIDATION_OR_VERIFIED_DIRECTION_CHANGES']
+
+    # Geometry is an independent prerequisite. Expose exact blockers even when a
+    # separate evidence-quality gate is also blocking the canonical decision.
+    for blocker in geometry_blockers:
+        condition = f"CLEAR_GEOMETRY_{blocker}"
+        if condition not in changes:
+            changes.append(condition)
 
     candidate_plan = {
         'direction': row.get('candidate_direction'),
@@ -228,6 +221,16 @@ def _analyst_output(row, gate):
         'risk_reward': candidate_plan['risk_reward'] if actionable else None,
         'candidate_plan': candidate_plan,
         'geometry_provenance': candidate_plan['geometry_provenance'] if actionable else {},
+        'geometry_readiness': {
+            'ready': bool(geometry_gate.get('qualified')),
+            'status': geometry_gate.get('status'),
+            'reason': geometry_gate.get('reason'),
+            'primary_blocker': geometry_gate.get('primary_blocker'),
+            'blocker_codes': geometry_blockers,
+            'checks': dict(geometry_gate.get('checks') or {}),
+            'reason_schema_version': geometry_gate.get('reason_schema_version'),
+            'geometry_version': geometry_gate.get('version'),
+        },
         'evidence_profile': profile,
         'reasons': reasons,
         'primary_reason': reason,
@@ -235,7 +238,7 @@ def _analyst_output(row, gate):
         'what_changes_status': changes,
         'setup_quality_gate': gate,
         'production_qualified_raw': bool(row.get('production_signal_qualified')),
-        'geometry_ready_raw': bool((row.get('geometry_gate') or {}).get('qualified')),
+        'geometry_ready_raw': bool(geometry_gate.get('qualified')),
         'playbook': row.get('playbook'),
         'regime': row.get('regime'),
         'data_timestamp': row.get('generated_at') or row.get('generated_at_ms'),
