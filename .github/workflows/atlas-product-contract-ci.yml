@@ -8,9 +8,16 @@ on:
       - 'confirmed-alerts-ui.js'
       - 'v7-ui-redesign.js'
       - 'atlas-production-decision.js'
+      - 'atlas-product-shell.js'
       - 'product_quality_gate_overlay.py'
+      - 'decision_intelligence.py'
+      - 'committed_research_api.py'
       - 'analyst_forward_attribution.py'
       - 'atlas_product_readiness_gate.py'
+      - 'tests/test_decision_intelligence.py'
+      - 'tests/test_product_quality_decision_intelligence.py'
+      - 'tests/test_canonical_paper_portfolio_api.py'
+      - 'tests/test_ui_canonical_contract.py'
       - 'tests/test_analyst_forward_attribution.py'
       - 'tests/test_atlas_product_readiness_gate.py'
       - '.github/workflows/atlas-product-contract-ci.yml'
@@ -30,6 +37,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Test dependency
+        run: python -m pip install -q pytest
       - name: Syntax
         run: |
           set -euo pipefail
@@ -37,7 +46,12 @@ jobs:
           node --check confirmed-alerts-ui.js
           node --check v7-ui-redesign.js
           node --check atlas-production-decision.js
-          python3 -m py_compile product_quality_gate_overlay.py analyst_forward_attribution.py atlas_product_readiness_gate.py tests/test_analyst_forward_attribution.py tests/test_atlas_product_readiness_gate.py
+          node --check atlas-product-shell.js
+          python3 -m py_compile product_quality_gate_overlay.py decision_intelligence.py committed_research_api.py analyst_forward_attribution.py atlas_product_readiness_gate.py tests/test_decision_intelligence.py tests/test_product_quality_decision_intelligence.py tests/test_canonical_paper_portfolio_api.py tests/test_ui_canonical_contract.py tests/test_analyst_forward_attribution.py tests/test_atlas_product_readiness_gate.py
+      - name: Decision Intelligence regression
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_decision_intelligence.py tests/test_product_quality_decision_intelligence.py tests/test_canonical_paper_portfolio_api.py tests/test_ui_canonical_contract.py
       - name: Analyzer-only UI contract
         run: |
           set -euo pipefail
@@ -62,6 +76,10 @@ jobs:
           ! grep -q 'BUY NOW' atlas-production-decision.js
           ! grep -q 'SELL NOW' atlas-production-decision.js
           ! grep -q 'ATLAS TRADE PLAN' atlas-production-decision.js
+          grep -q 'ATLAS_PRODUCT_SHELL_V5_DECISION_INTELLIGENCE' atlas-product-shell.js
+          grep -q 'decisionIntelligenceShadowOnly:true' atlas-product-shell.js
+          grep -q 'ATLAS_DECISION_INTELLIGENCE_V1_SHADOW' decision_intelligence.py
+          grep -q 'paper-portfolio-10k-analyst-latest.json' committed_research_api.py
       - name: Evidence and readiness contract
         run: |
           set -euo pipefail

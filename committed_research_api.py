@@ -7,12 +7,12 @@ from __future__ import annotations
 import copy, datetime as dt, json, urllib.parse
 from pathlib import Path
 
-VERSION='ATLAS_COMMITTED_RESEARCH_API_V2_PAPER_PORTFOLIO'
+VERSION='ATLAS_COMMITTED_RESEARCH_API_V3_CANONICAL_ANALYST_PORTFOLIO'
 REPORTS={
     '/api/research/offline-forward-evaluation':('offline-forward-evaluation-latest.json','ATLAS_OFFLINE_FORWARD_EVALUATION_V3_ROBUSTNESS','research'),
     '/api/research/forward-robustness-guardrails':('forward-robustness-guardrails-latest.json','ATLAS_FORWARD_ROBUSTNESS_GUARDRAILS_V1_SHADOW_ONLY','research'),
     '/api/research/prospective-direction-guardrail':('prospective-direction-guardrail-latest.json','ATLAS_PROSPECTIVE_DIRECTION_GUARDRAIL_V1_4H','research'),
-    '/api/research/paper-portfolio-10k':('paper-portfolio-10k-latest.json','ATLAS_PAPER_PORTFOLIO_10K_V1_PROSPECTIVE','paper'),
+    '/api/research/paper-portfolio-10k':('paper-portfolio-10k-analyst-latest.json','ATLAS_PAPER_10K_ANALYST_OUTPUT_V1','paper'),
 }
 
 def _parse_time(v):

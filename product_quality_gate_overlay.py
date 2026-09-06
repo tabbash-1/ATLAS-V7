@@ -7,6 +7,8 @@ quarantine. Research/shadow findings that have not earned promotion are exposed
 as warnings, never silently promoted into Production vetoes.
 """
 
+from decision_intelligence import VERSION as DECISION_INTELLIGENCE_VERSION, build as build_decision_intelligence
+
 VERSION = 'PRODUCT_QUALITY_GATE_V2_CANONICAL_ANALYST_OUTPUT'
 PROFILE_VERSION = 'ATLAS_ANALYSIS_EVIDENCE_PROFILE_V1'
 PRODUCT_HORIZON = '4-12H'
@@ -291,6 +293,9 @@ def install(atlas):
                 row['best_available_action'] = best
 
         row['analyst_output'] = _analyst_output(row, gate)
+        intelligence = build_decision_intelligence(row, row['analyst_output'])
+        row['decision_intelligence'] = intelligence
+        row['analyst_output']['decision_intelligence'] = intelligence
         row['evidence_profile'] = row['analyst_output']['evidence_profile']
         row['canonical_product_decision'] = row['analyst_output']['decision']
         row['canonical_product_contract'] = 'analyst_output'
@@ -299,9 +304,11 @@ def install(atlas):
     atlas.production_decision = build
     atlas.PRODUCT_QUALITY_GATE_STATE = {
         'enabled': True,'version': VERSION,'analysis_profile_version': PROFILE_VERSION,
+        'decision_intelligence_version': DECISION_INTELLIGENCE_VERSION,
         'product_lane': PRODUCT_LANE,'product_horizon': PRODUCT_HORIZON,
         'canonical_contract': 'analyst_output','quarantined_setup_families': len(QUARANTINE),
         'score_threshold_unchanged': True,'raw_production_qualification_preserved': True,
+        'decision_intelligence_shadow_only': True,'decision_intelligence_can_override': False,
         'research_warnings_never_auto_promote': True,'analysis_only': True,'live_execution': False,
     }
     return atlas.PRODUCT_QUALITY_GATE_STATE

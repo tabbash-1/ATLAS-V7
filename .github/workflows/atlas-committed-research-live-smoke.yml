@@ -8,9 +8,11 @@ on:
       - 'committed_research_api.py'
       - 'render_boot_patch.py'
       - 'atlas-research-validation-ui.js'
+      - 'atlas-paper-portfolio-ui.js'
       - 'status/offline-forward-evaluation-latest.json'
       - 'status/forward-robustness-guardrails-latest.json'
       - 'status/prospective-direction-guardrail-latest.json'
+      - 'status/paper-portfolio-10k-analyst-latest.json'
       - '.github/workflows/atlas-committed-research-live-smoke.yml'
   workflow_dispatch:
 
@@ -54,6 +56,23 @@ jobs:
             done
             if [[ "$ok" != "1" ]]; then echo "FAILED ${path}" >&2; cat "$tmp" >&2 || true; exit 1; fi
           done
+
+          paper="$(mktemp)"; paper_ok=0
+          for attempt in $(seq 1 30); do
+            code="$(curl -L --connect-timeout 20 --max-time 60 -sS -w '%{http_code}' -o "$paper" "${BASE_URL}/api/research/paper-portfolio-10k?t=$(date +%s)" || true)"
+            if [[ "$code" =~ ^2 ]] && jq -e '
+              .ok == true and .schema == "ATLAS_PAPER_10K_ANALYST_OUTPUT_V1" and
+              .canonical_contract == "analyst_output" and .product_horizon == "4-12H" and
+              .paper_only == true and .live_execution == false and .can_override_production == false and
+              .portfolio.starting_equity_usd == 10000 and
+              (.portfolio.entries|numbers) and (.portfolio.closed|numbers) and
+              .portfolio.entries >= .portfolio.closed
+            ' "$paper" >/dev/null 2>&1; then paper_ok=1; break; fi
+            echo "Waiting for canonical paper portfolio attempt ${attempt}/30 HTTP=${code:-none}"; sleep 12
+          done
+          if [[ "$paper_ok" != "1" ]]; then echo 'FAILED canonical analyst paper portfolio' >&2; cat "$paper" >&2 || true; exit 1; fi
+          echo 'PASS canonical analyst_output $10K paper portfolio'
+
           mode="$(mktemp)"
           curl -L --connect-timeout 20 --max-time 60 -fsS "${BASE_URL}/api/web-mode" -o "$mode"
           jq -e '.ok == true and .background_workers == false and .cloud_forward_in_web_process == false and .production_threshold == 68 and .committed_research_api.cached_only == true and .committed_research_api.background_workers == false' "$mode" >/dev/null
