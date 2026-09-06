@@ -50,10 +50,24 @@ def test_capture_preserves_research_only_contract():
     assert out['triggered'] is False
 
 
+def test_forward_return_is_raw_market_return_for_short():
+    rec={'direction':'SHORT','triggered':True,'triggered_at':'2026-09-06T00:00:00+00:00','activation_price':100.0,'forward_return_pct':{}}
+    candles=[
+        _c('2026-09-06T04:00:00+00:00',100,101,94,95),
+        _c('2026-09-06T08:00:00+00:00',95,96,89,90),
+        _c('2026-09-06T12:00:00+00:00',90,91,84,85),
+    ]
+    out=sor.attach_forward_returns(rec,candles)
+    assert out['forward_return_pct']['4'] == -5.0
+    assert out['forward_return_pct']['8'] == -10.0
+    assert out['forward_return_pct']['12'] == -15.0
+
+
 if __name__=='__main__':
     test_long_requires_close_then_retest_hold()
     test_touch_without_close_does_not_trigger()
     test_short_symmetric_trigger()
     test_invalidation_close_is_recorded()
     test_capture_preserves_research_only_contract()
+    test_forward_return_is_raw_market_return_for_short()
     print('scenario outcome recorder tests: OK')
