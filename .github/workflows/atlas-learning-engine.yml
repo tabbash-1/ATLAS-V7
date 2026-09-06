@@ -8,6 +8,16 @@ on:
       - 'analyst_forward_attribution.py'
       - 'wait_diagnostics.py'
       - 'tests/test_atlas_learning_engine.py'
+      - 'committed_research_api.py'
+      - '.github/workflows/atlas-learning-engine.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'atlas_learning_engine.py'
+      - 'analyst_forward_attribution.py'
+      - 'wait_diagnostics.py'
+      - 'tests/test_atlas_learning_engine.py'
+      - 'committed_research_api.py'
       - '.github/workflows/atlas-learning-engine.yml'
   schedule:
     - cron: '41 * * * *'
@@ -17,7 +27,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: atlas-canonical-learning-engine
+  group: atlas-canonical-learning-engine-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
