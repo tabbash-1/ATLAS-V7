@@ -9,6 +9,7 @@ on:
       - 'tests/test_atlas_release_contract.py'
       - 'tests/test_user_facing_analyzer_semantics.py'
       - 'tests/test_canonical_geometry_overlay.py'
+      - 'verify_canonical_geometry_payload.py'
       - 'ATLAS_V1_RELEASE.md'
       - 'cloud_web_only.py'
       - 'decision_engine.py'
@@ -59,7 +60,7 @@ jobs:
       - name: Release contract tests
         run: |
           set -euo pipefail
-          python -m py_compile atlas_release_contract.py canonical_geometry_overlay.py tests/test_atlas_release_contract.py tests/test_user_facing_analyzer_semantics.py tests/test_canonical_geometry_overlay.py
+          python -m py_compile atlas_release_contract.py canonical_geometry_overlay.py verify_canonical_geometry_payload.py tests/test_atlas_release_contract.py tests/test_user_facing_analyzer_semantics.py tests/test_canonical_geometry_overlay.py
           PYTHONPATH=. python - <<'PY'
           import tempfile
           from pathlib import Path
@@ -146,20 +147,7 @@ jobs:
               echo "$s retry=$attempt http=$code geometry=$(jq -r '.geometry_version // "missing"' "/tmp/v1/$s.json" 2>/dev/null || echo invalid)"; sleep 5
             done
             test "$success" = 1
-            python - "/tmp/v1/$s.json" <<'PY'
-import json, math, sys
-p=json.load(open(sys.argv[1]))
-d=p.get('candidate_direction')
-e=p.get('entry'); sl=p.get('stop_loss'); tp=p.get('take_profit')
-g=p.get('geometry_gate') or {}
-if d in ('LONG','SHORT') and all(isinstance(x,(int,float)) for x in (e,sl,tp)):
-    risk=abs(e-sl); reward=abs(tp-e)
-    rr=reward/risk if risk else None
-    reported=g.get('risk_reward')
-    if rr is None or reported is None or not math.isclose(rr, float(reported), rel_tol=1e-5, abs_tol=1e-5):
-        raise SystemExit(f'geometry RR mismatch computed={rr} reported={reported}')
-print('geometry exact-level RR verified')
-PY
+            python verify_canonical_geometry_payload.py "/tmp/v1/$s.json"
             echo "$s $(jq -r '.analyst_output.decision' "/tmp/v1/$s.json") geometry=$(jq -r '.geometry_gate.status' "/tmp/v1/$s.json") PASS"
           done
 
