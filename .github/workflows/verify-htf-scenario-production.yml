@@ -1,0 +1,71 @@
+name: Verify HTF Scenario Production
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  live-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Verify live Render HTF scenario contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, time, urllib.request
+
+          base='https://atlas-v7.onrender.com/api/decision/current?symbol='
+          symbols=['BTCUSDT','ETHUSDT']
+
+          def fetch(sym):
+              last=None
+              for _ in range(6):
+                  try:
+                      req=urllib.request.Request(base+sym,headers={'User-Agent':'ATLAS-scenario-smoke/1.0'})
+                      with urllib.request.urlopen(req,timeout=45) as r:
+                          return json.loads(r.read().decode())
+                  except Exception as e:
+                      last=e
+                      time.sleep(10)
+              raise last
+
+          for sym in symbols:
+              row=fetch(sym)
+              assert row.get('ok') is True, (sym,row)
+              scenario=row.get('htf_scenario_engine') or {}
+              assert scenario.get('version')=='HTF_SCENARIO_ENGINE_V1', (sym,scenario)
+              assert scenario.get('product_horizon')=='4-12H', (sym,scenario)
+              assert scenario.get('preferred_direction') in ('LONG','SHORT','WAIT'), (sym,scenario)
+              assert scenario.get('readiness') in ('CONDITIONAL_SCENARIO_READY','WAIT_FOR_HTF_ALIGNMENT','WAIT_FOR_PRICE_ACTION_RESOLUTION'), (sym,scenario)
+              assert scenario.get('reason'), (sym,scenario)
+              assert scenario.get('can_change_score') is False, (sym,scenario)
+              assert scenario.get('can_change_threshold') is False, (sym,scenario)
+              assert scenario.get('can_override_canonical_decision') is False, (sym,scenario)
+              assert scenario.get('can_mark_trade_ready') is False, (sym,scenario)
+              assert scenario.get('live_execution') is False, (sym,scenario)
+              for case_name in ('bull_case','bear_case'):
+                  case=scenario.get(case_name) or {}
+                  assert case.get('direction') in ('LONG','SHORT'), (sym,case_name,case)
+                  assert case.get('trigger_type'), (sym,case_name,case)
+                  assert case.get('trigger_condition'), (sym,case_name,case)
+                  assert isinstance(case.get('confirmation'),list) and case.get('confirmation'), (sym,case_name,case)
+                  assert case.get('invalidation_condition'), (sym,case_name,case)
+              if scenario.get('preferred_direction')=='WAIT':
+                  assert scenario.get('selected_case') is None, (sym,scenario)
+              else:
+                  selected=scenario.get('selected_case') or {}
+                  assert selected.get('direction')==scenario.get('preferred_direction'), (sym,scenario)
+              assert row.get('htf_scenario_score_preserved') is True, (sym,row.get('htf_scenario_score_preserved'))
+              assert row.get('htf_scenario_threshold_preserved') is True, (sym,row.get('htf_scenario_threshold_preserved'))
+              assert row.get('htf_scenario_decision_preserved') is True, (sym,row.get('htf_scenario_decision_preserved'))
+              assert row.get('htf_scenario_readiness_preserved') is True, (sym,row.get('htf_scenario_readiness_preserved'))
+              plan=row.get('trade_plan') or {}
+              assert 'bull_case' in plan and 'bear_case' in plan and 'scenario_readiness' in plan, (sym,plan)
+              assert (row.get('analyst_output') or {}).get('live_execution') is False, (sym,row.get('analyst_output'))
+              decision=(row.get('analyst_output') or {}).get('decision') or row.get('canonical_product_decision') or row.get('actionable_decision')
+              assert decision in ('LONG','SHORT','WAIT'), (sym,decision)
+              print(sym,'OK',decision,scenario.get('preferred_direction'),scenario.get('readiness'))
+          PY
