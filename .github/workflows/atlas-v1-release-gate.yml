@@ -8,11 +8,14 @@ on:
       - 'atlas_release_contract.py'
       - 'tests/test_atlas_release_contract.py'
       - 'tests/test_user_facing_analyzer_semantics.py'
+      - 'tests/test_canonical_geometry_overlay.py'
       - 'ATLAS_V1_RELEASE.md'
       - 'cloud_web_only.py'
       - 'decision_engine.py'
       - 'product_quality_gate_overlay.py'
       - 'production_trade_plan.py'
+      - 'production_decision_api.py'
+      - 'canonical_geometry_overlay.py'
       - 'atlas-product-shell.js'
       - 'atlas-unified-terminal.js'
       - 'atlas-unified-terminal-polish.js'
@@ -25,6 +28,7 @@ on:
       - '.github/workflows/atlas-final-production-gate.yml'
       - '.github/workflows/atlas-render-reliability.yml'
       - '.github/workflows/atlas-product-contract-ci.yml'
+      - '.github/workflows/atlas-canonical-geometry-ci.yml'
       - '.github/workflows/atlas-v1-release-gate.yml'
   workflow_dispatch:
 
@@ -43,6 +47,7 @@ jobs:
       BASE_URL: https://atlas-v7.onrender.com
       EXPECTED_GATE: PRODUCT_QUALITY_GATE_V2_CANONICAL_ANALYST_OUTPUT
       EXPECTED_PROFILE: ATLAS_ANALYSIS_EVIDENCE_PROFILE_V1
+      EXPECTED_CANONICAL_GEOMETRY: ATLAS_CANONICAL_GEOMETRY_TRUTH_V1
     steps:
       - uses: actions/checkout@v4
 
@@ -54,14 +59,15 @@ jobs:
       - name: Release contract tests
         run: |
           set -euo pipefail
-          python -m py_compile atlas_release_contract.py tests/test_atlas_release_contract.py tests/test_user_facing_analyzer_semantics.py
+          python -m py_compile atlas_release_contract.py canonical_geometry_overlay.py tests/test_atlas_release_contract.py tests/test_user_facing_analyzer_semantics.py tests/test_canonical_geometry_overlay.py
           PYTHONPATH=. python - <<'PY'
           import tempfile
           from pathlib import Path
           import tests.test_atlas_release_contract as release_tests
           import tests.test_user_facing_analyzer_semantics as ui_tests
+          import tests.test_canonical_geometry_overlay as geometry_tests
           tests=[]
-          for module in (release_tests, ui_tests):
+          for module in (release_tests, ui_tests, geometry_tests):
               tests += [getattr(module,n) for n in dir(module) if n.startswith('test_') and callable(getattr(module,n))]
           for fn in tests:
               if fn.__module__.endswith('test_atlas_release_contract'):
@@ -93,7 +99,7 @@ jobs:
           ok=0
           for attempt in $(seq 1 30); do
             code=$(curl -L --connect-timeout 15 --max-time 60 -sS -w '%{http_code}' -o /tmp/web.json "$BASE_URL/api/web-mode?t=$(date +%s%N)" || true)
-            if [[ "$code" =~ ^2 ]] && jq -e --arg g "$EXPECTED_GATE" --arg p "$EXPECTED_PROFILE" '
+            if [[ "$code" =~ ^2 ]] && jq -e --arg g "$EXPECTED_GATE" --arg p "$EXPECTED_PROFILE" --arg cg "$EXPECTED_CANONICAL_GEOMETRY" '
               .ok == true and
               .product_quality_gate.version == $g and
               .product_quality_gate.analysis_profile_version == $p and
@@ -101,9 +107,14 @@ jobs:
               .product_quality_gate.product_horizon == "4-12H" and
               .product_quality_gate.analysis_only == true and
               .product_quality_gate.live_execution == false and
-              .product_quality_gate.score_threshold_unchanged == true
+              .product_quality_gate.score_threshold_unchanged == true and
+              .canonical_geometry.version == $cg and
+              .canonical_geometry.rr_source == "EXACT_ENTRY_STOP_TARGET" and
+              .canonical_geometry.score_threshold_unchanged == true and
+              .canonical_geometry.analysis_only == true and
+              .canonical_geometry.live_execution == false
             ' /tmp/web.json >/dev/null 2>&1; then ok=1; break; fi
-            echo "runtime wait attempt=$attempt http=$code"; sleep 10
+            echo "runtime wait attempt=$attempt http=$code canonical_geometry=$(jq -r '.canonical_geometry.version // "missing"' /tmp/web.json 2>/dev/null || echo invalid)"; sleep 10
           done
           test "$ok" = 1
 
@@ -116,7 +127,7 @@ jobs:
             success=0
             for attempt in $(seq 1 8); do
               code=$(curl -L --connect-timeout 20 --max-time 90 -sS -w '%{http_code}' -o "/tmp/v1/$s.json" "$BASE_URL/api/decision/current?symbol=$s&t=$(date +%s%N)" || true)
-              if [[ "$code" =~ ^2 ]] && jq -e --arg s "$s" --arg g "$EXPECTED_GATE" '
+              if [[ "$code" =~ ^2 ]] && jq -e --arg s "$s" --arg g "$EXPECTED_GATE" --arg cg "$EXPECTED_CANONICAL_GEOMETRY" '
                 .ok == true and .symbol == $s and
                 .canonical_product_contract == "analyst_output" and
                 .analyst_output.contract_version == $g and
@@ -125,12 +136,31 @@ jobs:
                 (.analyst_output.decision == "LONG" or .analyst_output.decision == "SHORT" or .analyst_output.decision == "WAIT") and
                 .analyst_output.analysis_only == true and
                 .analyst_output.live_execution == false and
-                .production_threshold_changed_by_quality_gate == false
+                .production_threshold_changed_by_quality_gate == false and
+                .geometry_version == $cg and
+                .geometry_rr_source == "RECOMPUTED_FROM_EXACT_ENTRY_STOP_TARGET" and
+                .geometry_gate.version == $cg and
+                .score_or_threshold_changed_by_geometry == false and
+                .analysis_only == true and .live_execution == false
               ' "/tmp/v1/$s.json" >/dev/null 2>&1; then success=1; break; fi
-              echo "$s retry=$attempt http=$code"; sleep 5
+              echo "$s retry=$attempt http=$code geometry=$(jq -r '.geometry_version // "missing"' "/tmp/v1/$s.json" 2>/dev/null || echo invalid)"; sleep 5
             done
             test "$success" = 1
-            echo "$s $(jq -r '.analyst_output.decision' "/tmp/v1/$s.json") PASS"
+            python - "/tmp/v1/$s.json" <<'PY'
+import json, math, sys
+p=json.load(open(sys.argv[1]))
+d=p.get('candidate_direction')
+e=p.get('entry'); sl=p.get('stop_loss'); tp=p.get('take_profit')
+g=p.get('geometry_gate') or {}
+if d in ('LONG','SHORT') and all(isinstance(x,(int,float)) for x in (e,sl,tp)):
+    risk=abs(e-sl); reward=abs(tp-e)
+    rr=reward/risk if risk else None
+    reported=g.get('risk_reward')
+    if rr is None or reported is None or not math.isclose(rr, float(reported), rel_tol=1e-5, abs_tol=1e-5):
+        raise SystemExit(f'geometry RR mismatch computed={rr} reported={reported}')
+print('geometry exact-level RR verified')
+PY
+            echo "$s $(jq -r '.analyst_output.decision' "/tmp/v1/$s.json") geometry=$(jq -r '.geometry_gate.status' "/tmp/v1/$s.json") PASS"
           done
 
       - name: Release safety assertions
@@ -142,6 +172,8 @@ jobs:
           grep -q '"order_routing": False' atlas_release_contract.py
           grep -q '"live_execution": False' atlas_release_contract.py
           grep -q '"score_or_threshold_changed_by_release": False' atlas_release_contract.py
+          grep -q 'ATLAS_CANONICAL_GEOMETRY_TRUTH_V1' canonical_geometry_overlay.py
+          grep -q 'RECOMPUTED_FROM_EXACT_ENTRY_STOP_TARGET' canonical_geometry_overlay.py
           ! grep -q 'TRADE READY' atlas-paper-portfolio-ui.js
           ! grep -qi 'execution stays WAIT' atlas-unified-terminal-polish.js
           grep -q 'Research Shadow Cohorts' atlas-research-validation-ui.js
