@@ -37,8 +37,10 @@ jobs:
           PYTHONPATH=. python tests/test_wait_diagnostics.py
       - name: Safety invariants
         run: |
+          set -euo pipefail
           grep -q "auto_apply.*False" outcome_calibration.py
           grep -q "threshold_changed.*False" outcome_calibration.py
           grep -q "execution_rules_changed.*False" wait_diagnostics.py
-          grep -q "ATLAS_CLOUD_FORWARD_MIN_SCORE.*68" cloud_start.py
-          grep -q "_install_outcome_calibration_runtime" cloud_start.py
+          grep -q 'os.environ\["ATLAS_CLOUD_FORWARD_ENABLED"\] = "0"' cloud_start.py
+          grep -q 'os.environ\["ATLAS_WEB_ONLY"\] = "1"' cloud_start.py
+          grep -q 'cloud_web_only.py' cloud_start.py
