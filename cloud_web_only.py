@@ -53,6 +53,8 @@ from production_continuation_scoring import install as install_continuation
 install_continuation(atlas)
 from production_decision_api import install as install_decision_api
 install_decision_api(atlas)
+from canonical_geometry_overlay import install as install_canonical_geometry
+CANONICAL_GEOMETRY = install_canonical_geometry(atlas)
 from decision_engine_v7 import install as install_decision_engine
 install_decision_engine(atlas)
 from horizon_fit_overlay import install as install_horizon_fit
@@ -179,6 +181,7 @@ atlas.WEB_SAFE_MODE = {
     'consensus_tiebreak_shadow': CONSENSUS_TIEBREAK_SHADOW,
     'fourth_vote_shadow': FOURTH_VOTE_SHADOW,
     'long_close_structure_shadow': LONG_CLOSE_STRUCTURE_SHADOW,
+    'canonical_geometry': CANONICAL_GEOMETRY,
     'product_quality_gate': PRODUCT_QUALITY_GATE,
 }
 
@@ -243,6 +246,7 @@ if __name__ == '__main__':
     print(f'Committed research API: {COMMITTED_RESEARCH_API["version"]}', flush=True)
     print('Production decision UI: ON + autoload', flush=True)
     print(f'Production scoring: {PRODUCTION_SCORING_VERSION}', flush=True)
+    print(f'Canonical geometry: {CANONICAL_GEOMETRY["version"]}', flush=True)
     print(f'RC10.1 deep analysis: {atlas.RC10_1_DEEP_ANALYSIS_VERSION}', flush=True)
     print(f'Consensus tie-break shadow: {CONSENSUS_TIEBREAK_SHADOW["version"]}', flush=True)
     print(f'Fourth-vote prospective shadow: {FOURTH_VOTE_SHADOW["version"]}', flush=True)
