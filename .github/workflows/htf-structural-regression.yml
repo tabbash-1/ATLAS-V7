@@ -18,10 +18,13 @@ jobs:
         run: python -m pip install --disable-pip-version-check pytest
       - name: Compile changed Python modules
         run: python -m py_compile htf_structural_thesis.py render_boot_patch.py product_quality_gate_overlay.py production_trade_plan.py
-      - name: Run HTF and core 4-12H regressions
-        run: >-
-          pytest -q
-          tests/test_htf_structural_thesis.py
-          tests/test_product_core_horizon_contract.py
-          tests/test_production_trade_plan.py
-          tests/test_product_quality_gate_overlay.py
+      - name: HTF structural thesis logic
+        run: pytest -q tests/test_htf_structural_thesis.py
+      - name: Render boot integration contract
+        run: pytest -q tests/test_htf_boot_integration_contract.py
+      - name: Core 4-12H horizon contract
+        run: pytest -q tests/test_product_core_horizon_contract.py
+      - name: Production trade plan regression
+        run: pytest -q tests/test_production_trade_plan.py
+      - name: Final product quality gate regression
+        run: pytest -q tests/test_product_quality_gate_overlay.py
