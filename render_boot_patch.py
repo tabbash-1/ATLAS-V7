@@ -8,6 +8,7 @@ APP = BASE / "app.js"
 INDEX = BASE / "index.html"
 V7_UI = BASE / "v7-ui-redesign.js"
 EXEC_RISK = BASE / "execution_risk_management.py"
+QUALITY_GATE = BASE / "product_quality_gate_overlay.py"
 
 
 def patch_hype_chart():
@@ -72,7 +73,27 @@ def patch_execution_semantics_install():
     print("ATLAS Render boot patch: explicit execution permission semantics enabled",flush=True)
 
 
+def patch_product_quality_gate_htf_install():
+    """Install HTF direction authority immediately before the final quality gate."""
+    if not QUALITY_GATE.exists(): return
+    text = QUALITY_GATE.read_text(encoding="utf-8")
+    marker = "HTF_STRUCTURAL_THESIS_BOOT_PATCH_V1"
+    if marker in text: return
+    needle = "def install(atlas):\n    original = atlas.production_decision"
+    replacement = (
+        "def install(atlas):\n"
+        "    # HTF_STRUCTURAL_THESIS_BOOT_PATCH_V1\n"
+        "    from htf_structural_thesis import install as _install_htf_structural_thesis\n"
+        "    _install_htf_structural_thesis(atlas)\n"
+        "    original = atlas.production_decision"
+    )
+    if needle not in text:
+        raise RuntimeError("product quality gate install signature changed; refusing silent HTF patch")
+    QUALITY_GATE.write_text(text.replace(needle, replacement, 1), encoding="utf-8")
+    print("ATLAS Render boot patch: 4H/12H structural direction authority enabled", flush=True)
+
+
 def apply():
-    patch_hype_chart();patch_production_ui();patch_legacy_command_mirrors();patch_execution_semantics_install()
+    patch_hype_chart();patch_production_ui();patch_legacy_command_mirrors();patch_execution_semantics_install();patch_product_quality_gate_htf_install()
 
 if __name__ == "__main__": apply()
