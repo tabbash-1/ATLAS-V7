@@ -1,0 +1,91 @@
+name: Verify HTF Production
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  live-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Verify Render health and HTF decision contract
+        env:
+          ATLAS_BASE_URL: https://atlas-v7.onrender.com
+        run: |
+          python - <<'PY'
+          import json, os, time, urllib.request
+
+          base = os.environ['ATLAS_BASE_URL'].rstrip('/')
+          expected = 'HTF_STRUCTURAL_THESIS_V1'
+          last = None
+
+          def get(path, timeout=25):
+              req = urllib.request.Request(base + path, headers={'User-Agent': 'ATLAS-Production-Smoke/1.0'})
+              with urllib.request.urlopen(req, timeout=timeout) as r:
+                  body = r.read().decode('utf-8')
+                  if r.status != 200:
+                      raise RuntimeError(f'HTTP {r.status}: {body[:300]}')
+                  return json.loads(body)
+
+          for attempt in range(30):
+              try:
+                  health = get('/health')
+                  if health.get('status') != 'ok':
+                      raise AssertionError(f'health status={health.get("status")}')
+                  if health.get('live_execution') is not False:
+                      raise AssertionError('health live_execution must remain false')
+
+                  checked = {}
+                  ready = True
+                  for symbol in ('BTCUSDT', 'ETHUSDT'):
+                      row = get('/api/decision/current?symbol=' + symbol)
+                      checked[symbol] = row
+                      if row.get('htf_thesis_version') != expected:
+                          ready = False
+                          break
+
+                      thesis = row.get('htf_thesis') or {}
+                      assert thesis.get('version') == expected, (symbol, thesis.get('version'))
+                      assert thesis.get('product_horizon') == '4-12H', (symbol, thesis.get('product_horizon'))
+                      assert thesis.get('authority_timeframes') == ['12h', '4h'], (symbol, thesis.get('authority_timeframes'))
+                      assert thesis.get('confirmation_timeframe') == '1h', (symbol, thesis.get('confirmation_timeframe'))
+                      assert thesis.get('context_timeframe') == '1d', (symbol, thesis.get('context_timeframe'))
+                      assert thesis.get('can_flip_from_1h_only') is False, symbol
+                      assert thesis.get('score_changed') is False, symbol
+                      assert thesis.get('threshold_changed') is False, symbol
+                      assert thesis.get('live_execution') is False, symbol
+                      assert thesis.get('status') in ('PASS', 'WAIT', 'BLOCK'), (symbol, thesis.get('status'))
+                      assert row.get('live_execution') is False, symbol
+                      assert (row.get('analyst_output') or {}).get('live_execution') is False, symbol
+                      assert row.get('canonical_product_decision') in ('LONG', 'SHORT', 'WAIT'), (symbol, row.get('canonical_product_decision'))
+                      rule = ((row.get('trade_plan') or {}).get('decision_persistence_rule') or '')
+                      assert 'cannot reverse LONG/SHORT' in rule, (symbol, rule)
+
+                  if ready:
+                      summary = {
+                          'health': health,
+                          'symbols': {
+                              s: {
+                                  'canonical_product_decision': r.get('canonical_product_decision'),
+                                  'htf_status': (r.get('htf_thesis') or {}).get('status'),
+                                  'htf_direction': (r.get('htf_thesis') or {}).get('direction'),
+                                  'htf_reason': (r.get('htf_thesis') or {}).get('reason'),
+                                  'daily_context': (r.get('htf_thesis') or {}).get('daily_context'),
+                                  'htf_thesis_version': r.get('htf_thesis_version'),
+                                  'live_execution': r.get('live_execution'),
+                              }
+                              for s, r in checked.items()
+                          }
+                      }
+                      print('ATLAS_PRODUCTION_HTF_VERIFIED=' + json.dumps(summary, sort_keys=True))
+                      raise SystemExit(0)
+                  last = f'production still reports version={next(iter(checked.values())).get("htf_thesis_version") if checked else None}'
+              except Exception as exc:
+                  last = f'{type(exc).__name__}: {exc}'
+              print(f'attempt {attempt+1}: {last}')
+              time.sleep(10)
+
+          raise SystemExit('Production HTF verification failed: ' + str(last))
+          PY
