@@ -17,11 +17,13 @@ jobs:
       - name: Install test dependency
         run: python -m pip install --disable-pip-version-check pytest
       - name: Compile changed Python modules
-        run: python -m py_compile htf_structural_thesis.py htf_price_action.py htf_price_action_overlay.py render_boot_patch.py product_quality_gate_overlay.py production_trade_plan.py
+        run: python -m py_compile htf_structural_thesis.py htf_price_action.py htf_price_action_overlay.py htf_scenario_engine.py render_boot_patch.py product_quality_gate_overlay.py production_trade_plan.py
       - name: HTF structural thesis logic
         run: PYTHONPATH=. pytest -q tests/test_htf_structural_thesis.py
       - name: HTF price-action logic
         run: PYTHONPATH=. pytest -q tests/test_htf_price_action.py
+      - name: HTF conditional scenario engine
+        run: PYTHONPATH=. pytest -q tests/test_htf_scenario_engine.py
       - name: Render boot integration contract
         run: PYTHONPATH=. pytest -q tests/test_htf_boot_integration_contract.py tests/test_htf_price_action_boot_contract.py
       - name: Core 4-12H horizon contract
