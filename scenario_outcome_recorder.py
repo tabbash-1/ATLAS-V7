@@ -3,7 +3,7 @@
 Research-only utility. A scenario is captured from the live decision payload and
 later settled from CLOSED 4H candles. Trigger definition mirrors the scenario
 engine: breakout/breakdown close plus retest confirmation. No Production state
-is changed.
+is changed. Regression validation is enforced by Scenario Outcome Recorder CI.
 """
 from __future__ import annotations
 
