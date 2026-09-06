@@ -1,0 +1,31 @@
+name: Scenario Outcome Recorder CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scenario_outcome_recorder.py'
+      - 'tests/test_scenario_outcome_recorder.py'
+      - '.github/workflows/scenario-outcome-recorder-ci.yml'
+  pull_request:
+    branches: [main]
+
+jobs:
+  recorder-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Python syntax
+        run: python -m py_compile scenario_outcome_recorder.py tests/test_scenario_outcome_recorder.py
+      - name: Recorder tests
+        run: PYTHONPATH=. python tests/test_scenario_outcome_recorder.py
+      - name: Safety invariants
+        run: |
+          set -euo pipefail
+          grep -q "research_only.*True" scenario_outcome_recorder.py
+          grep -q "live_execution.*False" scenario_outcome_recorder.py
+          grep -q "HORIZONS = (4, 8, 12)" scenario_outcome_recorder.py
