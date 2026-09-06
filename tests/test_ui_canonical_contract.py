@@ -35,7 +35,15 @@ def test_visible_geometry_comes_only_from_analyst_output_when_ready():
     assert "set('apsStop',ready?fmt(a.stop_loss):'—')" in js
     assert 'fmt(a.take_profit)' in js
     assert 'fmt(a.risk_reward,2)' in js
-    assert 'No user-facing Entry/SL/TP until canonical analysis is ready.' in js
+
+
+def test_wait_state_surfaces_canonical_geometry_blocker_codes():
+    js=Path('atlas-product-shell.js').read_text()
+    assert 'geometry_readiness' in js
+    assert 'blocker_codes' in js
+    assert 'Geometry blocker:' in js
+    assert 'geometryReasonCodes:true' in js
+    assert "set('apsAiGeometry',ready?" in js
 
 
 def test_legacy_trade_plan_cannot_construct_product_shell_decision():
