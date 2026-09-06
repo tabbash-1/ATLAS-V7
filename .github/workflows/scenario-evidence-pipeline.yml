@@ -1,0 +1,112 @@
+name: ATLAS Scenario Evidence Pipeline
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    paths:
+      - 'scenario_evidence_pipeline.py'
+      - 'scenario_outcome_recorder.py'
+      - 'scenario_outcome_calibration.py'
+      - 'tests/test_scenario_evidence_pipeline.py'
+      - 'tests/test_scenario_outcome_recorder.py'
+      - '.github/workflows/scenario-evidence-pipeline.yml'
+  schedule:
+    - cron: '23 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atlas-scenario-evidence
+  cancel-in-progress: false
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax
+        run: python -m py_compile scenario_evidence_pipeline.py scenario_outcome_recorder.py scenario_outcome_calibration.py tests/test_scenario_evidence_pipeline.py tests/test_scenario_outcome_recorder.py
+      - name: Recorder regression
+        run: PYTHONPATH=. python tests/test_scenario_outcome_recorder.py
+      - name: Pipeline regression
+        run: PYTHONPATH=. python tests/test_scenario_evidence_pipeline.py
+      - name: Safety invariants
+        run: |
+          set -euo pipefail
+          grep -q "research_only.*True" scenario_evidence_pipeline.py
+          grep -q "live_execution.*False" scenario_evidence_pipeline.py
+          grep -q "production_changed.*False" scenario_evidence_pipeline.py
+          grep -q "HORIZONS = (4, 8, 12)" scenario_outcome_recorder.py
+          grep -q "auto_apply.*False" scenario_outcome_calibration.py
+
+  live-smoke:
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    needs: regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify live Render scenario contract and existing Binance Spot feed family
+        env:
+          ATLAS_SCENARIO_STATUS_DIR: /tmp/atlas-scenario-status
+        run: |
+          set -euo pipefail
+          PYTHONPATH=. python - <<'PY'
+          import datetime as dt
+          import scenario_evidence_pipeline as p
+          for sym in ('BTCUSDT','ETHUSDT'):
+              row=p.fetch_decision(sym)
+              sc=row.get('htf_scenario_engine') or {}
+              assert sc.get('version') == 'HTF_SCENARIO_ENGINE_V1', (sym,sc)
+              assert sc.get('can_change_score') is False, (sym,sc)
+              assert sc.get('can_change_threshold') is False, (sym,sc)
+              assert sc.get('can_override_canonical_decision') is False, (sym,sc)
+              assert sc.get('can_mark_trade_ready') is False, (sym,sc)
+              assert sc.get('live_execution') is False, (sym,sc)
+          start=(dt.datetime.now(dt.timezone.utc)-dt.timedelta(hours=24)).isoformat()
+          rows=p.fetch_klines('BTCUSDT','4h',start)
+          assert rows, 'no closed BTC 4H klines returned'
+          assert all(x.get('closed') is True for x in rows)
+          print('live scenario + Binance Spot feed smoke: OK', len(rows))
+          PY
+
+  collect:
+    if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
+    needs: regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      ATLAS_BASE_URL: https://atlas-v7.onrender.com
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Collect and settle frozen HTF scenarios
+        run: |
+          set -euo pipefail
+          PYTHONPATH=. python scenario_evidence_pipeline.py | tee /tmp/scenario-evidence-run.json
+          test -s status/scenario-outcomes.json
+          test -s status/scenario-calibration-latest.json
+          jq -e '.research_only == true and .live_execution == false' status/scenario-outcomes.json >/dev/null
+          jq -e '.research_only == true and .live_execution == false and .production_changed == false and (.horizons|keys|sort)==["12","4","8"]' status/scenario-calibration-latest.json >/dev/null
+      - name: Commit scenario evidence snapshot
+        run: |
+          git config user.name "atlas-scenario-evidence"
+          git config user.email "atlas-scenario-evidence@users.noreply.github.com"
+          git add status/scenario-outcomes.json status/scenario-calibration-latest.json status/history/scenario-calibration.jsonl
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "chore: update HTF scenario evidence [skip ci]"
+          git pull --rebase origin main
+          git push
