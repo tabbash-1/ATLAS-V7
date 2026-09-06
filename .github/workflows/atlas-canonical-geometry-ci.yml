@@ -1,0 +1,42 @@
+name: ATLAS Canonical Geometry CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'canonical_geometry_overlay.py'
+      - 'production_decision_api.py'
+      - 'cloud_web_only.py'
+      - 'tests/test_canonical_geometry_overlay.py'
+      - '.github/workflows/atlas-canonical-geometry-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  geometry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax
+        run: python -m py_compile canonical_geometry_overlay.py cloud_web_only.py tests/test_canonical_geometry_overlay.py
+      - name: Canonical geometry regression
+        run: |
+          PYTHONPATH=. python - <<'PY'
+          import tests.test_canonical_geometry_overlay as t
+          tests=[getattr(t,n) for n in dir(t) if n.startswith('test_') and callable(getattr(t,n))]
+          assert tests, 'no canonical geometry tests discovered'
+          for fn in tests:
+              fn()
+          print(f'canonical geometry tests: {len(tests)} ok')
+          PY
+      - name: Safety invariants
+        run: |
+          set -euo pipefail
+          grep -q 'RECOMPUTED_FROM_EXACT_ENTRY_STOP_TARGET' canonical_geometry_overlay.py
+          grep -q 'score_or_threshold_changed_by_geometry.*False' canonical_geometry_overlay.py
+          grep -q 'live_execution.*False' canonical_geometry_overlay.py
+          grep -q "ATLAS_CLOUD_FORWARD_MIN_SCORE','68'" cloud_web_only.py
+          grep -q 'install_canonical_geometry(atlas)' cloud_web_only.py
