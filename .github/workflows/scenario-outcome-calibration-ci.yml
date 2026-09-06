@@ -1,0 +1,35 @@
+name: Scenario Outcome Calibration CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    paths:
+      - 'scenario_outcome_calibration.py'
+      - 'tests/test_scenario_outcome_calibration.py'
+      - '.github/workflows/scenario-outcome-calibration-ci.yml'
+
+jobs:
+  scenario-calibration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Python syntax
+        run: python -m py_compile scenario_outcome_calibration.py tests/test_scenario_outcome_calibration.py
+      - name: Scenario calibration tests
+        run: PYTHONPATH=. python tests/test_scenario_outcome_calibration.py
+      - name: Safety invariants
+        run: |
+          set -euo pipefail
+          grep -q "research_only.*True" scenario_outcome_calibration.py
+          grep -q "live_execution.*False" scenario_outcome_calibration.py
+          grep -q "score_changed.*False" scenario_outcome_calibration.py
+          grep -q "threshold_changed.*False" scenario_outcome_calibration.py
+          grep -q "readiness_changed.*False" scenario_outcome_calibration.py
+          grep -q "production_decision_changed.*False" scenario_outcome_calibration.py
+          grep -q "auto_apply.*False" scenario_outcome_calibration.py
