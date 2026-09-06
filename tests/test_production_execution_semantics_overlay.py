@@ -36,6 +36,7 @@ def test_geometry_without_explicit_permission_stays_wait():
     out = h.sent[0]
     assert out['geometry_ready'] is True
     assert out['execution_permission_ready'] is False
+    assert out['canonical_permission_ready'] is True
     assert out['execution_ready'] is False
     assert out['actionable_decision'] == 'WAIT'
     assert out['actionable_reason'] == 'EXECUTION_TRIGGER_OR_PERMISSION_PENDING'
@@ -52,9 +53,10 @@ def test_explicit_permission_can_be_execution_ready():
     out = h.sent[0]
     assert out['geometry_ready'] is True
     assert out['execution_permission_ready'] is True
+    assert out['canonical_permission_ready'] is True
     assert out['execution_ready'] is True
     assert out['actionable_decision'] == 'SHORT'
-    assert out['execution_contract']['rule'].endswith('can_execute=true')
+    assert out['execution_contract']['rule'].endswith('canonical analyst_output permits entry')
 
 
 def test_permission_cannot_bypass_bad_geometry():
@@ -70,6 +72,61 @@ def test_permission_cannot_bypass_bad_geometry():
     assert out['geometry_ready'] is False
     assert out['execution_ready'] is False
     assert out['actionable_decision'] == 'WAIT'
+
+
+def test_canonical_quality_block_cannot_be_resurrected_by_http_semantics():
+    atlas = install_handler(); h = atlas.Handler()
+    payload = {
+        'ok': True, 'source': 'PRODUCTION_DECISION_API_TEST',
+        'signal_qualified': True, 'candidate_direction': 'LONG',
+        'score': 70, 'signal_threshold': 68,
+        'execution_ready': True,
+        'trade_plan': {'can_execute': True},
+        'geometry_gate': {'qualified': True},
+        'setup_quality_gate': {
+            'status': 'BLOCK',
+            'reason': '4_12H_SETUP_FAMILY_FAILED_FORWARD_EVIDENCE_GATE',
+        },
+        'canonical_product_contract': 'analyst_output',
+        'canonical_product_decision': 'WAIT',
+        'analyst_output': {
+            'decision': 'WAIT',
+            'analysis_ready': False,
+            'primary_reason': '4_12H_SETUP_FAMILY_FAILED_FORWARD_EVIDENCE_GATE',
+        },
+    }
+    h._json(payload)
+    out = h.sent[0]
+    assert out['geometry_ready'] is True
+    assert out['execution_permission_ready'] is True
+    assert out['canonical_permission_ready'] is False
+    assert out['execution_ready'] is False
+    assert out['actionable_decision'] == 'WAIT'
+    assert out['actionable_reason'] == '4_12H_SETUP_FAMILY_FAILED_FORWARD_EVIDENCE_GATE'
+    assert out['score'] == 70
+    assert out['signal_threshold'] == 68
+    assert out['candidate_direction'] == 'LONG'
+
+
+def test_canonical_analyst_wait_fails_closed_without_quality_block():
+    atlas = install_handler(); h = atlas.Handler()
+    payload = {
+        'ok': True, 'source': 'PRODUCTION_DECISION_API_TEST',
+        'signal_qualified': True, 'candidate_direction': 'SHORT',
+        'execution_ready': True, 'trade_plan': {'can_execute': True},
+        'canonical_product_contract': 'analyst_output',
+        'analyst_output': {
+            'decision': 'WAIT',
+            'analysis_ready': False,
+            'primary_reason': 'CANONICAL_WAIT_TEST',
+        },
+    }
+    h._json(payload)
+    out = h.sent[0]
+    assert out['canonical_permission_ready'] is False
+    assert out['execution_ready'] is False
+    assert out['actionable_decision'] == 'WAIT'
+    assert out['actionable_reason'] == 'CANONICAL_WAIT_TEST'
 
 
 def test_threshold_and_score_are_untouched():
