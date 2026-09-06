@@ -7,7 +7,14 @@ on:
       - 'committed_research_api.py'
       - 'atlas-paper-portfolio-ui.js'
       - 'render_boot_patch.py'
-      - 'status/paper-portfolio-10k-latest.json'
+      - 'status/paper-portfolio-10k-analyst-latest.json'
+      - '.github/workflows/atlas-paper-portfolio-live-smoke.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'committed_research_api.py'
+      - 'atlas-paper-portfolio-ui.js'
+      - 'status/paper-portfolio-10k-analyst-latest.json'
       - '.github/workflows/atlas-paper-portfolio-live-smoke.yml'
   workflow_dispatch:
 
@@ -19,22 +26,30 @@ jobs:
       BASE_URL: https://atlas-v7.onrender.com
     steps:
       - uses: actions/checkout@v4
-      - name: Wait for Render and verify paper API/UI
+      - name: Verify canonical contract in repository
+        run: |
+          set -euo pipefail
+          grep -q "paper-portfolio-10k-analyst-latest.json" committed_research_api.py
+          grep -q "ATLAS_PAPER_10K_ANALYST_OUTPUT_V1" committed_research_api.py
+          jq -e '.schema == "ATLAS_PAPER_10K_ANALYST_OUTPUT_V1" and .canonical_contract == "analyst_output" and .product_horizon == "4-12H" and .paper_only == true and .live_execution == false and .can_override_production == false and .portfolio.starting_equity_usd == 10000' status/paper-portfolio-10k-analyst-latest.json >/dev/null
+      - name: Wait for Render and verify canonical paper API/UI
+        if: github.event_name != 'pull_request'
         run: |
           set -euo pipefail
           for i in $(seq 1 18); do
-            API=$(curl -L --connect-timeout 10 --max-time 35 -fsS "$BASE_URL/api/research/paper-portfolio-10k" || true)
+            API=$(curl -L --connect-timeout 10 --max-time 35 -fsS "$BASE_URL/api/research/paper-portfolio-10k?t=$(date +%s)" || true)
             HTML=$(curl -L --connect-timeout 10 --max-time 35 -fsS "$BASE_URL/" || true)
-            JS=$(curl -L --connect-timeout 10 --max-time 35 -fsS "$BASE_URL/atlas-paper-portfolio-ui.js" || true)
-            if printf '%s' "$API" | jq -e '.ok == true and .schema == "ATLAS_PAPER_PORTFOLIO_10K_V1_PROSPECTIVE" and .paper_only == true and .live_execution == false and .can_override_production == false and .portfolio.starting_equity_usd == 10000' >/dev/null 2>&1 \
+            JS=$(curl -L --connect-timeout 10 --max-time 35 -fsS "$BASE_URL/atlas-paper-portfolio-ui.js?t=$(date +%s)" || true)
+            if printf '%s' "$API" | jq -e '.ok == true and .schema == "ATLAS_PAPER_10K_ANALYST_OUTPUT_V1" and .canonical_contract == "analyst_output" and .product_horizon == "4-12H" and .paper_only == true and .live_execution == false and .can_override_production == false and .portfolio.starting_equity_usd == 10000 and (.portfolio.entries|numbers) and (.portfolio.closed|numbers) and .portfolio.entries >= .portfolio.closed' >/dev/null 2>&1 \
               && printf '%s' "$HTML" | grep -q 'atlas-paper-portfolio-ui.js' \
               && printf '%s' "$JS" | grep -q 'ATLAS_PAPER_PORTFOLIO_UI_V1' \
               && printf '%s' "$JS" | grep -q 'can_override_production:false'; then
-              echo "PASS live 10K paper portfolio API/UI"
+              echo "PASS live canonical analyst_output 10K paper portfolio API/UI"
+              printf '%s' "$API" | jq '{schema,canonical_contract,product_horizon,portfolio,paper_only,live_execution,can_override_production}'
               exit 0
             fi
             echo "Render not ready attempt $i/18"
             sleep 10
           done
-          echo "Live 10K paper portfolio contract did not become ready"
+          echo "Live canonical analyst_output 10K paper portfolio contract did not become ready"
           exit 1
