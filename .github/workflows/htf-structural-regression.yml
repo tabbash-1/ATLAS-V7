@@ -1,0 +1,27 @@
+name: HTF Structural Regression
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install test dependency
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Compile changed Python modules
+        run: python -m py_compile htf_structural_thesis.py render_boot_patch.py product_quality_gate_overlay.py production_trade_plan.py
+      - name: Run HTF and core 4-12H regressions
+        run: >-
+          pytest -q
+          tests/test_htf_structural_thesis.py
+          tests/test_product_core_horizon_contract.py
+          tests/test_production_trade_plan.py
+          tests/test_product_quality_gate_overlay.py
