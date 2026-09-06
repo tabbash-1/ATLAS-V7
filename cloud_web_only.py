@@ -53,8 +53,6 @@ from production_continuation_scoring import install as install_continuation
 install_continuation(atlas)
 from production_decision_api import install as install_decision_api
 install_decision_api(atlas)
-from canonical_geometry_overlay import install as install_canonical_geometry
-CANONICAL_GEOMETRY = install_canonical_geometry(atlas)
 from decision_engine_v7 import install as install_decision_engine
 install_decision_engine(atlas)
 from horizon_fit_overlay import install as install_horizon_fit
@@ -73,6 +71,12 @@ from prospective_fourth_vote_shadow import install as install_fourth_vote_shadow
 FOURTH_VOTE_SHADOW = install_fourth_vote_shadow(atlas)
 from prospective_long_close_shadow import install as install_long_close_shadow
 LONG_CLOSE_STRUCTURE_SHADOW = install_long_close_shadow(atlas)
+
+# Canonical geometry must be the final geometry authority after every component
+# that can rewrite Entry/SL/TP/R:R, but before the final product quality gate
+# builds analyst_output. It never changes score, threshold, or raw qualification.
+from canonical_geometry_overlay import install as install_canonical_geometry
+CANONICAL_GEOMETRY = install_canonical_geometry(atlas)
 
 # Final canonical product guard is intentionally installed after every component
 # that can alter the live Production decision. It may demote a score-qualified
