@@ -46,6 +46,7 @@ def capture(decision, captured_at=None):
         'invalidated': False,
         'invalidated_at': None,
         'activation_price': None,
+        # Raw market returns. Directional normalization belongs to calibration.
         'forward_return_pct': {},
         'research_only': True,
         'live_execution': False,
@@ -119,6 +120,11 @@ def settle(record, candles4h):
 
 
 def attach_forward_returns(record, hourly_candles):
+    """Attach RAW market returns at 4/8/12H after activation.
+
+    SHORT normalization is intentionally not performed here. The calibration
+    engine normalizes raw market returns by direction exactly once.
+    """
     out = dict(record or {})
     if not out.get('triggered') or not out.get('triggered_at'):
         return out
@@ -131,7 +137,6 @@ def attach_forward_returns(record, hourly_candles):
     except Exception:
         return out
 
-    direction = str(out.get('direction') or '').upper()
     returns = dict(out.get('forward_return_pct') or {})
     for h in HORIZONS:
         target = start + dt.timedelta(hours=h)
@@ -149,6 +154,6 @@ def attach_forward_returns(record, hourly_candles):
             continue
         _, close = min(candidates, key=lambda x: x[0])
         raw = 100.0 * (close - entry) / entry
-        returns[str(h)] = round(raw if direction == 'LONG' else -raw, 6)
+        returns[str(h)] = round(raw, 6)
     out['forward_return_pct'] = returns
     return out
