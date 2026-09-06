@@ -130,7 +130,7 @@ jobs:
             ui_code="$(curl -L --connect-timeout 20 --max-time 60 -sS -w '%{http_code}' -o "$ui" "${BASE_URL}/atlas-research-validation-ui.js?v=research-validation-v1" || true)"
             if [[ "$page_code" =~ ^2 ]] && [[ "$ui_code" =~ ^2 ]] && \
                grep -q 'atlas-research-validation-ui.js?v=research-validation-v1' "$page" && \
-               grep -q "ATLAS_RESEARCH_VALIDATION_UI_V1" "$ui" && \
+               grep -q "ATLAS_RESEARCH_SHADOW_UI_V2" "$ui" && \
                grep -q "can_override_production:false" "$ui" && \
                grep -q "can_change_threshold:false" "$ui"; then
               ui_ok=1; break
@@ -142,4 +142,4 @@ jobs:
             grep -o 'atlas-research-validation-ui[^<]*' "$page" >&2 || true
             exit 1
           fi
-          echo 'PASS live Research Validation UI isolation contract'
+          echo 'PASS live Research Shadow UI isolation contract'
