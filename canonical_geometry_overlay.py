@@ -9,6 +9,7 @@ Entry/Stop/Target shown by the decision payload and preserves the legacy
 """
 
 VERSION = "ATLAS_CANONICAL_GEOMETRY_TRUTH_V1"
+REASON_SCHEMA_VERSION = "ATLAS_GEOMETRY_REASON_CODES_V1"
 MIN_RR = 1.0
 
 
@@ -19,69 +20,85 @@ def _num(value):
         return None
 
 
+def _base(status, qualified, reason, blockers, **extra):
+    out = {
+        "status": status,
+        "qualified": qualified,
+        "reason": reason,
+        "primary_blocker": blockers[0] if blockers else None,
+        "blocker_codes": list(blockers),
+        "reason_schema_version": REASON_SCHEMA_VERSION,
+        "risk_reward": None,
+        "min_risk_reward": MIN_RR,
+        "version": VERSION,
+    }
+    out.update(extra)
+    return out
+
+
 def assess(direction, entry, stop, target):
     entry = _num(entry)
     stop = _num(stop)
     target = _num(target)
+    checks = {
+        "direction_valid": direction in ("LONG", "SHORT"),
+        "entry_present": entry is not None,
+        "stop_present": stop is not None,
+        "target_present": target is not None,
+        "stop_correct_side": None,
+        "target_correct_side": None,
+        "risk_positive": None,
+        "rr_meets_minimum": None,
+    }
 
     if direction not in ("LONG", "SHORT"):
-        return {
-            "status": "NOT_APPLICABLE",
-            "qualified": False,
-            "reason": "NO_DIRECTION",
-            "risk_reward": None,
-            "version": VERSION,
-        }
-    if None in (entry, stop, target):
-        return {
-            "status": "BLOCK",
-            "qualified": False,
-            "reason": "GEOMETRY_INCOMPLETE",
-            "risk_reward": None,
-            "min_risk_reward": MIN_RR,
-            "version": VERSION,
-        }
+        return _base("NOT_APPLICABLE", False, "NO_DIRECTION", ["NO_DIRECTION"], checks=checks)
 
-    directional = (
-        direction == "LONG" and stop < entry < target
-    ) or (
-        direction == "SHORT" and target < entry < stop
-    )
-    if not directional:
-        return {
-            "status": "BLOCK",
-            "qualified": False,
-            "reason": "INVALID_ENTRY_SL_TP_ORDER",
-            "risk_reward": None,
-            "min_risk_reward": MIN_RR,
-            "version": VERSION,
-        }
+    missing = []
+    if entry is None:
+        missing.append("MISSING_ENTRY")
+    if stop is None:
+        missing.append("MISSING_STOP")
+    if target is None:
+        missing.append("MISSING_TARGET")
+    if missing:
+        return _base("BLOCK", False, "GEOMETRY_INCOMPLETE", missing, checks=checks)
+
+    if direction == "LONG":
+        checks["stop_correct_side"] = stop < entry
+        checks["target_correct_side"] = target > entry
+    else:
+        checks["stop_correct_side"] = stop > entry
+        checks["target_correct_side"] = target < entry
+
+    ordering_blockers = []
+    if not checks["stop_correct_side"]:
+        ordering_blockers.append("STOP_WRONG_SIDE")
+    if not checks["target_correct_side"]:
+        ordering_blockers.append("TARGET_WRONG_SIDE")
+    if ordering_blockers:
+        return _base("BLOCK", False, "INVALID_ENTRY_SL_TP_ORDER", ordering_blockers, checks=checks)
 
     risk = abs(entry - stop)
     reward = abs(target - entry)
-    rr = reward / risk if risk > 0 else None
-    if rr is None:
-        return {
-            "status": "BLOCK",
-            "qualified": False,
-            "reason": "ZERO_RISK_GEOMETRY",
-            "risk_reward": None,
-            "min_risk_reward": MIN_RR,
-            "version": VERSION,
-        }
+    checks["risk_positive"] = risk > 0
+    if not checks["risk_positive"]:
+        return _base("BLOCK", False, "ZERO_RISK_GEOMETRY", ["NON_POSITIVE_RISK"], checks=checks)
 
-    qualified = rr >= MIN_RR
-    return {
-        "status": "PASS" if qualified else "BLOCK",
-        "qualified": qualified,
-        "reason": "RR_ONE_TO_ONE_OR_BETTER" if qualified else "RR_BELOW_ONE_TO_ONE",
-        "risk_reward": round(rr, 6),
-        "min_risk_reward": MIN_RR,
-        "risk": round(risk, 10),
-        "reward": round(reward, 10),
-        "rr_source": "RECOMPUTED_FROM_EXACT_ENTRY_STOP_TARGET",
-        "version": VERSION,
-    }
+    rr = reward / risk
+    checks["rr_meets_minimum"] = rr >= MIN_RR
+    qualified = checks["rr_meets_minimum"]
+    return _base(
+        "PASS" if qualified else "BLOCK",
+        qualified,
+        "RR_ONE_TO_ONE_OR_BETTER" if qualified else "RR_BELOW_ONE_TO_ONE",
+        [] if qualified else ["RR_BELOW_MINIMUM"],
+        risk_reward=round(rr, 6),
+        risk=round(risk, 10),
+        reward=round(reward, 10),
+        rr_source="RECOMPUTED_FROM_EXACT_ENTRY_STOP_TARGET",
+        checks=checks,
+    )
 
 
 def install(atlas):
@@ -107,6 +124,7 @@ def install(atlas):
         payload["geometry_ready"] = geometry_ready
         payload["raw_geometry_ready"] = geometry_ready
         payload["geometry_version"] = VERSION
+        payload["geometry_reason_schema_version"] = REASON_SCHEMA_VERSION
         payload["geometry_rr_source"] = "RECOMPUTED_FROM_EXACT_ENTRY_STOP_TARGET"
         payload["score_or_threshold_changed_by_geometry"] = False
 
@@ -117,7 +135,7 @@ def install(atlas):
         if not qualified:
             payload["actionable_reason"] = payload.get("wait_reason") or "SCORE_BELOW_SIGNAL_THRESHOLD"
         elif not geometry_ready:
-            payload["actionable_reason"] = geometry.get("reason")
+            payload["actionable_reason"] = geometry.get("primary_blocker") or geometry.get("reason")
         else:
             payload["actionable_reason"] = "ANALYSIS_GEOMETRY_READY"
 
@@ -131,6 +149,7 @@ def install(atlas):
             matrix["swing"]["risk_reward"] = geometry.get("risk_reward")
             matrix["swing"]["execution_ready"] = geometry_ready
             matrix["swing"]["geometry_ready"] = geometry_ready
+            matrix["swing"]["geometry_blocker_codes"] = list(geometry.get("blocker_codes") or [])
             matrix["swing"]["actionable_decision"] = direction if geometry_ready else "WAIT"
 
         payload["analysis_only"] = True
@@ -141,6 +160,7 @@ def install(atlas):
     return {
         "enabled": True,
         "version": VERSION,
+        "reason_schema_version": REASON_SCHEMA_VERSION,
         "min_rr": MIN_RR,
         "rr_source": "EXACT_ENTRY_STOP_TARGET",
         "score_threshold_unchanged": True,
