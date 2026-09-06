@@ -11,6 +11,7 @@ on:
       - 'production_decision_api.py'
       - 'canonical_geometry_overlay.py'
       - 'tests/test_canonical_geometry_overlay.py'
+      - 'verify_canonical_geometry_payload.py'
       - 'decision_engine_v7.py'
       - 'production-web-autoload.js'
       - 'atlas-unified-terminal.js'
@@ -95,20 +96,7 @@ jobs:
               .analysis_only == true and .live_execution == false and
               .production_threshold_changed_by_quality_gate == false and .production_score_preserved == true
             ' "/tmp/atlas-final-gate/$s.json" >/dev/null
-            python - "/tmp/atlas-final-gate/$s.json" <<'PY'
-import json, math, sys
-p=json.load(open(sys.argv[1]))
-d=p.get('candidate_direction')
-e=p.get('entry'); sl=p.get('stop_loss'); tp=p.get('take_profit')
-g=p.get('geometry_gate') or {}
-if d in ('LONG','SHORT') and all(isinstance(x,(int,float)) for x in (e,sl,tp)):
-    risk=abs(e-sl); reward=abs(tp-e)
-    rr=reward/risk if risk else None
-    reported=g.get('risk_reward')
-    if rr is None or reported is None or not math.isclose(rr, float(reported), rel_tol=1e-5, abs_tol=1e-5):
-        raise SystemExit(f'geometry RR mismatch computed={rr} reported={reported}')
-print('exact geometry RR PASS')
-PY
+            python verify_canonical_geometry_payload.py "/tmp/atlas-final-gate/$s.json"
             decision=$(jq -r '.analyst_output.decision' "/tmp/atlas-final-gate/$s.json")
             gate=$(jq -r '.analyst_output.setup_quality_gate.status' "/tmp/atlas-final-gate/$s.json")
             score=$(jq -r '.analyst_output.confidence' "/tmp/atlas-final-gate/$s.json")
