@@ -1,0 +1,66 @@
+name: ATLAS Render Canonical Execution Semantics Smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/render-execution-semantics-live-smoke.yml'
+      - 'production_execution_semantics_overlay.py'
+      - 'product_quality_gate_overlay.py'
+      - 'production_trade_plan.py'
+      - 'production_opportunity_runtime.py'
+  workflow_dispatch:
+
+jobs:
+  canonical-execution-live-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Wait for Render deploy
+        run: sleep 120
+
+      - name: Verify live canonical decision cannot be resurrected
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://atlas-v7.onrender.com'
+          curl -fsSL --retry 8 --retry-delay 10 --retry-all-errors --connect-timeout 10 --max-time 30 "$base/health" >/tmp/health.json
+          python3 -m json.tool /tmp/health.json >/dev/null
+
+          for symbol in BTCUSDT ETHUSDT SOLUSDT XRPUSDT BNBUSDT DOGEUSDT HYPEUSDT ZECUSDT; do
+            url="$base/api/decision/current?symbol=$symbol"
+            code="$(curl -L --retry 5 --retry-delay 10 --retry-all-errors --connect-timeout 10 --max-time 45 -sS -w '%{http_code}' -o "/tmp/$symbol.json" "$url")"
+            echo "$symbol HTTP=$code"
+            test "$code" -ge 200 -a "$code" -lt 300
+            SYMBOL="$symbol" python3 - <<'PY'
+          import json, os
+          symbol=os.environ['SYMBOL']
+          x=json.load(open(f'/tmp/{symbol}.json'))
+          assert x.get('ok') is True, x
+          expected='PRODUCTION_EXECUTION_SEMANTICS_V2_CANONICAL_FAIL_CLOSED'
+          assert x.get('execution_semantics_version') == expected, (symbol, x.get('execution_semantics_version'))
+
+          analyst=x.get('analyst_output') or {}
+          gate=x.get('setup_quality_gate') or {}
+          canonical=str(analyst.get('decision') or x.get('canonical_product_decision') or '').upper()
+          quality_blocked=str(gate.get('status') or '').upper() == 'BLOCK'
+          if canonical == 'WAIT' or quality_blocked:
+              assert x.get('actionable_decision') == 'WAIT', (symbol, canonical, gate, x.get('actionable_decision'))
+              assert x.get('execution_ready') is False, (symbol, x.get('execution_ready'))
+              assert x.get('canonical_permission_ready') is False, (symbol, x.get('canonical_permission_ready'))
+
+          if x.get('execution_ready'):
+              assert str(x.get('actionable_decision') or '').upper() in {'LONG','SHORT'}, x
+              assert x.get('canonical_permission_ready') is True, x
+              assert x.get('execution_permission_ready') is True, x
+              assert x.get('geometry_ready') is True, x
+
+          print('CANONICAL_EXECUTION_OK', symbol, json.dumps({
+              'canonical': canonical,
+              'actionable': x.get('actionable_decision'),
+              'quality_gate': gate.get('status'),
+              'execution_ready': x.get('execution_ready'),
+              'semantics_version': x.get('execution_semantics_version'),
+          }, sort_keys=True))
+          PY
+          done
