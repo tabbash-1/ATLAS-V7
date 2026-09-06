@@ -53,18 +53,21 @@ def test_legacy_trade_plan_cannot_construct_product_shell_decision():
         assert token not in js
 
 
-def test_ai_is_context_only_and_cannot_override_canonical_decision():
+def test_decision_intelligence_is_shadow_only_and_cannot_override_canonical_decision():
     js=Path('atlas-product-shell.js').read_text()
-    assert 'Canonical decision cannot be overridden' in js
-    assert 'CONTEXT ONLY · CANNOT OVERRIDE' in js
-    assert "set('apsAiBest',a.analysis_ready?a.decision:'WAIT')" in js
+    assert 'ATLAS_PRODUCT_SHELL_V5_DECISION_INTELLIGENCE' in js
+    assert 'ATLAS AI · DECISION INTELLIGENCE' in js
+    assert 'shadow explanation only' in js
+    assert 'canonical decision locked' in js
+    assert "set('apsAiBest',ready?decision:'WAIT')" in js
     assert 'ai?.canonical_action' not in js
     assert 'best_counterfactual' not in js
+    assert 'decisionIntelligenceShadowOnly:true' in js
 
 
 def test_product_shell_identity_is_analysis_only():
     js=Path('atlas-product-shell.js').read_text()
-    assert 'ATLAS_PRODUCT_SHELL_V4_ANALYST_OUTPUT_ONLY' in js
+    assert 'ATLAS_PRODUCT_SHELL_V5_DECISION_INTELLIGENCE' in js
     assert 'CRYPTO TRADE INTELLIGENCE & ANALYSIS' in js
     assert 'Canonical 4–12H Analysis' in js
     assert 'Evidence quality' in js
