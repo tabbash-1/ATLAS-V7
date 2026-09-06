@@ -38,6 +38,7 @@ jobs:
       EXPECTED_PROFILE: ATLAS_ANALYSIS_EVIDENCE_PROFILE_V1
       EXPECTED_GEOMETRY: ATLAS_GEOMETRY_V5_ATR_STRUCTURE_PROVENANCE
       EXPECTED_CANONICAL_GEOMETRY: ATLAS_CANONICAL_GEOMETRY_TRUTH_V1
+      EXPECTED_GEOMETRY_REASON_SCHEMA: ATLAS_GEOMETRY_REASON_CODES_V1
     steps:
       - uses: actions/checkout@v4
       - name: Wait for exact deployed runtime contract
@@ -47,11 +48,11 @@ jobs:
           ok=0
           for attempt in $(seq 1 36); do
             code=$(curl -L --connect-timeout 15 --max-time 60 -sS -w '%{http_code}' -o /tmp/web-mode.json "$BASE_URL/api/web-mode?t=$(date +%s)" || true)
-            if [[ "$code" =~ ^2 ]] && jq -e --arg v "$EXPECTED_GATE" --arg p "$EXPECTED_PROFILE" --arg cg "$EXPECTED_CANONICAL_GEOMETRY" '.ok == true and .product_quality_gate.version == $v and .product_quality_gate.analysis_profile_version == $p and .product_quality_gate.canonical_contract == "analyst_output" and .product_quality_gate.product_horizon == "4-12H" and .product_quality_gate.analysis_only == true and .product_quality_gate.live_execution == false and .product_quality_gate.score_threshold_unchanged == true and .product_quality_gate.raw_production_qualification_preserved == true and .canonical_geometry.version == $cg and .canonical_geometry.rr_source == "EXACT_ENTRY_STOP_TARGET" and .canonical_geometry.score_threshold_unchanged == true and .canonical_geometry.analysis_only == true and .canonical_geometry.live_execution == false' /tmp/web-mode.json >/dev/null 2>&1; then
+            if [[ "$code" =~ ^2 ]] && jq -e --arg v "$EXPECTED_GATE" --arg p "$EXPECTED_PROFILE" --arg cg "$EXPECTED_CANONICAL_GEOMETRY" --arg gr "$EXPECTED_GEOMETRY_REASON_SCHEMA" '.ok == true and .product_quality_gate.version == $v and .product_quality_gate.analysis_profile_version == $p and .product_quality_gate.canonical_contract == "analyst_output" and .product_quality_gate.product_horizon == "4-12H" and .product_quality_gate.analysis_only == true and .product_quality_gate.live_execution == false and .product_quality_gate.score_threshold_unchanged == true and .product_quality_gate.raw_production_qualification_preserved == true and .canonical_geometry.version == $cg and .canonical_geometry.reason_schema_version == $gr and .canonical_geometry.rr_source == "EXACT_ENTRY_STOP_TARGET" and .canonical_geometry.score_threshold_unchanged == true and .canonical_geometry.analysis_only == true and .canonical_geometry.live_execution == false' /tmp/web-mode.json >/dev/null 2>&1; then
               ok=1
               break
             fi
-            echo "attempt=$attempt http=$code deployed_gate=$(jq -r '.product_quality_gate.version // "missing"' /tmp/web-mode.json 2>/dev/null || echo invalid) canonical_geometry=$(jq -r '.canonical_geometry.version // "missing"' /tmp/web-mode.json 2>/dev/null || echo invalid)"
+            echo "attempt=$attempt http=$code deployed_gate=$(jq -r '.product_quality_gate.version // "missing"' /tmp/web-mode.json 2>/dev/null || echo invalid) canonical_geometry=$(jq -r '.canonical_geometry.version // "missing"' /tmp/web-mode.json 2>/dev/null || echo invalid) reason_schema=$(jq -r '.canonical_geometry.reason_schema_version // "missing"' /tmp/web-mode.json 2>/dev/null || echo invalid)"
             sleep 10
           done
           test "$ok" = 1
@@ -74,14 +75,17 @@ jobs:
           }
           for s in BTCUSDT ETHUSDT SOLUSDT XRPUSDT BNBUSDT DOGEUSDT ZECUSDT HYPEUSDT; do
             fetch_decision "$s"
-            jq -e --arg s "$s" --arg v "$EXPECTED_GATE" --arg p "$EXPECTED_PROFILE" --arg cg "$EXPECTED_CANONICAL_GEOMETRY" '
+            jq -e --arg s "$s" --arg v "$EXPECTED_GATE" --arg p "$EXPECTED_PROFILE" --arg cg "$EXPECTED_CANONICAL_GEOMETRY" --arg gr "$EXPECTED_GEOMETRY_REASON_SCHEMA" '
               .ok == true and .symbol == $s and
               .canonical_product_contract == "analyst_output" and
               .quality_gate_version == $v and
               .analysis_profile_version == $p and
               .geometry_version == $cg and
+              .geometry_reason_schema_version == $gr and
               .geometry_rr_source == "RECOMPUTED_FROM_EXACT_ENTRY_STOP_TARGET" and
               .geometry_gate.version == $cg and
+              .geometry_gate.reason_schema_version == $gr and
+              (.geometry_gate.blocker_codes | type) == "array" and
               .score_or_threshold_changed_by_geometry == false and
               .analyst_output.contract_version == $v and
               .analyst_output.analysis_profile_version == $p and
@@ -89,6 +93,11 @@ jobs:
               .analyst_output.horizon == "4-12H" and
               (.analyst_output.decision == "LONG" or .analyst_output.decision == "SHORT" or .analyst_output.decision == "WAIT") and
               .analyst_output.analysis_only == true and .analyst_output.live_execution == false and
+              .analyst_output.geometry_readiness.reason_schema_version == $gr and
+              .analyst_output.geometry_readiness.geometry_version == $cg and
+              (.analyst_output.geometry_readiness.blocker_codes | type) == "array" and
+              .analyst_output.geometry_readiness.ready == (.geometry_gate.qualified == true) and
+              ((.geometry_gate.qualified == true and (.analyst_output.geometry_readiness.blocker_codes | length) == 0) or (.geometry_gate.qualified != true and (.analyst_output.geometry_readiness.blocker_codes | length) >= 1)) and
               .analyst_output.evidence_profile.version == $p and
               .analyst_output.evidence_profile.score_changed == false and
               .analyst_output.evidence_profile.threshold_changed == false and
@@ -102,7 +111,8 @@ jobs:
             score=$(jq -r '.analyst_output.confidence' "/tmp/atlas-final-gate/$s.json")
             threshold=$(jq -r '.analyst_output.signal_threshold' "/tmp/atlas-final-gate/$s.json")
             raw_geom=$(jq -r '.geometry_gate.status' "/tmp/atlas-final-gate/$s.json")
-            echo "$s decision=$decision gate=$gate raw_geometry=$raw_geom score=$score threshold=$threshold profile=$EXPECTED_PROFILE"
+            blocker=$(jq -r '.analyst_output.geometry_readiness.primary_blocker // "NONE"' "/tmp/atlas-final-gate/$s.json")
+            echo "$s decision=$decision gate=$gate raw_geometry=$raw_geom geometry_blocker=$blocker score=$score threshold=$threshold profile=$EXPECTED_PROFILE"
             if [[ "$decision" == "LONG" || "$decision" == "SHORT" ]]; then
               jq -e --arg g "$EXPECTED_GEOMETRY" '.analyst_output.analysis_ready == true and (.analyst_output.entry|numbers) and (.analyst_output.stop_loss|numbers) and (.analyst_output.take_profit|numbers) and (.analyst_output.risk_reward|numbers) and .analyst_output.geometry_provenance.geometry_version == $g and .analyst_output.geometry_provenance.score_or_threshold_changed == false' "/tmp/atlas-final-gate/$s.json" >/dev/null
             else
@@ -124,13 +134,17 @@ jobs:
           grep -q 'ATLAS_PRODUCT_SHELL_V4_ANALYST_OUTPUT_ONLY' /tmp/atlas-product-shell.js
           grep -q "canonicalContract:'analyst_output'" /tmp/atlas-product-shell.js
           grep -q "productHorizon:'4-12H'" /tmp/atlas-product-shell.js
+          grep -q 'geometry_readiness' /tmp/atlas-product-shell.js
+          grep -q 'Geometry blocker:' /tmp/atlas-product-shell.js
+          grep -q 'geometryReasonCodes:true' /tmp/atlas-product-shell.js
           ! grep -q "p.status==='ACTIONABLE'" /tmp/atlas-product-shell.js
           ! grep -q "execution_ready" /tmp/atlas-product-shell.js
       - name: Final safety assertions
         shell: bash
         run: |
           set -euo pipefail
-          jq -e '.product_quality_gate.score_threshold_unchanged == true and .product_quality_gate.raw_production_qualification_preserved == true and .product_quality_gate.research_warnings_never_auto_promote == true and .product_quality_gate.analysis_only == true and .product_quality_gate.live_execution == false and .canonical_geometry.score_threshold_unchanged == true and .canonical_geometry.live_execution == false' /tmp/web-mode.json >/dev/null
+          jq -e --arg gr "$EXPECTED_GEOMETRY_REASON_SCHEMA" '.product_quality_gate.score_threshold_unchanged == true and .product_quality_gate.raw_production_qualification_preserved == true and .product_quality_gate.research_warnings_never_auto_promote == true and .product_quality_gate.analysis_only == true and .product_quality_gate.live_execution == false and .canonical_geometry.reason_schema_version == $gr and .canonical_geometry.score_threshold_unchanged == true and .canonical_geometry.live_execution == false' /tmp/web-mode.json >/dev/null
           grep -q 'ATLAS_CANONICAL_GEOMETRY_TRUTH_V1' canonical_geometry_overlay.py
+          grep -q 'ATLAS_GEOMETRY_REASON_CODES_V1' canonical_geometry_overlay.py
           grep -q 'RECOMPUTED_FROM_EXACT_ENTRY_STOP_TARGET' canonical_geometry_overlay.py
           echo 'ATLAS FINAL PRODUCTION GATE: PASS'
