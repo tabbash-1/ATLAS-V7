@@ -1,0 +1,57 @@
+name: ATLAS Canonical Learning Engine
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'atlas_learning_engine.py'
+      - 'analyst_forward_attribution.py'
+      - 'wait_diagnostics.py'
+      - 'tests/test_atlas_learning_engine.py'
+      - 'committed_research_api.py'
+      - '.github/workflows/atlas-learning-engine.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'atlas_learning_engine.py'
+      - 'analyst_forward_attribution.py'
+      - 'wait_diagnostics.py'
+      - 'tests/test_atlas_learning_engine.py'
+      - 'committed_research_api.py'
+      - '.github/workflows/atlas-learning-engine.yml'
+  schedule:
+    - cron: '41 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atlas-canonical-learning-engine-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  learn:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Safety regression
+        run: python3 tests/test_atlas_learning_engine.py
+      - name: Build canonical learning evidence
+        run: python3 atlas_learning_engine.py
+      - name: Verify immutable Production boundary
+        run: |
+          jq -e '.schema == "ATLAS_LEARNING_ENGINE_V1" and .canonical_contract == "analyst_output" and .product_horizon == "4-12H" and .methodology.future_leakage_allowed == false and .methodology.automatic_learning_updates == false and .proof_status.edge_proven == false and .safety.research_only == true and .safety.paper_only == true and .safety.analysis_only == true and .safety.live_execution == false and .safety.can_override_production == false and .safety.can_change_score == false and .safety.can_change_threshold == false and .safety.can_change_geometry == false and .safety.can_change_decision == false' status/learning-engine-latest.json >/dev/null
+      - name: Commit evidence report
+        if: github.event_name != 'pull_request'
+        run: |
+          git config user.name "atlas-learning-engine"
+          git config user.email "atlas-learning-engine@users.noreply.github.com"
+          git add status/learning-engine-latest.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "chore: update canonical learning evidence [skip ci]"
+          git pull --rebase origin main
+          git push
