@@ -10,9 +10,9 @@ as warnings, never silently promoted into Production vetoes.
 from decision_intelligence import VERSION as DECISION_INTELLIGENCE_VERSION, build as build_decision_intelligence
 
 # Keep the public contract identifier stable for existing API/CI consumers while
-# exposing the HTF direction revision separately.
+# exposing feature revisions separately.
 VERSION = 'PRODUCT_QUALITY_GATE_V2_CANONICAL_ANALYST_OUTPUT'
-FEATURE_VERSION = 'PRODUCT_QUALITY_GATE_FEATURE_V3_HTF_DIRECTION_CONTRACT'
+FEATURE_VERSION = 'PRODUCT_QUALITY_GATE_FEATURE_V4_HTF_DIRECTION_GEOMETRY_CONTRACT'
 PROFILE_VERSION = 'ATLAS_ANALYSIS_EVIDENCE_PROFILE_V1'
 PRODUCT_HORIZON = '4-12H'
 PRODUCT_LANE = 'CORE_4_12H'
@@ -178,14 +178,63 @@ def _direction_state(row):
     }
 
 
+def _geometry_state(row):
+    """Canonical geometry readiness: HTF geometry wins when installed.
+
+    The legacy 1H-derived geometry gate remains visible for diagnostics and
+    backward audit, but cannot contradict the final 4-12H analyst contract.
+    """
+    htf = dict(row.get('htf_core_geometry') or {})
+    legacy = dict(row.get('geometry_gate') or {})
+    if htf:
+        ready = bool(htf.get('ready'))
+        reason = htf.get('reason') or ('HTF_GEOMETRY_READY' if ready else 'HTF_GEOMETRY_NOT_READY')
+        blockers = [] if ready else [reason]
+        return {
+            'ready': ready,
+            'status': htf.get('status'),
+            'reason': reason,
+            'primary_blocker': None if ready else reason,
+            'blocker_codes': blockers,
+            'checks': {
+                'product_direction_present': htf.get('product_direction') in ('LONG', 'SHORT'),
+                'entry_confirmation_aligned': htf.get('direction_alignment') == 'ALIGNED',
+                'rr_tp1_meets_minimum': bool(ready and _num(htf.get('rr_tp1')) is not None and _num(htf.get('rr_tp1')) >= _num(htf.get('min_rr'), 1.0)),
+            },
+            'reason_schema_version': 'HTF_CORE_GEOMETRY_REASON_V1',
+            'geometry_version': htf.get('version'),
+            'authority': 'HTF_4H_12H',
+            'legacy_geometry_gate': legacy,
+            'legacy_geometry_ready': bool(legacy.get('qualified')),
+            'legacy_geometry_can_override': False,
+        }
+    legacy_blockers = list(legacy.get('blocker_codes') or [])
+    if not legacy_blockers and not legacy.get('qualified') and legacy.get('reason'):
+        legacy_blockers = [legacy.get('reason')]
+    return {
+        'ready': bool(legacy.get('qualified')),
+        'status': legacy.get('status'),
+        'reason': legacy.get('reason'),
+        'primary_blocker': legacy.get('primary_blocker'),
+        'blocker_codes': legacy_blockers,
+        'checks': dict(legacy.get('checks') or {}),
+        'reason_schema_version': legacy.get('reason_schema_version'),
+        'geometry_version': legacy.get('version'),
+        'authority': 'LEGACY_PRE_HTF',
+        'legacy_geometry_gate': legacy,
+        'legacy_geometry_ready': bool(legacy.get('qualified')),
+        'legacy_geometry_can_override': True,
+    }
+
+
 def _analyst_output(row, gate):
     decision = _norm(row.get('actionable_decision'))
     if decision not in ('LONG', 'SHORT'):
         decision = 'WAIT'
     plan = row.get('trade_plan') or {}
     actionable = decision in ('LONG', 'SHORT')
-    geometry_gate = dict(row.get('geometry_gate') or {})
-    geometry_blockers = list(geometry_gate.get('blocker_codes') or [])
+    geometry_state = _geometry_state(row)
+    geometry_blockers = list(geometry_state.get('blocker_codes') or [])
     reason = row.get('actionable_reason') or row.get('wait_reason') or gate.get('reason')
     reasons = []
     for item in (
@@ -258,16 +307,7 @@ def _analyst_output(row, gate):
         'risk_reward': candidate_plan['risk_reward'] if actionable else None,
         'candidate_plan': candidate_plan,
         'geometry_provenance': candidate_plan['geometry_provenance'] if actionable else {},
-        'geometry_readiness': {
-            'ready': bool(geometry_gate.get('qualified')),
-            'status': geometry_gate.get('status'),
-            'reason': geometry_gate.get('reason'),
-            'primary_blocker': geometry_gate.get('primary_blocker'),
-            'blocker_codes': geometry_blockers,
-            'checks': dict(geometry_gate.get('checks') or {}),
-            'reason_schema_version': geometry_gate.get('reason_schema_version'),
-            'geometry_version': geometry_gate.get('version'),
-        },
+        'geometry_readiness': geometry_state,
         'evidence_profile': profile,
         'reasons': reasons,
         'primary_reason': reason,
@@ -275,7 +315,9 @@ def _analyst_output(row, gate):
         'what_changes_status': changes,
         'setup_quality_gate': gate,
         'production_qualified_raw': bool(row.get('production_signal_qualified')),
-        'geometry_ready_raw': bool(geometry_gate.get('qualified')),
+        'geometry_ready_raw': bool(geometry_state.get('ready')),
+        'geometry_ready_canonical': bool(geometry_state.get('ready')),
+        'legacy_geometry_ready_raw': bool(geometry_state.get('legacy_geometry_ready')),
         'playbook': row.get('playbook'),
         'regime': row.get('regime'),
         'data_timestamp': row.get('generated_at') or row.get('generated_at_ms'),
@@ -335,6 +377,8 @@ def install(atlas):
         row['evidence_profile'] = row['analyst_output']['evidence_profile']
         row['canonical_product_decision'] = row['analyst_output']['decision']
         row['canonical_product_direction'] = row['analyst_output']['product_direction']
+        row['canonical_geometry_ready'] = row['analyst_output']['geometry_ready_canonical']
+        row['canonical_geometry_authority'] = row['analyst_output']['geometry_readiness']['authority']
         row['canonical_product_contract'] = 'analyst_output'
         return row
 
@@ -344,9 +388,11 @@ def install(atlas):
         'decision_intelligence_version': DECISION_INTELLIGENCE_VERSION,
         'product_lane': PRODUCT_LANE,'product_horizon': PRODUCT_HORIZON,
         'direction_authority': 'HTF_12H_4H','entry_confirmation_timeframe': '1h',
+        'geometry_authority': 'HTF_4H_12H_WHEN_AVAILABLE',
         'canonical_contract': 'analyst_output','quarantined_setup_families': len(QUARANTINE),
         'score_threshold_unchanged': True,'raw_production_qualification_preserved': True,
         'score_never_relabelled_to_opposite_htf_direction': True,
+        'legacy_geometry_cannot_override_htf_geometry': True,
         'decision_intelligence_shadow_only': True,'decision_intelligence_can_override': False,
         'research_warnings_never_auto_promote': True,'analysis_only': True,'live_execution': False,
     }
