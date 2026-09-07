@@ -30,6 +30,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Install test dependency
+        run: python -m pip install --disable-pip-version-check -q pytest
       - name: Compile HTF production modules
         run: python -m py_compile htf_structural_thesis.py htf_price_action.py htf_price_action_overlay.py htf_scenario_engine.py htf_core_geometry_overlay.py product_quality_gate_overlay.py cloud_start_web.py
       - name: Run HTF direction and geometry regressions
