@@ -14,7 +14,8 @@ def wave_series(n=120, start=100.0, step=0.12):
 def test_price_action_contract_is_analysis_only():
     row=analyze_price_action(wave_series(),'4h')
     assert row['ok'] is True
-    assert row['version']=='HTF_PRICE_ACTION_V1'
+    assert row['version']=='HTF_PRICE_ACTION_V2_ATR_GEOMETRY_INPUT'
+    assert row['atr14'] > 0
     assert row['score_changed'] is False
     assert row['threshold_changed'] is False
     assert row['live_execution'] is False
@@ -23,7 +24,6 @@ def test_price_action_contract_is_analysis_only():
 
 def test_liquidity_sweep_high_detected():
     rows=wave_series()
-    # Force a known prior swing high, then wick above and close below it.
     rows[-6]['high']=rows[-6]['close']+4.0
     level=rows[-6]['high']
     rows[-1]['open']=level-0.4
@@ -32,6 +32,7 @@ def test_liquidity_sweep_high_detected():
     rows[-1]['close']=level-0.3
     row=analyze_price_action(rows,'4h')
     assert row['liquidity_sweep'] in {'LIQUIDITY_SWEEP_HIGH','NONE'}
+    assert row['atr14'] > 0
     assert row['live_execution'] is False
 
 
