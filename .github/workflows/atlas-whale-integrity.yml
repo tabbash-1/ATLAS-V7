@@ -1,0 +1,67 @@
+name: ATLAS Whale Integrity
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'whale_intelligence.py'
+      - 'test_whale_intelligence.py'
+      - 'cloud_web_only_final.py'
+      - 'status/whale-intelligence-latest.json'
+      - '.github/workflows/atlas-whale-integrity.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlas-whale-integrity
+  cancel-in-progress: true
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run whale integrity regression
+        run: python3 -m unittest -v test_whale_intelligence.py
+
+  verify-live:
+    needs: regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Verify Production whale contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://atlas-v7.onrender.com'
+          ok=0
+          for i in $(seq 1 36); do
+            if curl -fsSL --connect-timeout 10 --max-time 40 "$base/api/runtime/status" -o /tmp/runtime.json \
+              && jq -e '.ok == true and .runtime == "WEB_ONLY_FINAL" and .whale_intelligence.version == "ATLAS_WHALE_INTELLIGENCE_V1_FAIL_CLOSED"' /tmp/runtime.json >/dev/null; then
+              ok=1; break
+            fi
+            sleep 10
+          done
+          test "$ok" = 1
+
+          curl -fsSL --connect-timeout 10 --max-time 40 "$base/api/whales/status" -o /tmp/status.json
+          curl -fsSL --connect-timeout 10 --max-time 40 "$base/api/whales/top10" -o /tmp/top10.json
+          curl -fsSL --connect-timeout 10 --max-time 40 "$base/api/whales/feed" -o /tmp/feed.json
+          curl -fsSL --connect-timeout 10 --max-time 40 "$base/api/whales/consensus" -o /tmp/consensus.json
+
+          jq -e '.ok == true and (.data_available|type) == "boolean" and .live_execution == false and .can_override_production == false' /tmp/status.json >/dev/null
+          jq -e '.ok == true and (.top10|type) == "array" and .live_execution == false and .can_override_production == false' /tmp/top10.json >/dev/null
+          jq -e '.ok == true and (.feed|type) == "array" and .live_execution == false and .can_override_production == false' /tmp/feed.json >/dev/null
+          jq -e '.ok == true and (.consensus.status == "BULLISH" or .consensus.status == "BEARISH" or .consensus.status == "MIXED" or .consensus.status == "INSUFFICIENT_DATA") and .live_execution == false and .can_override_production == false' /tmp/consensus.json >/dev/null
+
+          # Critical invariant: unavailable data must never render invented whales.
+          jq -e 'if .data_available == false then .count == 0 and (.top10|length) == 0 and .state == "DATA_UNAVAILABLE" else true end' /tmp/top10.json >/dev/null
+          jq -e 'if .data_available == false then .count == 0 and (.feed|length) == 0 and .state == "DATA_UNAVAILABLE" else true end' /tmp/feed.json >/dev/null
+
+          echo 'LIVE_WHALE_INTEGRITY_OK'
+          jq '{state,data_available,provider,last_updated,message}' /tmp/status.json
+          jq '{count,state,data_available}' /tmp/top10.json
+          jq '{consensus,state,data_available}' /tmp/consensus.json
