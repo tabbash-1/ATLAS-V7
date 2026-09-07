@@ -9,7 +9,7 @@ as warnings, never silently promoted into Production vetoes.
 
 from decision_intelligence import VERSION as DECISION_INTELLIGENCE_VERSION, build as build_decision_intelligence
 
-VERSION = 'PRODUCT_QUALITY_GATE_V2_CANONICAL_ANALYST_OUTPUT'
+VERSION = 'PRODUCT_QUALITY_GATE_V3_HTF_DIRECTION_CONTRACT'
 PROFILE_VERSION = 'ATLAS_ANALYSIS_EVIDENCE_PROFILE_V1'
 PRODUCT_HORIZON = '4-12H'
 PRODUCT_LANE = 'CORE_4_12H'
@@ -153,6 +153,28 @@ def _evidence_profile(row, gate):
     }
 
 
+def _direction_state(row):
+    thesis = dict(row.get('htf_thesis') or {})
+    product_direction = row.get('product_direction') or thesis.get('product_direction') or thesis.get('direction')
+    entry_direction = row.get('entry_confirmation_direction') or thesis.get('entry_confirmation_direction') or row.get('candidate_direction')
+    alignment = row.get('direction_alignment') or thesis.get('direction_alignment')
+    authority = row.get('direction_authority') or 'HTF_12H_4H'
+    return {
+        'product_direction': product_direction if product_direction in ('LONG', 'SHORT') else None,
+        'entry_confirmation_direction': entry_direction if entry_direction in ('LONG', 'SHORT') else None,
+        'alignment': alignment,
+        'authority': authority,
+        'authority_timeframes': list(thesis.get('authority_timeframes') or ['12h', '4h']),
+        'entry_confirmation_timeframe': thesis.get('confirmation_timeframe') or '1h',
+        'macro_context_timeframe': thesis.get('context_timeframe') or '1d',
+        'macro_context_direction': thesis.get('daily_context'),
+        'macro_context_confidence': thesis.get('daily_context_confidence'),
+        'one_hour_can_flip_product_direction': False,
+        'score_direction': row.get('candidate_direction'),
+        'score_reused_for_opposite_direction': False,
+    }
+
+
 def _analyst_output(row, gate):
     decision = _norm(row.get('actionable_decision'))
     if decision not in ('LONG', 'SHORT'):
@@ -185,15 +207,17 @@ def _analyst_output(row, gate):
     else:
         changes = ['REASSESS_IF_INVALIDATION_OR_VERIFIED_DIRECTION_CHANGES']
 
-    # Geometry is an independent prerequisite. Expose exact blockers even when a
-    # separate evidence-quality gate is also blocking the canonical decision.
     for blocker in geometry_blockers:
         condition = f"CLEAR_GEOMETRY_{blocker}"
         if condition not in changes:
             changes.append(condition)
 
+    direction_state = _direction_state(row)
     candidate_plan = {
         'direction': row.get('candidate_direction'),
+        'direction_role': 'ENTRY_CONFIRMATION_AND_SCORE_GEOMETRY',
+        'product_direction': direction_state['product_direction'],
+        'direction_alignment': direction_state['alignment'],
         'entry': row.get('entry') if row.get('entry') is not None else plan.get('entry'),
         'stop_loss': row.get('stop_loss') if row.get('stop_loss') is not None else plan.get('stop_loss'),
         'take_profit': row.get('take_profit') if row.get('take_profit') is not None else plan.get('tp2'),
@@ -202,6 +226,7 @@ def _analyst_output(row, gate):
         'entry_trigger': plan.get('entry_trigger'),
         'invalidation': plan.get('invalidation') or 'Re-evaluate if verified structure or direction changes.',
         'geometry_provenance': plan.get('geometry_provenance') or {},
+        'geometry_must_not_be_relabelled_to_opposite_product_direction': True,
     }
     profile = _evidence_profile(row, gate)
 
@@ -212,9 +237,15 @@ def _analyst_output(row, gate):
         'lane': PRODUCT_LANE,
         'horizon': PRODUCT_HORIZON,
         'decision': decision,
+        'product_direction': direction_state['product_direction'],
+        'entry_confirmation_direction': direction_state['entry_confirmation_direction'],
+        'direction_alignment': direction_state['alignment'],
+        'direction_authority': direction_state['authority'],
+        'direction_state': direction_state,
         'analysis_ready': actionable,
         'confidence': row.get('score'),
         'confidence_basis': 'PRODUCTION_SCORE_NOT_PROBABILITY',
+        'confidence_direction': row.get('candidate_direction'),
         'signal_threshold': row.get('signal_threshold'),
         'entry': candidate_plan['entry'] if actionable else None,
         'stop_loss': candidate_plan['stop_loss'] if actionable else None,
@@ -298,6 +329,7 @@ def install(atlas):
         row['analyst_output']['decision_intelligence'] = intelligence
         row['evidence_profile'] = row['analyst_output']['evidence_profile']
         row['canonical_product_decision'] = row['analyst_output']['decision']
+        row['canonical_product_direction'] = row['analyst_output']['product_direction']
         row['canonical_product_contract'] = 'analyst_output'
         return row
 
@@ -306,8 +338,10 @@ def install(atlas):
         'enabled': True,'version': VERSION,'analysis_profile_version': PROFILE_VERSION,
         'decision_intelligence_version': DECISION_INTELLIGENCE_VERSION,
         'product_lane': PRODUCT_LANE,'product_horizon': PRODUCT_HORIZON,
+        'direction_authority': 'HTF_12H_4H','entry_confirmation_timeframe': '1h',
         'canonical_contract': 'analyst_output','quarantined_setup_families': len(QUARANTINE),
         'score_threshold_unchanged': True,'raw_production_qualification_preserved': True,
+        'score_never_relabelled_to_opposite_htf_direction': True,
         'decision_intelligence_shadow_only': True,'decision_intelligence_can_override': False,
         'research_warnings_never_auto_promote': True,'analysis_only': True,'live_execution': False,
     }
