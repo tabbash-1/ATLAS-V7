@@ -190,6 +190,10 @@ def _geometry_state(row):
         ready = bool(htf.get('ready'))
         reason = htf.get('reason') or ('HTF_GEOMETRY_READY' if ready else 'HTF_GEOMETRY_NOT_READY')
         blockers = [] if ready else [reason]
+        rr_tp1 = _num(htf.get('rr_tp1'))
+        min_rr = _num(htf.get('min_rr'))
+        if min_rr is None:
+            min_rr = 1.0
         return {
             'ready': ready,
             'status': htf.get('status'),
@@ -199,7 +203,7 @@ def _geometry_state(row):
             'checks': {
                 'product_direction_present': htf.get('product_direction') in ('LONG', 'SHORT'),
                 'entry_confirmation_aligned': htf.get('direction_alignment') == 'ALIGNED',
-                'rr_tp1_meets_minimum': bool(ready and _num(htf.get('rr_tp1')) is not None and _num(htf.get('rr_tp1')) >= _num(htf.get('min_rr'), 1.0)),
+                'rr_tp1_meets_minimum': bool(ready and rr_tp1 is not None and rr_tp1 >= min_rr),
             },
             'reason_schema_version': 'HTF_CORE_GEOMETRY_REASON_V1',
             'geometry_version': htf.get('version'),
