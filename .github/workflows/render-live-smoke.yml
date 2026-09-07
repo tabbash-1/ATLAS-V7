@@ -6,12 +6,10 @@ on:
     paths:
       - '.github/workflows/render-live-smoke.yml'
       - 'cloud_start.py'
-      - 'trade_path_settlement.py'
-      - 'trade_outcome_runtime.py'
-      - 'execution_outcome_scope.py'
-      - 'execution_risk_management.py'
+      - 'cloud_web_only_final.py'
+      - 'final_trade_ready_guard.py'
       - 'production_decision_api.py'
-      - 'quick_reentry_guard.py'
+      - 'product_quality_gate_overlay.py'
   workflow_dispatch:
 
 jobs:
@@ -21,100 +19,43 @@ jobs:
     steps:
       - name: Wait for Render deploy
         run: sleep 90
-      - name: Verify health and runtime
+      - name: Verify health and final runtime authority
         shell: bash
         run: |
           set -euo pipefail
           base='https://atlas-v7.onrender.com'
-          curl -fsSL --retry 8 --retry-delay 10 --retry-all-errors --connect-timeout 10 --max-time 30 "$base/health" | tee /tmp/health.json
-          python3 -m json.tool /tmp/health.json >/dev/null
-          curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --connect-timeout 10 --max-time 30 "$base/api/runtime/status" | tee /tmp/runtime.json
-          python3 -m json.tool /tmp/runtime.json >/dev/null
-      - name: Verify managed signal and execution path summaries
+          curl -fsSL --retry 8 --retry-delay 10 --retry-all-errors --connect-timeout 10 --max-time 30 "$base/health" -o /tmp/health.json
+          jq -e '.status == "ok" and .service == "ATLAS_V7" and .live_execution == false' /tmp/health.json >/dev/null
+          curl -fsSL --retry 8 --retry-delay 10 --retry-all-errors --connect-timeout 10 --max-time 30 "$base/api/runtime/status" -o /tmp/runtime.json
+          jq -e '.ok == true and .runtime == "WEB_ONLY_FINAL" and .product_horizon == "4-12H" and .production_threshold == 68 and .live_execution == false' /tmp/runtime.json >/dev/null
+          jq -e '.final_trade_ready_guard.version == "FINAL_TRADE_READY_GUARD_V1_HTF_FAIL_CLOSED" and .final_trade_ready_guard.fail_closed == true and .final_trade_ready_guard.paper_portfolio_authority == "trade_ready"' /tmp/runtime.json >/dev/null
+          echo RUNTIME_FINAL_GUARD_OK
+      - name: Verify live final decision is fail-closed
         shell: bash
         run: |
           set -euo pipefail
-          base='https://atlas-v7.onrender.com/api/outcomes/path-summary'
-          for scope in signals execution; do
-            code="$(curl -L --retry 3 --retry-delay 10 --retry-all-errors --connect-timeout 10 --max-time 45 -sS -w '%{http_code}' -o "/tmp/path-${scope}.json" "$base?scope=${scope}&limit=100")"
-            echo "scope=$scope HTTP=$code"
-            cat "/tmp/path-${scope}.json"
-            test "$code" -ge 200 -a "$code" -lt 300
-            python3 -m json.tool "/tmp/path-${scope}.json" >/dev/null
+          base='https://atlas-v7.onrender.com'
+          for symbol in BTCUSDT BNBUSDT; do
+            curl -fsSL --retry 6 --retry-delay 8 --retry-all-errors --connect-timeout 10 --max-time 60 "$base/api/decision/current?symbol=$symbol" -o "/tmp/$symbol.json"
+            jq -e '.ok == true and (.trade_ready|type) == "boolean" and .final_trade_gate.version == "FINAL_TRADE_READY_GUARD_V1_HTF_FAIL_CLOSED"' "/tmp/$symbol.json" >/dev/null
+            jq -e '
+              if .trade_ready == true then
+                (.actionable_decision == "LONG" or .actionable_decision == "SHORT")
+                and .actionable_decision == .final_trade_gate.direction
+                and .final_trade_gate.status == "TRADE_READY"
+                and .final_trade_gate.direction_alignment == "ALIGNED"
+                and .final_trade_gate.production_signal_qualified == true
+                and .final_trade_gate.canonical_geometry_ready == true
+              else
+                .actionable_decision == "WAIT"
+                and .analysis_ready == false
+                and .can_execute == false
+                and .final_trade_gate.status == "WAIT"
+                and (.final_trade_gate.blockers|length) > 0
+                and (.trade_plan.analysis_ready == false)
+                and (.trade_plan.can_execute == false)
+              end
+            ' "/tmp/$symbol.json" >/dev/null
+            jq '{symbol,actionable_decision,trade_ready,product_direction,direction_alignment,final_trade_gate}' "/tmp/$symbol.json"
           done
-          python3 - <<'PY'
-          import json
-          signals=json.load(open('/tmp/path-signals.json'))
-          execution=json.load(open('/tmp/path-execution.json'))
-          expected='ATLAS_TRADE_PATH_SUMMARY_V2_EXECUTION_SCOPE'
-          policy='ATLAS_EXECUTION_RISK_V1_STRUCTURAL_TP1_PROTECT'
-          assert signals.get('schema') == expected, signals
-          assert execution.get('schema') == expected, execution
-          for payload in (signals, execution):
-              overall=payload.get('overall') or {}
-              assert 'market_data_errors' in overall, overall
-              assert 'market_data_circuit' in overall, overall
-              assert overall.get('management_policy') == policy, overall
-              assert isinstance(overall.get('unmanaged_baseline'), dict), overall
-              assert 'protected_tp1_exits' in overall, overall
-          assert execution.get('scope') == 'execution', execution
-          assert execution.get('signal_scope_semantics') == 'PRODUCTION_SCORE_QUALIFIED_PLUS_VALID_GEOMETRY_RR_GTE_1', execution
-          assert execution.get('execution_rejection_summary') is not None, execution
-          print('SIGNALS_MANAGED_METRICS', json.dumps(signals.get('overall') or {}, sort_keys=True))
-          print('EXECUTION_MANAGED_METRICS', json.dumps(execution.get('overall') or {}, sort_keys=True))
-          print('EXECUTION_REJECTIONS', json.dumps(execution.get('execution_rejection_summary') or {}, sort_keys=True))
-          PY
-      - name: Verify live decision exposes only valid management geometry
-        shell: bash
-        run: |
-          set -euo pipefail
-          url='https://atlas-v7.onrender.com/api/decision/current?symbol=BTCUSDT'
-          code="$(curl -L --retry 3 --retry-delay 10 --retry-all-errors --connect-timeout 10 --max-time 45 -sS -w '%{http_code}' -o /tmp/decision.json "$url")"
-          echo "HTTP=$code"
-          cat /tmp/decision.json
-          test "$code" -ge 200 -a "$code" -lt 300
-          python3 - <<'PY'
-          import json
-          x=json.load(open('/tmp/decision.json'))
-          assert x.get('ok') is True, x
-          assert x.get('execution_policy_version') == 'ATLAS_EXECUTION_RISK_V1_STRUCTURAL_TP1_PROTECT', x
-          plan=x.get('management_plan')
-          if plan is not None:
-              assert plan.get('tp1_close_fraction') == 0.5, plan
-              direction=plan.get('direction')
-              entry=float(plan['entry'])
-              stop=float(plan['initial_stop_loss'])
-              tp1=float(plan['tp1'])
-              tp2=float(plan['tp2'])
-              rr=float(plan['rr_tp2_actual'])
-              assert rr >= 1.0, plan
-              assert float(plan['after_tp1_stop']) == entry, plan
-              if direction == 'LONG':
-                  assert stop < entry < tp1 <= tp2, plan
-              elif direction == 'SHORT':
-                  assert tp2 <= tp1 < entry < stop, plan
-              else:
-                  raise AssertionError(plan)
-
-              trade=x.get('trade_plan') or {}
-              if plan.get('source') == 'TRADE_PLAN':
-                  assert float(trade['entry']) == entry, (trade, plan)
-                  assert float(trade['stop_loss']) == stop, (trade, plan)
-                  assert float(trade['tp1']) == tp1, (trade, plan)
-                  assert float(trade['tp2']) == tp2, (trade, plan)
-          else:
-              assert str(x.get('management_plan_status') or '').startswith('BLOCKED'), x
-
-          if x.get('execution_ready'):
-              gate=x.get('geometry_gate') or {}
-              assert gate.get('qualified') is True, gate
-              assert float(x.get('risk_reward')) >= 1.0, x
-          print('DECISION_RISK_POLICY', json.dumps({
-              'decision':x.get('actionable_decision'),
-              'reason':x.get('actionable_reason'),
-              'rr':x.get('risk_reward'),
-              'policy':x.get('execution_policy_version'),
-              'management_plan_status':x.get('management_plan_status'),
-              'management_plan':plan,
-          }, sort_keys=True))
-          PY
+          echo LIVE_FINAL_DECISION_FAIL_CLOSED_OK
