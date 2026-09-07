@@ -9,7 +9,10 @@ as warnings, never silently promoted into Production vetoes.
 
 from decision_intelligence import VERSION as DECISION_INTELLIGENCE_VERSION, build as build_decision_intelligence
 
-VERSION = 'PRODUCT_QUALITY_GATE_V3_HTF_DIRECTION_CONTRACT'
+# Keep the public contract identifier stable for existing API/CI consumers while
+# exposing the HTF direction revision separately.
+VERSION = 'PRODUCT_QUALITY_GATE_V2_CANONICAL_ANALYST_OUTPUT'
+FEATURE_VERSION = 'PRODUCT_QUALITY_GATE_FEATURE_V3_HTF_DIRECTION_CONTRACT'
 PROFILE_VERSION = 'ATLAS_ANALYSIS_EVIDENCE_PROFILE_V1'
 PRODUCT_HORIZON = '4-12H'
 PRODUCT_LANE = 'CORE_4_12H'
@@ -232,6 +235,7 @@ def _analyst_output(row, gate):
 
     return {
         'contract_version': VERSION,
+        'feature_version': FEATURE_VERSION,
         'analysis_profile_version': PROFILE_VERSION,
         'symbol': row.get('symbol'),
         'lane': PRODUCT_LANE,
@@ -292,6 +296,7 @@ def install(atlas):
         gate = assess(row)
         row['setup_quality_gate'] = gate
         row['quality_gate_version'] = VERSION
+        row['quality_gate_feature_version'] = FEATURE_VERSION
         row['analysis_profile_version'] = PROFILE_VERSION
         row['production_score_preserved'] = True
         row['production_threshold_changed_by_quality_gate'] = False
@@ -335,7 +340,7 @@ def install(atlas):
 
     atlas.production_decision = build
     atlas.PRODUCT_QUALITY_GATE_STATE = {
-        'enabled': True,'version': VERSION,'analysis_profile_version': PROFILE_VERSION,
+        'enabled': True,'version': VERSION,'feature_version': FEATURE_VERSION,'analysis_profile_version': PROFILE_VERSION,
         'decision_intelligence_version': DECISION_INTELLIGENCE_VERSION,
         'product_lane': PRODUCT_LANE,'product_horizon': PRODUCT_HORIZON,
         'direction_authority': 'HTF_12H_4H','entry_confirmation_timeframe': '1h',
