@@ -11,6 +11,8 @@ def atlas_with(row):
 def base_row(**extra):
     row={
         'ok':True,'symbol':'BTCUSDT','candidate_direction':'LONG',
+        'product_direction':'LONG','entry_confirmation_direction':'LONG','direction_alignment':'ALIGNED','direction_authority':'HTF_12H_4H',
+        'htf_thesis':{'product_direction':'LONG','entry_confirmation_direction':'LONG','direction_alignment':'ALIGNED','authority_timeframes':['12h','4h'],'confirmation_timeframe':'1h','context_timeframe':'1d','daily_context':'LONG','daily_context_confidence':'STRONG'},
         'production_signal_qualified':True,'score':75.0,'signal_threshold':68.0,
         'regime':'TREND_UP','playbook':'TREND_PULLBACK_LONG',
         'actionable_decision':'LONG','actionable_reason':'EXECUTION_READY',
@@ -47,6 +49,7 @@ def test_quarantined_setup_demotes_only_product_action():
     assert r['analyst_output']['evidence_profile']['quality']=='BLOCKED'
     assert r['analyst_output']['geometry_readiness']['ready'] is True
     assert r['canonical_product_contract']=='analyst_output'
+    assert r['canonical_product_direction']=='LONG'
     assert r['analysis_only'] is True and r['live_execution'] is False
 
 
@@ -59,6 +62,13 @@ def test_non_quarantined_setup_passes_with_complete_analyst_output():
     assert r['actionable_decision']=='LONG'
     assert r['primary_analysis']['decision']=='LONG'
     assert out['decision']=='LONG'
+    assert out['product_direction']=='LONG'
+    assert out['entry_confirmation_direction']=='LONG'
+    assert out['direction_alignment']=='ALIGNED'
+    assert out['direction_authority']=='HTF_12H_4H'
+    assert out['direction_state']['authority_timeframes']==['12h','4h']
+    assert out['direction_state']['entry_confirmation_timeframe']=='1h'
+    assert out['direction_state']['one_hour_can_flip_product_direction'] is False
     assert out['entry']==100.0 and out['stop_loss']==98.0 and out['take_profit']==104.0
     assert out['risk_reward']==2.0
     assert out['invalidation']=='4H structure fails.'
@@ -67,6 +77,25 @@ def test_non_quarantined_setup_passes_with_complete_analyst_output():
     assert 'GEOMETRY_PROVENANCE_COMPLETE' in out['evidence_profile']['confirmations']
     assert out['geometry_readiness']['reason_schema_version']=='ATLAS_GEOMETRY_REASON_CODES_V1'
     assert out['analysis_only'] is True and out['live_execution'] is False
+
+
+def test_opposed_entry_confirmation_does_not_relabel_geometry():
+    row=base_row(
+        candidate_direction='SHORT',product_direction='LONG',entry_confirmation_direction='SHORT',direction_alignment='OPPOSED',
+        actionable_decision='WAIT',actionable_reason='ENTRY_CONFIRMATION_OPPOSES_PRODUCT_DIRECTION',
+        htf_thesis={'product_direction':'LONG','entry_confirmation_direction':'SHORT','direction_alignment':'OPPOSED','authority_timeframes':['12h','4h'],'confirmation_timeframe':'1h','context_timeframe':'1d','daily_context':'LONG','daily_context_confidence':'STRONG'},
+    )
+    a=atlas_with(row); qg.install(a)
+    out=a.production_decision('BTCUSDT')['analyst_output']
+    assert out['decision']=='WAIT'
+    assert out['product_direction']=='LONG'
+    assert out['entry_confirmation_direction']=='SHORT'
+    assert out['direction_alignment']=='OPPOSED'
+    assert out['confidence_direction']=='SHORT'
+    assert out['candidate_plan']['direction']=='SHORT'
+    assert out['candidate_plan']['product_direction']=='LONG'
+    assert out['candidate_plan']['geometry_must_not_be_relabelled_to_opposite_product_direction'] is True
+    assert out['direction_state']['score_reused_for_opposite_direction'] is False
 
 
 def test_geometry_blockers_remain_visible_even_with_quality_gate_block():
@@ -108,9 +137,14 @@ def test_rejected_research_rules_never_auto_promote():
 
 
 def test_short_is_not_blanket_blocked():
-    a=atlas_with(base_row(candidate_direction='SHORT',regime='TREND_DOWN',playbook='MARKET_CONTINUATION_SHORT',actionable_decision='SHORT'))
+    row=base_row(
+        candidate_direction='SHORT',product_direction='SHORT',entry_confirmation_direction='SHORT',direction_alignment='ALIGNED',
+        htf_thesis={'product_direction':'SHORT','entry_confirmation_direction':'SHORT','direction_alignment':'ALIGNED','authority_timeframes':['12h','4h'],'confirmation_timeframe':'1h','context_timeframe':'1d','daily_context':'SHORT','daily_context_confidence':'STRONG'},
+        regime='TREND_DOWN',playbook='MARKET_CONTINUATION_SHORT',actionable_decision='SHORT')
+    a=atlas_with(row)
     qg.install(a)
     r=a.production_decision('BTCUSDT')
     assert r['setup_quality_gate']['status']=='PASS'
     assert r['actionable_decision']=='SHORT'
     assert r['analyst_output']['decision']=='SHORT'
+    assert r['analyst_output']['product_direction']=='SHORT'
