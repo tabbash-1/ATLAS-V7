@@ -21,32 +21,43 @@ def test_aligned_htf_and_one_hour_pass():
     row = analyze_frames(frames(), 'LONG')
     assert row['status'] == 'PASS'
     assert row['direction'] == 'LONG'
+    assert row['product_direction'] == 'LONG'
+    assert row['entry_confirmation_direction'] == 'LONG'
+    assert row['direction_alignment'] == 'ALIGNED'
 
 
 def test_one_hour_cannot_flip_higher_timeframe_thesis():
     row = analyze_frames(frames(h1='SHORT'), 'SHORT')
     assert row['status'] == 'WAIT'
     assert row['direction'] == 'LONG'
+    assert row['product_direction'] == 'LONG'
+    assert row['entry_confirmation_direction'] == 'SHORT'
+    assert row['direction_alignment'] == 'OPPOSED'
     assert row['can_flip_from_1h_only'] is False
 
 
-def test_proposed_direction_cannot_override_higher_timeframes():
+def test_entry_confirmation_direction_cannot_override_higher_timeframes():
     row = analyze_frames(frames(), 'SHORT')
     assert row['status'] == 'WAIT'
-    assert row['reason'] == 'PROPOSED_DIRECTION_OPPOSES_HTF'
+    assert row['reason'] == 'ENTRY_CONFIRMATION_OPPOSES_PRODUCT_DIRECTION'
+    assert row['product_direction'] == 'LONG'
+    assert row['entry_confirmation_direction'] == 'SHORT'
 
 
-def test_4h_12h_conflict_fails_to_wait():
+def test_4h_12h_conflict_fails_to_wait_without_product_direction():
     row = analyze_frames(frames(h4='LONG', h12='SHORT'), 'LONG')
     assert row['status'] == 'WAIT'
     assert row['direction'] is None
+    assert row['product_direction'] is None
     assert row['reason'] == '4H_12H_NOT_ALIGNED'
 
 
-def test_daily_is_context_not_fast_flip_authority():
+def test_strong_daily_opposition_is_macro_veto_not_direction_flip():
     row = analyze_frames(frames(d1='SHORT'), 'LONG')
-    assert row['status'] == 'PASS'
+    assert row['status'] == 'WAIT'
+    assert row['reason'] == '1D_MACRO_STRONGLY_OPPOSES_HTF'
     assert row['daily_context'] == 'SHORT'
+    assert row['product_direction'] == 'LONG'
     assert row['direction'] == 'LONG'
 
 
@@ -55,4 +66,5 @@ def test_incomplete_htf_data_fails_closed():
     f['12h'] = f['12h'][:20]
     row = analyze_frames(f, 'LONG')
     assert row['status'] == 'BLOCK'
+    assert row['product_direction'] is None
     assert '12h' in row['missing_timeframes']
