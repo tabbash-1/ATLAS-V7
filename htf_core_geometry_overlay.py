@@ -4,12 +4,22 @@ Uses only aligned HTF product direction plus 4H/12H price-action levels. It neve
 changes Production score or threshold and never relabels geometry from an
 opposite 1H/scorer direction. When HTF direction and entry confirmation disagree,
 geometry is withheld and the product remains WAIT.
+
+A legacy WAIT may be cleared only when the raw Production score was already
+qualified and the sole blocker came from the superseded short-horizon geometry.
+Consensus, threshold, data-health, reliability and quality vetoes are never
+cleared here.
 """
 from __future__ import annotations
 
-VERSION = 'HTF_CORE_GEOMETRY_V1'
+VERSION = 'HTF_CORE_GEOMETRY_V2_LEGACY_WAIT_CLEARANCE'
 PRODUCT_HORIZON = '4-12H'
 MIN_RR = 1.0
+LEGACY_GEOMETRY_ONLY_BLOCKERS = frozenset({
+    'RR_BELOW_ONE_TO_ONE',
+    'GEOMETRY_INCOMPLETE',
+    'INVALID_ENTRY_SL_TP_ORDER',
+})
 
 
 def _f(v, default=None):
@@ -76,7 +86,6 @@ def build(row):
     selected=((row.get('htf_scenario_engine') or {}).get('selected_case') or {})
     trigger=_f(selected.get('trigger_level'))
     s=1 if direction=='LONG' else -1
-    # Use the HTF trigger only when it lies ahead in the intended direction.
     trigger_ahead = trigger is not None and ((direction=='LONG' and trigger>=px) or (direction=='SHORT' and trigger<=px))
     if trigger_ahead:
         entry=trigger+s*max(atr4*.05,abs(trigger)*.0004)
@@ -97,7 +106,6 @@ def build(row):
         if valid: stop_candidates.append({'timeframe':tf,'price':edge,'zone':zone})
     if not stop_candidates:
         return {**base,'status':'WAIT','reason':'NO_HTF_STRUCTURAL_INVALIDATION','ready':False,'entry':round(entry,10)}
-    # Nearest valid HTF structural invalidation keeps risk tied to current structure.
     stop_ref=max(stop_candidates,key=lambda x:x['price']) if direction=='LONG' else min(stop_candidates,key=lambda x:x['price'])
     stop=stop_ref['price']-atr4*.15 if direction=='LONG' else stop_ref['price']+atr4*.15
     risk=abs(entry-stop)
@@ -149,6 +157,20 @@ def build(row):
     }
 
 
+def _legacy_geometry_only_wait(row):
+    if not bool(row.get('production_signal_qualified')):
+        return False, None
+    candidate=row.get('candidate_direction')
+    product=row.get('product_direction') or ((row.get('htf_thesis') or {}).get('product_direction'))
+    if candidate not in ('LONG','SHORT') or candidate!=product:
+        return False, None
+    legacy_gate=dict(row.get('geometry_gate') or {})
+    reason=str(row.get('actionable_reason') or legacy_gate.get('reason') or '').strip().upper()
+    if reason in LEGACY_GEOMETRY_ONLY_BLOCKERS:
+        return True, reason
+    return False, reason or None
+
+
 def install(atlas):
     if getattr(atlas,'_HTF_CORE_GEOMETRY_INSTALLED',False):
         return getattr(atlas,'HTF_CORE_GEOMETRY_STATE',{'enabled':True,'version':VERSION})
@@ -166,9 +188,10 @@ def install(atlas):
         matrix=dict(row.get('timeframe_matrix') or {}); matrix['htf_core_geometry']=geom; row['timeframe_matrix']=matrix
 
         plan=dict(row.get('trade_plan') or {})
-        plan['legacy_entry_geometry']= {
+        plan['legacy_entry_geometry']={
             'direction':plan.get('direction'),'entry':plan.get('entry'),'stop_loss':plan.get('stop_loss'),
             'tp1':plan.get('tp1'),'tp2':plan.get('tp2'),'geometry_provenance':plan.get('geometry_provenance'),
+            'geometry_gate':dict(row.get('geometry_gate') or {}),
         }
         plan['htf_core_geometry']=geom
         if geom.get('ready'):
@@ -180,8 +203,23 @@ def install(atlas):
                 'geometry_authority':'HTF_4H_12H',
             })
             row['entry']=geom.get('entry'); row['stop_loss']=geom.get('stop_loss'); row['take_profit']=geom.get('tp2'); row['risk_reward']=geom.get('rr_tp2')
+            can_clear, legacy_reason=_legacy_geometry_only_wait(row)
+            if can_clear:
+                row['pre_htf_geometry_actionable_decision']=row.get('actionable_decision')
+                row['pre_htf_geometry_actionable_reason']=row.get('actionable_reason')
+                row['legacy_geometry_blocker_cleared']=legacy_reason
+                row['actionable_decision']=geom.get('product_direction')
+                row['actionable_reason']='HTF_4_12H_GEOMETRY_READY_RAW_SCORE_QUALIFIED'
+                row['analysis_ready']=True
+                row['setup_ready']=True
+                row['opportunity_state']='ACTIONABLE'
+                row['opportunity_state_reason']='RAW_SCORE_QUALIFIED_HTF_DIRECTION_AND_GEOMETRY_READY'
+                # Execution routing remains disabled; this is an analysis signal promotion only.
+                row['execution_ready']=False
+                row['htf_analysis_promotion_only']=True
         elif row.get('actionable_decision') in ('LONG','SHORT'):
             row['pre_htf_geometry_actionable_decision']=row.get('actionable_decision')
+            row['pre_htf_geometry_actionable_reason']=row.get('actionable_reason')
             row['actionable_decision']='WAIT'; row['actionable_reason']=geom.get('reason') or 'HTF_GEOMETRY_NOT_READY'
             row['analysis_ready']=False; row['setup_ready']=False; row['opportunity_state']='WATCH'
         row['trade_plan']=plan
@@ -192,6 +230,8 @@ def install(atlas):
     atlas.HTF_CORE_GEOMETRY_STATE={
         'enabled':True,'version':VERSION,'product_horizon':PRODUCT_HORIZON,'min_rr':MIN_RR,
         'requires_direction_alignment':True,'uses_timeframes':['4h','12h'],
+        'legacy_geometry_only_wait_clearance':sorted(LEGACY_GEOMETRY_ONLY_BLOCKERS),
+        'can_clear_consensus_wait':False,'can_clear_threshold_wait':False,'can_clear_data_wait':False,
         'score_threshold_unchanged':True,'analysis_only':True,'live_execution':False,
     }
     return atlas.HTF_CORE_GEOMETRY_STATE
