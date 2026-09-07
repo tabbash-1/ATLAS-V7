@@ -29,6 +29,16 @@ def base_row(**extra):
     row.update(extra); return row
 
 
+def htf_geometry(ready=True, reason=None):
+    return {
+        'version':'HTF_CORE_GEOMETRY_V2_LEGACY_WAIT_CLEARANCE',
+        'ready':ready,'status':'READY' if ready else 'WAIT',
+        'reason':reason or ('HTF_DIRECTION_AND_GEOMETRY_ALIGNED' if ready else 'INSUFFICIENT_HTF_ROOM_TO_TARGET'),
+        'product_direction':'LONG','entry_confirmation_direction':'LONG','direction_alignment':'ALIGNED',
+        'min_rr':1.0,'rr_tp1':1.4 if ready else 0.6,'rr_tp2':2.2 if ready else None,
+    }
+
+
 def test_quarantined_setup_demotes_only_product_action():
     a=atlas_with(base_row())
     qg.install(a)
@@ -113,6 +123,36 @@ def test_geometry_blockers_remain_visible_even_with_quality_gate_block():
     assert out['geometry_readiness']['primary_blocker']=='MISSING_STOP'
     assert out['geometry_readiness']['blocker_codes']==['MISSING_STOP']
     assert 'CLEAR_GEOMETRY_MISSING_STOP' in out['what_changes_status']
+
+
+def test_htf_ready_overrides_legacy_geometry_block_in_readiness_only():
+    legacy={'status':'BLOCK','qualified':False,'reason':'RR_BELOW_ONE_TO_ONE','primary_blocker':'RR_BELOW_ONE_TO_ONE','blocker_codes':['RR_BELOW_ONE_TO_ONE']}
+    row=base_row(playbook='BREAKOUT_CONFIRMED_LONG',geometry_gate=legacy,htf_core_geometry=htf_geometry(True))
+    a=atlas_with(row); qg.install(a)
+    r=a.production_decision('BTCUSDT'); out=r['analyst_output']
+    assert out['geometry_readiness']['ready'] is True
+    assert out['geometry_readiness']['authority']=='HTF_4H_12H'
+    assert out['geometry_readiness']['geometry_version']=='HTF_CORE_GEOMETRY_V2_LEGACY_WAIT_CLEARANCE'
+    assert out['geometry_readiness']['legacy_geometry_ready'] is False
+    assert out['geometry_readiness']['legacy_geometry_can_override'] is False
+    assert out['geometry_ready_canonical'] is True
+    assert out['legacy_geometry_ready_raw'] is False
+    assert r['canonical_geometry_ready'] is True
+    assert r['canonical_geometry_authority']=='HTF_4H_12H'
+
+
+def test_htf_not_ready_blocks_canonical_readiness_even_if_legacy_passes():
+    row=base_row(playbook='BREAKOUT_CONFIRMED_LONG',htf_core_geometry=htf_geometry(False,'INSUFFICIENT_HTF_ROOM_TO_TARGET'),actionable_decision='WAIT',actionable_reason='INSUFFICIENT_HTF_ROOM_TO_TARGET')
+    a=atlas_with(row); qg.install(a)
+    out=a.production_decision('BTCUSDT')['analyst_output']
+    assert out['geometry_readiness']['ready'] is False
+    assert out['geometry_readiness']['authority']=='HTF_4H_12H'
+    assert out['geometry_readiness']['primary_blocker']=='INSUFFICIENT_HTF_ROOM_TO_TARGET'
+    assert out['geometry_readiness']['legacy_geometry_ready'] is True
+    assert out['geometry_readiness']['legacy_geometry_can_override'] is False
+    assert out['geometry_ready_canonical'] is False
+    assert out['legacy_geometry_ready_raw'] is True
+    assert 'CLEAR_GEOMETRY_INSUFFICIENT_HTF_ROOM_TO_TARGET' in out['what_changes_status']
 
 
 def test_shadow_structure_risk_is_warning_not_veto():
