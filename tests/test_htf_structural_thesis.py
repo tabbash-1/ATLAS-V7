@@ -17,7 +17,7 @@ def structural_series(direction='LONG', n=120, start=100.0):
     """Trending series with real local swings so structure + EMA agree."""
     out=[]
     for i in range(n):
-        trend=(i*0.10) if direction=='LONG' else -(i*0.10)
+        trend=(i*0.25) if direction=='LONG' else -(i*0.25)
         wave=math.sin(i/3.0)*2.0
         c=start+trend+wave
         out.append({'time':i,'open':c-0.1,'high':c+0.8,'low':c-0.8,'close':c,'volume':100+i})
