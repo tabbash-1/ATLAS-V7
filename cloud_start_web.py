@@ -63,10 +63,10 @@ if index_path.exists():
     if 'id="atlasAiCouncilCard"' not in html:
         panel = '''
       <section id="atlasAiCouncilCard" class="card metrics-card ai-council-card">
-        <div class="card-head"><div><strong>ATLAS AI TRADE COUNCIL</strong><div class="muted small">Production + Tactical 1–3H + Bull/Bear + Counterfactual + Hybrid Judge</div></div><span id="aiCouncilBadge" class="pill neutral">WAITING</span></div>
+        <div class="card-head"><div><strong>ATLAS AI TRADE COUNCIL</strong><div class="muted small">Core 4–12H + 1H entry confirmation + Bull/Bear + Counterfactual + Hybrid Judge</div></div><span id="aiCouncilBadge" class="pill neutral">WAITING</span></div>
         <div class="ai-council-grid">
-          <div class="ai-kpi"><span>Production</span><b id="aiProdDecision">—</b><small id="aiProdScore">—</small></div>
-          <div class="ai-kpi"><span>Tactical 1–3H</span><b id="aiTactical">—</b><small id="aiTacticalRR">—</small></div>
+          <div class="ai-kpi"><span>Core 4–12H</span><b id="aiProdDecision">—</b><small id="aiProdScore">—</small></div>
+          <div class="ai-kpi"><span>1H Confirmation</span><b id="aiTactical">—</b><small id="aiTacticalRR">—</small></div>
           <div class="ai-kpi"><span>AI Judge</span><b id="aiJudge">—</b><small id="aiConfidence">—</small></div>
           <div class="ai-kpi"><span>Hybrid</span><b id="aiHybrid">—</b><small id="aiHybridSub">—</small></div>
         </div>
@@ -132,6 +132,20 @@ from horizon_fit_overlay import install as _install_horizon_fit_overlay
 _install_horizon_fit_overlay(_collector)
 from execution_risk_management import install as _install_execution_risk_management
 _install_execution_risk_management(_collector)
+
+# Canonical 4-12H authority must be installed in the actual Render entrypoint.
+# 12H + 4H own direction; 1H may confirm/delay but may not reverse the thesis.
+from htf_structural_thesis import install as _install_htf_structural_thesis
+_install_htf_structural_thesis(_collector)
+from htf_price_action_overlay import install as _install_htf_price_action
+_install_htf_price_action(_collector)
+from htf_scenario_engine import install as _install_htf_scenario_engine
+_install_htf_scenario_engine(_collector)
+from product_quality_gate_overlay import install as _install_product_quality_gate
+_install_product_quality_gate(_collector)
+
+# AI council must wrap the final canonical 4-12H product decision, not the legacy
+# short-horizon candidate generator.
 from ai_trade_council import install as _install_ai_trade_council
 _install_ai_trade_council(_collector)
 from research_memory_bridge import install as _install_research_memory_bridge
@@ -159,5 +173,6 @@ _install_rc10_1_deep_analysis(_collector)
 entrypoint = "atlas_runtime_server.py"
 print(f"ATLAS production boot: data={DATA_DIR} runtime=memory-safe-web release={release_token}")
 print("ATLAS web memory policy: heavy research/shadow runtimes isolated from Render web process")
+print("ATLAS core horizon authority: 12H+4H; 1H confirmation only; 1D context")
 print(f"ATLAS deep analysis: {_collector.RC10_1_DEEP_ANALYSIS_VERSION}")
 runpy.run_path(str(BASE / entrypoint), run_name="__main__")
