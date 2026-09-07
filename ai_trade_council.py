@@ -1,15 +1,17 @@
-"""ATLAS AI Trade Council V5 — canonical Production plan.
+"""ATLAS AI Trade Council V6 — canonical 4-12H Production plan.
 
 The Production `trade_plan` is the single user-facing action contract. AI may
 explain or research alternatives, but an ACTIONABLE Production plan is always
 returned as the best action and can never be replaced by WAIT/PULLBACK/BREAKOUT.
+The product horizon is 4-12H; 1H evidence is entry confirmation/context only.
 """
 from __future__ import annotations
 import json, math, urllib.parse
 from pathlib import Path
 
-VERSION='ATLAS_AI_TRADE_COUNCIL_V5_CANONICAL_PLAN'
-HORIZON='1-3H'
+VERSION='ATLAS_AI_TRADE_COUNCIL_V6_CORE_4_12H'
+HORIZON='4-12H'
+ENTRY_CONFIRMATION_HORIZON='1H'
 
 
 def _num(v):
@@ -41,7 +43,7 @@ def _evidence(d):
     trr=_num(tac.get('risk_reward'))
     if trr is not None:
         s=1 if tac.get('direction')=='LONG' else -1 if tac.get('direction')=='SHORT' else 0
-        add('tactical_geometry',s*_clip((trr-.8)/1.5),1.5,f'Tactical RR {trr:.2f}')
+        add('tactical_geometry',s*_clip((trr-.8)/1.5),.45,f'1H tactical RR {trr:.2f} (entry context only)','entry_confirmation_context')
     for name,w in [('trend_base',.5),('momentum_adjustment',.5),('market_breadth_adjustment',.45),('volume_bonus',.45),('relative_strength_adjustment',.45),('futures_adjustment',.45),('obstacle_adjustment',.7)]:
         pts=_num(attr.get(name))
         if pts is not None and pts!=0:add('scorer_'+name,pts/10,w,f'{name} {pts:+.2f}','production_scorer')
@@ -70,12 +72,12 @@ def _breakout_anchor(d,direction,px):
 def _canonical_action(d):
     p=d.get('trade_plan') or {}; status=p.get('status')
     if status in ('ACTIONABLE','CONDITIONAL'):
-        return {'status':status,'action':p.get('action'),'direction':p.get('direction'),'entry_mode':p.get('entry_mode'),'entry':p.get('entry'),'stop_loss':p.get('stop_loss'),'tp1':p.get('tp1'),'tp2':p.get('tp2'),'rr_tp1':p.get('rr_tp1'),'rr_tp2':p.get('rr_tp2'),'entry_trigger':p.get('entry_trigger'),'source':'production_trade_plan'}
-    return {'status':'WAIT','action':'WAIT','direction':d.get('candidate_direction'),'source':'production_trade_plan'}
+        return {'status':status,'action':p.get('action'),'direction':p.get('direction'),'entry_mode':p.get('entry_mode'),'entry':p.get('entry'),'stop_loss':p.get('stop_loss'),'tp1':p.get('tp1'),'tp2':p.get('tp2'),'rr_tp1':p.get('rr_tp1'),'rr_tp2':p.get('rr_tp2'),'entry_trigger':p.get('entry_trigger'),'source':'production_trade_plan','product_horizon':HORIZON}
+    return {'status':'WAIT','action':'WAIT','direction':d.get('candidate_direction'),'source':'production_trade_plan','product_horizon':HORIZON}
 
 
 def _production_row(p,conditional=False):
-    return {'scenario':'PRODUCTION_CONDITIONAL' if conditional else 'PRODUCTION_NOW','direction':p.get('direction'),'entry':p.get('entry'),'stop_loss':p.get('stop_loss'),'target':p.get('tp2'),'tp1':p.get('tp1'),'risk_reward':p.get('rr_tp2'),'trigger':p.get('entry_trigger'),'thesis':'Canonical Production trade plan.','shadow_only':False,'canonical':True}
+    return {'scenario':'PRODUCTION_CONDITIONAL' if conditional else 'PRODUCTION_NOW','direction':p.get('direction'),'entry':p.get('entry'),'stop_loss':p.get('stop_loss'),'target':p.get('tp2'),'tp1':p.get('tp1'),'risk_reward':p.get('rr_tp2'),'trigger':p.get('entry_trigger'),'thesis':'Canonical 4-12H Production trade plan.','shadow_only':False,'canonical':True,'product_horizon':HORIZON}
 
 
 def _counterfactuals(d,direction,confidence=None):
@@ -87,14 +89,14 @@ def _counterfactuals(d,direction,confidence=None):
     if status=='CONDITIONAL' and p.get('direction') in ('LONG','SHORT'): rows.append(_production_row(p,True))
     atr=_num((d.get('indicators') or {}).get('atr14')) or px*.01; s=1 if direction=='LONG' else -1; tac=d.get('tactical_opportunity') or {}; target=_num(tac.get('target')); stop=_num(tac.get('stop_loss'))
     def add(name,entry,sl,tp,trigger,thesis,**extra):
-        risk=abs(entry-sl); reward=abs(tp-entry); row={'scenario':name,'direction':direction,'entry':round(entry,10),'stop_loss':round(sl,10),'target':round(tp,10),'risk_reward':round(reward/risk,3) if risk else None,'trigger':trigger,'thesis':thesis,'shadow_only':True,'canonical':False}; row.update(extra); rows.append(row)
-    add('ENTER_NOW',px,stop or px-s*atr*.65,target or px+s*atr*1.2,'Immediate only if current evidence remains valid','Shadow comparison only.')
-    pull=px-s*atr*.35; add('WAIT_PULLBACK',pull,pull-s*atr*.75,target or pull+s*atr*1.5,'Price retraces ~0.35 ATR without structure failure','Requalify after a better entry.')
+        risk=abs(entry-sl); reward=abs(tp-entry); row={'scenario':name,'direction':direction,'entry':round(entry,10),'stop_loss':round(sl,10),'target':round(tp,10),'risk_reward':round(reward/risk,3) if risk else None,'trigger':trigger,'thesis':thesis,'shadow_only':True,'canonical':False,'research_horizon':'1-3H_CONTEXT_ONLY'}; row.update(extra); rows.append(row)
+    add('ENTER_NOW',px,stop or px-s*atr*.65,target or px+s*atr*1.2,'1H confirmation while 4-12H thesis remains valid','Shadow entry-timing comparison only.')
+    pull=px-s*atr*.35; add('WAIT_PULLBACK',pull,pull-s*atr*.75,target or pull+s*atr*1.5,'Price retraces ~0.35 ATR without 4H structure failure','Requalify entry timing; do not replace 4-12H thesis.')
     level,source=_breakout_anchor(d,direction,px)
     if level is not None:
         buffer=max(atr*.10,abs(level)*.0005); brk=level+s*buffer; relation='above' if direction=='LONG' else 'below'
-        add('WAIT_BREAKOUT',brk,brk-s*atr*.75,brk+s*atr*1.6,f'1H price closes/holds {relation} {level:.8g} ({source}) with confirmation','Enter only after actual blocking structure is cleared.',reference_level=round(level,10),reference_source=source,structure_anchored=True,confirmation_buffer=round(buffer,10))
-    rows.append({'scenario':'REJECT','direction':None,'entry':None,'stop_loss':None,'target':None,'risk_reward':None,'trigger':'No acceptable setup','thesis':'Preserve capital.','shadow_only':True,'canonical':False})
+        add('WAIT_BREAKOUT',brk,brk-s*atr*.75,brk+s*atr*1.6,f'1H price closes/holds {relation} {level:.8g} ({source}) with confirmation','Entry confirmation after blocking structure clears.',reference_level=round(level,10),reference_source=source,structure_anchored=True,confirmation_buffer=round(buffer,10))
+    rows.append({'scenario':'REJECT','direction':None,'entry':None,'stop_loss':None,'target':None,'risk_reward':None,'trigger':'No acceptable setup','thesis':'Preserve capital.','shadow_only':True,'canonical':False,'research_horizon':'1-3H_CONTEXT_ONLY'})
     return rows
 
 
@@ -102,8 +104,6 @@ def analyze(d):
     plan=d.get('trade_plan') or {}; canonical=_canonical_action(d); prod_dir=d.get('candidate_direction'); prod_ok=bool(d.get('production_signal_qualified') or d.get('signal_qualified')); execution=bool(d.get('execution_ready'))
     ev=_evidence(d); bull=_side_score(ev,'LONG'); bear=_side_score(ev,'SHORT'); ai_dir='LONG' if bull-bear>=0 else 'SHORT'; strength=abs(bull-bear)/2; agree=(prod_dir==ai_dir) if prod_dir else False
     tac=d.get('tactical_opportunity') or {}; trr=_num(tac.get('risk_reward')); confidence=round(max(50,min(92,50+strength*45)))
-    # Hard canonical invariant: actionable Production is returned immediately as
-    # the best action. No RR sort or AI opinion is allowed to replace it.
     if canonical.get('status')=='ACTIONABLE':
         best=_production_row(plan,False); verdict='CONFIRM_PRODUCTION' if agree else 'PRODUCTION_PRIORITY'; hybrid='CONFIRM'; reason='CANONICAL_PRODUCTION_ACTIONABLE'
     else:
@@ -117,7 +117,7 @@ def analyze(d):
         else: verdict='WAIT'; hybrid='WAIT'; reason='CONFLICTING_EVIDENCE'
     rows=_counterfactuals(d,ai_dir,confidence)
     bull_top=sorted(ev,key=lambda x:x['value']*x['weight'],reverse=True)[:5]; bear_top=sorted(ev,key=lambda x:-x['value']*x['weight'],reverse=True)[:5]
-    return {'version':VERSION,'mode':'SHADOW_RESEARCH_ONLY','symbol':d.get('symbol'),'horizon':HORIZON,'generated_at':d.get('generated_at'),'entry':d.get('entry'),'direction':prod_dir or ai_dir,'verdict':verdict,'confidence':confidence,'reason':reason,'canonical_action':canonical,'bull_analyst':{'score':round(bull,3),'best_case':[x['detail'] for x in bull_top if x['value']>0]},'bear_analyst':{'score':round(bear,3),'best_case':[x['detail'] for x in bear_top if x['value']<0]},'judge':{'net_strength':round(strength,3),'tactical_rr':trr,'canonical_trade_plan':plan,'invalidation':'Production trade_plan is canonical while actionable.'},'counterfactuals':rows,'best_counterfactual':best,'hybrid_judge':{'decision':hybrid,'production_direction':prod_dir,'production_score':_num(d.get('score')),'production_qualified':prod_ok,'execution_ready':execution,'ai_direction':ai_dir,'ai_verdict':verdict,'agreement':agree,'production_priority':execution},'evidence':ev,'production_decision':d.get('decision'),'production_score':d.get('score'),'production_qualified':prod_ok,'safety':{'can_execute':False,'can_change_threshold':False,'can_override_production':False,'production_trade_plan_canonical':True}}
+    return {'version':VERSION,'mode':'SHADOW_RESEARCH_ONLY','symbol':d.get('symbol'),'horizon':HORIZON,'product_horizon':HORIZON,'product_lane':'CORE_4_12H','entry_confirmation_horizon':ENTRY_CONFIRMATION_HORIZON,'generated_at':d.get('generated_at'),'entry':d.get('entry'),'direction':prod_dir or ai_dir,'verdict':verdict,'confidence':confidence,'reason':reason,'canonical_action':canonical,'bull_analyst':{'score':round(bull,3),'best_case':[x['detail'] for x in bull_top if x['value']>0]},'bear_analyst':{'score':round(bear,3),'best_case':[x['detail'] for x in bear_top if x['value']<0]},'judge':{'net_strength':round(strength,3),'tactical_rr':trr,'canonical_trade_plan':plan,'invalidation':'4-12H Production trade_plan is canonical; 1H is confirmation/context only.'},'counterfactuals':rows,'best_counterfactual':best,'hybrid_judge':{'decision':hybrid,'production_direction':prod_dir,'production_score':_num(d.get('score')),'production_qualified':prod_ok,'execution_ready':execution,'ai_direction':ai_dir,'ai_verdict':verdict,'agreement':agree,'production_priority':execution},'evidence':ev,'production_decision':d.get('decision'),'production_score':d.get('score'),'production_qualified':prod_ok,'safety':{'can_execute':False,'can_change_threshold':False,'can_override_production':False,'production_trade_plan_canonical':True,'short_horizon_can_set_product_direction':False}}
 
 
 def install(atlas):
@@ -137,7 +137,7 @@ def install(atlas):
             q=urllib.parse.parse_qs(u.query); symbol=q.get('symbol',['BTCUSDT'])[0].upper().replace('BINANCE:','')
             try:return self._json(council(symbol),200)
             except Exception as exc:return self._json({'ok':False,'source':VERSION,'error':f'{type(exc).__name__}: {exc}'},500)
-        if u.path=='/api/ai/council/status': return self._json({'ok':True,'version':VERSION,'mode':'SHADOW_RESEARCH_ONLY','can_execute':False,'counterfactuals':True,'structure_anchored_breakouts':True,'production_trade_plan_canonical':True},200)
+        if u.path=='/api/ai/council/status': return self._json({'ok':True,'version':VERSION,'mode':'SHADOW_RESEARCH_ONLY','horizon':HORIZON,'product_lane':'CORE_4_12H','entry_confirmation_horizon':ENTRY_CONFIRMATION_HORIZON,'can_execute':False,'counterfactuals':True,'structure_anchored_breakouts':True,'production_trade_plan_canonical':True},200)
         return original(self)
     atlas.Handler.do_GET=do_GET
-    return {'enabled':True,'version':VERSION,'endpoint':'/api/ai/council','production_trade_plan_canonical':True}
+    return {'enabled':True,'version':VERSION,'endpoint':'/api/ai/council','product_horizon':HORIZON,'entry_confirmation_horizon':ENTRY_CONFIRMATION_HORIZON,'production_trade_plan_canonical':True}
