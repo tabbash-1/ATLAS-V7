@@ -141,6 +141,9 @@ from htf_price_action_overlay import install as _install_htf_price_action
 _install_htf_price_action(_collector)
 from htf_scenario_engine import install as _install_htf_scenario_engine
 _install_htf_scenario_engine(_collector)
+# Canonical geometry is promoted only after HTF direction + 1H confirmation align.
+from htf_core_geometry_overlay import install as _install_htf_core_geometry
+_install_htf_core_geometry(_collector)
 from product_quality_gate_overlay import install as _install_product_quality_gate
 _install_product_quality_gate(_collector)
 
@@ -174,5 +177,6 @@ entrypoint = "atlas_runtime_server.py"
 print(f"ATLAS production boot: data={DATA_DIR} runtime=memory-safe-web release={release_token}")
 print("ATLAS web memory policy: heavy research/shadow runtimes isolated from Render web process")
 print("ATLAS core horizon authority: 12H+4H; 1H confirmation only; 1D context")
+print("ATLAS core geometry authority: aligned 4H+12H structure/ATR; legacy 1H geometry retained as provenance only")
 print(f"ATLAS deep analysis: {_collector.RC10_1_DEEP_ANALYSIS_VERSION}")
 runpy.run_path(str(BASE / entrypoint), run_name="__main__")
