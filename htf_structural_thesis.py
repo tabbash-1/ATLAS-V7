@@ -1,14 +1,16 @@
 """ATLAS hierarchical 4-12H structural thesis gate.
 
 Direction authority belongs to 12H + 4H. 1H may confirm or delay an entry but
-cannot reverse the higher-timeframe thesis. 1D is macro context. The module
-never changes Production score/threshold and never enables live execution.
+cannot reverse the higher-timeframe thesis. 1D is macro context and may veto
+only when its directional bias strongly opposes the aligned 4H+12H thesis.
+The module never changes Production score/threshold and never enables live
+execution.
 """
 from __future__ import annotations
 
 import urllib.parse
 
-VERSION = "HTF_STRUCTURAL_THESIS_V1"
+VERSION = "HTF_STRUCTURAL_THESIS_V2_PRODUCT_DIRECTION_AUTHORITY"
 PRODUCT_HORIZON = "4-12H"
 TIMEFRAMES = ("1h", "4h", "12h", "1d")
 AUTHORITY_TIMEFRAMES = ("12h", "4h")
@@ -131,6 +133,8 @@ def analyze_frames(frames, proposed_direction=None):
     if missing:
         return {
             "version": VERSION, "status": "BLOCK", "direction": None,
+            "product_direction": None, "entry_confirmation_direction": proposed_direction,
+            "direction_alignment": "UNKNOWN",
             "reason": "HTF_DATA_INCOMPLETE", "missing_timeframes": missing,
             "frames": states, "product_horizon": PRODUCT_HORIZON,
             "can_flip_from_1h_only": False, "live_execution": False,
@@ -141,8 +145,14 @@ def analyze_frames(frames, proposed_direction=None):
         status, reason = "WAIT", "4H_12H_NOT_ALIGNED"
     else:
         direction = b4
-        if proposed_direction in ("LONG", "SHORT") and proposed_direction != direction:
-            status, reason = "WAIT", "PROPOSED_DIRECTION_OPPOSES_HTF"
+        daily_strong_opposition = (
+            bd in ("LONG", "SHORT") and bd != direction and
+            states["1d"].get("confidence") == "STRONG"
+        )
+        if daily_strong_opposition:
+            status, reason = "WAIT", "1D_MACRO_STRONGLY_OPPOSES_HTF"
+        elif proposed_direction in ("LONG", "SHORT") and proposed_direction != direction:
+            status, reason = "WAIT", "ENTRY_CONFIRMATION_OPPOSES_PRODUCT_DIRECTION"
         elif b1 in ("LONG", "SHORT") and b1 != direction:
             status, reason = "WAIT", "1H_NOT_CONFIRMED_HTF"
         else:
@@ -160,15 +170,26 @@ def analyze_frames(frames, proposed_direction=None):
     else:
         invalidation = None; trigger_level = None
         trigger = "Wait for 4H and 12H to align on the same structural direction"
+    if direction not in ("LONG", "SHORT"):
+        alignment = "NO_PRODUCT_DIRECTION"
+    elif proposed_direction not in ("LONG", "SHORT"):
+        alignment = "NO_ENTRY_CONFIRMATION_DIRECTION"
+    elif proposed_direction == direction:
+        alignment = "ALIGNED"
+    else:
+        alignment = "OPPOSED"
     return {
-        "version": VERSION, "status": status, "direction": direction, "reason": reason,
+        "version": VERSION, "status": status, "direction": direction,
+        "product_direction": direction, "entry_confirmation_direction": proposed_direction,
+        "direction_alignment": alignment, "reason": reason,
         "product_horizon": PRODUCT_HORIZON, "authority_timeframes": list(AUTHORITY_TIMEFRAMES),
         "context_timeframe": "1d", "confirmation_timeframe": "1h",
-        "daily_context": bd, "frames": states,
+        "daily_context": bd, "daily_context_confidence": states["1d"].get("confidence"), "frames": states,
         "nearest_support": support, "nearest_resistance": resistance,
         "trigger": trigger, "trigger_level": trigger_level,
         "invalidation_level": invalidation.get("price") if invalidation else None,
         "invalidation_source": invalidation,
+        "direction_authority_rule": "4H+12H define product_direction. 1H/scorer direction is entry confirmation only and may never reverse product_direction.",
         "decision_persistence_rule": "1H may delay to WAIT but cannot reverse LONG/SHORT unless 4H+12H thesis changes or structural invalidation is breached.",
         "can_flip_from_1h_only": False, "score_changed": False, "threshold_changed": False,
         "research_only": False, "analysis_only": True, "live_execution": False,
@@ -218,8 +239,13 @@ def install(atlas):
             return row
         proposed = row.get("candidate_direction")
         thesis = build_live_thesis(atlas, str(symbol or row.get("symbol") or "").upper().replace("BINANCE:", ""), proposed)
+        product_direction = thesis.get("product_direction") if thesis.get("product_direction") in ("LONG", "SHORT") else None
         row["htf_thesis"] = thesis
         row["htf_thesis_version"] = VERSION
+        row["product_direction"] = product_direction
+        row["entry_confirmation_direction"] = proposed if proposed in ("LONG", "SHORT") else None
+        row["direction_alignment"] = thesis.get("direction_alignment")
+        row["direction_authority"] = "HTF_12H_4H"
         row["htf_score_preserved"] = True
         row["htf_threshold_preserved"] = True
         if thesis.get("status") != "PASS":
@@ -232,12 +258,18 @@ def install(atlas):
             row["opportunity_state"] = "WATCH"
             row["opportunity_state_reason"] = row["actionable_reason"]
         plan = dict(row.get("trade_plan") or {})
+        plan["product_direction"] = product_direction
+        plan["entry_confirmation_direction"] = row.get("entry_confirmation_direction")
+        plan["direction_alignment"] = row.get("direction_alignment")
+        plan["direction_authority"] = "HTF_12H_4H"
+        plan["direction_authority_timeframes"] = list(AUTHORITY_TIMEFRAMES)
         if thesis.get("trigger"):
             plan["htf_entry_trigger"] = thesis["trigger"]
             if not plan.get("entry_trigger"): plan["entry_trigger"] = thesis["trigger"]
         if thesis.get("invalidation_level") is not None:
             plan["htf_invalidation_level"] = thesis["invalidation_level"]
             plan["htf_invalidation_source"] = thesis.get("invalidation_source")
+        plan["direction_authority_rule"] = thesis.get("direction_authority_rule")
         plan["decision_persistence_rule"] = thesis.get("decision_persistence_rule")
         row["trade_plan"] = plan
         matrix = dict(row.get("timeframe_matrix") or {})
@@ -250,6 +282,8 @@ def install(atlas):
     atlas.HTF_STRUCTURAL_THESIS_STATE = {
         "enabled": True, "version": VERSION, "product_horizon": PRODUCT_HORIZON,
         "direction_authority": list(AUTHORITY_TIMEFRAMES), "confirmation": "1h", "context": "1d",
+        "product_direction_field": "product_direction",
+        "entry_confirmation_direction_field": "entry_confirmation_direction",
         "one_hour_can_flip_direction": False, "score_threshold_unchanged": True,
         "analysis_only": True, "live_execution": False,
     }
