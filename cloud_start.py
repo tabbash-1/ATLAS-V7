@@ -21,6 +21,7 @@ BASE = Path(__file__).resolve().parent
 if os.environ.get("RENDER"):
     os.environ["ATLAS_CLOUD_FORWARD_ENABLED"] = "0"
     os.environ["ATLAS_WEB_ONLY"] = "1"
+    # Keep the final guard as the last authority in the deployed request path.
     print("ATLAS cloud_start compatibility guard: RENDER -> cloud_web_only_final.py", flush=True)
     runpy.run_path(str(BASE / "cloud_web_only_final.py"), run_name="__main__")
 else:
