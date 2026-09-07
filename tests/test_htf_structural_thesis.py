@@ -13,6 +13,17 @@ def series(direction='LONG', n=120, start=100.0, step=0.35):
     return out
 
 
+def structural_series(direction='LONG', n=120, start=100.0):
+    """Trending series with real local swings so structure + EMA agree."""
+    out=[]
+    for i in range(n):
+        trend=(i*0.10) if direction=='LONG' else -(i*0.10)
+        wave=math.sin(i/3.0)*2.0
+        c=start+trend+wave
+        out.append({'time':i,'open':c-0.1,'high':c+0.8,'low':c-0.8,'close':c,'volume':100+i})
+    return out
+
+
 def frames(h1='LONG', h4='LONG', h12='LONG', d1='LONG'):
     return {'1h': series(h1), '4h': series(h4), '12h': series(h12), '1d': series(d1)}
 
@@ -53,12 +64,23 @@ def test_4h_12h_conflict_fails_to_wait_without_product_direction():
 
 
 def test_strong_daily_opposition_is_macro_veto_not_direction_flip():
-    row = analyze_frames(frames(d1='SHORT'), 'LONG')
+    f=frames()
+    f['1d']=structural_series('SHORT')
+    row = analyze_frames(f, 'LONG')
+    assert row['daily_context'] == 'SHORT'
+    assert row['daily_context_confidence'] == 'STRONG'
     assert row['status'] == 'WAIT'
     assert row['reason'] == '1D_MACRO_STRONGLY_OPPOSES_HTF'
-    assert row['daily_context'] == 'SHORT'
     assert row['product_direction'] == 'LONG'
     assert row['direction'] == 'LONG'
+
+
+def test_trend_only_daily_opposition_is_context_not_blanket_veto():
+    row=analyze_frames(frames(d1='SHORT'),'LONG')
+    assert row['daily_context']=='SHORT'
+    assert row['daily_context_confidence']=='TREND_ONLY'
+    assert row['status']=='PASS'
+    assert row['product_direction']=='LONG'
 
 
 def test_incomplete_htf_data_fails_closed():
