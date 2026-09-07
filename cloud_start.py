@@ -5,7 +5,8 @@ Render historically used ``python3 cloud_start.py`` from a manually configured
 service. Keep this path permanently safe: on Render it delegates to the minimal
 web-only runtime plus the final fail-closed TRADE READY guard so dashboard
 settings cannot accidentally boot the heavy research process or bypass final
-4-12H direction authority.
+4-12H direction authority. ``cloud_web_only.py`` remains the delegated base
+runtime and is loaded by ``cloud_web_only_final.py`` before the last guard.
 
 The pre-change full runtime is preserved in Git history and on branch
 ``backup/pre-render-safe-cloud-start-20260828``.
