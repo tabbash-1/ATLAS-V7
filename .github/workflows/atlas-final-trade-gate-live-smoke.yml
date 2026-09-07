@@ -1,0 +1,59 @@
+name: ATLAS Final Trade Gate Live Smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'final_trade_ready_guard.py'
+      - 'cloud_web_only_final.py'
+      - 'cloud_start.py'
+      - '.github/workflows/atlas-final-trade-gate-live-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlas-final-trade-gate-live-smoke
+  cancel-in-progress: true
+
+jobs:
+  verify-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Verify Production runtime and final decision contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://atlas-v7.onrender.com'
+          ok=0
+          for i in $(seq 1 36); do
+            if curl -fsSL --connect-timeout 10 --max-time 40 "$base/api/runtime/status" -o /tmp/runtime.json \
+              && jq -e '.ok == true and .runtime == "WEB_ONLY_FINAL" and .final_trade_ready_guard.version == "FINAL_TRADE_READY_GUARD_V1_HTF_FAIL_CLOSED" and .product_horizon == "4-12H" and .live_execution == false' /tmp/runtime.json >/dev/null; then
+              ok=1; break
+            fi
+            sleep 10
+          done
+          test "$ok" = 1
+
+          curl -fsSL --retry 6 --retry-delay 8 --retry-all-errors --connect-timeout 10 --max-time 60 \
+            "$base/api/decision/current?symbol=BNBUSDT" -o /tmp/decision.json
+          jq -e '.ok == true and (.trade_ready|type) == "boolean" and .final_trade_gate.version == "FINAL_TRADE_READY_GUARD_V1_HTF_FAIL_CLOSED"' /tmp/decision.json >/dev/null
+          jq -e '
+            if .trade_ready == true then
+              (.actionable_decision == .final_trade_gate.direction)
+              and (.actionable_decision == "LONG" or .actionable_decision == "SHORT")
+              and .final_trade_gate.direction_alignment == "ALIGNED"
+              and .final_trade_gate.production_signal_qualified == true
+              and .final_trade_gate.canonical_geometry_ready == true
+            else
+              .actionable_decision == "WAIT"
+              and .analysis_ready == false
+              and .can_execute == false
+              and (.trade_plan.analysis_ready == false)
+              and (.trade_plan.can_execute == false)
+            end
+          ' /tmp/decision.json >/dev/null
+          echo 'LIVE_FINAL_TRADE_GATE_OK'
+          jq '{symbol,actionable_decision,trade_ready,final_trade_gate,product_direction,direction_alignment}' /tmp/decision.json
