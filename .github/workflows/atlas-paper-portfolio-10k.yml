@@ -5,9 +5,12 @@ on:
     branches: [main]
     paths:
       - 'paper_portfolio_10k.py'
+      - 'paper_portfolio_10k_final.py'
+      - 'final_trade_ready_guard.py'
       - 'offline_production_path_settlement.py'
       - 'status/paper-portfolio-10k-manifest.json'
       - 'tests/test_paper_portfolio_10k.py'
+      - 'tests/test_final_trade_ready_guard.py'
       - '.github/workflows/atlas-paper-portfolio-10k.yml'
       - 'status/history/production-snapshots.jsonl'
   schedule:
@@ -36,12 +39,13 @@ jobs:
         run: |
           set -euo pipefail
           PYTHONPATH=. python tests/test_paper_portfolio_10k.py
-          python -m py_compile paper_portfolio_10k.py
+          PYTHONPATH=. python tests/test_final_trade_ready_guard.py
+          python -m py_compile paper_portfolio_10k.py paper_portfolio_10k_final.py final_trade_ready_guard.py cloud_web_only_final.py
       - name: Run prospective paper portfolio
         run: |
           set -euo pipefail
-          python paper_portfolio_10k.py | tee /tmp/atlas-paper-10k.log
-          jq -e '.schema == "ATLAS_PAPER_PORTFOLIO_10K_V1_PROSPECTIVE"' status/paper-portfolio-10k-latest.json >/dev/null
+          python paper_portfolio_10k_final.py | tee /tmp/atlas-paper-10k.log
+          jq -e '.schema == "ATLAS_PAPER_PORTFOLIO_10K_V2_PRODUCT_WINDOW"' status/paper-portfolio-10k-latest.json >/dev/null
           jq -e '.paper_only == true and .live_execution == false and .can_override_production == false and .production_threshold_unchanged == 68' status/paper-portfolio-10k-latest.json >/dev/null
           jq -e '.portfolio.starting_equity_usd == 10000 and .portfolio.equity_usd >= 0' status/paper-portfolio-10k-latest.json >/dev/null
           jq -e '.append_only_verified == true and .paper_only == true and .live_execution == false' status/paper-portfolio-10k-integrity.json >/dev/null
