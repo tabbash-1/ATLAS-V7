@@ -42,9 +42,20 @@ def test_ai_never_says_wait_when_production_is_actionable():
     assert x['best_counterfactual']['scenario']=='PRODUCTION_NOW'
 
 
+def test_ai_contract_is_core_4_12h():
+    x=a.analyze(prod_ready())
+    assert x['horizon']=='4-12H'
+    assert x['product_horizon']=='4-12H'
+    assert x['product_lane']=='CORE_4_12H'
+    assert x['entry_confirmation_horizon']=='1H'
+    assert x['canonical_action']['product_horizon']=='4-12H'
+    assert x['safety']['short_horizon_can_set_product_direction'] is False
+
+
 def test_non_actionable_can_still_use_counterfactuals():
     d=prod_ready(); d['execution_ready']=False; d['actionable_decision']='WAIT'; d['production_signal_qualified']=False; d['signal_qualified']=False
     d['trade_plan']={'status':'CONDITIONAL','action':'BUY_ONLY_IF','direction':'LONG','entry_mode':'BREAKOUT','entry':81345.0,'stop_loss':80799.0,'tp1':81891.0,'tp2':82509.0,'rr_tp1':1.0,'rr_tp2':2.13,'entry_trigger':'Buy only after 1H close/hold above resistance.'}
     x=a.analyze(d)
     assert x['canonical_action']['status']=='CONDITIONAL'
     assert x['canonical_action']['action']=='BUY_ONLY_IF'
+    assert x['best_counterfactual']['product_horizon']=='4-12H'
