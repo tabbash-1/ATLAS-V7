@@ -4,7 +4,7 @@ Pure analysis module: no score/threshold mutation and no live execution.
 """
 from __future__ import annotations
 
-VERSION = "HTF_PRICE_ACTION_V1"
+VERSION = "HTF_PRICE_ACTION_V2_ATR_GEOMETRY_INPUT"
 
 
 def _f(v, default=None):
@@ -102,7 +102,7 @@ def analyze_price_action(rows,timeframe):
     elif sweep=='LIQUIDITY_SWEEP_HIGH' or rejection=='BEARISH_REJECTION_AT_RESISTANCE': scenario='BEARISH_REVERSAL_WATCH'
 
     return {
-        'version':VERSION,'timeframe':timeframe,'ok':True,'price':px,
+        'version':VERSION,'timeframe':timeframe,'ok':True,'price':px,'atr14':round(atr,10),
         'break_of_structure':bos,'liquidity_sweep':sweep,'retest_state':retest,'rejection_state':rejection,
         'market_location':location,'scenario':scenario,
         'nearest_support_zone':nearest_support,'nearest_resistance_zone':nearest_resistance,
