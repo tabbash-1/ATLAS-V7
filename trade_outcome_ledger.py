@@ -48,7 +48,10 @@ def is_production_signal(row):
 
 
 def is_legacy_score_signal(row):
-    """Historical research lane only; never an official Production signal."""
+    """Historical score/flag lane only; canonical rows are never duplicated here."""
+    c = _canonical(row)
+    if c.get('canonical_source_present') is True and c.get('source_of_truth') == CANONICAL_SOURCE:
+        return False
     if 'production_signal_qualified' in (row or {}):
         return bool(row.get('production_signal_qualified'))
     score = _score(row or {})
@@ -204,7 +207,7 @@ def summarize(rows, horizon=12, scope='signals'):
         'scope': scope,
         'scope_semantics': {
             'signals': 'Explicit FINAL_TRADE_GATE canonical TRADE READY only',
-            'legacy_score_signals': 'Legacy score/flag-qualified research rows only; never official Production trades',
+            'legacy_score_signals': 'Legacy score/flag-qualified research rows only; canonical rows excluded; never official Production trades',
             'champions': 'Broader research champion lane',
             'all': 'All directional forward observations',
         },
