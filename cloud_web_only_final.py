@@ -17,20 +17,34 @@ if isinstance(getattr(atlas, "WEB_SAFE_MODE", None), dict):
 from whale_intelligence import VERSION as WHALE_INTELLIGENCE_VERSION
 from whale_intelligence import filter_feed as filter_whale_feed
 from whale_intelligence import load_snapshot as load_whale_snapshot
+from canonical_outcome_snapshot import VERSION as CANONICAL_OUTCOME_VERSION
+from canonical_outcome_snapshot import load_snapshot as load_canonical_outcomes
 
 
 def _whale_snapshot():
-    # Read on request so a newly committed verified snapshot can become visible
-    # after deploy without any web-process collector or hidden mutable state.
     return load_whale_snapshot(BASE)
 
 
+def _outcome_snapshot():
+    # Web process is read-only: scheduled GitHub Actions own generation/settlement.
+    return load_canonical_outcomes(BASE)
+
+
+def _outcome_rows(snapshot, symbol=None):
+    rows = list(((snapshot.get("signals") or {}).get("rows") or []))
+    if symbol:
+        symbol = str(symbol).upper()
+        rows = [x for x in rows if str(x.get("symbol") or "").upper() == symbol]
+    return rows
+
+
 class FinalWebOnlyHandler(ns["WebOnlyHandler"]):
-    """Web-only handler with explicit final-decision and whale-data contracts."""
+    """Web-only handler with explicit final-decision, outcome and whale contracts."""
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path == "/api/runtime/status":
             whale = _whale_snapshot()
+            outcomes = _outcome_snapshot()
             return self._json({
                 "ok": True,
                 "service": "ATLAS_V7",
@@ -39,6 +53,14 @@ class FinalWebOnlyHandler(ns["WebOnlyHandler"]):
                 "final_trade_ready_guard": FINAL_TRADE_READY_GUARD,
                 "production_threshold": float(atlas.CLOUD_FORWARD_MIN_SCORE),
                 "product_horizon": "4-12H",
+                "canonical_outcomes": {
+                    "version": CANONICAL_OUTCOME_VERSION,
+                    "state": outcomes.get("state", "READY"),
+                    "decision_source_of_truth": outcomes.get("decision_source_of_truth"),
+                    "evaluation_horizons_h": outcomes.get("evaluation_horizons_h"),
+                    "signal_count": (outcomes.get("signals") or {}).get("count", 0),
+                    "web_process_background_worker": False,
+                },
                 "whale_intelligence": {
                     "version": WHALE_INTELLIGENCE_VERSION,
                     "state": whale.get("state"),
@@ -50,6 +72,53 @@ class FinalWebOnlyHandler(ns["WebOnlyHandler"]):
                 "analysis_only": True,
                 "live_execution": False,
             })
+        if parsed.path in {
+            "/api/outcomes/ledger", "/api/outcomes/summary",
+            "/api/outcomes/path-ledger", "/api/outcomes/path-summary",
+            "/api/outcomes/geometry-status", "/api/outcomes/settlement-status",
+        }:
+            q = urllib.parse.parse_qs(parsed.query)
+            scope = str((q.get("scope") or ["signals"])[0]).lower()
+            if scope not in {"signals", "execution"}:
+                return self._json({"error":"Production web exposes only canonical signals/execution scopes","scope":scope,"research_only":True,"live_execution":False}, 400)
+            snapshot = _outcome_snapshot()
+            symbol = (q.get("symbol") or [None])[0]
+            horizon_raw = (q.get("horizon") or ["12"])[0]
+            try:
+                horizon = int(horizon_raw)
+            except Exception:
+                horizon = -1
+            if horizon not in (4, 8, 12):
+                return self._json({"error":"official outcome horizon must be one of 4, 8, 12","research_only":True,"live_execution":False}, 400)
+            rows = _outcome_rows(snapshot, symbol=symbol)
+            base = {
+                "schema": snapshot.get("schema"),
+                "state": snapshot.get("state", "READY"),
+                "decision_source_of_truth": snapshot.get("decision_source_of_truth"),
+                "product_horizon": snapshot.get("product_horizon"),
+                "evaluation_horizons_h": snapshot.get("evaluation_horizons_h"),
+                "legacy_backfill_allowed": False,
+                "scope": scope,
+                "symbol": symbol,
+                "horizon_h": horizon,
+                "served_from": "COMMITTED_GITHUB_ACTIONS_SNAPSHOT",
+                "web_process_background_worker": False,
+                "outcome_read_triggered_by_request": False,
+                "research_only": True,
+                "live_execution": False,
+                "can_override_production": False,
+            }
+            if parsed.path == "/api/outcomes/ledger":
+                return self._json({**base, "rows": rows, "count": len(rows)})
+            if parsed.path == "/api/outcomes/summary":
+                return self._json({**base, "summary": snapshot.get("summary") or {}, "signal_count": len(rows)})
+            if parsed.path == "/api/outcomes/path-ledger":
+                return self._json({**base, "rows": rows, "count": len(rows), "path_semantics":"CANONICAL_PAPER_TRADE_PATH_ONLY"})
+            if parsed.path == "/api/outcomes/path-summary":
+                return self._json({**base, "path_summary": snapshot.get("path_summary") or {}, "path_semantics":"CANONICAL_PAPER_TRADE_PATH_ONLY"})
+            if parsed.path == "/api/outcomes/geometry-status":
+                return self._json({**base, "geometry_status": snapshot.get("geometry_status") or {}})
+            return self._json({**base, "settlement_status": snapshot.get("settlement_status") or {}})
         if parsed.path == "/api/whales/status":
             whale = _whale_snapshot()
             return self._json({
@@ -133,6 +202,7 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8080"))
     print("ATLAS Render WEB-ONLY safe mode + FINAL TRADE READY guard", flush=True)
     print(f"Final trade-ready guard: {FINAL_TRADE_READY_GUARD['version']}", flush=True)
+    print(f"Canonical outcomes: {CANONICAL_OUTCOME_VERSION}", flush=True)
     print(f"Whale intelligence: {WHALE_INTELLIGENCE_VERSION}", flush=True)
     print(f"Listening on {port}", flush=True)
     ns["Server"](("0.0.0.0", port), FinalWebOnlyHandler).serve_forever(poll_interval=0.5)
