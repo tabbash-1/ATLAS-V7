@@ -1,10 +1,24 @@
 import trade_outcome_ledger as ledger
 
 
+def canonical(direction='LONG', trade_ready=True, decision_id='dec-1'):
+    return {
+        'schema': 'ATLAS_CANONICAL_DECISION_TRUTH_V1',
+        'decision_id': decision_id,
+        'canonical_source_present': True,
+        'source_of_truth': 'FINAL_TRADE_GATE',
+        'decision': direction if trade_ready else 'WAIT',
+        'direction': direction if trade_ready else None,
+        'trade_ready': trade_ready,
+        'paper_trade_eligible': trade_ready,
+        'evaluation_horizons_h': [4, 8, 12],
+    }
+
+
 def row(**extra):
     base = {
         'id': 'x1',
-        'captured_at': '2026-08-23T00:00:00+00:00',
+        'captured_at': '2026-09-08T00:00:00+00:00',
         'captured_at_ms': 1000,
         'symbol': 'BTCUSDT',
         'direction': 'LONG',
@@ -12,101 +26,124 @@ def row(**extra):
         'champion_take': True,
         'champion_score': 80,
         'final_score': 80,
-        'forward_return_pct': {'1': 1.0, '4': 2.0, '12': -1.0, '24': 3.0},
+        'signal_threshold': 68,
+        'canonical_decision': canonical(),
+        'forward_return_pct': {'4': 1.0, '8': 2.0, '12': -1.0},
     }
     base.update(extra)
     return base
 
 
 def test_long_positive_is_win_and_negative_is_loss():
-    assert ledger.classify_row(row(), 24)['outcome'] == 'WIN'
+    assert ledger.classify_row(row(), 8)['outcome'] == 'WIN'
     assert ledger.classify_row(row(), 12)['outcome'] == 'LOSS'
 
 
 def test_short_inverts_market_return():
-    x = ledger.classify_row(row(direction='SHORT', forward_return_pct={'24': -2.5}), 24)
+    x = ledger.classify_row(row(direction='SHORT', canonical_decision=canonical('SHORT'), forward_return_pct={'8': -2.5}), 8)
     assert x['outcome'] == 'WIN'
     assert x['directional_return_pct'] == 2.5
 
 
 def test_unmatured_is_open():
-    x = ledger.classify_row(row(forward_return_pct={}), 24)
+    x = ledger.classify_row(row(forward_return_pct={}), 12)
     assert x['outcome'] == 'OPEN'
 
 
-def test_signal_scope_is_production_threshold_not_research_champion():
-    rows = [
-        row(id='production', final_score=70, champion_score=70, champion_take=True),
-        row(id='research_champion', captured_at_ms=1100, final_score=65, champion_score=65, champion_take=True),
-        row(id='research_sample', captured_at_ms=1200, final_score=55, champion_score=55, champion_take=False, research_sampling_lane=True),
-    ]
-    signals = ledger.build_ledger(rows, horizon=24, scope='signals')
-    champions = ledger.build_ledger(rows, horizon=24, scope='champions')
-    all_rows = ledger.build_ledger(rows, horizon=24, scope='all')
-    assert [x['id'] for x in signals] == ['production']
-    assert {x['id'] for x in champions} == {'production', 'research_champion'}
-    assert len(all_rows) == 3
-
-
-def test_explicit_production_flag_wins_over_legacy_score_fallback():
-    x = row(final_score=80, production_signal_qualified=False, signal_threshold=68)
+def test_high_score_without_canonical_proof_is_not_production():
+    x = row(canonical_decision=None, final_score=99, production_signal_qualified=True)
     assert ledger.is_production_signal(x) is False
-    assert ledger.classify_row(x, 24)['signal_qualified'] is False
+    assert ledger.build_ledger([x], horizon=12, scope='signals') == []
+
+
+def test_legacy_flag_without_final_gate_is_not_production():
+    x = row(canonical_decision=None, production_signal_qualified=True, execution_ready=True)
+    assert ledger.is_production_signal(x) is False
+    legacy = ledger.build_ledger([x], horizon=12, scope='legacy_score_signals')
+    assert len(legacy) == 1
+    assert legacy[0]['production_signal_qualified'] is False
+    assert legacy[0]['legacy_score_signal'] is True
+
+
+def test_canonical_wait_is_not_production_even_with_high_score():
+    x = row(canonical_decision=canonical(trade_ready=False), final_score=100, production_signal_qualified=True)
+    assert ledger.is_production_signal(x) is False
+
+
+def test_canonical_trade_ready_requires_decision_id_and_final_gate_source():
+    good = row(canonical_decision=canonical('LONG', True, 'abc123'))
+    missing_id = row(canonical_decision=canonical('LONG', True, ''))
+    wrong_source = row(canonical_decision={**canonical(), 'source_of_truth': 'ANALYST_OUTPUT'})
+    assert ledger.is_production_signal(good) is True
+    assert ledger.is_production_signal(missing_id) is False
+    assert ledger.is_production_signal(wrong_source) is False
+
+
+def test_official_horizons_are_only_4_8_12():
+    assert ledger.HORIZONS == (4, 8, 12)
+    for h in (4, 8, 12):
+        ledger.classify_row(row(), h)
+    for h in (1, 24):
+        try:
+            ledger.classify_row(row(), h)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f'legacy horizon {h} must be rejected by official ledger')
+
+
+def test_signal_scope_is_final_gate_not_research_champion():
+    rows = [
+        row(id='production', canonical_decision=canonical('LONG', True, 'p1')),
+        row(id='legacy', captured_at_ms=1100, canonical_decision=None, final_score=90, production_signal_qualified=True),
+        row(id='research', captured_at_ms=1200, canonical_decision=None, final_score=55, champion_take=True),
+    ]
+    signals = ledger.build_ledger(rows, horizon=12, scope='signals')
+    legacy = ledger.build_ledger(rows, horizon=12, scope='legacy_score_signals')
+    assert [x['id'] for x in signals] == ['production']
+    assert {x['id'] for x in legacy} == {'legacy'}
 
 
 def test_summary_win_rate_uses_decisive_closed_only():
     rows = [
-        row(id='w', forward_return_pct={'24': 2}),
-        row(id='l', captured_at_ms=1100, forward_return_pct={'24': -1}),
-        row(id='o', captured_at_ms=1200, forward_return_pct={}),
+        row(id='w', canonical_decision=canonical('LONG', True, 'w'), forward_return_pct={'12': 2}),
+        row(id='l', captured_at_ms=1100, canonical_decision=canonical('LONG', True, 'l'), forward_return_pct={'12': -1}),
+        row(id='o', captured_at_ms=1200, canonical_decision=canonical('LONG', True, 'o'), forward_return_pct={}),
     ]
-    s = ledger.summarize(rows, 24, 'signals')
+    s = ledger.summarize(rows, 12, 'signals')
     assert s['overall']['wins'] == 1
     assert s['overall']['losses'] == 1
     assert s['overall']['open'] == 1
     assert s['overall']['win_rate_pct'] == 50.0
-    assert s['r_multiple_available'] is False
+    assert s['canonical_source_of_truth'] == 'FINAL_TRADE_GATE'
+    assert s['legacy_backfill_allowed'] is False
 
 
-def test_version_provenance_is_preserved_in_outcome_rows():
+def test_version_provenance_is_preserved_without_inference():
     x = ledger.classify_row(row(
         scoring_version='PROD_SIGNAL_V6',
         decision_version='DECISION_V3',
         trade_plan_version='PLAN_V2',
         policy_version='POLICY_V1',
-        generation_id='gen-20260828-001',
-    ), 24)
+        generation_id='gen-20260908-001',
+    ), 12)
     assert x['scoring_version'] == 'PROD_SIGNAL_V6'
     assert x['decision_version'] == 'DECISION_V3'
     assert x['trade_plan_version'] == 'PLAN_V2'
     assert x['policy_version'] == 'POLICY_V1'
-    assert x['generation_id'] == 'gen-20260828-001'
-
-
-def test_summary_builds_frozen_version_cohorts_without_inference():
-    rows = [
-        row(id='v6-win', scoring_version='V6', decision_version='D2', trade_plan_version='P2', forward_return_pct={'24': 2}),
-        row(id='v6-loss', captured_at_ms=1100, scoring_version='V6', decision_version='D2', trade_plan_version='P2', forward_return_pct={'24': -1}),
-        row(id='v7-win', captured_at_ms=1200, scoring_version='V7', decision_version='D3', trade_plan_version='P3', forward_return_pct={'24': 4}),
-        row(id='legacy', captured_at_ms=1300, scoring_version=None, decision_version=None, trade_plan_version=None, forward_return_pct={'24': 1}),
-    ]
-    s = ledger.summarize(rows, 24, 'signals')
-    assert s['schema'] == 'ATLAS_TRADE_OUTCOME_SUMMARY_V2_VERSION_COHORTS'
-    assert s['by_scoring_version']['V6']['win_rate_pct'] == 50.0
-    assert s['by_scoring_version']['V6']['average_directional_return_pct'] == 0.5
-    assert s['by_scoring_version']['V7']['win_rate_pct'] == 100.0
-    assert s['by_scoring_version']['UNKNOWN']['total'] == 1
-    assert s['by_decision_version']['D2']['total'] == 2
-    assert s['by_trade_plan_version']['P3']['total'] == 1
+    assert x['generation_id'] == 'gen-20260908-001'
 
 
 if __name__ == '__main__':
     test_long_positive_is_win_and_negative_is_loss()
     test_short_inverts_market_return()
     test_unmatured_is_open()
-    test_signal_scope_is_production_threshold_not_research_champion()
-    test_explicit_production_flag_wins_over_legacy_score_fallback()
+    test_high_score_without_canonical_proof_is_not_production()
+    test_legacy_flag_without_final_gate_is_not_production()
+    test_canonical_wait_is_not_production_even_with_high_score()
+    test_canonical_trade_ready_requires_decision_id_and_final_gate_source()
+    test_official_horizons_are_only_4_8_12()
+    test_signal_scope_is_final_gate_not_research_champion()
     test_summary_win_rate_uses_decisive_closed_only()
-    test_version_provenance_is_preserved_in_outcome_rows()
-    test_summary_builds_frozen_version_cohorts_without_inference()
+    test_version_provenance_is_preserved_without_inference()
     print('trade outcome ledger tests: ok')
