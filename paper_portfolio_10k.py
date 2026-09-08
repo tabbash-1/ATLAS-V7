@@ -16,6 +16,7 @@ import pathlib
 import time
 from typing import Any
 
+from canonical_decision_contract import from_decision
 from offline_production_path_settlement import market_klines, event_from, excursions
 
 ROOT = pathlib.Path(__file__).resolve().parent
@@ -24,7 +25,7 @@ HISTORY = ROOT / "status/history/production-snapshots.jsonl"
 COHORT = ROOT / "status/history/paper-portfolio-10k-cohort.jsonl"
 LATEST = ROOT / "status/paper-portfolio-10k-latest.json"
 INTEGRITY = ROOT / "status/paper-portfolio-10k-integrity.json"
-SCHEMA = "ATLAS_PAPER_PORTFOLIO_10K_V2_PRODUCT_WINDOW"
+SCHEMA = "ATLAS_PAPER_PORTFOLIO_10K_V3_CANONICAL_TRUTH"
 INTEGRITY_SCHEMA = "ATLAS_PAPER_PORTFOLIO_10K_INTEGRITY_V1"
 PRODUCT_HORIZON = "4-12H"
 PRODUCT_CHECKPOINT_HOURS = (4, 8, 12)
@@ -84,7 +85,8 @@ def load_snapshots(start: dt.datetime):
 
 def geometry(decision: dict[str, Any]):
     p = decision.get("trade_plan") or {}
-    direction = str(p.get("direction") or decision.get("candidate_direction") or "").upper()
+    truth = from_decision(decision)
+    direction = truth.get("direction") or str(p.get("direction") or "").upper()
     entry, stop, tp1, tp2 = map(fnum, (p.get("entry"), p.get("stop_loss"), p.get("tp1"), p.get("tp2")))
     if direction not in {"LONG", "SHORT"} or None in (entry, stop, tp2): return None
     risk = abs(entry-stop)
@@ -100,12 +102,14 @@ def geometry(decision: dict[str, Any]):
 
 
 def trade_ready(decision: dict[str, Any]) -> bool:
-    p = decision.get("trade_plan") or {}
-    action = str(decision.get("actionable_decision") or "").upper()
-    return bool(decision.get("execution_ready") is True and p.get("can_execute") is True and action in {"LONG","SHORT"} and geometry(decision))
+    truth = from_decision(decision)
+    return bool(truth.get("trade_ready") is True and truth.get("source_of_truth") == "FINAL_TRADE_GATE" and geometry(decision))
 
 
-def event_id(symbol: str, captured_at: str, g: dict[str, Any]) -> str:
+def event_id(symbol: str, captured_at: str, g: dict[str, Any], decision: dict[str, Any] | None = None) -> str:
+    truth = from_decision(decision or {}, symbol=symbol, captured_at=captured_at)
+    if truth.get("decision_id"):
+        return str(truth["decision_id"])
     return hashlib.sha256(f"{symbol}|{captured_at}|{g['direction']}|{g['entry']:.12g}|{g['stop_loss']:.12g}|{g['tp2']:.12g}".encode()).hexdigest()[:24]
 
 
@@ -152,7 +156,7 @@ def enroll_new(manifest, cohort, snapshots, observed_through, sizing_equity):
             prior = active_state.get(symbol)
             active_state[symbol] = direction
             if not ready or prior == direction: continue
-            captured = t.isoformat(); eid = event_id(symbol, captured, g)
+            captured = t.isoformat(); truth = from_decision(d, symbol=symbol, captured_at=captured); eid = event_id(symbol, captured, g, d)
             if eid in ids: continue
             conservative_open = [r for r in cohort if parse_time(r["captured_at"]) <= t < parse_time(r["captured_at"]) + horizon]
             if len(conservative_open) >= max_positions:
@@ -160,9 +164,9 @@ def enroll_new(manifest, cohort, snapshots, observed_through, sizing_equity):
             risk_usd = round(sizing_equity * risk_pct, 2)
             qty = risk_usd / g["risk_abs"]
             row = {
-                "schema":"ATLAS_PAPER_PORTFOLIO_10K_ENTRY_V2","id":eid,"portfolio_id":manifest["portfolio_id"],
+                "schema":"ATLAS_PAPER_PORTFOLIO_10K_ENTRY_V3_CANONICAL_TRUTH","id":eid,"decision_id":truth["decision_id"],"portfolio_id":manifest["portfolio_id"],
                 "captured_at":captured,"captured_at_ms":int(t.timestamp()*1000),"symbol":symbol,"direction":direction,
-                "decision_source":"COMMITTED_PRODUCTION_SNAPSHOT","decision_action":"TRADE_READY",
+                "decision_source":"FINAL_TRADE_GATE","decision_action":"TRADE_READY","canonical_truth_schema":truth["schema"],
                 "product_horizon":g.get("product_horizon") or PRODUCT_HORIZON,"canonical_lane":g.get("canonical_lane") or "CORE_4_12H",
                 "evaluation_horizons":["4h","8h","12h"],
                 "score":fnum(d.get("score")),"threshold":fnum(d.get("signal_threshold")),
@@ -264,17 +268,19 @@ def portfolio_report(manifest, cohort, settlements, generated_at, observed_throu
         s=by_id.get(row["id"],{"status":"OPEN","terminal":False,"r_multiple":None}); e=eq_after.get(row["id"])
         detail.append({**row,"product_window_checkpoints":checkpoints.get(row["id"],[]),"settlement":s,
                        "pnl_usd":e["pnl_usd"] if e else None,"equity_after_usd":e["equity_usd"] if e else None,"drawdown_after_pct":e["drawdown_pct"] if e else None})
+    gross_profit=sum(x["pnl_usd"] for x in closed if x["pnl_usd"]>0); gross_loss=abs(sum(x["pnl_usd"] for x in closed if x["pnl_usd"]<0))
     return {
         "schema":SCHEMA,"generated_at":generated_at,"observed_through_at":observed_through.isoformat(),"manifest_hash":manifest["manifest_hash"],
-        "product_horizon":PRODUCT_HORIZON,"evaluation_horizons":["4h","8h","12h"],
+        "product_horizon":PRODUCT_HORIZON,"evaluation_horizons":["4h","8h","12h"],"decision_source_of_truth":"FINAL_TRADE_GATE",
         "paper_only":True,"live_execution":False,"can_override_production":False,"production_threshold_unchanged":manifest["production_threshold"],
-        "methodology":"Prospective canonical TRADE READY entries only; frozen Entry/SL/TP2; 4h/8h/12h product-window checkpoints; 5m first-touch with 1m ambiguity refinement; 12h terminal mark-to-market expiry; gross paper P&L before fees/slippage.",
+        "methodology":"Prospective canonical Final Trade Guard TRADE READY entries only; frozen Entry/SL/TP2; 4h/8h/12h product-window checkpoints; 5m first-touch with 1m ambiguity refinement; 12h terminal mark-to-market expiry; gross paper P&L before fees/slippage.",
         "cost_note":"Gross paper performance. Exchange fees, funding and slippage are not deducted and results must not be described as live-account P&L.",
         "checkpoint_summary":checkpoint_summary,
         "portfolio":{"starting_equity_usd":start,"equity_usd":round(equity,2),"net_pnl_usd":round(equity-start,2),"return_pct":round((equity/start-1)*100,4),
                      "peak_equity_usd":round(peak,2),"max_drawdown_pct":round(max_dd,4),"entries":len(cohort),"closed":len(closed),
                      "open_or_unresolved":len(cohort)-len(closed),"wins":len(wins),"losses":len(losses),
                      "win_rate_pct":round(100*len(wins)/len(closed),2) if closed else None,"net_r":round(sum(rs),4),"avg_r":round(sum(rs)/len(rs),4) if rs else None,
+                     "profit_factor":round(gross_profit/gross_loss,4) if gross_loss>0 else (None if gross_profit==0 else "INF"),
                      "long":direction_stats("LONG"),"short":direction_stats("SHORT")},
         "equity_curve":equity_curve,"trades":detail
     }
@@ -298,7 +304,7 @@ def main():
     hashes=verify_append_only(cohort, previous_integrity); chain=hashlib.sha256("".join(hashes).encode()).hexdigest()
     integrity={"schema":INTEGRITY_SCHEMA,"generated_at":generated,"manifest_hash":manifest["manifest_hash"],"append_only_verified":True,
                "row_count":len(cohort),"new_row_count":len(added),"row_hashes":hashes,"chain_sha256":chain,
-               "paper_only":True,"live_execution":False,"can_override_production":False}
+               "decision_source_of_truth":"FINAL_TRADE_GATE","paper_only":True,"live_execution":False,"can_override_production":False}
     INTEGRITY.write_text(json.dumps(integrity,indent=2,sort_keys=True))
     print(json.dumps({"schema":SCHEMA,"added":len(added),"integrity":integrity,"portfolio":report["portfolio"],"checkpoint_summary":report["checkpoint_summary"]},indent=2))
 
