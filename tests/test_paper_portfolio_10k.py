@@ -15,15 +15,16 @@ def ready(direction='LONG', entry=100.0, stop=99.0, tp2=102.0):
     tp1=101.0 if direction=='LONG' else 99.0
     if direction=='SHORT': stop=101.0; tp2=98.0
     return {'execution_ready':True,'actionable_decision':direction,'candidate_direction':direction,'score':75,'signal_threshold':68,
+            'final_trade_gate':{'version':'FINAL_TRADE_READY_GUARD_V1_HTF_FAIL_CLOSED','status':'TRADE_READY','trade_ready':True,'direction':direction,'product_direction':direction,'primary_blocker':None},
             'trade_plan':{'version':'PRODUCTION_TRADE_PLAN_V4_CORE_4_12H','can_execute':True,'direction':direction,'entry':entry,
                           'stop_loss':stop,'tp1':tp1,'tp2':tp2,'rr_tp2':2.0,'product_horizon':'4-12H','canonical_lane':'CORE_4_12H'}}
 
 
-def test_trade_ready_requires_explicit_permission_and_action():
+def test_trade_ready_requires_final_gate_authority():
     d=ready(); assert p.trade_ready(d)
-    d2=ready(); d2['trade_plan']['can_execute']=False; assert not p.trade_ready(d2)
-    d3=ready(); d3['execution_ready']=False; assert not p.trade_ready(d3)
-    d4=ready(); d4['actionable_decision']='WAIT'; assert not p.trade_ready(d4)
+    d2=ready(); d2['final_trade_gate']['trade_ready']=False; d2['final_trade_gate']['status']='WAIT'; assert not p.trade_ready(d2)
+    d3=ready(); d3.pop('final_trade_gate'); assert not p.trade_ready(d3)
+    d4=ready(); d4['actionable_decision']='WAIT'; assert p.trade_ready(d4), 'legacy action must not override final guard truth'
 
 
 def test_geometry_rejects_invalid_long_ordering():
@@ -45,6 +46,8 @@ def test_enrollment_is_prospective_transition_only_and_risk_frozen():
     assert cohort[0]['product_horizon']=='4-12H'
     assert cohort[0]['canonical_lane']=='CORE_4_12H'
     assert cohort[0]['evaluation_horizons']==['4h','8h','12h']
+    assert cohort[0]['decision_source']=='FINAL_TRADE_GATE'
+    assert cohort[0]['decision_id']
     assert newest==t0+dt.timedelta(minutes=20)
 
 
@@ -83,7 +86,7 @@ def test_checkpoint_marks_directional_r_without_changing_terminal_settlement():
         p.event_from=old_event
 
 
-def test_portfolio_report_computes_dollars_equity_drawdown_and_checkpoint_summary():
+def test_portfolio_report_computes_dollars_equity_drawdown_profit_factor_and_checkpoint_summary():
     m=manifest(); t0=dt.datetime.fromisoformat(m['cohort_start_at'])
     cohort=[
         {'id':'a','captured_at':t0.isoformat(),'captured_at_ms':int(t0.timestamp()*1000),'direction':'LONG','risk_usd':100.0},
@@ -101,11 +104,13 @@ def test_portfolio_report_computes_dollars_equity_drawdown_and_checkpoint_summar
     pf=r['portfolio']
     assert r['product_horizon']=='4-12H'
     assert r['evaluation_horizons']==['4h','8h','12h']
+    assert r['decision_source_of_truth']=='FINAL_TRADE_GATE'
     assert r['checkpoint_summary']['4h']['matured']==2
     assert r['checkpoint_summary']['4h']['avg_r']==0.125
     assert pf['equity_usd']==10100.0
     assert pf['net_pnl_usd']==100.0
     assert pf['win_rate_pct']==50.0
+    assert pf['profit_factor']==2.0
     assert pf['max_drawdown_pct']>0
     assert pf['long']['pnl_usd']==200.0 and pf['short']['pnl_usd']==-100.0
 
