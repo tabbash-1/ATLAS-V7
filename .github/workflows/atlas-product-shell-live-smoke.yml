@@ -8,6 +8,7 @@ on:
       - 'final_trade_ready_guard.py'
       - 'canonical_decision_contract.py'
       - 'cloud_web_only_final.py'
+      - 'render_boot_patch.py'
       - '.github/workflows/atlas-product-shell-live-smoke.yml'
   workflow_dispatch:
 
@@ -30,7 +31,8 @@ jobs:
           base='https://atlas-v7.onrender.com'
           ready=0
           for i in $(seq 1 60); do
-            if curl -fsSL --connect-timeout 10 --max-time 40 "$base/api/decision/current?symbol=BNBUSDT" -o /tmp/decision.json; then
+            if curl -fsSL --connect-timeout 10 --max-time 40 "$base/api/decision/current?symbol=BNBUSDT" -o /tmp/decision.json \
+              && curl -fsSL --connect-timeout 10 --max-time 40 "$base/" -o /tmp/index.html; then
               if jq -e '
                 .ok == true
                 and .canonical_decision.schema == "ATLAS_CANONICAL_DECISION_TRUTH_V1"
@@ -46,7 +48,8 @@ jobs:
                 and .analyst_output.geometry_bound_to_canonical_decision == true
                 and .analyst_output.analysis_only == true
                 and .analyst_output.live_execution == false
-              ' /tmp/decision.json >/dev/null; then
+              ' /tmp/decision.json >/dev/null \
+              && grep -q 'atlas-product-shell.js?v=product-shell-v7-bound-analyst-geometry' /tmp/index.html; then
                 ready=1; break
               fi
             fi
