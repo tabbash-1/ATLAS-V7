@@ -9,6 +9,7 @@ across user-facing/nested plan fields so no stale actionable flag can escape.
 from __future__ import annotations
 
 from canonical_decision_contract import from_decision
+from golden_thesis_engine import VERSION as GOLDEN_THESIS_VERSION, build as build_golden_thesis
 
 VERSION = "FINAL_TRADE_READY_GUARD_V1_HTF_FAIL_CLOSED"
 PRODUCT_HORIZON = "4-12H"
@@ -111,7 +112,12 @@ def _publish_truth(row):
         analyst["evaluation_horizons_h"] = list(canonical.get("evaluation_horizons_h") or [])
         analyst["product_horizon"] = canonical.get("product_horizon")
         analyst["geometry_bound_to_canonical_decision"] = bool(canonical.get("decision_id"))
+        golden = build_golden_thesis(row, analyst)
+        golden["canonical_decision_id"] = canonical.get("decision_id")
+        golden["bound_after_final_trade_gate"] = True
+        analyst["golden_thesis"] = golden
         row["analyst_output"] = analyst
+        row["golden_thesis"] = golden
     return row
 
 
@@ -133,6 +139,7 @@ def apply(row):
             analyst["trade_ready"] = True
             analyst["final_trade_gate"] = gate
             analyst["analysis_ready"] = True
+            analyst["decision"] = gate["direction"]
             row["analyst_output"] = analyst
         plan = row.get("trade_plan")
         if isinstance(plan, dict):
@@ -186,6 +193,12 @@ def install(atlas):
             row.setdefault("symbol", symbol)
         return apply(row)
     atlas.production_decision = guarded
-    state = {"enabled":True,"version":VERSION,"product_horizon":PRODUCT_HORIZON,"fail_closed":True,"paper_portfolio_authority":"final_trade_gate","canonical_decision_contract":"ATLAS_CANONICAL_DECISION_TRUTH_V1","analysis_only":True,"live_execution":False}
+    state = {
+        "enabled":True,"version":VERSION,"product_horizon":PRODUCT_HORIZON,
+        "fail_closed":True,"paper_portfolio_authority":"final_trade_gate",
+        "canonical_decision_contract":"ATLAS_CANONICAL_DECISION_TRUTH_V1",
+        "golden_thesis_version":GOLDEN_THESIS_VERSION,"golden_thesis_shadow_only":True,
+        "golden_thesis_can_override":False,"analysis_only":True,"live_execution":False,
+    }
     atlas.FINAL_TRADE_READY_GUARD_STATE = state
     return state

@@ -1,0 +1,69 @@
+name: Golden Thesis Live Production Smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'golden_thesis_engine.py'
+      - 'final_trade_ready_guard.py'
+      - 'cloud_web_only_final.py'
+      - 'render.yaml'
+      - '.github/workflows/golden-thesis-live-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  live-production:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      BASE_URL: https://atlas-v7.onrender.com
+      GOLDEN_VERSION: ATLAS_GOLDEN_THESIS_ENGINE_V1_SHADOW
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for guarded Render runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          ok=0
+          for attempt in $(seq 1 36); do
+            code=$(curl -L --connect-timeout 15 --max-time 60 -sS -w '%{http_code}' -o /tmp/runtime.json "$BASE_URL/api/runtime/status?t=$(date +%s)" || true)
+            if [[ "$code" =~ ^2 ]] && jq -e --arg g "$GOLDEN_VERSION" '
+              .ok == true and
+              .runtime == "WEB_ONLY_FINAL" and
+              .final_trade_ready_guard.golden_thesis_version == $g and
+              .final_trade_ready_guard.golden_thesis_shadow_only == true and
+              .final_trade_ready_guard.golden_thesis_can_override == false and
+              .final_trade_ready_guard.product_horizon == "4-12H" and
+              .analysis_only == true and .live_execution == false
+            ' /tmp/runtime.json >/dev/null 2>&1; then ok=1; break; fi
+            echo "waiting for Golden runtime attempt=$attempt http=${code:-none}"
+            sleep 10
+          done
+          if [[ "$ok" != 1 ]]; then cat /tmp/runtime.json || true; exit 1; fi
+      - name: Verify canonical decisions carry bound Golden thesis
+        shell: bash
+        run: |
+          set -euo pipefail
+          for symbol in BTCUSDT ETHUSDT; do
+            out="/tmp/${symbol}.json"; ok=0
+            for attempt in $(seq 1 12); do
+              code=$(curl -L --connect-timeout 15 --max-time 60 -sS -w '%{http_code}' -o "$out" "$BASE_URL/api/decision/current?symbol=${symbol}&t=$(date +%s)" || true)
+              if [[ "$code" =~ ^2 ]] && jq -e --arg g "$GOLDEN_VERSION" --arg s "$symbol" '
+                .ok == true and .symbol == $s and
+                .canonical_decision.schema == "ATLAS_CANONICAL_DECISION_TRUTH_V1" and
+                .canonical_decision.product_horizon == "4-12H" and
+                .golden_thesis.version == $g and
+                .golden_thesis.mode == "SHADOW_FALSIFICATION_ONLY" and
+                .golden_thesis.bound_after_final_trade_gate == true and
+                .golden_thesis.canonical_decision_id == .canonical_decision_id and
+                .golden_thesis.can_override_canonical_decision == false and
+                .golden_thesis.can_change_score == false and
+                .golden_thesis.can_change_threshold == false and
+                .golden_thesis.can_change_geometry == false and
+                .analysis_only == true and .live_execution == false
+              ' "$out" >/dev/null 2>&1; then ok=1; break; fi
+              sleep 5
+            done
+            if [[ "$ok" != 1 ]]; then echo "FAILED $symbol"; cat "$out" || true; exit 1; fi
+            jq -r '"PASS \(.symbol) canonical=\(.canonical_decision.decision) golden_stage=\(.golden_thesis.stage) countercase=\(.golden_thesis.strongest_countercase)"' "$out"
+          done

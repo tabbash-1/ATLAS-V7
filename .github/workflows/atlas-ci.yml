@@ -193,8 +193,8 @@ jobs:
           curl --fail --silent http://127.0.0.1:18080/api/runtime/status | grep -q '"storage_hardening"'
           curl --fail --silent http://127.0.0.1:18080/production-status.html | grep -q 'Research Progress'
           curl --fail --silent http://127.0.0.1:18080/trade-outcomes.html | grep -q 'Trade Outcomes'
-          curl --fail --silent 'http://127.0.0.1:18080/api/outcomes/summary?horizon=24&scope=signals' | grep -q 'ATLAS_TRADE_OUTCOME_SUMMARY_V2_VERSION_COHORTS'
-          curl --fail --silent 'http://127.0.0.1:18080/api/outcomes/geometry-status' | grep -q 'ATLAS_TRADE_GEOMETRY_STATUS_V2_EXECUTION_SCOPE'
+          curl --fail --silent 'http://127.0.0.1:18080/api/outcomes/summary?horizon=12&scope=signals' | grep -q 'ATLAS_TRADE_OUTCOME_SUMMARY_V3_CANONICAL_FINAL_GATE'
+          curl --fail --silent 'http://127.0.0.1:18080/api/outcomes/geometry-status' | grep -q 'ATLAS_TRADE_GEOMETRY_STATUS_V3_CANONICAL_FINAL_GATE'
           curl --fail --silent http://127.0.0.1:18080/api/system/readiness | grep -q '"persistent_data_dir": "/tmp/atlas-ci-data"'
           curl --fail --silent http://127.0.0.1:18080/api/production/readiness | grep -q '"ready_for_live_execution": false'
           test -f "$ATLAS_DATA_DIR/$legacy_file"
