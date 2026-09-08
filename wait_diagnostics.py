@@ -6,8 +6,10 @@ with missed directional moves and may emit SHADOW experiment suggestions, but it
 never changes Production score thresholds, execution rules, or live weights.
 """
 
-VERSION = 'WAIT_DIAGNOSTICS_V3_SEGMENTED_CALIBRATION'
-HORIZONS = (1, 3, 6, 12, 24)
+from canonical_decision_contract import EVALUATION_HORIZONS_H, canonical_wait_reason
+
+VERSION = 'WAIT_DIAGNOSTICS_V4_CANONICAL_4_12H'
+HORIZONS = EVALUATION_HORIZONS_H
 MIN_REVIEW_SAMPLE = 10
 MIN_PROMOTION_SAMPLE = 20
 MIN_CONFIRMING_HORIZONS = 2
@@ -24,7 +26,7 @@ def _f(v, default=None):
 
 
 def _horizon(row, hours):
-    return (row.get('horizons') or {}).get(f'{int(hours)}h') or {}
+    return (row.get('horizons') or {}).get(f'{int(hours)}h') or (row.get('horizons') or {}).get(str(int(hours))) or {}
 
 
 def score_band(score, threshold=68.0):
@@ -48,34 +50,39 @@ def score_gap_band(row):
     return 'GAP_8_PLUS'
 
 
+def reason(row):
+    return str(row.get('wait_reason') or canonical_wait_reason(row.get('raw_wait_reason') or row.get('reason')) or 'OTHER')
+
+
 def blocker(row):
-    reason = str(row.get('reason') or 'UNKNOWN')
+    r = reason(row)
+    if r in ('NO_CONSENSUS','HTF_CONFLICT','NO_CONFIRMATION','NO_STRUCTURE','POOR_RR','LOW_VOLUME','OVEREXTENDED','WHALE_CONFLICT','DERIVATIVES_RISK','DATA_DEGRADED','QUALITY_BLOCKED'):
+        return r
     attr = row.get('score_attribution') or {}
     obstacle = _f(attr.get('obstacle_adjustment'), 0) or 0
     futures = _f(attr.get('futures_adjustment'), 0) or 0
     rel = _f(attr.get('relative_strength_adjustment'), 0) or 0
-    if reason == 'NO_DIRECTIONAL_CONSENSUS': return 'NO_DIRECTIONAL_CONSENSUS'
-    if obstacle <= -4: return 'STRUCTURE_OBSTACLE_PENALTY'
-    if futures < 0: return 'FUTURES_OPPOSITION'
+    if obstacle <= -4: return 'NO_STRUCTURE'
+    if futures < 0: return 'DERIVATIVES_RISK'
     if rel < 0: return 'RELATIVE_STRENGTH_OPPOSITION'
-    if reason == 'SCORE_BELOW_SIGNAL_THRESHOLD': return 'SCORE_GAP_OTHER'
-    return reason
+    if r == 'NOT_QUALIFIED': return 'NOT_QUALIFIED'
+    return r
 
 
 def blocker_segment(row):
     b = blocker(row)
-    if b == 'STRUCTURE_OBSTACLE_PENALTY':
+    if b == 'NO_STRUCTURE':
         obstacle = _f((row.get('score_attribution') or {}).get('obstacle_adjustment'), 0) or 0
         severity = 'PENALTY_8_PLUS' if obstacle <= -8 else 'PENALTY_4_7'
         return f'{b}|{severity}|{score_gap_band(row)}'
-    if b in ('FUTURES_OPPOSITION','RELATIVE_STRENGTH_OPPOSITION','SCORE_GAP_OTHER'):
+    if b in ('DERIVATIVES_RISK','RELATIVE_STRENGTH_OPPOSITION','NOT_QUALIFIED'):
         return f'{b}|{score_gap_band(row)}'
     return b
 
 
-def classify(row, hours=24):
+def classify(row, hours=12):
     h = _horizon(row, hours)
-    direction = str(row.get('candidate_direction') or 'NONE').upper()
+    direction = str(row.get('direction') or row.get('candidate_direction') or 'NONE').upper()
     directional = _f(h.get('directional_return_pct'))
     raw = _f(h.get('change_pct'))
     if direction in ('LONG', 'SHORT') and directional is not None:
@@ -124,7 +131,7 @@ def _proposal(name, rows, segmented=False):
         if st.get('directional_decisive',0) >= MIN_PROMOTION_SAMPLE and rate is not None and rate >= 65.0:
             confirmations.append(h)
     blocked_name = name.split('|',1)[0]
-    eligible = len(confirmations) >= MIN_CONFIRMING_HORIZONS and blocked_name != 'NO_DIRECTIONAL_CONSENSUS'
+    eligible = len(confirmations) >= MIN_CONFIRMING_HORIZONS and blocked_name != 'NO_CONSENSUS'
     max_rate=max([horizon_stats[f'{h}h'].get('missed_directional_rate_pct') or 0 for h in confirmations],default=0)
     suggested=0.0
     if eligible: suggested=1.0 if max_rate < 75 else SHADOW_MAX_ADJUSTMENT_POINTS
@@ -139,45 +146,35 @@ def _proposal(name, rows, segmented=False):
 
 
 def calibration(payload):
-    """Conservative multi-horizon SHADOW-only calibration proposals.
-
-    V3 evaluates both broad blockers and narrow blocker/severity/score-gap segments.
-    Segmentation prevents a globally protective blocker from hiding a small, repeatedly
-    over-restrictive near-threshold cohort. Nothing here can modify Production.
-    """
     records = payload.get('records') if isinstance(payload, dict) else payload
     records = [r for r in (records or []) if isinstance(r, dict)]
     broad = [_proposal(k,v,False) for k,v in sorted(_group(records,blocker).items())]
     segmented = [_proposal(k,v,True) for k,v in sorted(_group(records,blocker_segment).items())]
     eligible_segments=[x for x in segmented if x['eligible_for_shadow_experiment']]
     return {
-        'schema':'ATLAS_WAIT_OPPORTUNITY_CALIBRATION_V2_SEGMENTED',
-        'version':VERSION,'records':len(records),
+        'schema':'ATLAS_WAIT_OPPORTUNITY_CALIBRATION_V3_CANONICAL_4_12H',
+        'version':VERSION,'records':len(records),'product_horizon':'4-12H','evaluation_horizons_h':list(HORIZONS),
         'guardrails':{
             'min_decisive_sample_per_horizon':MIN_PROMOTION_SAMPLE,
             'min_confirming_horizons':MIN_CONFIRMING_HORIZONS,
             'min_missed_rate_pct':65.0,
             'max_shadow_adjustment_points':SHADOW_MAX_ADJUSTMENT_POINTS,
         },
-        'proposals':broad,
-        'segment_proposals':segmented,
-        'eligible_segment_count':len(eligible_segments),
-        'eligible_segments':eligible_segments,
-        'production_change_authorized':False,
-        'threshold_changed':False,
-        'execution_rules_changed':False,
-        'production_weights_changed':False,
+        'proposals':broad,'segment_proposals':segmented,
+        'eligible_segment_count':len(eligible_segments),'eligible_segments':eligible_segments,
+        'production_change_authorized':False,'threshold_changed':False,
+        'execution_rules_changed':False,'production_weights_changed':False,
     }
 
 
-def diagnose(payload, hours=24):
+def diagnose(payload, hours=12):
     hours=int(hours)
-    if hours not in HORIZONS: raise ValueError('hours must be one of 1,3,6,12,24')
+    if hours not in HORIZONS: raise ValueError('hours must be one of 4,8,12')
     records=payload.get('records') if isinstance(payload,dict) else payload
     records=[r for r in (records or []) if isinstance(r,dict)]
     by_reason={}; by_blocker={}; by_segment={}; by_band={}; by_symbol={}
     for r in records:
-        by_reason.setdefault(str(r.get('reason') or 'UNKNOWN'),[]).append(r)
+        by_reason.setdefault(reason(r),[]).append(r)
         by_blocker.setdefault(blocker(r),[]).append(r)
         by_segment.setdefault(blocker_segment(r),[]).append(r)
         by_band.setdefault(score_band(r.get('score'),r.get('threshold',68)),[]).append(r)
@@ -194,7 +191,7 @@ def diagnose(payload, hours=24):
                 'review_priority':'HIGH' if missed/sample>=.65 else 'MEDIUM' if missed/sample>=.50 else 'LOW'})
     review.sort(key=lambda x:(x['review_priority']=='HIGH',x['missed_rate_pct'],x['decisive_sample']),reverse=True)
     return {
-        'schema':'ATLAS_WAIT_DIAGNOSTICS_V3_SEGMENTED','version':VERSION,'horizon_h':hours,
+        'schema':'ATLAS_WAIT_DIAGNOSTICS_V4_CANONICAL_4_12H','version':VERSION,'horizon_h':hours,'product_horizon':'4-12H','evaluation_horizons_h':list(HORIZONS),'decision_source_of_truth':'FINAL_TRADE_GATE',
         'records':len(records),'overall':_stats(records,hours),
         'by_reason':{k:_stats(v,hours) for k,v in sorted(by_reason.items())},
         'by_blocker':blocker_rows,
