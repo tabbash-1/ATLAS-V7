@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Offline evaluation of committed ATLAS Production snapshots.
 Research-only; cannot modify Production or execution state.
+Only decisions carrying the canonical Final Trade Guard contract are eligible.
+Legacy pre-guard snapshots are counted and excluded, never reinterpreted or backfilled.
 """
 from __future__ import annotations
 import argparse, datetime as dt, json, math, statistics
@@ -80,11 +82,15 @@ def chronological_folds(items,n=3):
     return out
 
 def build(rows):
-    obs=[]; last={}
+    obs=[]; last={}; noncanonical=0; canonical_decisions=0
     for i,(t0,r0) in enumerate(rows):
         for symbol,d0 in (r0.get('decisions') or {}).items():
             if not isinstance(d0,dict) or not d0.get('ok'):continue
             truth=from_decision(d0,symbol=symbol,captured_at=t0.isoformat())
+            if not truth.get('canonical_source_present'):
+                noncanonical += 1
+                continue
+            canonical_decisions += 1
             p0=price(d0)
             side=truth.get('direction') if truth.get('trade_ready') else candidate_direction(d0)
             if not p0 or side not in ('LONG','SHORT'):continue
@@ -92,7 +98,11 @@ def build(rows):
             key=(symbol,klass,side)
             if key in last and (t0-last[key]).total_seconds()<3600:continue
             last[key]=t0; score=f(d0.get('score'))
-            x={'decision_id':truth['decision_id'],'symbol':symbol,'captured_at':t0.isoformat(),'classification':klass,'decision_source_of_truth':'FINAL_TRADE_GATE','direction':side,'score':score,'score_band':score_band(score),'wait_reason':truth.get('wait_reason'),'raw_wait_reason':truth.get('raw_wait_reason'),'trade_ready':truth.get('trade_ready') is True,'playbook':str(d0.get('playbook') or 'UNKNOWN'),'regime':str(d0.get('regime') or 'UNKNOWN'),'horizons':{}}
+            x={'decision_id':truth['decision_id'],'symbol':symbol,'captured_at':t0.isoformat(),'classification':klass,
+               'decision_source_of_truth':'FINAL_TRADE_GATE','direction':side,'score':score,'score_band':score_band(score),
+               'wait_reason':truth.get('wait_reason'),'raw_wait_reason':truth.get('raw_wait_reason'),
+               'trade_ready':truth.get('trade_ready') is True,'playbook':str(d0.get('playbook') or 'UNKNOWN'),
+               'regime':str(d0.get('regime') or 'UNKNOWN'),'horizons':{}}
             for h in HORIZONS:
                 hit=nearest(rows,i,symbol,t0+dt.timedelta(hours=h))
                 if not hit:continue
@@ -101,7 +111,21 @@ def build(rows):
             obs.append(x)
     now=dt.datetime.now(dt.timezone.utc); latest=rows[-1][0] if rows else None; age=((now-latest).total_seconds()/60) if latest else None
     q=[x for x in obs if x['classification']=='TRADE_READY']; w=[x for x in obs if x['classification']=='WAIT_DIRECTIONAL']
-    return {'schema':SCHEMA,'generated_at':now.isoformat(),'research_only':True,'live_execution':False,'can_override_production':False,'production_threshold_changed':False,'product_horizon':'4-12H','evaluation_horizons_h':list(HORIZONS),'decision_source_of_truth':'FINAL_TRADE_GATE','source':{'file':'status/history/production-snapshots.jsonl','snapshot_rows':len(rows),'latest_snapshot_at':latest.isoformat() if latest else None,'latest_snapshot_age_minutes':round(age,2) if age is not None else None,'stale':age is None or age>90},'sampling':'max one row per symbol/class/direction per hour','overall':aggregate(obs),'trade_ready':aggregate(q),'wait_directional':aggregate(w),'trade_ready_by_symbol':grouped(q,lambda x:x['symbol']),'trade_ready_by_direction':grouped(q,lambda x:x['direction']),'trade_ready_by_score_band':grouped(q,lambda x:x['score_band']),'trade_ready_by_regime':grouped(q,lambda x:x['regime']),'trade_ready_by_playbook':grouped(q,lambda x:x['playbook']),'trade_ready_chronological_folds':chronological_folds(q,3),'wait_reason_counts':dict(Counter(str(x.get('wait_reason') or 'UNSPECIFIED') for x in w).most_common()),'observation_count':len(obs),'trade_ready_count':len(q),'wait_directional_count':len(w),'latest_observations':obs[-80:]}
+    return {
+        'schema':SCHEMA,'generated_at':now.isoformat(),'research_only':True,'live_execution':False,'can_override_production':False,
+        'production_threshold_changed':False,'product_horizon':'4-12H','evaluation_horizons_h':list(HORIZONS),
+        'decision_source_of_truth':'FINAL_TRADE_GATE','legacy_backfill_performed':False,
+        'source':{'file':'status/history/production-snapshots.jsonl','snapshot_rows':len(rows),
+                  'canonical_decision_rows':canonical_decisions,'excluded_noncanonical_decision_rows':noncanonical,
+                  'latest_snapshot_at':latest.isoformat() if latest else None,
+                  'latest_snapshot_age_minutes':round(age,2) if age is not None else None,'stale':age is None or age>90},
+        'sampling':'max one canonical row per symbol/class/direction per hour',
+        'overall':aggregate(obs),'trade_ready':aggregate(q),'wait_directional':aggregate(w),
+        'trade_ready_by_symbol':grouped(q,lambda x:x['symbol']),'trade_ready_by_direction':grouped(q,lambda x:x['direction']),
+        'trade_ready_by_score_band':grouped(q,lambda x:x['score_band']),'trade_ready_by_regime':grouped(q,lambda x:x['regime']),
+        'trade_ready_by_playbook':grouped(q,lambda x:x['playbook']),'trade_ready_chronological_folds':chronological_folds(q,3),
+        'wait_reason_counts':dict(Counter(str(x.get('wait_reason') or 'UNSPECIFIED') for x in w).most_common()),
+        'observation_count':len(obs),'trade_ready_count':len(q),'wait_directional_count':len(w),'latest_observations':obs[-80:]}
 def main():
-    ap=argparse.ArgumentParser(); ap.add_argument('--history',default='status/history/production-snapshots.jsonl'); ap.add_argument('--output',default='status/offline-forward-evaluation-latest.json'); a=ap.parse_args(); report=build(load(Path(a.history))); p=Path(a.output); p.parent.mkdir(parents=True,exist_ok=True); p.write_text(json.dumps(report,indent=2,sort_keys=True)); print(json.dumps({'schema':report['schema'],'trade_ready':report['trade_ready_count'],'4h':report['trade_ready']['4'],'8h':report['trade_ready']['8'],'12h':report['trade_ready']['12'],'folds':report['trade_ready_chronological_folds']},sort_keys=True))
+    ap=argparse.ArgumentParser(); ap.add_argument('--history',default='status/history/production-snapshots.jsonl'); ap.add_argument('--output',default='status/offline-forward-evaluation-latest.json'); a=ap.parse_args(); report=build(load(Path(a.history))); p=Path(a.output); p.parent.mkdir(parents=True,exist_ok=True); p.write_text(json.dumps(report,indent=2,sort_keys=True)); print(json.dumps({'schema':report['schema'],'trade_ready':report['trade_ready_count'],'excluded_noncanonical':report['source']['excluded_noncanonical_decision_rows'],'4h':report['trade_ready']['4'],'8h':report['trade_ready']['8'],'12h':report['trade_ready']['12'],'folds':report['trade_ready_chronological_folds']},sort_keys=True))
 if __name__=='__main__':main()
