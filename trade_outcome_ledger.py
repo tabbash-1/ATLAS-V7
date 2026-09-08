@@ -1,22 +1,16 @@
 """Read-only outcome ledger for frozen ATLAS forward observations.
 
-This module never changes scores, thresholds, signals, archives, or execution.
-It classifies already-matured directional observations as WIN / LOSS / FLAT
-using the canonical forward_return_pct captured by ATLAS.
-
-Scope semantics:
-- signals: strict Production-qualified observations only.
-- champions: broader research champion lane (legacy champion_take=True).
-- all: every directional forward observation.
-
-Legacy rows that predate explicit production_signal_qualified are classified
-using their frozen score and threshold when available, falling back to the
-current historical Production threshold of 68.
+Official Production outcome semantics are fail-closed: a row is a Production
+signal only when it carries the explicit canonical decision contract published
+by Final Trade Guard. Legacy score-qualified rows remain available only through
+an explicitly named research scope and are never backfilled or reclassified as
+Production trades.
 """
 
-HORIZONS = (1, 4, 12, 24)
-LEGACY_PRODUCTION_THRESHOLD = 68.0
+HORIZONS = (4, 8, 12)
 UNKNOWN_VERSION = 'UNKNOWN'
+CANONICAL_SOURCE = 'FINAL_TRADE_GATE'
+CANONICAL_SCHEMA = 'ATLAS_CANONICAL_DECISION_TRUTH_V1'
 
 
 def _fnum(value):
@@ -30,14 +24,36 @@ def _score(row):
     return _fnum(row.get('final_score')) if row.get('final_score') is not None else _fnum(row.get('champion_score'))
 
 
+def _canonical(row):
+    value = (row or {}).get('canonical_decision')
+    return value if isinstance(value, dict) else {}
+
+
 def is_production_signal(row):
-    if 'production_signal_qualified' in row:
+    """True only for explicit Final Trade Gate canonical TRADE READY rows."""
+    c = _canonical(row)
+    direction = str(c.get('direction') or c.get('decision') or '').upper()
+    decision_id = str(c.get('decision_id') or '').strip()
+    horizons = c.get('evaluation_horizons_h')
+    return bool(
+        c.get('schema') == CANONICAL_SCHEMA
+        and c.get('source_of_truth') == CANONICAL_SOURCE
+        and c.get('canonical_source_present') is True
+        and c.get('trade_ready') is True
+        and c.get('paper_trade_eligible') is True
+        and direction in ('LONG', 'SHORT')
+        and decision_id
+        and list(horizons or []) == list(HORIZONS)
+    )
+
+
+def is_legacy_score_signal(row):
+    """Historical research lane only; never an official Production signal."""
+    if 'production_signal_qualified' in (row or {}):
         return bool(row.get('production_signal_qualified'))
-    score = _score(row)
-    threshold = _fnum(row.get('signal_threshold'))
-    if threshold is None:
-        threshold = LEGACY_PRODUCTION_THRESHOLD
-    return bool(score is not None and score >= threshold)
+    score = _score(row or {})
+    threshold = _fnum((row or {}).get('signal_threshold'))
+    return bool(score is not None and threshold is not None and score >= threshold)
 
 
 def is_research_champion(row):
@@ -46,11 +62,18 @@ def is_research_champion(row):
     return bool(row.get('champion_take'))
 
 
+def _direction(row):
+    if is_production_signal(row):
+        c = _canonical(row)
+        return str(c.get('direction') or c.get('decision') or '').upper()
+    return str(row.get('direction') or '').upper()
+
+
 def _directional_return(row, horizon):
     raw = _fnum((row.get('forward_return_pct') or {}).get(str(horizon)))
     if raw is None:
         return None, None
-    direction = str(row.get('direction') or '').upper()
+    direction = _direction(row)
     if direction == 'LONG':
         return raw, raw
     if direction == 'SHORT':
@@ -58,10 +81,10 @@ def _directional_return(row, horizon):
     return raw, None
 
 
-def classify_row(row, horizon=24):
+def classify_row(row, horizon=12):
     horizon = int(horizon)
     if horizon not in HORIZONS:
-        raise ValueError('horizon must be one of 1, 4, 12, 24')
+        raise ValueError('horizon must be one of 4, 8, 12')
 
     raw_return, directional_return = _directional_return(row, horizon)
     if directional_return is None:
@@ -75,15 +98,17 @@ def classify_row(row, horizon=24):
 
     production_qualified = is_production_signal(row)
     research_champion = is_research_champion(row)
+    canonical = _canonical(row)
     return {
         'id': row.get('id'),
+        'decision_id': canonical.get('decision_id') if production_qualified else None,
         'captured_at': row.get('captured_at'),
         'captured_at_ms': row.get('captured_at_ms'),
         'symbol': row.get('symbol'),
-        'direction': row.get('direction'),
+        'direction': _direction(row),
         'entry': _fnum(row.get('entry')),
         'score': _score(row),
-        'signal_threshold': _fnum(row.get('signal_threshold')) or LEGACY_PRODUCTION_THRESHOLD,
+        'signal_threshold': _fnum(row.get('signal_threshold')),
         'scoring_version': row.get('scoring_version'),
         'decision_version': row.get('decision_version'),
         'trade_plan_version': row.get('trade_plan_version'),
@@ -93,8 +118,12 @@ def classify_row(row, horizon=24):
         'source': row.get('auto_source'),
         'signal_qualified': production_qualified,
         'production_signal_qualified': production_qualified,
+        'canonical_source_present': bool(canonical.get('canonical_source_present')),
+        'canonical_source_of_truth': canonical.get('source_of_truth'),
+        'canonical_schema': canonical.get('schema'),
         'research_champion': research_champion,
         'research_sampling_lane': bool(row.get('research_sampling_lane')),
+        'legacy_score_signal': is_legacy_score_signal(row),
         'horizon_h': horizon,
         'market_return_pct': raw_return,
         'directional_return_pct': directional_return,
@@ -108,16 +137,19 @@ def classify_row(row, horizon=24):
     }
 
 
-def build_ledger(rows, horizon=24, scope='signals', symbol=None, limit=200):
+def build_ledger(rows, horizon=12, scope='signals', symbol=None, limit=200):
     scope = str(scope or 'signals').lower()
-    if scope not in ('signals', 'champions', 'all'):
-        raise ValueError('scope must be signals, champions or all')
+    if scope not in ('signals', 'legacy_score_signals', 'champions', 'all'):
+        raise ValueError('scope must be signals, legacy_score_signals, champions or all')
     symbol = str(symbol or '').upper() or None
     selected = []
     for row in rows or []:
-        if str(row.get('direction') or '').upper() not in ('LONG', 'SHORT'):
+        direction = _direction(row)
+        if direction not in ('LONG', 'SHORT'):
             continue
         if scope == 'signals' and not is_production_signal(row):
+            continue
+        if scope == 'legacy_score_signals' and not is_legacy_score_signal(row):
             continue
         if scope == 'champions' and not is_research_champion(row):
             continue
@@ -158,7 +190,7 @@ def _version_buckets(ledger, field):
     return {key: _bucket(rows) for key, rows in sorted(grouped.items())}
 
 
-def summarize(rows, horizon=24, scope='signals'):
+def summarize(rows, horizon=12, scope='signals'):
     ledger = build_ledger(rows, horizon=horizon, scope=scope, limit=2000)
     by_symbol = {}
     by_direction = {}
@@ -166,22 +198,26 @@ def summarize(rows, horizon=24, scope='signals'):
         by_symbol.setdefault(item.get('symbol') or 'UNKNOWN', []).append(item)
         by_direction.setdefault(item.get('direction') or 'UNKNOWN', []).append(item)
     return {
-        'schema': 'ATLAS_TRADE_OUTCOME_SUMMARY_V2_VERSION_COHORTS',
+        'schema': 'ATLAS_TRADE_OUTCOME_SUMMARY_V3_CANONICAL_FINAL_GATE',
         'horizon_h': int(horizon),
+        'evaluation_horizons_h': list(HORIZONS),
         'scope': scope,
         'scope_semantics': {
-            'signals': 'Production-qualified only',
+            'signals': 'Explicit FINAL_TRADE_GATE canonical TRADE READY only',
+            'legacy_score_signals': 'Legacy score/flag-qualified research rows only; never official Production trades',
             'champions': 'Broader research champion lane',
             'all': 'All directional forward observations',
         },
+        'canonical_source_of_truth': CANONICAL_SOURCE if scope == 'signals' else None,
+        'legacy_backfill_allowed': False,
         'overall': _bucket(ledger),
         'by_symbol': {k: _bucket(v) for k, v in sorted(by_symbol.items())},
         'by_direction': {k: _bucket(v) for k, v in sorted(by_direction.items())},
         'by_scoring_version': _version_buckets(ledger, 'scoring_version'),
         'by_decision_version': _version_buckets(ledger, 'decision_version'),
         'by_trade_plan_version': _version_buckets(ledger, 'trade_plan_version'),
-        'version_cohort_methodology': 'Cohorts are computed only from frozen observation provenance; missing legacy provenance is grouped under UNKNOWN and never inferred.',
-        'methodology': 'WIN/LOSS is based on frozen canonical forward return in the signaled direction at the selected horizon. It is not TP/SL path settlement.',
+        'version_cohort_methodology': 'Cohorts use only frozen provenance. Missing legacy provenance is grouped under UNKNOWN and is never inferred.',
+        'methodology': 'Official signals require explicit FINAL_TRADE_GATE canonical TRADE READY proof. WIN/LOSS uses frozen forward return in that direction at 4h, 8h or 12h; no score fallback or retrospective reclassification.',
         'r_multiple_available': False,
         'research_only': True,
         'live_execution': False,
