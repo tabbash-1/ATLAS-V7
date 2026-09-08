@@ -19,7 +19,7 @@ from pathlib import Path
 
 import trade_outcome_ledger
 
-MAX_HORIZON_H = 24
+MAX_HORIZON_H = 12
 CACHE_SECONDS = 300
 PROVIDER_TIMEOUT_SECONDS = 6
 MARKET_DATA_CIRCUIT_SECONDS = 60
