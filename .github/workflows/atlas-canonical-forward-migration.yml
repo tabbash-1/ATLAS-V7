@@ -1,0 +1,97 @@
+name: ATLAS Canonical Forward Migration
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tests/test_canonical_forward_freeze_contract.py'
+      - '.github/workflows/atlas-canonical-forward-migration.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  migrate-forward-writer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply fail-closed canonical forward migration
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('collector_server.py')
+          s=p.read_text(encoding='utf-8')
+
+          def replace_once(old,new,label):
+              global s
+              n=s.count(old)
+              if n != 1:
+                  raise SystemExit(f'{label}: expected exactly one match, got {n}')
+              s=s.replace(old,new,1)
+
+          replace_once(
+              "HORIZONS=(1,4,12,24)\n",
+              "HORIZONS=(1,4,12,24)\nCANONICAL_FORWARD_HORIZONS=(4,8,12)\nCANONICAL_DECISION_SCHEMA='ATLAS_CANONICAL_DECISION_TRUTH_V1'\nCANONICAL_DECISION_SOURCE='FINAL_TRADE_GATE'\n",
+              'canonical constants')
+
+          replace_once(
+              "def forward_observe(payload):\n",
+              "def _is_canonical_forward_row(row):\n"
+              "    c=(row or {}).get('canonical_decision')\n"
+              "    if not isinstance(c,dict): return False\n"
+              "    direction=str(c.get('direction') or c.get('decision') or '').upper()\n"
+              "    return bool(c.get('schema')==CANONICAL_DECISION_SCHEMA and c.get('source_of_truth')==CANONICAL_DECISION_SOURCE and c.get('canonical_source_present') is True and c.get('trade_ready') is True and c.get('paper_trade_eligible') is True and str(c.get('decision_id') or '').strip() and direction in ('LONG','SHORT') and list(c.get('evaluation_horizons_h') or [])==list(CANONICAL_FORWARD_HORIZONS))\n\n"
+              "def forward_observe(payload):\n",
+              'canonical helper')
+
+          replace_once(
+              "    incoming_execution=bool(payload.get('production_signal_qualified') and payload.get('execution_ready'))\n",
+              "    incoming_execution=_is_canonical_forward_row(payload)\n",
+              'incoming execution authority')
+
+          replace_once(
+              "        if incoming_execution and not bool(old.get('production_signal_qualified') and old.get('execution_ready')):\n",
+              "        if incoming_execution and not _is_canonical_forward_row(old):\n",
+              'dedup authority')
+
+          replace_once(
+              "              'production_signal_qualified','execution_ready','opportunity_state',\n",
+              "              'production_signal_qualified','execution_ready','opportunity_state',\n              'canonical_decision','canonical_decision_id','canonical_wait_reason',\n",
+              'freeze fields')
+
+          replace_once(
+              "      if payload.get(k) is not None: row[k]=payload.get(k)\n    _forward_write(row)\n",
+              "      if payload.get(k) is not None: row[k]=payload.get(k)\n    if _is_canonical_forward_row(row):\n      row['schema']='ATLAS_FORWARD_V2_CANONICAL_FREEZE'\n      row['decision_source_of_truth']=CANONICAL_DECISION_SOURCE\n      row['evaluation_horizons_h']=list(CANONICAL_FORWARD_HORIZONS)\n      row['legacy_backfill_allowed']=False\n    _forward_write(row)\n",
+              'canonical row metadata')
+
+          replace_once(
+              "    # Use Binance spot klines to mature each frozen observation at 1/4/12/24h.\n    for r in rows:\n      ts=int(r.get('captured_at_ms') or 0); symbol=r.get('symbol'); entry=fnum(r.get('entry'))\n      if not ts or not symbol or not entry: continue\n      fr=r.setdefault('forward_return_pct',{})\n      for h in HORIZONS:\n",
+              "    # Use Binance spot klines to mature each frozen observation: legacy 1/4/12/24; canonical rows add 8h prospectively only.\n    for r in rows:\n      ts=int(r.get('captured_at_ms') or 0); symbol=r.get('symbol'); entry=fnum(r.get('entry'))\n      if not ts or not symbol or not entry: continue\n      fr=r.setdefault('forward_return_pct',{})\n      horizons=HORIZONS + ((8,) if _is_canonical_forward_row(r) else ())\n      for h in horizons:\n",
+              'prospective 8h maturity')
+
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Syntax and contract tests
+        run: |
+          python -m py_compile collector_server.py trade_outcome_ledger.py trade_outcome_runtime.py
+          PYTHONPATH=. python tests/test_canonical_forward_freeze_contract.py
+          PYTHONPATH=. python tests/test_trade_outcome_ledger.py
+          PYTHONPATH=. python tests/test_trade_outcome_runtime.py
+      - name: Commit canonical writer migration
+        run: |
+          if git diff --quiet -- collector_server.py; then
+            echo 'collector_server.py already canonical; nothing to commit'
+            exit 0
+          fi
+          git config user.name 'atlas-canonical-migrator'
+          git config user.email 'atlas-migrator@users.noreply.github.com'
+          git add collector_server.py
+          git commit -m 'refactor: freeze canonical final-gate truth in forward rows'
+          git push origin HEAD:main
