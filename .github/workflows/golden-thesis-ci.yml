@@ -1,0 +1,47 @@
+name: Golden Thesis CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'golden_thesis_engine.py'
+      - 'final_trade_ready_guard.py'
+      - 'tests/test_golden_thesis_engine.py'
+      - 'tests/test_final_gate_golden_thesis.py'
+      - 'tests/golden-thesis.contract.txt'
+      - '.github/workflows/golden-thesis-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'golden_thesis_engine.py'
+      - 'final_trade_ready_guard.py'
+      - 'tests/test_golden_thesis_engine.py'
+      - 'tests/test_final_gate_golden_thesis.py'
+      - 'tests/golden-thesis.contract.txt'
+      - '.github/workflows/golden-thesis-ci.yml'
+
+jobs:
+  golden-thesis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pytest
+        run: python -m pip install -q pytest
+      - name: Compile
+        run: python -m py_compile golden_thesis_engine.py final_trade_ready_guard.py tests/test_golden_thesis_engine.py tests/test_final_gate_golden_thesis.py
+      - name: Golden thesis regressions
+        run: PYTHONPATH=. python -m pytest -q tests/test_golden_thesis_engine.py tests/test_final_gate_golden_thesis.py
+      - name: Safety invariants
+        run: |
+          set -euo pipefail
+          grep -q 'ATLAS_GOLDEN_THESIS_ENGINE_V1_SHADOW' golden_thesis_engine.py
+          grep -q 'can_override_canonical_decision.*False' golden_thesis_engine.py
+          grep -q 'can_change_score.*False' golden_thesis_engine.py
+          grep -q 'can_change_threshold.*False' golden_thesis_engine.py
+          grep -q 'can_change_geometry.*False' golden_thesis_engine.py
+          grep -q 'bound_after_final_trade_gate' final_trade_ready_guard.py
+          grep -q 'golden_thesis_shadow_only.*True' final_trade_ready_guard.py
+          grep -q 'LIVE_EXECUTION=false' tests/golden-thesis.contract.txt
