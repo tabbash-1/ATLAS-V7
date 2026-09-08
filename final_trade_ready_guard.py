@@ -98,9 +98,20 @@ def _collapse_plan(plan, reason):
 
 
 def _publish_truth(row):
-    row["canonical_decision"] = from_decision(row, symbol=row.get("symbol"), captured_at=row.get("captured_at") or row.get("generated_at"))
-    row["canonical_wait_reason"] = row["canonical_decision"].get("wait_reason")
-    row["canonical_decision_id"] = row["canonical_decision"].get("decision_id")
+    canonical = from_decision(row, symbol=row.get("symbol"), captured_at=row.get("captured_at") or row.get("generated_at"))
+    row["canonical_decision"] = canonical
+    row["canonical_wait_reason"] = canonical.get("wait_reason")
+    row["canonical_decision_id"] = canonical.get("decision_id")
+    analyst = row.get("analyst_output")
+    if isinstance(analyst, dict):
+        analyst = dict(analyst)
+        analyst["canonical_decision_id"] = canonical.get("decision_id")
+        analyst["decision_source_of_truth"] = canonical.get("source_of_truth")
+        analyst["canonical_decision_schema"] = canonical.get("schema")
+        analyst["evaluation_horizons_h"] = list(canonical.get("evaluation_horizons_h") or [])
+        analyst["product_horizon"] = canonical.get("product_horizon")
+        analyst["geometry_bound_to_canonical_decision"] = bool(canonical.get("decision_id"))
+        row["analyst_output"] = analyst
     return row
 
 
