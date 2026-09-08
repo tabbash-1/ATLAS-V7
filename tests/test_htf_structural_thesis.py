@@ -34,7 +34,7 @@ def test_aligned_htf_and_one_hour_pass():
     assert row['product_direction'] == 'LONG'
     assert row['entry_confirmation_direction'] == 'LONG'
     assert row['direction_alignment'] == 'ALIGNED'
-    assert row['analysis_model_version'] == 'ATLAS_MARKET_PHASE_V1'
+    assert row['analysis_model_version'] == 'ATLAS_MARKET_INTELLIGENCE_V1'
 
 
 def test_frame_exposes_structure_and_current_phase_separately():
