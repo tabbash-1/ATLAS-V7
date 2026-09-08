@@ -1,12 +1,14 @@
 from pathlib import Path
 
 
-def test_production_decision_ui_is_analyst_output_first():
+def test_production_decision_ui_is_final_gate_first_with_bound_analyst_geometry():
     js=Path('atlas-production-decision.js').read_text()
+    assert 'canonical_decision' in js
+    assert "source_of_truth!=='FINAL_TRADE_GATE'" in js
     assert 'analyst_output' in js
-    assert 'canonical_product_contract' in js
+    assert 'geometry_bound_to_canonical_decision' in js
+    assert "geometrySource:'bound_analyst_output'" in js
     assert '4-12H' in js
-    assert 'ANALYSIS' in js
     assert 'live_execution' in js or 'liveExecution' in js
 
 
