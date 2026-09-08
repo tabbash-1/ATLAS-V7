@@ -28,7 +28,7 @@ def patch_production_ui():
     for name in names:
         html = re.sub(rf'<script[^>]+src=["\']{re.escape(name)}(?:\?[^"\']*)?["\'][^>]*></script>', '', html)
     scripts = "\n".join([
-        '  <script src="atlas-production-decision.js?v=web-only-prod-v5-bound-truth"></script>',
+        '  <script src="atlas-production-decision.js?v=production-decision-v12-final-gate-only"></script>',
         '  <script src="atlas-product-shell.js?v=product-shell-v7-bound-analyst-geometry"></script>',
         '  <script src="production-web-autoload.js?v=production-autoload-v6-strict-final-truth"></script>',
         '  <script src="atlas-deep-analysis-ui.js?v=rc10-1-deep-v2-primary-4-12h"></script>',
@@ -40,7 +40,7 @@ def patch_production_ui():
     injection="\n"+scripts+"\n"
     html=html.replace("</body>",injection+"</body>",1) if "</body>" in html else html+injection
     INDEX.write_text(html,encoding="utf-8")
-    print("ATLAS Render boot patch: strict Final Gate terminal + canonical 10K paper portfolio + isolated research shadow UI enabled",flush=True)
+    print("ATLAS Render boot patch: Final Gate-only decision UI + strict terminal + canonical 10K paper portfolio + isolated research shadow UI enabled",flush=True)
 
 
 def patch_legacy_command_mirrors():
