@@ -69,14 +69,17 @@ jobs:
           grep -q 'CANONICAL ANALYSIS' v7-ui-redesign.js
           grep -q 'ANALYSIS PLAN' v7-ui-redesign.js
           grep -q 'NO ORDER ROUTING' v7-ui-redesign.js
-          grep -q "canonical_product_contract.*analyst_output" atlas-production-decision.js
+          grep -q "canonical_decision" atlas-production-decision.js
+          grep -q "FINAL_TRADE_GATE" atlas-production-decision.js
+          grep -q "geometrySource:'bound_analyst_output'" atlas-production-decision.js
           grep -q "productHorizon:'4-12H'" atlas-production-decision.js
+          grep -q "evaluationHorizons:\[4,8,12\]" atlas-production-decision.js
           grep -q "analysisOnly:true" atlas-production-decision.js
           grep -q "liveExecution:false" atlas-production-decision.js
           ! grep -q 'BUY NOW' atlas-production-decision.js
           ! grep -q 'SELL NOW' atlas-production-decision.js
           ! grep -q 'ATLAS TRADE PLAN' atlas-production-decision.js
-          grep -q 'ATLAS_PRODUCT_SHELL_V5_DECISION_INTELLIGENCE' atlas-product-shell.js
+          grep -q 'ATLAS_PRODUCT_SHELL_V7_BOUND_ANALYST_GEOMETRY' atlas-product-shell.js
           grep -q 'decisionIntelligenceShadowOnly:true' atlas-product-shell.js
           grep -q 'ATLAS_DECISION_INTELLIGENCE_V1_SHADOW' decision_intelligence.py
           grep -q 'paper-portfolio-10k-analyst-latest.json' committed_research_api.py
