@@ -1,0 +1,69 @@
+name: ATLAS Canonical Outcome Snapshot
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'canonical_outcome_snapshot.py'
+      - 'status/paper-portfolio-10k-latest.json'
+      - 'status/offline-forward-evaluation-latest.json'
+      - 'trade_outcome_ledger.py'
+      - 'trade_path_settlement.py'
+      - 'collector_server.py'
+      - '.github/workflows/atlas-canonical-outcome-snapshot.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build canonical snapshot
+        run: |
+          python -m py_compile canonical_outcome_snapshot.py cloud_web_only_final.py collector_server.py trade_outcome_ledger.py trade_path_settlement.py
+          python canonical_outcome_snapshot.py
+      - name: Verify truth contract
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path('status/canonical-outcomes-latest.json').read_text())
+          assert p['schema']=='ATLAS_CANONICAL_OUTCOME_SNAPSHOT_V1'
+          assert p['decision_source_of_truth']=='FINAL_TRADE_GATE'
+          assert p['evaluation_horizons_h']==[4,8,12]
+          assert p['legacy_backfill_allowed'] is False
+          assert p['legacy_score_path_research_included'] is False
+          assert p['safety']['live_execution'] is False
+          assert p['safety']['can_override_production'] is False
+          for r in p['signals']['rows']:
+              assert r['decision_source_of_truth']=='FINAL_TRADE_GATE'
+              assert r['decision_id']
+              assert r['evaluation_horizons_h']==[4,8,12]
+          print('CANONICAL_OUTCOME_SNAPSHOT_OK', p['signals']['count'])
+          PY
+      - name: Canonical regression suite
+        run: |
+          PYTHONPATH=. python tests/test_canonical_forward_freeze_contract.py
+          PYTHONPATH=. python tests/test_trade_outcome_ledger.py
+          PYTHONPATH=. python tests/test_trade_outcome_runtime.py
+          PYTHONPATH=. python tests/test_trade_path_settlement.py
+      - name: Commit generated snapshot
+        run: |
+          if git diff --quiet -- status/canonical-outcomes-latest.json; then
+            echo 'snapshot unchanged'
+            exit 0
+          fi
+          git config user.name 'atlas-outcome-snapshot'
+          git config user.email 'atlas-outcomes@users.noreply.github.com'
+          git add status/canonical-outcomes-latest.json
+          git commit -m 'outcomes: update canonical final-gate snapshot [skip ci]'
+          git push origin HEAD:main
