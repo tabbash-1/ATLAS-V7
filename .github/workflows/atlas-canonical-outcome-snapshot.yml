@@ -11,10 +11,16 @@ on:
       - 'trade_path_settlement.py'
       - 'collector_server.py'
       - '.github/workflows/atlas-canonical-outcome-snapshot.yml'
+  schedule:
+    - cron: '*/15 * * * *'
   workflow_dispatch:
 
 permissions:
   contents: write
+
+concurrency:
+  group: atlas-canonical-outcome-snapshot
+  cancel-in-progress: false
 
 jobs:
   generate:
