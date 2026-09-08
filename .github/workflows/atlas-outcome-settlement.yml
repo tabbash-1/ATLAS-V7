@@ -1,15 +1,29 @@
 name: ATLAS Outcome Settlement
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'trade_outcome_runtime.py'
+      - 'trade_outcome_ledger.py'
+      - 'execution_outcome_scope.py'
+      - 'trade_path_settlement.py'
+      - 'tests/test_trade_outcome_runtime.py'
+      - 'tests/test_trade_outcome_ledger.py'
+      - 'tests/test_trade_path_settlement.py'
+      - '.github/workflows/atlas-outcome-settlement.yml'
   pull_request:
     branches: [main]
     paths:
       - 'trade_outcome_runtime.py'
       - 'trade_outcome_ledger.py'
+      - 'execution_outcome_scope.py'
       - 'trade_path_settlement.py'
       - 'tests/test_trade_outcome_runtime.py'
+      - 'tests/test_trade_outcome_ledger.py'
       - 'tests/test_trade_path_settlement.py'
       - '.github/workflows/atlas-outcome-settlement.yml'
+  workflow_dispatch:
 
 jobs:
   outcome-settlement:
@@ -21,13 +35,13 @@ jobs:
         with:
           python-version: '3.12'
       - name: Syntax
-        run: python -m py_compile trade_outcome_runtime.py trade_outcome_ledger.py trade_path_settlement.py tests/test_trade_outcome_runtime.py tests/test_trade_path_settlement.py
-      - name: Outcome runtime regression
-        run: PYTHONPATH=. python tests/test_trade_outcome_runtime.py
-      - name: Existing outcome regressions
+        run: python -m py_compile trade_outcome_runtime.py trade_outcome_ledger.py execution_outcome_scope.py trade_path_settlement.py tests/test_trade_outcome_runtime.py tests/test_trade_outcome_ledger.py tests/test_trade_path_settlement.py
+      - name: Canonical outcome regressions
         run: |
           PYTHONPATH=. python tests/test_trade_outcome_ledger.py
-          PYTHONPATH=. python tests/test_trade_path_settlement.py
+          PYTHONPATH=. python tests/test_trade_outcome_runtime.py
+      - name: Existing path regressions
+        run: PYTHONPATH=. python tests/test_trade_path_settlement.py
       - name: Geometry cohort invariant
         run: |
           PYTHONPATH=. python - <<'PY'
@@ -42,11 +56,23 @@ jobs:
           assert geometry['frozen_at_observation'] is True
           print('GEOMETRY_VERSION', geometry['geometry_version'])
           PY
-      - name: Safety invariants
+      - name: Canonical safety invariants
         run: |
+          set -euo pipefail
           grep -q "default_scope': 'signals'" trade_outcome_runtime.py
+          grep -q "default_horizon_h': DEFAULT_HORIZON" trade_outcome_runtime.py
+          grep -q 'OFFICIAL_HORIZONS = (4, 8, 12)' trade_outcome_runtime.py
+          grep -q 'FINAL_TRADE_GATE_CANONICAL_TRADE_READY_ONLY' trade_outcome_runtime.py
+          grep -q "CANONICAL_SOURCE = 'FINAL_TRADE_GATE'" trade_outcome_ledger.py
+          grep -q "HORIZONS = (4, 8, 12)" trade_outcome_ledger.py
+          grep -q "legacy_backfill_allowed': False" trade_outcome_ledger.py
+          grep -q "scope == 'legacy_score_signals'" trade_outcome_runtime.py
+          if grep -q 'LEGACY_PRODUCTION_THRESHOLD' trade_outcome_ledger.py; then
+            echo 'Legacy score fallback leaked into official ledger' >&2
+            exit 1
+          fi
           grep -q 'SETTLEMENT_INTERVAL_SECONDS = 900' trade_outcome_runtime.py
           grep -q '/api/outcomes/settlement-status' trade_outcome_runtime.py
           grep -q 'live_execution.*False' trade_outcome_runtime.py
-          grep -q 'production_signal_qualified' trade_outcome_ledger.py
           grep -q 'ATLAS_GEOMETRY_V3_STRUCTURAL_TP2_FROZEN_RR' trade_path_settlement.py
+          echo CANONICAL_OUTCOME_CONTRACT_OK
