@@ -4,6 +4,7 @@ services:
     runtime: python
     plan: starter
     buildCommand: pip install -r requirements.txt
+    # cloud_web_only_final.py delegates to cloud_web_only.py, then installs Final Trade Guard last.
     startCommand: python3 render_boot_patch.py && python3 cloud_web_only_final.py
     healthCheckPath: /health
     envVars:
