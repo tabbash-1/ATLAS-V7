@@ -1,13 +1,14 @@
-"""ATLAS NO_DIRECTIONAL_CONSENSUS diagnostics.
+"""ATLAS NO_CONSENSUS diagnostics.
 
-Research-only analysis for 2-2 vote ties. It reconstructs the contemporaneous
-four-vote signature (price/EMA20, EMA20/EMA50, RSI50, 24h momentum) from the
-WAIT tracker decision_context and studies later market direction. It never
-breaks a Production tie, changes threshold 68, or authorizes execution.
+Research-only analysis for unresolved directional consensus. It studies later market
+direction only inside the product window and never breaks a Production tie, changes
+threshold 68, or authorizes execution.
 """
 
-VERSION = 'NO_CONSENSUS_DIAGNOSTICS_V1'
-HORIZONS = (1, 3, 6, 12, 24)
+from canonical_decision_contract import EVALUATION_HORIZONS_H, canonical_wait_reason
+
+VERSION = 'NO_CONSENSUS_DIAGNOSTICS_V2_CANONICAL_4_12H'
+HORIZONS = EVALUATION_HORIZONS_H
 MIN_CONTEXT_SAMPLE = 20
 MIN_CONFIRMING_HORIZONS = 2
 MIN_DIRECTION_BIAS_PCT = 70.0
@@ -27,8 +28,13 @@ def has_context(row):
     return all(_f(c.get(k)) is not None for k in required) and _f(row.get('wait_price')) is not None
 
 
+def is_no_consensus(row):
+    r = row.get('wait_reason') or canonical_wait_reason(row.get('raw_wait_reason') or row.get('reason'))
+    return str(r or '') == 'NO_CONSENSUS'
+
+
 def is_two_two(row):
-    if str(row.get('reason') or '') != 'NO_DIRECTIONAL_CONSENSUS':
+    if not is_no_consensus(row):
         return False
     c = row.get('decision_context') or {}
     lv = _f(c.get('direction_votes_long'))
@@ -37,7 +43,6 @@ def is_two_two(row):
 
 
 def tie_signature(row):
-    """Return the exact four binary vote polarities used by Production scoring."""
     if not has_context(row):
         return None
     c = row.get('decision_context') or {}
@@ -54,7 +59,8 @@ def tie_signature(row):
 
 
 def _h(row, hours):
-    return (row.get('horizons') or {}).get(f'{int(hours)}h') or {}
+    hs = row.get('horizons') or {}
+    return hs.get(f'{int(hours)}h') or hs.get(str(int(hours))) or {}
 
 
 def outcome_direction(row, hours):
@@ -97,7 +103,7 @@ def _stats(rows, hours):
 def diagnose(payload):
     records = payload.get('records') if isinstance(payload,dict) else payload
     records = [r for r in (records or []) if isinstance(r,dict)]
-    no_consensus = [r for r in records if str(r.get('reason') or '') == 'NO_DIRECTIONAL_CONSENSUS']
+    no_consensus = [r for r in records if is_no_consensus(r)]
     tied = [r for r in no_consensus if is_two_two(r)]
     contextual = [r for r in tied if has_context(r) and tie_signature(r)]
     groups = {}
@@ -128,7 +134,8 @@ def diagnose(payload):
             hypotheses.append({'signature':sig,'direction':dirs[0],'confirming_horizons_h':confirmations,'records':len(rows),'production_applied':False})
 
     return {
-        'schema':'ATLAS_NO_CONSENSUS_DIAGNOSTICS_V1','version':VERSION,
+        'schema':'ATLAS_NO_CONSENSUS_DIAGNOSTICS_V2_CANONICAL_4_12H','version':VERSION,
+        'product_horizon':'4-12H','evaluation_horizons_h':list(HORIZONS),'decision_source_of_truth':'FINAL_TRADE_GATE',
         'records_total':len(records),'no_consensus_records':len(no_consensus),
         'two_two_records':len(tied),'contextual_two_two_records':len(contextual),
         'context_coverage_pct':round(100*len(contextual)/len(tied),2) if tied else None,
