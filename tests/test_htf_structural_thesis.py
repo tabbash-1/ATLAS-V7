@@ -1,6 +1,6 @@
 import math
 
-from htf_structural_thesis import analyze_frames
+from htf_structural_thesis import analyze_frame, analyze_frames
 
 
 def series(direction='LONG', n=120, start=100.0, step=0.35):
@@ -14,7 +14,6 @@ def series(direction='LONG', n=120, start=100.0, step=0.35):
 
 
 def structural_series(direction='LONG', n=120, start=100.0):
-    """Trending series with real local swings so structure + EMA agree."""
     out=[]
     for i in range(n):
         trend=(i*0.25) if direction=='LONG' else -(i*0.25)
@@ -35,6 +34,32 @@ def test_aligned_htf_and_one_hour_pass():
     assert row['product_direction'] == 'LONG'
     assert row['entry_confirmation_direction'] == 'LONG'
     assert row['direction_alignment'] == 'ALIGNED'
+    assert row['analysis_model_version'] == 'ATLAS_MARKET_PHASE_V1'
+
+
+def test_frame_exposes_structure_and_current_phase_separately():
+    row=analyze_frame(structural_series('LONG'),'4h')
+    assert row['structural_direction']=='LONG'
+    assert row['current_phase'] in ('BULLISH_EXPANSION','BEARISH_CORRECTION','CONSOLIDATION_OR_TRANSITION')
+    assert row['impulse'] in ('BULLISH','BEARISH','NEUTRAL')
+    assert row['trend_health'] in ('CONFIRMED','DETERIORATING','STABLE')
+    assert 'relative_volume' in row
+    assert 'return_3_bars_pct' in row
+
+
+def test_bullish_structure_can_report_bearish_correction_without_relabeling_structure():
+    rows=structural_series('LONG',140)
+    # Controlled late selloff: enough to establish a bearish current impulse while
+    # preserving the previously established higher-timeframe swing structure.
+    last=rows[-7]['close']
+    for j in range(6):
+        c=last-(j+1)*1.1
+        rows[-6+j]={'time':140-6+j,'open':c+0.5,'high':c+0.8,'low':c-0.8,'close':c,'volume':400+j*40}
+    row=analyze_frame(rows,'4h')
+    assert row['impulse']=='BEARISH'
+    if row['structural_direction']=='LONG':
+        assert row['current_phase']=='BEARISH_CORRECTION'
+        assert row['trend_health']=='DETERIORATING'
 
 
 def test_one_hour_cannot_flip_higher_timeframe_thesis():
@@ -64,8 +89,7 @@ def test_4h_12h_conflict_fails_to_wait_without_product_direction():
 
 
 def test_strong_daily_opposition_is_macro_veto_not_direction_flip():
-    f=frames()
-    f['1d']=structural_series('SHORT')
+    f=frames(); f['1d']=structural_series('SHORT')
     row = analyze_frames(f, 'LONG')
     assert row['daily_context'] == 'SHORT'
     assert row['daily_context_confidence'] == 'STRONG'
@@ -84,8 +108,7 @@ def test_trend_only_daily_opposition_is_context_not_blanket_veto():
 
 
 def test_incomplete_htf_data_fails_closed():
-    f = frames()
-    f['12h'] = f['12h'][:20]
+    f = frames(); f['12h'] = f['12h'][:20]
     row = analyze_frames(f, 'LONG')
     assert row['status'] == 'BLOCK'
     assert row['product_direction'] is None
