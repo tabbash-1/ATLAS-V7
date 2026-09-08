@@ -6,6 +6,20 @@ from pathlib import Path
 import trade_path_settlement as tps
 
 
+def canonical_decision(direction='LONG', trade_ready=True):
+    return {
+        'schema': 'ATLAS_CANONICAL_DECISION_TRUTH_V1',
+        'source_of_truth': 'FINAL_TRADE_GATE',
+        'canonical_source_present': True,
+        'decision_id': f'decision-{direction.lower()}',
+        'decision': direction if trade_ready else 'WAIT',
+        'direction': direction if trade_ready else None,
+        'trade_ready': trade_ready,
+        'paper_trade_eligible': trade_ready,
+        'evaluation_horizons_h': [4, 8, 12],
+    }
+
+
 def test_canonical_production_plan_geometry_is_frozen_directly():
     geometry = tps.derive_geometry({
         'direction': 'LONG', 'entry': 100, 'stop_loss': 98,
@@ -24,6 +38,9 @@ def signal_payload(direction='LONG', score=84, production=True):
         'final_score': score, 'rr_tp2': 2.0,
         'execution_decision': f'{direction}_CANDIDATE' if production else 'RESEARCH_OBSERVATION_ONLY',
     }
+    if production:
+        base['canonical_decision'] = canonical_decision(direction, True)
+        base['canonical_decision_id'] = base['canonical_decision']['decision_id']
     if direction == 'LONG':
         base.update({'direction': 'LONG', 'support_distance_pct': 1.0, 'resistance_distance_pct': 4.0})
     else:
@@ -67,6 +84,10 @@ def production_row(**extra):
         'captured_at_ms': 1_000_000, 'champion_take': True,
         'research_champion_take': True, 'production_signal_qualified': True,
         'final_score': 84, 'signal_threshold': 68,
+        'canonical_decision': canonical_decision('LONG', True),
+        'canonical_decision_id': 'decision-long',
+        'evaluation_horizons_h': [4, 8, 12],
+        'decision_source_of_truth': 'FINAL_TRADE_GATE',
     }
     row.update(extra)
     return row
@@ -98,10 +119,10 @@ def test_same_candle_is_not_guessed_when_test_loader_cannot_resolve_order():
     assert out['r_multiple'] is None
 
 
-def test_24h_no_hit_expires_at_zero_r():
+def test_12h_no_hit_expires_at_zero_r():
     start = 1_000_000
     geom = {'geometry': tps.derive_geometry(signal_payload('LONG'))}
-    out = tps.settle_row(production_row(captured_at_ms=start), geom, now_ms=start + 24 * 3600000,
+    out = tps.settle_row(production_row(captured_at_ms=start), geom, now_ms=start + 12 * 3600000,
                          candle_loader=lambda *_: [candle(start, 99.2, 100.8)])
     assert out['path_outcome'] == 'EXPIRED'
     assert out['r_multiple'] == 0.0
@@ -112,6 +133,7 @@ def test_research_champion_is_excluded_from_signal_path_scope():
     research = production_row(
         id='research', final_score=64, champion_take=True, research_champion_take=True,
         production_signal_qualified=False, signal_threshold=68,
+        canonical_decision=canonical_decision('LONG', False), canonical_decision_id='decision-wait',
     )
     items = tps.build_path_ledger([real, research], {}, scope='signals', now_ms=2_000_000)
     assert [x['id'] for x in items] == ['prod']
@@ -122,6 +144,7 @@ def test_research_champion_scope_remains_available_separately():
     research = production_row(
         id='research', final_score=64, champion_take=True, research_champion_take=True,
         production_signal_qualified=False, signal_threshold=68,
+        canonical_decision=canonical_decision('LONG', False), canonical_decision_id='decision-wait',
     )
     items = tps.build_path_ledger([research], {}, scope='champions', now_ms=2_000_000)
     assert len(items) == 1
@@ -140,8 +163,9 @@ class FakeCollector:
     def forward_observe(self, payload):
         self.seq += 1
         self.calls.append(dict(payload))
-        return {
-            'schema': 'ATLAS_FORWARD_V1', 'id': f'fwd-{self.seq}',
+        row = {
+            'schema': 'ATLAS_FORWARD_V2_CANONICAL_FREEZE' if payload.get('canonical_decision') else 'ATLAS_FORWARD_V1',
+            'id': f'fwd-{self.seq}',
             'captured_at': '2026-08-23T00:00:00+00:00', 'captured_at_ms': 1_000_000 + self.seq,
             'symbol': payload['symbol'], 'direction': payload['direction'], 'entry': payload['entry'],
             'champion_take': payload.get('champion_take', False),
@@ -149,6 +173,12 @@ class FakeCollector:
             'production_signal_qualified': payload.get('production_signal_qualified', False),
             'final_score': payload.get('final_score'), 'signal_threshold': payload.get('signal_threshold', 68),
         }
+        if payload.get('canonical_decision'):
+            row['canonical_decision'] = payload['canonical_decision']
+            row['canonical_decision_id'] = payload['canonical_decision'].get('decision_id')
+            row['decision_source_of_truth'] = 'FINAL_TRADE_GATE'
+            row['evaluation_horizons_h'] = [4, 8, 12]
+        return row
 
 
 def test_freezer_persists_separate_exact_id_geometry_archive_with_signal_semantics():
@@ -178,13 +208,14 @@ def test_freezer_labels_research_champion_as_not_production_signal():
 
 
 if __name__ == '__main__':
+    test_canonical_production_plan_geometry_is_frozen_directly()
     test_geometry_long_is_deterministic_and_does_not_change_decision()
     test_geometry_short_is_symmetric()
     test_geometry_unavailable_when_inputs_are_missing()
     test_path_tp2_wins_and_returns_rr()
     test_path_stop_loss_is_minus_one_r()
     test_same_candle_is_not_guessed_when_test_loader_cannot_resolve_order()
-    test_24h_no_hit_expires_at_zero_r()
+    test_12h_no_hit_expires_at_zero_r()
     test_research_champion_is_excluded_from_signal_path_scope()
     test_research_champion_scope_remains_available_separately()
     test_freezer_persists_separate_exact_id_geometry_archive_with_signal_semantics()
