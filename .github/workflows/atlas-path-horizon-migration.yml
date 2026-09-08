@@ -1,0 +1,57 @@
+name: ATLAS Path Horizon Migration
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tests/test_trade_path_settlement.py'
+      - '.github/workflows/atlas-path-horizon-migration.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  migrate-path-horizon:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply canonical 12h settlement horizon
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('trade_path_settlement.py')
+          s=p.read_text(encoding='utf-8')
+          old='MAX_HORIZON_H = 24\n'
+          new='MAX_HORIZON_H = 12\n'
+          if new in s:
+              print('path settlement already 12h')
+          elif s.count(old)==1:
+              p.write_text(s.replace(old,new,1),encoding='utf-8')
+          else:
+              raise SystemExit(f'expected one legacy MAX_HORIZON_H, got {s.count(old)}')
+          PY
+      - name: Regression tests
+        run: |
+          python -m py_compile trade_path_settlement.py trade_outcome_ledger.py tests/test_trade_path_settlement.py
+          PYTHONPATH=. python tests/test_trade_path_settlement.py
+          PYTHONPATH=. python tests/test_trade_outcome_ledger.py
+          grep -q 'MAX_HORIZON_H = 12' trade_path_settlement.py
+          if grep -q 'MAX_HORIZON_H = 24' trade_path_settlement.py; then exit 1; fi
+      - name: Commit settlement migration
+        run: |
+          if git diff --quiet -- trade_path_settlement.py; then
+            echo 'trade_path_settlement.py already canonical; nothing to commit'
+            exit 0
+          fi
+          git config user.name 'atlas-canonical-migrator'
+          git config user.email 'atlas-migrator@users.noreply.github.com'
+          git add trade_path_settlement.py
+          git commit -m 'refactor: expire canonical trade paths at 12h'
+          git push origin HEAD:main
