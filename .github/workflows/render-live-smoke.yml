@@ -8,6 +8,7 @@ on:
       - 'cloud_start.py'
       - 'cloud_web_only_final.py'
       - 'final_trade_ready_guard.py'
+      - 'golden_thesis_engine.py'
       - 'production_decision_api.py'
       - 'product_quality_gate_overlay.py'
   workflow_dispatch:
@@ -15,20 +16,41 @@ on:
 jobs:
   live-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 12
     steps:
-      - name: Wait for Render deploy
-        run: sleep 90
       - name: Verify health and final runtime authority
         shell: bash
         run: |
           set -euo pipefail
           base='https://atlas-v7.onrender.com'
-          curl -fsSL --retry 8 --retry-delay 10 --retry-all-errors --connect-timeout 10 --max-time 30 "$base/health" -o /tmp/health.json
-          jq -e '.status == "ok" and .service == "ATLAS_V7" and .live_execution == false' /tmp/health.json >/dev/null
-          curl -fsSL --retry 8 --retry-delay 10 --retry-all-errors --connect-timeout 10 --max-time 30 "$base/api/runtime/status" -o /tmp/runtime.json
-          jq -e '.ok == true and .runtime == "WEB_ONLY_FINAL" and .product_horizon == "4-12H" and .production_threshold == 68 and .live_execution == false' /tmp/runtime.json >/dev/null
-          jq -e '.final_trade_ready_guard.version == "FINAL_TRADE_READY_GUARD_V1_HTF_FAIL_CLOSED" and .final_trade_ready_guard.fail_closed == true and .final_trade_ready_guard.paper_portfolio_authority == "trade_ready"' /tmp/runtime.json >/dev/null
+          ok=0
+          for attempt in $(seq 1 36); do
+            health_code=$(curl -L --connect-timeout 10 --max-time 30 -sS -w '%{http_code}' -o /tmp/health.json "$base/health?t=$(date +%s)" || true)
+            runtime_code=$(curl -L --connect-timeout 10 --max-time 30 -sS -w '%{http_code}' -o /tmp/runtime.json "$base/api/runtime/status?t=$(date +%s)" || true)
+            if [[ "$health_code" =~ ^2 ]] && [[ "$runtime_code" =~ ^2 ]] && \
+              jq -e '.status == "ok" and .service == "ATLAS_V7" and .live_execution == false' /tmp/health.json >/dev/null 2>&1 && \
+              jq -e '
+                .ok == true and .runtime == "WEB_ONLY_FINAL" and .product_horizon == "4-12H" and
+                .production_threshold == 68 and .live_execution == false and
+                .final_trade_ready_guard.version == "FINAL_TRADE_READY_GUARD_V1_HTF_FAIL_CLOSED" and
+                .final_trade_ready_guard.fail_closed == true and
+                .final_trade_ready_guard.paper_portfolio_authority == "final_trade_gate" and
+                .final_trade_ready_guard.golden_thesis_version == "ATLAS_GOLDEN_THESIS_ENGINE_V1_SHADOW" and
+                .final_trade_ready_guard.golden_thesis_shadow_only == true and
+                .final_trade_ready_guard.golden_thesis_can_override == false
+              ' /tmp/runtime.json >/dev/null 2>&1; then
+              ok=1
+              break
+            fi
+            echo "waiting for stable Render revision attempt=$attempt health=${health_code:-none} runtime=${runtime_code:-none}"
+            sleep 10
+          done
+          if [[ "$ok" != 1 ]]; then
+            echo 'Render runtime did not settle on the expected final guarded contract' >&2
+            cat /tmp/health.json 2>/dev/null || true
+            cat /tmp/runtime.json 2>/dev/null || true
+            exit 1
+          fi
           echo RUNTIME_FINAL_GUARD_OK
       - name: Verify live final decision is fail-closed
         shell: bash
@@ -36,8 +58,26 @@ jobs:
           set -euo pipefail
           base='https://atlas-v7.onrender.com'
           for symbol in BTCUSDT BNBUSDT; do
-            curl -fsSL --retry 6 --retry-delay 8 --retry-all-errors --connect-timeout 10 --max-time 60 "$base/api/decision/current?symbol=$symbol" -o "/tmp/$symbol.json"
-            jq -e '.ok == true and (.trade_ready|type) == "boolean" and .final_trade_gate.version == "FINAL_TRADE_READY_GUARD_V1_HTF_FAIL_CLOSED"' "/tmp/$symbol.json" >/dev/null
+            out="/tmp/$symbol.json"; ok=0
+            for attempt in $(seq 1 12); do
+              code=$(curl -L --connect-timeout 10 --max-time 60 -sS -w '%{http_code}' -o "$out" "$base/api/decision/current?symbol=$symbol&t=$(date +%s)" || true)
+              if [[ "$code" =~ ^2 ]] && jq -e '
+                .ok == true and (.trade_ready|type) == "boolean" and
+                .final_trade_gate.version == "FINAL_TRADE_READY_GUARD_V1_HTF_FAIL_CLOSED" and
+                .canonical_decision.schema == "ATLAS_CANONICAL_DECISION_TRUTH_V1" and
+                .canonical_decision.product_horizon == "4-12H" and
+                .golden_thesis.version == "ATLAS_GOLDEN_THESIS_ENGINE_V1_SHADOW" and
+                .golden_thesis.bound_after_final_trade_gate == true and
+                .golden_thesis.canonical_decision_id == .canonical_decision_id and
+                .golden_thesis.can_override_canonical_decision == false
+              ' "$out" >/dev/null 2>&1; then
+                ok=1
+                break
+              fi
+              echo "decision retry symbol=$symbol attempt=$attempt http=${code:-none}"
+              sleep 5
+            done
+            if [[ "$ok" != 1 ]]; then echo "FAILED $symbol"; cat "$out" || true; exit 1; fi
             jq -e '
               if .trade_ready == true then
                 (.actionable_decision == "LONG" or .actionable_decision == "SHORT")
@@ -55,7 +95,7 @@ jobs:
                 and (.trade_plan.analysis_ready == false)
                 and (.trade_plan.can_execute == false)
               end
-            ' "/tmp/$symbol.json" >/dev/null
-            jq '{symbol,actionable_decision,trade_ready,product_direction,direction_alignment,final_trade_gate}' "/tmp/$symbol.json"
+            ' "$out" >/dev/null
+            jq '{symbol,canonical_decision,trade_ready,product_direction,direction_alignment,golden_thesis,final_trade_gate}' "$out"
           done
           echo LIVE_FINAL_DECISION_FAIL_CLOSED_OK
