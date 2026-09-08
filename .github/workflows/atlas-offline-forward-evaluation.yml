@@ -43,18 +43,26 @@ jobs:
           assert x['can_override_production'] is False and x['production_threshold_changed'] is False
           assert x['decision_source_of_truth']=='FINAL_TRADE_GATE'
           assert x['evaluation_horizons_h']==[4,8,12]
+          assert x['legacy_backfill_performed'] is False
+          assert x['source']['excluded_noncanonical_decision_rows'] >= 0
+          assert x['source']['canonical_decision_rows'] >= 0
           assert len(x['trade_ready_chronological_folds']) == 3
-          assert g['schema']=='ATLAS_FORWARD_ROBUSTNESS_GUARDRAILS_V2_CANONICAL_TRUTH'
+          for row in x['latest_observations']:
+              assert row['decision_source_of_truth']=='FINAL_TRADE_GATE'
+              assert row.get('decision_id')
+              assert set(row.get('horizons',{})).issubset({'4','8','12'})
+          gschema='ATLAS_FORWARD_ROBUSTNESS_GUARDRAILS_V2_CANONICAL_TRUTH'
+          assert g['schema']==gschema
           assert g['research_only'] is True and g['shadow_only'] is True
           assert g['can_override_production'] is False and g['can_change_threshold'] is False
           assert g['decision_source_of_truth']=='FINAL_TRADE_GATE'
           print('TRADE_READY_4H',json.dumps(x['trade_ready']['4'],sort_keys=True))
           print('TRADE_READY_8H',json.dumps(x['trade_ready']['8'],sort_keys=True))
           print('TRADE_READY_12H',json.dumps(x['trade_ready']['12'],sort_keys=True))
-          print('TRADE_READY_BY_DIRECTION',json.dumps(x['trade_ready_by_direction'],sort_keys=True))
-          print('CHRONOLOGICAL_FOLDS',json.dumps(x['trade_ready_chronological_folds'],sort_keys=True))
+          print('EXCLUDED_NONCANONICAL',x['source']['excluded_noncanonical_decision_rows'])
+          print('CANONICAL_DECISIONS',x['source']['canonical_decision_rows'])
+          print('WAIT_REASONS',json.dumps(x['wait_reason_counts'],sort_keys=True))
           print('SHADOW_GUARDRAILS',json.dumps(g,sort_keys=True))
-          print('SOURCE',json.dumps(x['source'],sort_keys=True))
           PY
       - name: Commit research reports only when data changed
         run: |
