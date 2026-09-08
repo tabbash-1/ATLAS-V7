@@ -96,7 +96,7 @@ jobs:
           grep -q 'can_override_production.*False' prospective_fourth_vote_shadow.py
           grep -q 'production_threshold_changed.*False' prospective_fourth_vote_shadow.py
           grep -q 'PRODUCT_QUALITY_GATE_V2_CANONICAL_ANALYST_OUTPUT' product_quality_gate_overlay.py
-          grep -q "canonical_product_contract.*analyst_output" product_quality_gate_overlay.py
+          grep -q "only_quality_gate_can_change_canonical_decision.*True" product_quality_gate_overlay.py
       - name: Verify resilient provider chain and safety invariants
         run: |
           set -euo pipefail
