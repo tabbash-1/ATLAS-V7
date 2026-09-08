@@ -1,4 +1,9 @@
-"""HTTP integration for ATLAS read-only trade outcome ledgers."""
+"""HTTP integration for ATLAS read-only trade outcome ledgers.
+
+Official Production outcome endpoints are fail-closed to the canonical
+FINAL_TRADE_GATE decision contract. Legacy score-qualified observations remain
+available only under explicit research scopes.
+"""
 
 import json
 import threading
@@ -10,15 +15,12 @@ import trade_outcome_ledger
 import trade_path_settlement
 
 SETTLEMENT_INTERVAL_SECONDS = 900
+OFFICIAL_HORIZONS = (4, 8, 12)
+DEFAULT_HORIZON = 12
 
 
 def _repair_null_forward_slots(collector):
-    """Repair legacy rows where None-valued horizon keys permanently block maturation.
-
-    collector.update_forward_returns() historically skips a horizon whenever the
-    key already exists. Older rows can therefore get stuck forever when a key was
-    persisted as null. Remove only null placeholders; never rewrite real returns.
-    """
+    """Repair null placeholders only for official 4/8/12 maturities."""
     rows = collector.read_forward()
     changed = 0
     for row in rows:
@@ -27,7 +29,7 @@ def _repair_null_forward_slots(collector):
             row['forward_return_pct'] = {}
             changed += 1
             continue
-        for key in ('1', '4', '12', '24'):
+        for key in ('4', '8', '12'):
             if key in fr and fr.get(key) is None:
                 del fr[key]
                 changed += 1
@@ -55,7 +57,6 @@ def _repair_null_forward_slots(collector):
 
 
 def _settle_forward_maturity(collector):
-    """Retry canonical forward maturation and return a compact audit record."""
     repaired = _repair_null_forward_slots(collector)
     result = collector.update_forward_returns()
     if not isinstance(result, dict):
@@ -68,12 +69,6 @@ def _settle_forward_maturity(collector):
 
 
 def _settlement_status_payload(state):
-    """Return a race-safe public settlement status snapshot.
-
-    The legacy last_settlement_* fields always describe the same completed run.
-    A currently running settlement is exposed separately so callers never compare
-    the start of the current run with the finish of the previous run.
-    """
     payload = dict(state)
     completed = state.get('last_completed_settlement')
     if isinstance(completed, dict):
@@ -91,7 +86,8 @@ def install(collector):
         'enabled': True,
         'read_only': True,
         'default_scope': 'signals',
-        'default_horizon_h': 24,
+        'default_horizon_h': DEFAULT_HORIZON,
+        'official_horizons_h': list(OFFICIAL_HORIZONS),
         'requests': 0,
         'path_requests': 0,
         'settlement_runs': 0,
@@ -104,8 +100,10 @@ def install(collector):
         'last_settlement_finished_at': None,
         'last_settlement_error': None,
         'last_error': None,
-        'signal_scope_semantics': 'PRODUCTION_SCORE_QUALIFIED',
-        'execution_scope_semantics': 'PRODUCTION_SCORE_QUALIFIED_PLUS_VALID_GEOMETRY_RR_GTE_1',
+        'signal_scope_semantics': 'FINAL_TRADE_GATE_CANONICAL_TRADE_READY_ONLY',
+        'execution_scope_semantics': 'FINAL_TRADE_GATE_CANONICAL_TRADE_READY_PLUS_VALID_FROZEN_GEOMETRY',
+        'legacy_backfill_allowed': False,
+        'canonical_source_of_truth': 'FINAL_TRADE_GATE',
     }
     settlement_lock = threading.Lock()
 
@@ -127,14 +125,7 @@ def install(collector):
             return {'error': state['last_settlement_error']}
         finally:
             finished_at = collector.now_iso() if hasattr(collector, 'now_iso') else None
-            completed = {
-                'started_at': started_at,
-                'finished_at': finished_at,
-                'error': state['last_settlement_error'],
-            }
-            # Publish the completed run as one immutable object first. Public
-            # status derives the legacy timestamps from this object, avoiding
-            # cross-run timestamp pairs while another request reads state.
+            completed = {'started_at': started_at, 'finished_at': finished_at, 'error': state['last_settlement_error']}
             state['last_completed_settlement'] = completed
             state['last_settlement_started_at'] = started_at
             state['last_settlement_finished_at'] = finished_at
@@ -152,11 +143,13 @@ def install(collector):
         scope = str(scope or 'signals').lower()
         if scope == 'signals':
             return [x for x in rows if trade_outcome_ledger.is_production_signal(x)]
+        if scope == 'legacy_score_signals':
+            return [x for x in rows if trade_outcome_ledger.is_legacy_score_signal(x)]
         if scope == 'champions':
             return [x for x in rows if trade_outcome_ledger.is_research_champion(x)]
         if scope == 'all':
             return list(rows)
-        raise ValueError('scope must be signals, champions or all')
+        raise ValueError('scope must be signals, legacy_score_signals, champions or all')
 
     def outcome_do_get(self):
         u = urllib.parse.urlparse(self.path)
@@ -174,13 +167,12 @@ def install(collector):
             symbol = q.get('symbol', [None])[0]
 
             if u.path == '/api/outcomes/settlement-status':
-                payload = {
-                    'schema': 'ATLAS_OUTCOME_SETTLEMENT_STATUS_V2_RUN_SAFE',
+                return self._json({
+                    'schema': 'ATLAS_OUTCOME_SETTLEMENT_STATUS_V3_CANONICAL',
                     **_settlement_status_payload(state),
                     'research_only': True,
                     'live_execution': False,
-                }
-                return self._json(payload)
+                })
 
             settle_once()
             rows = collector.read_forward()
@@ -193,7 +185,7 @@ def install(collector):
                 execution_rows, rejected = execution_outcome_scope.filter_execution_rows(signal_rows, geometry_map)
                 research_champions = [x for x in rows if trade_outcome_ledger.is_research_champion(x)]
                 payload = {
-                    'schema': 'ATLAS_TRADE_GEOMETRY_STATUS_V2_EXECUTION_SCOPE',
+                    'schema': 'ATLAS_TRADE_GEOMETRY_STATUS_V3_CANONICAL_FINAL_GATE',
                     'archive_rows': len(geometry_rows),
                     'production_signal_forward_rows': len(signal_rows),
                     'execution_qualified_forward_rows': len(execution_rows),
@@ -203,8 +195,10 @@ def install(collector):
                     'signal_forward_rows': len(signal_rows),
                     'signal_rows_with_frozen_geometry': linked_signals,
                     'signal_geometry_coverage_pct': round(100 * linked_signals / len(signal_rows), 2) if signal_rows else None,
-                    'signal_scope_semantics': 'PRODUCTION_SCORE_QUALIFIED',
-                    'execution_scope_semantics': 'PRODUCTION_SCORE_QUALIFIED_PLUS_VALID_GEOMETRY_RR_GTE_1',
+                    'signal_scope_semantics': 'FINAL_TRADE_GATE_CANONICAL_TRADE_READY_ONLY',
+                    'execution_scope_semantics': 'FINAL_TRADE_GATE_CANONICAL_TRADE_READY_PLUS_VALID_FROZEN_GEOMETRY',
+                    'canonical_source_of_truth': 'FINAL_TRADE_GATE',
+                    'legacy_backfill_allowed': False,
                     'freezer': getattr(collector, 'TRADE_GEOMETRY_FREEZER_STATE', {}),
                     'research_only': True,
                     'live_execution': False,
@@ -215,41 +209,37 @@ def install(collector):
                 geometry_map = trade_path_settlement.geometry_by_forward_id(collector)
                 rejected = []
                 if scope == 'execution':
-                    selected_rows, rejected = execution_outcome_scope.filter_execution_rows(rows, geometry_map, symbol=symbol)
+                    canonical_rows = scoped_rows(rows, 'signals')
+                    selected_rows, rejected = execution_outcome_scope.filter_execution_rows(canonical_rows, geometry_map, symbol=symbol)
                     items = trade_path_settlement.build_path_ledger(selected_rows, geometry_map, scope='all', symbol=symbol, limit=limit)
                     items = [execution_outcome_scope.annotate_settled_item(x) for x in items]
-                    scope_semantics = 'PRODUCTION_SCORE_QUALIFIED_PLUS_VALID_GEOMETRY_RR_GTE_1'
+                    scope_semantics = 'FINAL_TRADE_GATE_CANONICAL_TRADE_READY_PLUS_VALID_FROZEN_GEOMETRY'
                 else:
                     selected_rows = scoped_rows(rows, scope)
                     items = trade_path_settlement.build_path_ledger(selected_rows, geometry_map, scope='all', symbol=symbol, limit=limit)
-                    scope_semantics = 'PRODUCTION_SCORE_QUALIFIED' if scope == 'signals' else None
-                if u.path == '/api/outcomes/path-summary':
-                    payload = {
-                        'schema': 'ATLAS_TRADE_PATH_SUMMARY_V2_EXECUTION_SCOPE',
-                        'scope': scope,
-                        'symbol': symbol,
-                        'signal_scope_semantics': scope_semantics,
-                        'overall': trade_path_settlement.summarize_path(items),
-                        'execution_rejection_summary': execution_outcome_scope.rejection_summary(rejected) if scope == 'execution' else None,
-                        'methodology': 'Frozen SL/TP geometry settled from post-entry 5m candles; same-candle SL/TP conflicts are refined with 1m candles and remain ambiguous if order is still unknowable. execution scope requires score qualification plus valid directional geometry and R:R >= 1.0.',
-                        'research_only': True,
-                        'live_execution': False,
-                    }
+                    scope_semantics = 'FINAL_TRADE_GATE_CANONICAL_TRADE_READY_ONLY' if scope == 'signals' else ('LEGACY_SCORE_SIGNAL_RESEARCH_ONLY' if scope == 'legacy_score_signals' else None)
+                payload = {
+                    'schema': 'ATLAS_TRADE_PATH_SUMMARY_V3_CANONICAL_FINAL_GATE' if u.path.endswith('summary') else 'ATLAS_TRADE_PATH_LEDGER_V3_CANONICAL_FINAL_GATE',
+                    'scope': scope,
+                    'symbol': symbol,
+                    'signal_scope_semantics': scope_semantics,
+                    'canonical_source_of_truth': 'FINAL_TRADE_GATE' if scope in ('signals', 'execution') else None,
+                    'legacy_backfill_allowed': False,
+                    'execution_rejection_summary': execution_outcome_scope.rejection_summary(rejected) if scope == 'execution' else None,
+                    'research_only': True,
+                    'live_execution': False,
+                }
+                if u.path.endswith('summary'):
+                    payload['overall'] = trade_path_settlement.summarize_path(items)
+                    payload['methodology'] = 'Frozen SL/TP path settlement. Official signals/execution scopes first require explicit FINAL_TRADE_GATE canonical TRADE READY proof; legacy score qualification cannot create a Production trade.'
                 else:
-                    payload = {
-                        'schema': 'ATLAS_TRADE_PATH_LEDGER_V2_EXECUTION_SCOPE',
-                        'scope': scope,
-                        'symbol': symbol,
-                        'signal_scope_semantics': scope_semantics,
-                        'rows': items,
-                        'execution_rejection_summary': execution_outcome_scope.rejection_summary(rejected) if scope == 'execution' else None,
-                        'research_only': True,
-                        'live_execution': False,
-                    }
+                    payload['rows'] = items
             else:
                 if scope == 'execution':
-                    raise ValueError('execution scope is available on path-ledger, path-summary and geometry-status; forward-return ledger has no frozen geometry')
-                horizon = int(q.get('horizon', ['24'])[0])
+                    raise ValueError('execution scope is available on path-ledger, path-summary and geometry-status')
+                horizon = int(q.get('horizon', [str(DEFAULT_HORIZON)])[0])
+                if horizon not in OFFICIAL_HORIZONS:
+                    raise ValueError('official outcome horizon must be one of 4, 8, 12')
                 if u.path == '/api/outcomes/summary':
                     payload = trade_outcome_ledger.summarize(rows, horizon=horizon, scope=scope)
                     payload['settlement_status'] = {
@@ -261,10 +251,13 @@ def install(collector):
                 else:
                     limit = int(q.get('limit', ['200'])[0])
                     payload = {
-                        'schema': 'ATLAS_TRADE_OUTCOME_LEDGER_V1',
+                        'schema': 'ATLAS_TRADE_OUTCOME_LEDGER_V2_CANONICAL_FINAL_GATE',
                         'horizon_h': horizon,
+                        'evaluation_horizons_h': list(OFFICIAL_HORIZONS),
                         'scope': scope,
                         'symbol': symbol,
+                        'canonical_source_of_truth': 'FINAL_TRADE_GATE' if scope == 'signals' else None,
+                        'legacy_backfill_allowed': False,
                         'rows': trade_outcome_ledger.build_ledger(rows, horizon=horizon, scope=scope, symbol=symbol, limit=limit),
                         'settlement_status': {
                             'runs': state['settlement_runs'],
@@ -279,7 +272,7 @@ def install(collector):
             return self._json(payload)
         except Exception as exc:
             state['last_error'] = f'{type(exc).__name__}: {exc}'
-            return self._json({'error': str(exc), 'research_only': True}, 400)
+            return self._json({'error': str(exc), 'research_only': True, 'live_execution': False}, 400)
 
     collector.Handler.do_GET = outcome_do_get
     collector.TRADE_OUTCOME_RUNTIME_STATE = state
