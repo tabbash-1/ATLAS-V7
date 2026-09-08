@@ -1,0 +1,77 @@
+name: ATLAS HTF 1D Live Smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'htf_structural_thesis.py'
+      - 'render_boot_patch.py'
+      - 'final_trade_ready_guard.py'
+      - '.github/workflows/atlas-htf-1d-live-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlas-htf-1d-live-smoke
+  cancel-in-progress: true
+
+jobs:
+  verify-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Verify 4H+12H authority, 1D macro context and 1H confirmation live
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://atlas-v7.onrender.com'
+          ok=0
+          for i in $(seq 1 60); do
+            if curl -fsSL --connect-timeout 10 --max-time 60 "$base/api/decision/current?symbol=BNBUSDT" -o /tmp/d.json; then
+              if jq -e '
+                .ok == true
+                and .htf_thesis.version == "HTF_STRUCTURAL_THESIS_V2_PRODUCT_DIRECTION_AUTHORITY"
+                and .htf_thesis.product_horizon == "4-12H"
+                and .htf_thesis.authority_timeframes == ["12h","4h"]
+                and .htf_thesis.context_timeframe == "1d"
+                and .htf_thesis.confirmation_timeframe == "1h"
+                and (.htf_thesis.frames["1h"].ok == true)
+                and (.htf_thesis.frames["4h"].ok == true)
+                and (.htf_thesis.frames["12h"].ok == true)
+                and (.htf_thesis.frames["1d"].ok == true)
+                and .htf_thesis.can_flip_from_1h_only == false
+                and .htf_thesis.score_changed == false
+                and .htf_thesis.threshold_changed == false
+                and .htf_thesis.live_execution == false
+                and .direction_authority == "HTF_12H_4H"
+              ' /tmp/d.json >/dev/null; then
+                ok=1; break
+              fi
+            fi
+            sleep 10
+          done
+          test "$ok" = 1
+
+          jq -e '
+            if (.htf_thesis.product_direction == "LONG" or .htf_thesis.product_direction == "SHORT")
+               and (.htf_thesis.daily_context == "LONG" or .htf_thesis.daily_context == "SHORT")
+               and .htf_thesis.daily_context != .htf_thesis.product_direction
+               and .htf_thesis.daily_context_confidence == "STRONG"
+            then
+              .htf_thesis.status == "WAIT"
+              and .htf_thesis.reason == "1D_MACRO_STRONGLY_OPPOSES_HTF"
+              and .actionable_decision == "WAIT"
+            else true end
+          ' /tmp/d.json >/dev/null
+
+          jq -e '
+            if (.htf_thesis.product_direction == "LONG" or .htf_thesis.product_direction == "SHORT")
+               and (.htf_thesis.frames["1h"].bias == "LONG" or .htf_thesis.frames["1h"].bias == "SHORT")
+               and .htf_thesis.frames["1h"].bias != .htf_thesis.product_direction
+            then .htf_thesis.status == "WAIT" else true end
+          ' /tmp/d.json >/dev/null
+
+          echo 'LIVE_HTF_1D_MACRO_CONTEXT_OK'
+          jq '{symbol,actionable_decision,product_direction,direction_authority,htf_thesis:{version,status,reason,authority_timeframes,context_timeframe,confirmation_timeframe,daily_context,daily_context_confidence,can_flip_from_1h_only,frames}}' /tmp/d.json
