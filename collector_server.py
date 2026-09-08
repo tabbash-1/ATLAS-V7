@@ -21,6 +21,9 @@ ON_DEMAND_SYMBOLS=('BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT',
 INTERVAL_SECONDS=3600
 UA=os.environ.get('ATLAS_HTTP_UA','ATLAS-Research/1.0 contact=research@example.invalid')
 HORIZONS=(1,4,12,24)
+CANONICAL_FORWARD_HORIZONS=(4,8,12)
+CANONICAL_DECISION_SCHEMA='ATLAS_CANONICAL_DECISION_TRUTH_V1'
+CANONICAL_DECISION_SOURCE='FINAL_TRADE_GATE'
 CONFLUENCE_HORIZONS=(1,4,12,24)
 EVENT_HORIZONS=(1,4,12,24)
 NEWS_POLL_SECONDS=int(os.environ.get('ATLAS_NEWS_POLL_SECONDS','600'))
@@ -677,6 +680,12 @@ def read_forward():
 def _forward_write(row):
     with FORWARD_ARCHIVE.open('a') as f:f.write(json.dumps(row,separators=(',',':'))+'\n')
 
+def _is_canonical_forward_row(row):
+    c=(row or {}).get('canonical_decision')
+    if not isinstance(c,dict): return False
+    direction=str(c.get('direction') or c.get('decision') or '').upper()
+    return bool(c.get('schema')==CANONICAL_DECISION_SCHEMA and c.get('source_of_truth')==CANONICAL_DECISION_SOURCE and c.get('canonical_source_present') is True and c.get('trade_ready') is True and c.get('paper_trade_eligible') is True and str(c.get('decision_id') or '').strip() and direction in ('LONG','SHORT') and list(c.get('evaluation_horizons_h') or [])==list(CANONICAL_FORWARD_HORIZONS))
+
 def forward_observe(payload):
     symbol=str(payload.get('symbol') or 'BTCUSDT').upper().replace('BINANCE:','')
     if symbol not in ON_DEMAND_SYMBOLS: raise ValueError('Unsupported symbol')
@@ -685,12 +694,12 @@ def forward_observe(payload):
     if direction not in ('LONG','SHORT') or not entry: raise ValueError('direction LONG/SHORT and entry required')
     nowms=int(time.time()*1000)
     dedup_minutes=int(payload.get('dedup_minutes') or 50)
-    incoming_execution=bool(payload.get('production_signal_qualified') and payload.get('execution_ready'))
+    incoming_execution=_is_canonical_forward_row(payload)
     for old in reversed(read_forward()[-500:]):
       if old.get('symbol')==symbol and old.get('direction')==direction and nowms-int(old.get('captured_at_ms',0))<dedup_minutes*60*1000:
         # A legacy research observation must never swallow the first canonical
         # ACTIONABLE Production entry in the same window.
-        if incoming_execution and not bool(old.get('production_signal_qualified') and old.get('execution_ready')):
+        if incoming_execution and not _is_canonical_forward_row(old):
           continue
         return {'stored':False,'reason':'DEDUP_WINDOW','existing_id':old.get('id'),'record':old}
     # Freeze the promoted-rule set at observation time. Future rule changes cannot rewrite history.
@@ -757,8 +766,14 @@ def forward_observe(payload):
     # Store selected context for auditability.
     for k in ('trade_plan_status','rr_tp1','rr_tp2','stop_loss','tp1','tp2','signal_threshold',
               'production_signal_qualified','execution_ready','opportunity_state',
+              'canonical_decision','canonical_decision_id','canonical_wait_reason',
               'anomaly_score','futures_score','liquidity_score','regime','volume_quality','relative_volume'):
       if payload.get(k) is not None: row[k]=payload.get(k)
+    if _is_canonical_forward_row(row):
+      row['schema']='ATLAS_FORWARD_V2_CANONICAL_FREEZE'
+      row['decision_source_of_truth']=CANONICAL_DECISION_SOURCE
+      row['evaluation_horizons_h']=list(CANONICAL_FORWARD_HORIZONS)
+      row['legacy_backfill_allowed']=False
     _forward_write(row)
     return row
 
@@ -1361,12 +1376,13 @@ def update_forward_returns():
     rows=read_forward()
     if not rows:return {'updated':0,'rows':0}
     changed=0; now_ms=int(time.time()*1000)
-    # Use Binance spot klines to mature each frozen observation at 1/4/12/24h.
+    # Use Binance spot klines to mature each frozen observation: legacy 1/4/12/24; canonical rows add 8h prospectively only.
     for r in rows:
       ts=int(r.get('captured_at_ms') or 0); symbol=r.get('symbol'); entry=fnum(r.get('entry'))
       if not ts or not symbol or not entry: continue
       fr=r.setdefault('forward_return_pct',{})
-      for h in HORIZONS:
+      horizons=HORIZONS + ((8,) if _is_canonical_forward_row(r) else ())
+      for h in horizons:
         key=str(h)
         if key in fr or now_ms<ts+h*3600*1000: continue
         try:
