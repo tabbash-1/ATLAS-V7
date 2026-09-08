@@ -24,12 +24,13 @@ def patch_hype_chart():
 def patch_production_ui():
     if not INDEX.exists(): return
     html = INDEX.read_text(encoding="utf-8")
-    names=("atlas-production-decision.js","production-web-autoload.js","atlas-deep-analysis-ui.js","atlas-unified-terminal.js","atlas-unified-terminal-polish.js","atlas-research-validation-ui.js","atlas-paper-portfolio-ui.js")
+    names=("atlas-production-decision.js","atlas-product-shell.js","production-web-autoload.js","atlas-deep-analysis-ui.js","atlas-unified-terminal.js","atlas-unified-terminal-polish.js","atlas-research-validation-ui.js","atlas-paper-portfolio-ui.js")
     for name in names:
         html = re.sub(rf'<script[^>]+src=["\']{re.escape(name)}(?:\?[^"\']*)?["\'][^>]*></script>', '', html)
     scripts = "\n".join([
-        '  <script src="atlas-production-decision.js?v=web-only-prod-v4"></script>',
-        '  <script src="production-web-autoload.js?v=web-only-prod-v4"></script>',
+        '  <script src="atlas-production-decision.js?v=web-only-prod-v5-bound-truth"></script>',
+        '  <script src="atlas-product-shell.js?v=product-shell-v7-bound-analyst-geometry"></script>',
+        '  <script src="production-web-autoload.js?v=web-only-prod-v5-bound-truth"></script>',
         '  <script src="atlas-deep-analysis-ui.js?v=rc10-1-deep-v2-primary-4-12h"></script>',
         '  <script src="atlas-unified-terminal.js?v=unified-terminal-v1"></script>',
         '  <script src="atlas-unified-terminal-polish.js?v=unified-terminal-polish-v2-execution-semantics"></script>',
@@ -39,7 +40,7 @@ def patch_production_ui():
     injection="\n"+scripts+"\n"
     html=html.replace("</body>",injection+"</body>",1) if "</body>" in html else html+injection
     INDEX.write_text(html,encoding="utf-8")
-    print("ATLAS Render boot patch: unified terminal + 10K paper portfolio + isolated research validation + Production + RC10.1 enabled",flush=True)
+    print("ATLAS Render boot patch: canonical Product Shell V7 + unified terminal + 10K paper portfolio + isolated research validation enabled",flush=True)
 
 
 def patch_legacy_command_mirrors():
@@ -117,7 +118,7 @@ def patch_product_quality_gate_htf_install():
             raise RuntimeError("HTF price-action install tail changed; refusing silent scenario-engine patch")
         text = text.replace(needle, replacement, 1)
     QUALITY_GATE.write_text(text, encoding="utf-8")
-    print("ATLAS Render boot patch: 4H/12H structural authority + price action + scenario engine enabled", flush=True)
+    print("ATLAS Render boot patch: 4H/12H structural authority + 1D macro context + 1H confirmation + price action + scenario engine enabled", flush=True)
 
 
 def apply():
