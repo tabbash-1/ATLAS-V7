@@ -1,8 +1,8 @@
-"""Strict execution-qualified classification for ATLAS outcome analytics.
+"""Strict canonical execution-qualified classification for ATLAS outcomes.
 
-This layer does not rewrite frozen history. It separates score-qualified research
-signals from trades whose frozen geometry satisfies the current minimum execution
-contract: valid directional ordering and R:R >= 1.0.
+Official execution/outcome analytics start only from an explicit canonical
+FINAL_TRADE_GATE TRADE READY row, then require valid frozen geometry. Historical
+score-qualified flags are not an execution authority and are never backfilled.
 """
 
 import trade_outcome_ledger
@@ -55,17 +55,17 @@ def geometry_integrity(geometry):
 def classify(row, geometry_record=None):
     row = row or {}
     geometry = (geometry_record or {}).get('geometry') if isinstance(geometry_record, dict) else None
-    signal_qualified = trade_outcome_ledger.is_production_signal(row)
+    canonical_trade_ready = trade_outcome_ledger.is_production_signal(row)
     integrity = geometry_integrity(geometry)
 
     explicit_execution_ready = row.get('execution_ready') if 'execution_ready' in row else None
     explicit_trade_plan_status = row.get('trade_plan_status')
     explicit_block = explicit_execution_ready is False or explicit_trade_plan_status == 'SCORE_QUALIFIED_GEOMETRY_BLOCKED'
 
-    qualified = bool(signal_qualified and integrity['valid'] and not explicit_block)
+    qualified = bool(canonical_trade_ready and integrity['valid'] and not explicit_block)
     reasons = []
-    if not signal_qualified:
-        reasons.append('NOT_PRODUCTION_SCORE_QUALIFIED')
+    if not canonical_trade_ready:
+        reasons.append('NOT_CANONICAL_TRADE_READY')
     reasons.extend(integrity['reasons'])
     if explicit_execution_ready is False:
         reasons.append('EXPLICIT_EXECUTION_NOT_READY')
@@ -74,7 +74,10 @@ def classify(row, geometry_record=None):
 
     return {
         'execution_qualified': qualified,
-        'production_signal_qualified': signal_qualified,
+        'canonical_trade_ready': canonical_trade_ready,
+        # Compatibility field; semantics are now canonical Final Gate, not score qualification.
+        'production_signal_qualified': canonical_trade_ready,
+        'decision_source_of_truth': 'FINAL_TRADE_GATE' if canonical_trade_ready else None,
         'geometry_integrity': integrity,
         'explicit_execution_ready': explicit_execution_ready,
         'trade_plan_status': explicit_trade_plan_status,
@@ -87,7 +90,8 @@ def filter_execution_rows(rows, geometry_map, symbol=None):
     selected = []
     rejected = []
     for row in rows or []:
-        if str(row.get('direction') or '').upper() not in ('LONG', 'SHORT'):
+        direction = str(((row.get('canonical_decision') or {}).get('direction') or row.get('direction') or '')).upper()
+        if direction not in ('LONG', 'SHORT'):
             continue
         if symbol and str(row.get('symbol') or '').upper() != symbol:
             continue
@@ -95,16 +99,17 @@ def filter_execution_rows(rows, geometry_map, symbol=None):
         result = classify(row, rec)
         if result['execution_qualified']:
             selected.append(row)
-        elif result['production_signal_qualified']:
-            rejected.append({'id': row.get('id'), 'symbol': row.get('symbol'), 'direction': row.get('direction'), 'score': row.get('final_score') if row.get('final_score') is not None else row.get('champion_score'), **result})
+        elif result['canonical_trade_ready']:
+            rejected.append({'id': row.get('id'), 'symbol': row.get('symbol'), 'direction': direction, 'score': row.get('final_score') if row.get('final_score') is not None else row.get('champion_score'), **result})
     return selected, rejected
 
 
 def annotate_settled_item(item):
     item = dict(item or {})
     result = geometry_integrity(item.get('geometry'))
+    canonical = bool(item.get('canonical_trade_ready'))
     item['geometry_integrity'] = result
-    item['execution_qualified'] = bool(item.get('production_signal_qualified') and result['valid'])
+    item['execution_qualified'] = bool(canonical and result['valid'])
     return item
 
 
@@ -114,6 +119,8 @@ def rejection_summary(rejected):
         for reason in row.get('reasons') or []:
             counts[reason] = counts.get(reason, 0) + 1
     return {
-        'rejected_score_qualified_rows': len(rejected or []),
+        'rejected_canonical_trade_ready_rows': len(rejected or []),
         'reason_counts': dict(sorted(counts.items())),
+        'decision_source_of_truth': 'FINAL_TRADE_GATE',
+        'legacy_backfill_allowed': False,
     }
