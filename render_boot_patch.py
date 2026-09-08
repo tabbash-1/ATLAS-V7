@@ -32,15 +32,15 @@ def patch_production_ui():
         '  <script src="atlas-product-shell.js?v=product-shell-v7-bound-analyst-geometry"></script>',
         '  <script src="production-web-autoload.js?v=web-only-prod-v5-bound-truth"></script>',
         '  <script src="atlas-deep-analysis-ui.js?v=rc10-1-deep-v2-primary-4-12h"></script>',
-        '  <script src="atlas-unified-terminal.js?v=unified-terminal-v1"></script>',
+        '  <script src="atlas-unified-terminal.js?v=unified-terminal-v5-strict-final-gate"></script>',
         '  <script src="atlas-unified-terminal-polish.js?v=unified-terminal-polish-v2-execution-semantics"></script>',
-        '  <script src="atlas-paper-portfolio-ui.js?v=paper-portfolio-10k-v1"></script>',
-        '  <script src="atlas-research-validation-ui.js?v=research-validation-v1"></script>',
+        '  <script src="atlas-paper-portfolio-ui.js?v=paper-portfolio-v3-final-gate-only"></script>',
+        '  <script src="atlas-research-validation-ui.js?v=research-shadow-v3-target-status"></script>',
     ])
     injection="\n"+scripts+"\n"
     html=html.replace("</body>",injection+"</body>",1) if "</body>" in html else html+injection
     INDEX.write_text(html,encoding="utf-8")
-    print("ATLAS Render boot patch: canonical Product Shell V7 + unified terminal + 10K paper portfolio + isolated research validation enabled",flush=True)
+    print("ATLAS Render boot patch: strict Final Gate terminal + canonical 10K paper portfolio + isolated research shadow UI enabled",flush=True)
 
 
 def patch_legacy_command_mirrors():
