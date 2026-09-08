@@ -58,12 +58,12 @@ jobs:
           PYTHONPATH=. python tests/test_trade_path_settlement.py
       - name: Commit generated snapshot
         run: |
-          if git diff --quiet -- status/canonical-outcomes-latest.json; then
+          git add status/canonical-outcomes-latest.json
+          if git diff --cached --quiet; then
             echo 'snapshot unchanged'
             exit 0
           fi
           git config user.name 'atlas-outcome-snapshot'
           git config user.email 'atlas-outcomes@users.noreply.github.com'
-          git add status/canonical-outcomes-latest.json
           git commit -m 'outcomes: update canonical final-gate snapshot [skip ci]'
           git push origin HEAD:main
