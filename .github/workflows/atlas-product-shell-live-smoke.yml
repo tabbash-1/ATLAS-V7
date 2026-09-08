@@ -1,0 +1,88 @@
+name: ATLAS Product Shell Live Smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'atlas-product-shell.js'
+      - 'final_trade_ready_guard.py'
+      - 'canonical_decision_contract.py'
+      - 'cloud_web_only_final.py'
+      - '.github/workflows/atlas-product-shell-live-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlas-product-shell-live-smoke
+  cancel-in-progress: true
+
+jobs:
+  verify-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Verify canonical analyst geometry binding on Production
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://atlas-v7.onrender.com'
+          ready=0
+          for i in $(seq 1 60); do
+            if curl -fsSL --connect-timeout 10 --max-time 40 "$base/api/decision/current?symbol=BNBUSDT" -o /tmp/decision.json; then
+              if jq -e '
+                .ok == true
+                and .canonical_decision.schema == "ATLAS_CANONICAL_DECISION_TRUTH_V1"
+                and .canonical_decision.source_of_truth == "FINAL_TRADE_GATE"
+                and .canonical_decision.evaluation_horizons_h == [4,8,12]
+                and (.canonical_decision_id|type) == "string"
+                and (.canonical_decision_id|length) > 0
+                and .analyst_output.canonical_decision_id == .canonical_decision_id
+                and .analyst_output.decision_source_of_truth == "FINAL_TRADE_GATE"
+                and .analyst_output.canonical_decision_schema == .canonical_decision.schema
+                and .analyst_output.evaluation_horizons_h == [4,8,12]
+                and .analyst_output.product_horizon == "4-12H"
+                and .analyst_output.geometry_bound_to_canonical_decision == true
+                and .analyst_output.analysis_only == true
+                and .analyst_output.live_execution == false
+              ' /tmp/decision.json >/dev/null; then
+                ready=1; break
+              fi
+            fi
+            sleep 10
+          done
+          test "$ready" = 1
+
+          jq -e '
+            if .canonical_decision.trade_ready == true then
+              (.canonical_decision.decision == "LONG" or .canonical_decision.decision == "SHORT")
+              and .analyst_output.analysis_ready == true
+              and .analyst_output.decision == .canonical_decision.decision
+              and (.analyst_output.entry != null)
+              and (.analyst_output.stop_loss != null)
+              and (.analyst_output.take_profit != null)
+              and (.analyst_output.risk_reward != null)
+            else
+              .canonical_decision.decision == "WAIT"
+              and .analyst_output.decision == "WAIT"
+              and .analyst_output.analysis_ready == false
+              and .analyst_output.entry == null
+              and .analyst_output.stop_loss == null
+              and .analyst_output.take_profit == null
+            end
+          ' /tmp/decision.json >/dev/null
+
+          curl -fsSL --retry 6 --retry-delay 5 --retry-all-errors --connect-timeout 10 --max-time 40 \
+            "$base/atlas-product-shell.js" -o /tmp/product-shell.js
+          grep -q 'ATLAS_PRODUCT_SHELL_V7_BOUND_ANALYST_GEOMETRY' /tmp/product-shell.js
+          grep -q "geometrySource:'analyst_output'" /tmp/product-shell.js
+          grep -q "sourceOfTruth:'FINAL_TRADE_GATE'" /tmp/product-shell.js
+          if grep -q 'trade_plan||{}' /tmp/product-shell.js; then
+            echo 'legacy trade_plan geometry authority still live' >&2; exit 1
+          fi
+          if grep -q 'execution_ready' /tmp/product-shell.js; then
+            echo 'legacy execution flag still live in product shell truth' >&2; exit 1
+          fi
+          echo 'LIVE_BOUND_PRODUCT_GEOMETRY_OK'
+          jq '{symbol,trade_ready,canonical_decision_id,canonical_decision,analyst_output:{decision,analysis_ready,canonical_decision_id,decision_source_of_truth,canonical_decision_schema,evaluation_horizons_h,product_horizon,geometry_bound_to_canonical_decision,entry,stop_loss,take_profit,risk_reward}}' /tmp/decision.json
