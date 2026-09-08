@@ -5,12 +5,15 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/atlas-production-snapshot.yml'
+      - 'canonical_decision_contract.py'
+      - 'final_trade_ready_guard.py'
       - 'production_signal_scoring.py'
       - 'production_decision_api.py'
       - 'ai_trade_council.py'
       - 'hype_market_data.py'
       - 'cloud_start.py'
       - 'cloud_web_only.py'
+      - 'cloud_web_only_final.py'
       - 'atlas_runtime_server.py'
       - 'atlas_research_runtime_server.py'
       - 'trade_outcome_ledger.py'
@@ -87,42 +90,59 @@ jobs:
           symbols=['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT','HYPEUSDT']
           decisions={s:load('decision_'+s) for s in symbols}
           raw_councils={s:load('ai_'+s) for s in symbols}
+          def truth(d):
+              x=(d or {}).get('canonical_decision') or {}
+              if x.get('schema')!='ATLAS_CANONICAL_DECISION_TRUTH_V1' or x.get('canonical_source_present') is not True or x.get('source_of_truth')!='FINAL_TRADE_GATE':
+                  return None
+              return x
           def canonical_ref(d):
+              t=truth(d)
               return {
                   'source':'/api/decision/current',
-                  'symbol':d.get('symbol'),
+                  'symbol':(t or {}).get('symbol') or d.get('symbol'),
                   'generated_at':d.get('generated_at'),
-                  'decision':d.get('decision'),
-                  'candidate_direction':d.get('candidate_direction'),
-                  'score':d.get('score'),
-                  'threshold':d.get('signal_threshold'),
-                  'signal_qualified':bool(d.get('signal_qualified')),
-                  'execution_ready':bool(d.get('execution_ready')),
+                  'decision_id':(t or {}).get('decision_id'),
+                  'decision':(t or {}).get('decision'),
+                  'trade_ready':bool((t or {}).get('trade_ready')),
+                  'wait_reason':(t or {}).get('wait_reason'),
+                  'product_horizon':(t or {}).get('product_horizon'),
+                  'evaluation_horizons_h':(t or {}).get('evaluation_horizons_h'),
+                  'score':(t or {}).get('score'),
+                  'threshold':(t or {}).get('threshold'),
+                  'canonical_source_present':t is not None,
                   'trade_plan':d.get('trade_plan') or {},
               }
           councils={}; consistency=[]
           for s,a0 in raw_councils.items():
               a=dict(a0) if isinstance(a0,dict) else {'ok':False,'error':'invalid_ai_snapshot'}
-              d=decisions.get(s) or {}
+              d=decisions.get(s) or {}; ref=canonical_ref(d)
               ai_observed={'production_decision':a.pop('production_decision',None),'production_score':a.pop('production_score',None),'production_qualified':a.pop('production_qualified',None),'generated_at':a.get('generated_at')}
               a['snapshot_role']='SHADOW_RESEARCH_ONLY'; a['production_reference_authoritative']=False
-              a['research_observed_production_reference']=ai_observed; a['canonical_production_reference']=canonical_ref(d)
-              mismatch=(ai_observed.get('production_score') != d.get('score') or ai_observed.get('production_decision') != d.get('decision') or bool(ai_observed.get('production_qualified')) != bool(d.get('signal_qualified')))
+              a['research_observed_production_reference']=ai_observed; a['canonical_production_reference']=ref
+              observed_decision=str(ai_observed.get('production_decision') or '').upper()
+              canonical_decision=str(ref.get('decision') or '').upper()
+              mismatch=(ref.get('canonical_source_present') is not True or ai_observed.get('production_score') != ref.get('score') or (observed_decision and observed_decision != canonical_decision) or bool(ai_observed.get('production_qualified')) != bool(ref.get('trade_ready')))
               a['production_reference_mismatch']=mismatch
-              if mismatch: consistency.append({'symbol':s,'canonical':canonical_ref(d),'ai_research_observed':ai_observed})
+              if mismatch: consistency.append({'symbol':s,'canonical':ref,'ai_research_observed':ai_observed})
               councils[s]=a
-          qualified=[]; waits=[]; failures=[]; ai_actions=[]; ai_failures=[]
+          trade_ready=[]; waits=[]; failures=[]; noncanonical=[]; ai_actions=[]; ai_failures=[]
           def wait_context(d):
-              ind=d.get('indicators') or {}; geom=d.get('structural_geometry') or {}; br=geom.get('breakout') or {}
-              return {'direction_votes':d.get('direction_votes'),'direction_votes_long':d.get('direction_votes_long'),'direction_votes_short':d.get('direction_votes_short'),'ema20':ind.get('ema20'),'ema50':ind.get('ema50'),'rsi14':ind.get('rsi14'),'momentum_24h_pct':ind.get('momentum_24h_pct'),'relative_volume':d.get('relative_volume'),'relative_strength_score':d.get('relative_strength_score'),'futures_available':d.get('futures_available'),'futures_score':d.get('futures_score'),'futures_provider':d.get('futures_provider'),'regime':d.get('regime'),'structural_obstacle_price':geom.get('obstacle_price'),'structural_obstacle_distance_pct':geom.get('obstacle_distance_pct'),'breakout_confirmed':br.get('confirmed'),'scoring_version':d.get('scoring_version')}
+              ind=d.get('indicators') or {}; geom=d.get('structural_geometry') or {}; br=geom.get('breakout') or {}; t=truth(d) or {}
+              return {'decision_id':t.get('decision_id'),'canonical_wait_reason':t.get('wait_reason'),'raw_wait_reason':t.get('raw_wait_reason'),'direction_votes':d.get('direction_votes'),'direction_votes_long':d.get('direction_votes_long'),'direction_votes_short':d.get('direction_votes_short'),'ema20':ind.get('ema20'),'ema50':ind.get('ema50'),'rsi14':ind.get('rsi14'),'momentum_24h_pct':ind.get('momentum_24h_pct'),'relative_volume':d.get('relative_volume'),'relative_strength_score':d.get('relative_strength_score'),'futures_available':d.get('futures_available'),'futures_score':d.get('futures_score'),'futures_provider':d.get('futures_provider'),'regime':d.get('regime'),'structural_obstacle_price':geom.get('obstacle_price'),'structural_obstacle_distance_pct':geom.get('obstacle_distance_pct'),'breakout_confirmed':br.get('confirmed'),'scoring_version':d.get('scoring_version')}
           for s,d in decisions.items():
-              if not d.get('ok'): failures.append({'symbol':s,'error':d.get('error'),'http_code':d.get('http_code')})
-              elif d.get('signal_qualified'): qualified.append({'symbol':s,'decision':d.get('decision'),'score':d.get('score'),'threshold':d.get('signal_threshold'),'rr':d.get('risk_reward'),'playbook':d.get('playbook'),'generated_at':d.get('generated_at')})
-              else: waits.append({'symbol':s,'candidate':d.get('candidate_direction'),'score':d.get('score'),'threshold':d.get('signal_threshold'),'reason':d.get('wait_reason'),'score_gap_to_signal':d.get('score_gap_to_signal'),'score_attribution':d.get('score_attribution'),'decision_context':wait_context(d)})
+              if not d.get('ok'):
+                  failures.append({'symbol':s,'error':d.get('error'),'http_code':d.get('http_code')}); continue
+              t=truth(d)
+              if t is None:
+                  noncanonical.append({'symbol':s,'error':'CANONICAL_DECISION_MISSING_OR_INVALID'}); continue
+              if t.get('trade_ready') is True:
+                  trade_ready.append({'symbol':s,'decision_id':t.get('decision_id'),'decision':t.get('decision'),'score':t.get('score'),'threshold':t.get('threshold'),'rr':d.get('risk_reward'),'playbook':d.get('playbook'),'generated_at':d.get('generated_at')})
+              else:
+                  waits.append({'symbol':s,'decision_id':t.get('decision_id'),'candidate':d.get('candidate_direction') or d.get('product_direction'),'score':t.get('score'),'threshold':t.get('threshold'),'reason':t.get('wait_reason'),'raw_reason':t.get('raw_wait_reason'),'score_gap_to_signal':d.get('score_gap_to_signal'),'score_attribution':d.get('score_attribution'),'decision_context':wait_context(d)})
           for s,a in councils.items():
-              d=decisions.get(s) or {}; observed=a.get('research_observed_production_reference') or {}
+              d=decisions.get(s) or {}; observed=a.get('research_observed_production_reference') or {}; ref=canonical_ref(d)
               if a.get('error') or a.get('ok') is False: ai_failures.append({'symbol':s,'error':a.get('error'),'http_code':a.get('http_code')})
-              else: ai_actions.append({'symbol':s,'direction':a.get('direction'),'verdict':a.get('verdict'),'confidence':a.get('confidence'),'reason':a.get('reason'),'canonical_production_decision':d.get('decision'),'canonical_production_score':d.get('score'),'canonical_production_qualified':bool(d.get('signal_qualified')),'ai_research_observed_production_score':observed.get('production_score'),'production_reference_mismatch':a.get('production_reference_mismatch'),'judge':a.get('judge')})
+              else: ai_actions.append({'symbol':s,'direction':a.get('direction'),'verdict':a.get('verdict'),'confidence':a.get('confidence'),'reason':a.get('reason'),'canonical_decision_id':ref.get('decision_id'),'canonical_production_decision':ref.get('decision'),'canonical_production_score':ref.get('score'),'canonical_trade_ready':ref.get('trade_ready'),'ai_research_observed_production_score':observed.get('production_score'),'production_reference_mismatch':a.get('production_reference_mismatch'),'judge':a.get('judge')})
           path_report=load_file('status/production-path-settlement-latest.json')
           path_overall=(path_report.get('summary') or {}) if isinstance(path_report,dict) else {}
           generated=path_report.get('generated_at') if isinstance(path_report,dict) else None
@@ -130,50 +150,47 @@ jobs:
           try:
               gt=datetime.datetime.fromisoformat(str(generated).replace('Z','+00:00')); report_age_h=round((datetime.datetime.now(datetime.timezone.utc)-gt).total_seconds()/3600,3)
           except Exception: pass
-          realized_r={
-              'available':path_overall.get('terminal',0)>0 and path_overall.get('net_r') is not None,
-              'terminal':path_overall.get('terminal'),'open_or_error':path_overall.get('open_or_error'),
-              'wins':path_overall.get('wins'),'losses':path_overall.get('losses'),'net_r':path_overall.get('net_r'),
-              'average_r':path_overall.get('average_r'),'profit_factor_r':path_overall.get('profit_factor_r'),
-              'win_rate_pct':path_overall.get('win_rate_pct'),'ambiguous':path_overall.get('ambiguous'),
-              'market_data_errors':path_overall.get('market_data_errors'),'by_direction':path_overall.get('by_direction'),
-              'provider_counts':path_overall.get('provider_counts'),'report_generated_at':generated,'report_age_hours':report_age_h,
-              'stale':bool(report_age_h is None or report_age_h>2.5),
-              'source':'COMMITTED_OFFLINE_PRODUCTION_PATH_SETTLEMENT','research_only':True,'can_override_production':False
-          }
+          realized_r={'available':path_overall.get('terminal',0)>0 and path_overall.get('net_r') is not None,'terminal':path_overall.get('terminal'),'open_or_error':path_overall.get('open_or_error'),'wins':path_overall.get('wins'),'losses':path_overall.get('losses'),'net_r':path_overall.get('net_r'),'average_r':path_overall.get('average_r'),'profit_factor_r':path_overall.get('profit_factor_r'),'win_rate_pct':path_overall.get('win_rate_pct'),'ambiguous':path_overall.get('ambiguous'),'market_data_errors':path_overall.get('market_data_errors'),'by_direction':path_overall.get('by_direction'),'provider_counts':path_overall.get('provider_counts'),'report_generated_at':generated,'report_age_hours':report_age_h,'stale':bool(report_age_h is None or report_age_h>2.5),'source':'COMMITTED_OFFLINE_PRODUCTION_PATH_SETTLEMENT','research_only':True,'can_override_production':False}
           settlement_status={'ok':bool(path_report.get('schema')),'schema':path_report.get('schema'),'generated_at':generated,'report_age_hours':report_age_h,'cached_committed_report':True,'web_runtime_dependency':False,'research_only':True,'live_execution':False,'can_override_production':False}
           captured=datetime.datetime.now(datetime.timezone.utc)
-          summary={'schema':'ATLAS_PRODUCTION_SNAPSHOT_V11_OFFLINE_PATH_SETTLEMENT','captured_at':captured.isoformat(),'source':'https://atlas-v7.onrender.com','monitor_mode':'PACED_PER_SYMBOL_READ_ONLY','production_authority':'/api/decision/current','ai_role':'SHADOW_RESEARCH_ONLY','snapshot_consistency':{'ok':len(consistency)==0,'mismatch_count':len(consistency),'mismatches':consistency},'runtime':load('runtime'),'readiness':load('readiness'),'outcomes':load('outcomes'),'geometry_status':load('geometry'),'path_summary':path_report,'realized_r':realized_r,'settlement_status':settlement_status,'ai_status':load('ai_status'),'decisions':decisions,'ai_council':councils,'decision_summary':{'supported_assets':symbols,'qualified_count':len(qualified),'qualified':qualified,'wait_count':len(waits),'waits':waits,'failed_count':len(failures),'failures':failures},'ai_summary':{'analyzed_count':len(ai_actions),'analyses':ai_actions,'failed_count':len(ai_failures),'failures':ai_failures}}
+          summary={'schema':'ATLAS_PRODUCTION_SNAPSHOT_V12_CANONICAL_TRUTH','captured_at':captured.isoformat(),'source':'https://atlas-v7.onrender.com','monitor_mode':'PACED_PER_SYMBOL_READ_ONLY','production_authority':'FINAL_TRADE_GATE_VIA_CANONICAL_DECISION','decision_source_of_truth':'FINAL_TRADE_GATE','product_horizon':'4-12H','evaluation_horizons_h':[4,8,12],'ai_role':'SHADOW_RESEARCH_ONLY','snapshot_consistency':{'ok':len(consistency)==0 and len(noncanonical)==0,'mismatch_count':len(consistency),'mismatches':consistency,'noncanonical_count':len(noncanonical),'noncanonical':noncanonical},'runtime':load('runtime'),'readiness':load('readiness'),'outcomes':load('outcomes'),'geometry_status':load('geometry'),'path_summary':path_report,'realized_r':realized_r,'settlement_status':settlement_status,'ai_status':load('ai_status'),'decisions':decisions,'ai_council':councils,'decision_summary':{'supported_assets':symbols,'trade_ready_count':len(trade_ready),'trade_ready':trade_ready,'wait_count':len(waits),'waits':waits,'failed_count':len(failures),'failures':failures,'noncanonical_count':len(noncanonical),'noncanonical':noncanonical},'ai_summary':{'analyzed_count':len(ai_actions),'analyses':ai_actions,'failed_count':len(ai_failures),'failures':ai_failures}}
           pathlib.Path('status/atlas-production-latest.json').write_text(json.dumps(summary,indent=2,sort_keys=True))
           history=pathlib.Path('status/history/production-snapshots.jsonl')
           with history.open('a') as f:f.write(json.dumps(summary,separators=(',',':'))+'\n')
           rows=[]
           try:rows=[json.loads(x) for x in history.read_text().splitlines() if x.strip()]
           except Exception:rows=[]
-          horizons=(1,3,6,12,24)
+          horizons=(4,8,12)
           def price(d):
-              for k in ('entry','price','current_price','market_price','last_price','close'):
-                  try:
-                      v=float(d.get(k))
-                      if v>0:return v
-                  except:pass
+              p=(d or {}).get('trade_plan') or {}
+              for source in (p,d or {}):
+                  for k in ('entry','price','current_price','market_price','last_price','close'):
+                      try:
+                          v=float(source.get(k))
+                          if v>0:return v
+                      except:pass
               return None
           parsed=[]
           for r in rows:
-              try:t=datetime.datetime.fromisoformat(r['captured_at'].replace('Z','+00:00'))
+              try:t0=datetime.datetime.fromisoformat(r['captured_at'].replace('Z','+00:00'))
               except:continue
-              parsed.append((t,r))
-          tracker=[]
+              parsed.append((t0,r))
+          tracker=[]; excluded_legacy=0
           for i,(t0,r0) in enumerate(parsed):
               for s,d0 in (r0.get('decisions') or {}).items():
-                  if not d0.get('ok') or d0.get('signal_qualified'):continue
+                  if not isinstance(d0,dict) or not d0.get('ok'):continue
+                  t=truth(d0)
+                  if t is None:
+                      excluded_legacy+=1; continue
+                  if t.get('trade_ready') is True:continue
                   p0=price(d0)
                   if not p0:continue
-                  direction=d0.get('candidate_direction') or 'NONE'
-                  item={'symbol':s,'wait_at':t0.isoformat(),'wait_price':p0,'candidate_direction':direction,'score':d0.get('score'),'threshold':d0.get('signal_threshold'),'reason':d0.get('wait_reason'),'playbook':d0.get('playbook'),'score_attribution':d0.get('score_attribution'),'decision_context':wait_context(d0),'horizons':{}}
-                  future=[(t,r) for t,r in parsed[i+1:] if t>t0]
+                  direction=str(d0.get('candidate_direction') or d0.get('product_direction') or '').upper()
+                  if direction not in ('LONG','SHORT'): direction='NONE'
+                  item={'decision_id':t.get('decision_id'),'symbol':s,'wait_at':t0.isoformat(),'wait_price':p0,'candidate_direction':direction,'score':t.get('score'),'threshold':t.get('threshold'),'reason':t.get('wait_reason'),'raw_reason':t.get('raw_wait_reason'),'playbook':d0.get('playbook'),'score_attribution':d0.get('score_attribution'),'decision_context':wait_context(d0),'decision_source_of_truth':'FINAL_TRADE_GATE','horizons':{}}
+                  future=[(tx,rx) for tx,rx in parsed[i+1:] if tx>t0]
                   for h in horizons:
-                      target=t0+datetime.timedelta(hours=h); candidates=[(t,r) for t,r in future if t>=target]
+                      target=t0+datetime.timedelta(hours=h); candidates=[(tx,rx) for tx,rx in future if tx>=target]
                       if not candidates:continue
                       t1,r1=min(candidates,key=lambda x:x[0]); d1=(r1.get('decisions') or {}).get(s) or {}; p1=price(d1)
                       if not p1:continue
@@ -185,15 +202,18 @@ jobs:
                       change=(p1/p0-1)*100; max_up=(max(window)/p0-1)*100 if window else change; max_down=(min(window)/p0-1)*100 if window else change; favorable=change if direction=='LONG' else -change if direction=='SHORT' else None
                       item['horizons'][f'{h}h']={'observed_at':t1.isoformat(),'price':round(p1,10),'change_pct':round(change,4),'max_up_pct':round(max_up,4),'max_down_pct':round(max_down,4),'directional_return_pct':round(favorable,4) if favorable is not None else None}
                   if item['horizons']:tracker.append(item)
-          pathlib.Path('status/wait-outcomes.json').write_text(json.dumps({'schema':'ATLAS_WAIT_OUTCOME_TRACKER_V3_DECISION_CONTEXT','generated_at':captured.isoformat(),'horizons_hours':list(horizons),'note':'Measures opportunity cost of WAIT decisions and captures contemporaneous vote/indicator context; never alters trading thresholds.','records':tracker},indent=2,sort_keys=True))
+          pathlib.Path('status/wait-outcomes.json').write_text(json.dumps({'schema':'ATLAS_WAIT_OUTCOME_TRACKER_V4_CANONICAL_TRUTH','generated_at':captured.isoformat(),'decision_source_of_truth':'FINAL_TRADE_GATE','product_horizon':'4-12H','horizons_hours':list(horizons),'legacy_backfill_performed':False,'excluded_noncanonical_decision_rows':excluded_legacy,'note':'Measures opportunity cost only for canonical Final Trade Guard WAIT decisions; never alters trading thresholds and never reinterprets legacy snapshots.','records':tracker},indent=2,sort_keys=True))
           PY
-      - name: Verify no dead outcome endpoint dependency
+      - name: Verify canonical snapshot contract
         shell: bash
         run: |
           set -euo pipefail
           ! grep -q '/api/outcomes/path-summary' .github/workflows/atlas-production-snapshot.yml
           ! grep -q '/api/outcomes/settlement-status' .github/workflows/atlas-production-snapshot.yml
-          jq -e '.schema == "ATLAS_PRODUCTION_SNAPSHOT_V11_OFFLINE_PATH_SETTLEMENT" and .settlement_status.web_runtime_dependency == false and .realized_r.source == "COMMITTED_OFFLINE_PRODUCTION_PATH_SETTLEMENT"' status/atlas-production-latest.json >/dev/null
+          jq -e '.schema == "ATLAS_PRODUCTION_SNAPSHOT_V12_CANONICAL_TRUTH" and .decision_source_of_truth == "FINAL_TRADE_GATE" and .product_horizon == "4-12H" and .evaluation_horizons_h == [4,8,12] and .settlement_status.web_runtime_dependency == false and .realized_r.source == "COMMITTED_OFFLINE_PRODUCTION_PATH_SETTLEMENT" and .decision_summary.noncanonical_count == 0' status/atlas-production-latest.json >/dev/null
+          jq -e '.schema == "ATLAS_WAIT_OUTCOME_TRACKER_V4_CANONICAL_TRUTH" and .decision_source_of_truth == "FINAL_TRADE_GATE" and .horizons_hours == [4,8,12] and .legacy_backfill_performed == false' status/wait-outcomes.json >/dev/null
+          jq -e '[.decisions[] | select(.ok == true) | .canonical_decision | select(.schema != "ATLAS_CANONICAL_DECISION_TRUTH_V1" or .canonical_source_present != true or .source_of_truth != "FINAL_TRADE_GATE")] | length == 0' status/atlas-production-latest.json >/dev/null
+          echo 'CANONICAL_PRODUCTION_SNAPSHOT_OK'
       - name: Commit latest snapshot
         shell: bash
         run: |
@@ -201,6 +221,6 @@ jobs:
           git config user.email "atlas-monitor@users.noreply.github.com"
           git add status/atlas-production-latest.json status/raw/*.json status/history/production-snapshots.jsonl status/wait-outcomes.json
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m "chore: update ATLAS production snapshot [skip ci]"
+          git commit -m "chore: update canonical ATLAS production snapshot [skip ci]"
           git pull --rebase origin main
           git push
