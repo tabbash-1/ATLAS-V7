@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
     paths:
+      - 'atlas-production-decision.js'
       - 'atlas-unified-terminal.js'
       - 'atlas-paper-portfolio-ui.js'
       - 'atlas-research-validation-ui.js'
@@ -31,12 +32,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          node --check atlas-production-decision.js
           node --check atlas-unified-terminal.js
           node --check atlas-paper-portfolio-ui.js
           node --check atlas-research-validation-ui.js
           node --check production-web-autoload.js
           python -m py_compile render_boot_patch.py tests/test_production_single_snapshot_authority.py
           PYTHONPATH=. python tests/test_production_single_snapshot_authority.py
+
+          grep -q "ATLAS_PRODUCTION_DECISION_UI_V12_FINAL_GATE_ONLY" atlas-production-decision.js
+          grep -q "canonicalContract:'canonical_decision'" atlas-production-decision.js
+          grep -q "sourceOfTruth:'FINAL_TRADE_GATE'" atlas-production-decision.js
+          ! grep -q "canonicalContract:'analyst_output'" atlas-production-decision.js
+          ! grep -q "CANONICAL_ANALYST_OUTPUT" atlas-production-decision.js
+          ! grep -q "candidate_direction" atlas-production-decision.js
 
           grep -q "ATLAS_UNIFIED_TERMINAL_V5_STRICT_FINAL_GATE" atlas-unified-terminal.js
           grep -q "const PRODUCT_FRAMES=\['1d','12h','4h','1h'\]" atlas-unified-terminal.js
@@ -62,6 +71,7 @@ jobs:
           ! grep -q "d.product_direction||d.candidate_direction" production-web-autoload.js
           grep -q "geometrySource:'bound_analyst_output'" production-web-autoload.js
 
+          grep -q "production-decision-v12-final-gate-only" render_boot_patch.py
           grep -q "unified-terminal-v5-strict-final-gate" render_boot_patch.py
           grep -q "paper-portfolio-v3-final-gate-only" render_boot_patch.py
           grep -q "research-shadow-v3-target-status" render_boot_patch.py
@@ -79,13 +89,16 @@ jobs:
           ready=0
           for i in $(seq 1 60); do
             if curl -fsSL --connect-timeout 10 --max-time 50 "$base/" -o /tmp/index.html \
+              && curl -fsSL --connect-timeout 10 --max-time 50 "$base/atlas-production-decision.js" -o /tmp/prod.js \
               && curl -fsSL --connect-timeout 10 --max-time 50 "$base/atlas-unified-terminal.js" -o /tmp/unified.js \
               && curl -fsSL --connect-timeout 10 --max-time 50 "$base/atlas-paper-portfolio-ui.js" -o /tmp/paper.js \
               && curl -fsSL --connect-timeout 10 --max-time 50 "$base/atlas-research-validation-ui.js" -o /tmp/research.js \
               && curl -fsSL --connect-timeout 10 --max-time 50 "$base/production-web-autoload.js" -o /tmp/autoload.js; then
-              if grep -q 'unified-terminal-v5-strict-final-gate' /tmp/index.html \
+              if grep -q 'production-decision-v12-final-gate-only' /tmp/index.html \
+                && grep -q 'unified-terminal-v5-strict-final-gate' /tmp/index.html \
                 && grep -q 'paper-portfolio-v3-final-gate-only' /tmp/index.html \
                 && grep -q 'research-shadow-v3-target-status' /tmp/index.html \
+                && grep -q 'ATLAS_PRODUCTION_DECISION_UI_V12_FINAL_GATE_ONLY' /tmp/prod.js \
                 && grep -q 'ATLAS_UNIFIED_TERMINAL_V5_STRICT_FINAL_GATE' /tmp/unified.js \
                 && grep -q 'ATLAS_CANONICAL_PAPER_UI_V3_FINAL_GATE_ONLY' /tmp/paper.js \
                 && grep -q 'ATLAS_RESEARCH_SHADOW_UI_V3_TARGET_STATUS' /tmp/research.js \
@@ -121,6 +134,8 @@ jobs:
             and .canonical_decision.evaluation_horizons_h == [4,8,12]
           ' /tmp/zec.json >/dev/null
 
+          ! grep -q "canonicalContract:'analyst_output'" /tmp/prod.js
+          ! grep -q 'candidate_direction' /tmp/prod.js
           ! grep -q '/api/research/paper-portfolio-10k' /tmp/paper.js
           grep -q '/api/outcomes/summary?scope=signals&horizon=12' /tmp/paper.js
           grep -q "const PRODUCT_FRAMES=\['1d','12h','4h','1h'\]" /tmp/unified.js
