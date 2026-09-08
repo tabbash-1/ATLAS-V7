@@ -8,6 +8,8 @@ across user-facing/nested plan fields so no stale actionable flag can escape.
 """
 from __future__ import annotations
 
+from canonical_decision_contract import from_decision
+
 VERSION = "FINAL_TRADE_READY_GUARD_V1_HTF_FAIL_CLOSED"
 PRODUCT_HORIZON = "4-12H"
 
@@ -55,7 +57,6 @@ def assess(row):
     if not geometry_ready: blockers.append(geometry_reason or "CANONICAL_GEOMETRY_NOT_READY")
     if quality_blocked: blockers.append("SETUP_QUALITY_GATE_BLOCKED")
     if degraded: blockers.append("DATA_DEGRADED")
-    # Preserve order while removing duplicates.
     blockers = list(dict.fromkeys(x for x in blockers if x))
     ready = not blockers
     return {
@@ -96,6 +97,13 @@ def _collapse_plan(plan, reason):
     return out
 
 
+def _publish_truth(row):
+    row["canonical_decision"] = from_decision(row, symbol=row.get("symbol"), captured_at=row.get("captured_at") or row.get("generated_at"))
+    row["canonical_wait_reason"] = row["canonical_decision"].get("wait_reason")
+    row["canonical_decision_id"] = row["canonical_decision"].get("decision_id")
+    return row
+
+
 def apply(row):
     if not isinstance(row, dict) or not row.get("ok"):
         return row
@@ -107,7 +115,6 @@ def apply(row):
     row["analysis_only"] = True
     row["live_execution"] = False
     if gate["trade_ready"]:
-        # Certification only: never promote or relabel the pre-final decision.
         row["canonical_product_decision"] = gate["direction"]
         analyst = row.get("analyst_output")
         if isinstance(analyst, dict):
@@ -123,7 +130,7 @@ def apply(row):
             if isinstance(core, dict):
                 core = dict(core); core["trade_ready"] = True; plan["core_plan"] = core
             row["trade_plan"] = plan
-        return row
+        return _publish_truth(row)
 
     reason = gate["primary_blocker"] or "FINAL_TRADE_GATE_BLOCKED"
     row["pre_final_trade_gate_actionable_decision"] = row.get("actionable_decision")
@@ -156,14 +163,18 @@ def apply(row):
         if reason not in reasons: reasons.insert(0, reason)
         analyst["reasons"] = reasons
         row["analyst_output"] = analyst
-    return row
+    return _publish_truth(row)
 
 
 def install(atlas):
     original = atlas.production_decision
     def guarded(symbol):
-        return apply(original(symbol))
+        row = original(symbol)
+        if isinstance(row, dict):
+            row = dict(row)
+            row.setdefault("symbol", symbol)
+        return apply(row)
     atlas.production_decision = guarded
-    state = {"enabled":True,"version":VERSION,"product_horizon":PRODUCT_HORIZON,"fail_closed":True,"paper_portfolio_authority":"trade_ready","analysis_only":True,"live_execution":False}
+    state = {"enabled":True,"version":VERSION,"product_horizon":PRODUCT_HORIZON,"fail_closed":True,"paper_portfolio_authority":"final_trade_gate","canonical_decision_contract":"ATLAS_CANONICAL_DECISION_TRUTH_V1","analysis_only":True,"live_execution":False}
     atlas.FINAL_TRADE_READY_GUARD_STATE = state
     return state
