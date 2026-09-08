@@ -1,0 +1,83 @@
+name: ATLAS Canonical Outcomes Live Smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cloud_web_only_final.py'
+      - 'canonical_outcome_snapshot.py'
+      - 'status/canonical-outcomes-latest.json'
+      - 'render.yaml'
+      - '.github/workflows/atlas-canonical-outcomes-live-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  verify-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Wait for canonical outcome runtime on Render
+        run: |
+          python - <<'PY'
+          import json,time,urllib.request
+          base='https://atlas-v7.onrender.com'
+          last=None
+          for i in range(60):
+              try:
+                  with urllib.request.urlopen(base+'/api/runtime/status', timeout=20) as r:
+                      p=json.load(r)
+                  co=p.get('canonical_outcomes') or {}
+                  last=p
+                  if (p.get('ok') is True and p.get('runtime')=='WEB_ONLY_FINAL'
+                      and p.get('product_horizon')=='4-12H'
+                      and co.get('version')=='ATLAS_CANONICAL_OUTCOME_SNAPSHOT_V1'
+                      and co.get('decision_source_of_truth')=='FINAL_TRADE_GATE'
+                      and co.get('evaluation_horizons_h')==[4,8,12]
+                      and co.get('web_process_background_worker') is False):
+                      print('runtime canonical outcomes ready')
+                      break
+              except Exception as e:
+                  last={'error':str(e)}
+              time.sleep(10)
+          else:
+              raise SystemExit('Render did not expose canonical outcomes: '+json.dumps(last)[:2500])
+          PY
+      - name: Verify official outcome endpoints
+        run: |
+          python - <<'PY'
+          import json,urllib.request,urllib.error
+          base='https://atlas-v7.onrender.com'
+          endpoints=['ledger','summary','path-ledger','path-summary','geometry-status','settlement-status']
+          for ep in endpoints:
+              with urllib.request.urlopen(f'{base}/api/outcomes/{ep}?scope=signals&horizon=12', timeout=30) as r:
+                  p=json.load(r)
+              assert p['schema']=='ATLAS_CANONICAL_OUTCOME_SNAPSHOT_V1', (ep,p)
+              assert p['decision_source_of_truth']=='FINAL_TRADE_GATE', (ep,p)
+              assert p['product_horizon']=='4-12H', (ep,p)
+              assert p['evaluation_horizons_h']==[4,8,12], (ep,p)
+              assert p['legacy_backfill_allowed'] is False, (ep,p)
+              assert p['served_from']=='COMMITTED_GITHUB_ACTIONS_SNAPSHOT', (ep,p)
+              assert p['web_process_background_worker'] is False, (ep,p)
+              assert p['outcome_read_triggered_by_request'] is False, (ep,p)
+              assert p['live_execution'] is False and p['can_override_production'] is False, (ep,p)
+              for row in p.get('rows') or []:
+                  assert row.get('decision_source_of_truth')=='FINAL_TRADE_GATE'
+                  assert row.get('decision_id')
+                  assert row.get('evaluation_horizons_h')==[4,8,12]
+              print(ep, 'ok')
+          for h in (4,8,12):
+              with urllib.request.urlopen(f'{base}/api/outcomes/summary?scope=signals&horizon={h}', timeout=30) as r:
+                  p=json.load(r)
+              assert p['horizon_h']==h
+          try:
+              urllib.request.urlopen(base+'/api/outcomes/summary?scope=legacy_score_signals&horizon=12', timeout=30)
+              raise AssertionError('legacy scope must not be exposed on Production')
+          except urllib.error.HTTPError as e:
+              assert e.code==400
+          try:
+              urllib.request.urlopen(base+'/api/outcomes/summary?scope=signals&horizon=24', timeout=30)
+              raise AssertionError('24h must not be an official Production outcome horizon')
+          except urllib.error.HTTPError as e:
+              assert e.code==400
+          print('LIVE_CANONICAL_OUTCOME_TRUTH_OK')
+          PY
