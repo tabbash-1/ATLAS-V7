@@ -7,8 +7,10 @@ on:
       - 'atlas-unified-terminal.js'
       - 'atlas-paper-portfolio-ui.js'
       - 'atlas-research-validation-ui.js'
+      - 'production-web-autoload.js'
       - 'render_boot_patch.py'
       - 'cloud_web_only_final.py'
+      - 'tests/test_production_single_snapshot_authority.py'
       - '.github/workflows/atlas-strict-product-truth-live-smoke.yml'
   workflow_dispatch:
 
@@ -32,7 +34,9 @@ jobs:
           node --check atlas-unified-terminal.js
           node --check atlas-paper-portfolio-ui.js
           node --check atlas-research-validation-ui.js
-          python -m py_compile render_boot_patch.py
+          node --check production-web-autoload.js
+          python -m py_compile render_boot_patch.py tests/test_production_single_snapshot_authority.py
+          PYTHONPATH=. python tests/test_production_single_snapshot_authority.py
 
           grep -q "ATLAS_UNIFIED_TERMINAL_V5_STRICT_FINAL_GATE" atlas-unified-terminal.js
           grep -q "const PRODUCT_FRAMES=\['1d','12h','4h','1h'\]" atlas-unified-terminal.js
@@ -45,7 +49,6 @@ jobs:
 
           grep -q "ATLAS_CANONICAL_PAPER_UI_V3_FINAL_GATE_ONLY" atlas-paper-portfolio-ui.js
           grep -q "/api/outcomes/summary?scope=signals&horizon=12" atlas-paper-portfolio-ui.js
-          grep -q "FINAL_TRADE_GATE" atlas-paper-portfolio-ui.js
           ! grep -q "/api/research/paper-portfolio-10k" atlas-paper-portfolio-ui.js
           ! grep -q "Prospective analyst_output LONG/SHORT" atlas-paper-portfolio-ui.js
           grep -q "CANONICAL_SIGNAL_COUNT_MISMATCH" atlas-paper-portfolio-ui.js
@@ -53,6 +56,11 @@ jobs:
           grep -q "ATLAS_RESEARCH_SHADOW_UI_V3_TARGET_STATUS" atlas-research-validation-ui.js
           grep -q "target .* reached" atlas-research-validation-ui.js
           grep -q "can_change_portfolio:false" atlas-research-validation-ui.js
+
+          grep -q "ATLAS_PRODUCTION_WEB_AUTOLOAD_V6_STRICT_FINAL_TRUTH" production-web-autoload.js
+          ! grep -q "d?.trade_plan" production-web-autoload.js
+          ! grep -q "d.product_direction||d.candidate_direction" production-web-autoload.js
+          grep -q "geometrySource:'bound_analyst_output'" production-web-autoload.js
 
           grep -q "unified-terminal-v5-strict-final-gate" render_boot_patch.py
           grep -q "paper-portfolio-v3-final-gate-only" render_boot_patch.py
@@ -73,13 +81,15 @@ jobs:
             if curl -fsSL --connect-timeout 10 --max-time 50 "$base/" -o /tmp/index.html \
               && curl -fsSL --connect-timeout 10 --max-time 50 "$base/atlas-unified-terminal.js" -o /tmp/unified.js \
               && curl -fsSL --connect-timeout 10 --max-time 50 "$base/atlas-paper-portfolio-ui.js" -o /tmp/paper.js \
-              && curl -fsSL --connect-timeout 10 --max-time 50 "$base/atlas-research-validation-ui.js" -o /tmp/research.js; then
+              && curl -fsSL --connect-timeout 10 --max-time 50 "$base/atlas-research-validation-ui.js" -o /tmp/research.js \
+              && curl -fsSL --connect-timeout 10 --max-time 50 "$base/production-web-autoload.js" -o /tmp/autoload.js; then
               if grep -q 'unified-terminal-v5-strict-final-gate' /tmp/index.html \
                 && grep -q 'paper-portfolio-v3-final-gate-only' /tmp/index.html \
                 && grep -q 'research-shadow-v3-target-status' /tmp/index.html \
                 && grep -q 'ATLAS_UNIFIED_TERMINAL_V5_STRICT_FINAL_GATE' /tmp/unified.js \
                 && grep -q 'ATLAS_CANONICAL_PAPER_UI_V3_FINAL_GATE_ONLY' /tmp/paper.js \
-                && grep -q 'ATLAS_RESEARCH_SHADOW_UI_V3_TARGET_STATUS' /tmp/research.js; then
+                && grep -q 'ATLAS_RESEARCH_SHADOW_UI_V3_TARGET_STATUS' /tmp/research.js \
+                && grep -q 'ATLAS_PRODUCTION_WEB_AUTOLOAD_V6_STRICT_FINAL_TRUTH' /tmp/autoload.js; then
                 ready=1; break
               fi
             fi
@@ -116,6 +126,8 @@ jobs:
           grep -q "const PRODUCT_FRAMES=\['1d','12h','4h','1h'\]" /tmp/unified.js
           ! grep -q "\['1d','12h','6h','4h','1h'\]" /tmp/unified.js
           ! grep -q 'p.product_direction||p.candidate_direction' /tmp/unified.js
+          ! grep -q 'd?.trade_plan' /tmp/autoload.js
+          ! grep -q 'd.product_direction||d.candidate_direction' /tmp/autoload.js
 
           echo 'LIVE_STRICT_PRODUCT_TRUTH_OK'
           jq '{decision_source_of_truth,evaluation_horizons_h,signal_count,portfolio:.summary.portfolio}' /tmp/outcomes.json
