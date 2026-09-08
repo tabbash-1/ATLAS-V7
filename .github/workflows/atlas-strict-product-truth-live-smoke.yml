@@ -1,0 +1,122 @@
+name: ATLAS Strict Product Truth Live Smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'atlas-unified-terminal.js'
+      - 'atlas-paper-portfolio-ui.js'
+      - 'atlas-research-validation-ui.js'
+      - 'render_boot_patch.py'
+      - 'cloud_web_only_final.py'
+      - '.github/workflows/atlas-strict-product-truth-live-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlas-strict-product-truth-live-smoke
+  cancel-in-progress: true
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax and static truth invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check atlas-unified-terminal.js
+          node --check atlas-paper-portfolio-ui.js
+          node --check atlas-research-validation-ui.js
+          python -m py_compile render_boot_patch.py
+
+          grep -q "ATLAS_UNIFIED_TERMINAL_V5_STRICT_FINAL_GATE" atlas-unified-terminal.js
+          grep -q "const PRODUCT_FRAMES=\['1d','12h','4h','1h'\]" atlas-unified-terminal.js
+          ! grep -q "\['1d','12h','6h','4h','1h'\]" atlas-unified-terminal.js
+          ! grep -q "p.product_direction||p.candidate_direction" atlas-unified-terminal.js
+          ! grep -q "p.trade_plan" atlas-unified-terminal.js
+          grep -q "\$('auDir').textContent=actionable?decision:'—'" atlas-unified-terminal.js
+          grep -q "4H and 12H must align" atlas-unified-terminal.js
+          grep -q "1H must confirm" atlas-unified-terminal.js
+
+          grep -q "ATLAS_CANONICAL_PAPER_UI_V3_FINAL_GATE_ONLY" atlas-paper-portfolio-ui.js
+          grep -q "/api/outcomes/summary?scope=signals&horizon=12" atlas-paper-portfolio-ui.js
+          grep -q "FINAL_TRADE_GATE" atlas-paper-portfolio-ui.js
+          ! grep -q "/api/research/paper-portfolio-10k" atlas-paper-portfolio-ui.js
+          ! grep -q "Prospective analyst_output LONG/SHORT" atlas-paper-portfolio-ui.js
+          grep -q "CANONICAL_SIGNAL_COUNT_MISMATCH" atlas-paper-portfolio-ui.js
+
+          grep -q "ATLAS_RESEARCH_SHADOW_UI_V3_TARGET_STATUS" atlas-research-validation-ui.js
+          grep -q "target .* reached" atlas-research-validation-ui.js
+          grep -q "can_change_portfolio:false" atlas-research-validation-ui.js
+
+          grep -q "unified-terminal-v5-strict-final-gate" render_boot_patch.py
+          grep -q "paper-portfolio-v3-final-gate-only" render_boot_patch.py
+          grep -q "research-shadow-v3-target-status" render_boot_patch.py
+          echo 'STRICT_PRODUCT_TRUTH_REGRESSION_OK'
+
+  verify-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Verify strict canonical UI and portfolio on Production
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://atlas-v7.onrender.com'
+          ready=0
+          for i in $(seq 1 60); do
+            if curl -fsSL --connect-timeout 10 --max-time 50 "$base/" -o /tmp/index.html \
+              && curl -fsSL --connect-timeout 10 --max-time 50 "$base/atlas-unified-terminal.js" -o /tmp/unified.js \
+              && curl -fsSL --connect-timeout 10 --max-time 50 "$base/atlas-paper-portfolio-ui.js" -o /tmp/paper.js \
+              && curl -fsSL --connect-timeout 10 --max-time 50 "$base/atlas-research-validation-ui.js" -o /tmp/research.js; then
+              if grep -q 'unified-terminal-v5-strict-final-gate' /tmp/index.html \
+                && grep -q 'paper-portfolio-v3-final-gate-only' /tmp/index.html \
+                && grep -q 'research-shadow-v3-target-status' /tmp/index.html \
+                && grep -q 'ATLAS_UNIFIED_TERMINAL_V5_STRICT_FINAL_GATE' /tmp/unified.js \
+                && grep -q 'ATLAS_CANONICAL_PAPER_UI_V3_FINAL_GATE_ONLY' /tmp/paper.js \
+                && grep -q 'ATLAS_RESEARCH_SHADOW_UI_V3_TARGET_STATUS' /tmp/research.js; then
+                ready=1; break
+              fi
+            fi
+            sleep 10
+          done
+          test "$ready" = 1
+
+          curl -fsSL --retry 6 --retry-delay 5 --retry-all-errors --connect-timeout 10 --max-time 50 \
+            "$base/api/outcomes/summary?scope=signals&horizon=12" -o /tmp/outcomes.json
+          jq -e '
+            .schema == "ATLAS_CANONICAL_OUTCOME_SNAPSHOT_V1"
+            and .decision_source_of_truth == "FINAL_TRADE_GATE"
+            and .product_horizon == "4-12H"
+            and .evaluation_horizons_h == [4,8,12]
+            and .legacy_backfill_allowed == false
+            and .scope == "signals"
+            and .horizon_h == 12
+            and (.summary.portfolio.starting_equity_usd == 10000)
+            and (.signal_count == .summary.portfolio.entries)
+          ' /tmp/outcomes.json >/dev/null
+
+          curl -fsSL --retry 6 --retry-delay 5 --retry-all-errors --connect-timeout 10 --max-time 50 \
+            "$base/api/decision/current?symbol=ZECUSDT" -o /tmp/zec.json
+          jq -e '
+            .ok == true
+            and .canonical_decision.schema == "ATLAS_CANONICAL_DECISION_TRUTH_V1"
+            and .canonical_decision.source_of_truth == "FINAL_TRADE_GATE"
+            and .canonical_decision.product_horizon == "4-12H"
+            and .canonical_decision.evaluation_horizons_h == [4,8,12]
+          ' /tmp/zec.json >/dev/null
+
+          ! grep -q '/api/research/paper-portfolio-10k' /tmp/paper.js
+          grep -q '/api/outcomes/summary?scope=signals&horizon=12' /tmp/paper.js
+          grep -q "const PRODUCT_FRAMES=\['1d','12h','4h','1h'\]" /tmp/unified.js
+          ! grep -q "\['1d','12h','6h','4h','1h'\]" /tmp/unified.js
+          ! grep -q 'p.product_direction||p.candidate_direction' /tmp/unified.js
+
+          echo 'LIVE_STRICT_PRODUCT_TRUTH_OK'
+          jq '{decision_source_of_truth,evaluation_horizons_h,signal_count,portfolio:.summary.portfolio}' /tmp/outcomes.json
+          jq '{symbol,canonical_decision}' /tmp/zec.json
