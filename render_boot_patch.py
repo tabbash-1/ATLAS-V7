@@ -30,7 +30,7 @@ def patch_production_ui():
     scripts = "\n".join([
         '  <script src="atlas-production-decision.js?v=web-only-prod-v5-bound-truth"></script>',
         '  <script src="atlas-product-shell.js?v=product-shell-v7-bound-analyst-geometry"></script>',
-        '  <script src="production-web-autoload.js?v=web-only-prod-v5-bound-truth"></script>',
+        '  <script src="production-web-autoload.js?v=production-autoload-v6-strict-final-truth"></script>',
         '  <script src="atlas-deep-analysis-ui.js?v=rc10-1-deep-v2-primary-4-12h"></script>',
         '  <script src="atlas-unified-terminal.js?v=unified-terminal-v5-strict-final-gate"></script>',
         '  <script src="atlas-unified-terminal-polish.js?v=unified-terminal-polish-v2-execution-semantics"></script>',
