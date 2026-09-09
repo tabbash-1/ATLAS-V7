@@ -4,11 +4,14 @@
 Evaluation only. Never routes orders, changes Production, changes thresholds, or
 backfills decisions that predate the frozen cohort start. Paths/schema are
 parameterizable only to keep evidence cohorts isolated from one another.
+Experimental cohorts freeze execution costs at entry and fail closed when a
+validated cost snapshot is unavailable.
 """
 from __future__ import annotations
 import datetime as dt, hashlib, json, math, os, pathlib, time
 from typing import Any
 from offline_production_path_settlement import market_klines, event_from, excursions
+import execution_cost_model as execution_cost
 
 ROOT=pathlib.Path(__file__).resolve().parent
 def _path(env, default): return pathlib.Path(os.environ.get(env,str(ROOT/default)))
@@ -73,6 +76,52 @@ def verify_append_only(rows,prev):
     h=[sha(r) for r in rows]; old=(prev or {}).get('row_hashes') or []
     if len(h)<len(old) or h[:len(old)]!=old:raise RuntimeError('COHORT_APPEND_ONLY_VIOLATION')
     return h
+
+def freeze_execution_cost(m,symbol,notional,g,entry_captured_at):
+    """Freeze fee/spread/slippage evidence at enrollment for experimental cohorts."""
+    if m.get('experimental_threshold') is None:return None
+    policy=m.get('execution_cost_policy') or {}
+    venue=str(policy.get('venue') or '').strip().upper()
+    fee=num(policy.get('taker_fee_bps_per_side'))
+    measured_at=dt.datetime.now(dt.timezone.utc).isoformat()
+    try:
+        est=execution_cost.estimate(symbol,notional_usdt=notional,taker_fee_bps=fee,venue=venue)
+        return {
+            'schema':'ATLAS_ENTRY_EXECUTION_COST_SNAPSHOT_V1',
+            'entry_captured_at':entry_captured_at,
+            'measured_at':measured_at,
+            'version':est.get('version'),
+            'venue':est.get('venue'),
+            'instrument':est.get('instrument'),
+            'validated':bool(est.get('validated')),
+            'blockers':est.get('blockers') or [],
+            'research_notional_usdt':est.get('research_notional_usdt'),
+            'fee_bps_per_side':est.get('fee_bps'),
+            'half_spread_bps_per_side':est.get('spread_bps'),
+            'slippage_bps_per_side':est.get('slippage_bps'),
+            'round_trip_cost_bps':est.get('round_trip_cost_bps'),
+            'basis':est.get('basis'),
+            'entry':g['entry'],'risk_abs':g['risk_abs'],
+            'paper_only':True,'live_execution':False,
+        }
+    except Exception as exc:
+        return {
+            'schema':'ATLAS_ENTRY_EXECUTION_COST_SNAPSHOT_V1','entry_captured_at':entry_captured_at,
+            'measured_at':measured_at,'venue':venue or None,'validated':False,
+            'blockers':['EXECUTION_COST_SNAPSHOT_ERROR'],'error':f'{type(exc).__name__}: {exc}'[:500],
+            'fee_bps_per_side':fee,'half_spread_bps_per_side':None,'slippage_bps_per_side':None,
+            'round_trip_cost_bps':None,'entry':g['entry'],'risk_abs':g['risk_abs'],
+            'paper_only':True,'live_execution':False,
+        }
+
+def cost_adjusted(gross_r,row):
+    snap=row.get('execution_cost_snapshot') or {}
+    if gross_r is None or snap.get('validated') is not True:return None
+    return execution_cost.apply_cost_to_r(
+        gross_r,entry=row['geometry']['entry'],risk_abs=row['geometry']['risk_abs'],
+        fee_bps=snap.get('fee_bps_per_side'),spread_bps=snap.get('half_spread_bps_per_side'),
+        slippage_bps=snap.get('slippage_bps_per_side'))
+
 def enroll(m,cohort,rows,cursor,equity):
     ids={r['id'] for r in cohort}; state={}; added=[]; newest=cursor; horizon=dt.timedelta(hours=12); risk_pct=float(m['risk_per_trade_pct'])/100
     for t,s in rows:
@@ -88,10 +137,12 @@ def enroll(m,cohort,rows,cursor,equity):
             if eid in ids:continue
             openish=[r for r in cohort if parse(r['captured_at'])<=t<parse(r['captured_at'])+horizon]
             if len(openish)>=int(m['max_concurrent_positions']):continue
-            a=d['analyst_output']; risk_usd=round(equity*risk_pct,2); qty=risk_usd/g['risk_abs']
-            row={'schema':ENTRY_SCHEMA,'cohort_label':COHORT_LABEL,'id':eid,'portfolio_id':m['portfolio_id'],'captured_at':t.isoformat(),'captured_at_ms':int(t.timestamp()*1000),'symbol':sym,'direction':direction,'decision_source':'ISOLATED_THRESHOLD_COHORT' if m.get('experimental_threshold') is not None else 'COMMITTED_PRODUCTION_SNAPSHOT','decision_action':'ANALYST_OUTPUT_'+direction,'contract_version':a.get('contract_version'),'quality_gate_status':((a.get('setup_quality_gate') or {}).get('status')),'score':num(a.get('confidence')),'threshold':num(a.get('signal_threshold')),'geometry':g,'sizing_equity_usd':round(equity,2),'risk_pct':float(m['risk_per_trade_pct']),'risk_usd':risk_usd,'paper_quantity':round(qty,12),'paper_notional_usd':round(abs(qty*g['entry']),2),'evaluation_horizons':['4h','8h','12h'],'outcome_known_at_entry':False,'paper_only':True,'live_execution':False,'can_override_production':False,'manifest_hash':m['manifest_hash']}
+            a=d['analyst_output']; risk_usd=round(equity*risk_pct,2); qty=risk_usd/g['risk_abs']; notional=round(abs(qty*g['entry']),2)
+            row={'schema':ENTRY_SCHEMA,'cohort_label':COHORT_LABEL,'id':eid,'portfolio_id':m['portfolio_id'],'captured_at':t.isoformat(),'captured_at_ms':int(t.timestamp()*1000),'symbol':sym,'direction':direction,'decision_source':'ISOLATED_THRESHOLD_COHORT' if m.get('experimental_threshold') is not None else 'COMMITTED_PRODUCTION_SNAPSHOT','decision_action':'ANALYST_OUTPUT_'+direction,'contract_version':a.get('contract_version'),'quality_gate_status':((a.get('setup_quality_gate') or {}).get('status')),'score':num(a.get('confidence')),'threshold':num(a.get('signal_threshold')),'geometry':g,'sizing_equity_usd':round(equity,2),'risk_pct':float(m['risk_per_trade_pct']),'risk_usd':risk_usd,'paper_quantity':round(qty,12),'paper_notional_usd':notional,'evaluation_horizons':['4h','8h','12h'],'outcome_known_at_entry':False,'paper_only':True,'live_execution':False,'can_override_production':False,'manifest_hash':m['manifest_hash']}
+            if m.get('experimental_threshold') is not None:row['execution_cost_snapshot']=freeze_execution_cost(m,sym,notional,g,t.isoformat())
             cohort.append(row); added.append(row); ids.add(eid)
     return added,newest
+
 def checkpoint(row,h,now_ms):
     start=int(row['captured_at_ms']); end=start+h*3600_000; g=row['geometry']
     if now_ms<end:return {'checkpoint_h':h,'matured':False,'status':'NOT_MATURED','r_multiple':None}
@@ -130,25 +181,31 @@ def settle(row,now_ms):
         return {'status':status,'terminal':terminal,'r_multiple':None if r is None else round(float(r),4),'exit_at_ms':exit_ms,'tp1_reached':bool(tp1),'mfe_r':mfe,'mae_r':mae,'market_source':provider}
     except Exception as e:return {'status':'MARKET_DATA_ERROR','terminal':False,'r_multiple':None,'exit_at_ms':None,'error':str(e)[:500]}
 def report(m,cohort,settlements,cps,observed):
-    start=float(m['starting_equity_usd']); equity=start; peak=start; maxdd=0; detail=[]; rs=[]; wins=losses=0; closed=[]
+    start=float(m['starting_equity_usd']); equity=start; peak=start; maxdd=0; detail=[]; rs=[]; wins=losses=0; closed=[]; cost_net=[]; cost_valid=cost_invalid=0
     for row,s in zip(cohort,settlements):
         r=num(s.get('r_multiple'))
         if s.get('terminal') and r is not None:closed.append((s.get('exit_at_ms') or 10**30,row,s,r))
-    closed.sort(key=lambda x:x[0]); eqmap={}
+    closed.sort(key=lambda x:x[0]); eqmap={}; costmap={}
     for _,row,s,r in closed:
         pnl=round(float(row['risk_usd'])*r,2); equity=round(equity+pnl,2); peak=max(peak,equity); dd=(peak-equity)/peak*100 if peak else 0; maxdd=max(maxdd,dd); rs.append(r); wins+=pnl>0; losses+=pnl<0; eqmap[row['id']]={'pnl_usd':pnl,'equity_after_usd':equity,'drawdown_after_pct':round(dd,4)}
-    for row,s in zip(cohort,settlements):detail.append({**row,'product_window_checkpoints':cps[row['id']],'settlement':s,**eqmap.get(row['id'],{'pnl_usd':None,'equity_after_usd':None,'drawdown_after_pct':None})})
+        if m.get('experimental_threshold') is not None:
+            adj=cost_adjusted(r,row)
+            if adj is None:cost_invalid+=1; costmap[row['id']]={'gross_r':r,'net_r':None,'validated_cost_inputs':False}
+            else:cost_valid+=1; cost_net.append(adj['net_r']); costmap[row['id']]=adj
+    for row,s in zip(cohort,settlements):detail.append({**row,'product_window_checkpoints':cps[row['id']],'settlement':s,'cost_adjusted_settlement':costmap.get(row['id']),**eqmap.get(row['id'],{'pnl_usd':None,'equity_after_usd':None,'drawdown_after_pct':None})})
     summary={}
     for h in CHECKPOINTS:
         vals=[num(cp.get('r_multiple')) for arr in cps.values() for cp in arr if cp.get('checkpoint_h')==h and cp.get('matured')]; vals=[x for x in vals if x is not None]; summary[f'{h}h']={'matured':len(vals),'avg_r':round(sum(vals)/len(vals),4) if vals else None,'positive_pct':round(100*sum(x>0 for x in vals)/len(vals),2) if vals else None}
     base={'schema':SCHEMA,'generated_at':dt.datetime.now(dt.timezone.utc).isoformat(),'observed_through_at':observed.isoformat(),'canonical_contract':'analyst_output','product_horizon':'4-12H','evaluation_horizons':['4h','8h','12h'],'paper_only':True,'live_execution':False,'can_override_production':False,'production_threshold_unchanged':m['production_threshold'],'methodology':'Prospective canonical analyst_output LONG/SHORT transitions only; frozen Entry/SL/TP; 4h/8h/12h checkpoints; 12h terminal evaluation.','checkpoint_summary':summary,'portfolio':{'starting_equity_usd':start,'equity_usd':round(equity,2),'net_pnl_usd':round(equity-start,2),'return_pct':round((equity/start-1)*100,4),'entries':len(cohort),'closed':len(closed),'open_or_unresolved':len(cohort)-len(closed),'wins':wins,'losses':losses,'win_rate_pct':round(100*wins/len(closed),2) if closed else None,'net_r':round(sum(rs),4),'avg_r':round(sum(rs)/len(rs),4) if rs else None,'max_drawdown_pct':round(maxdd,4)},'trades':detail}
-    if m.get('experimental_threshold') is not None:base.update({'cohort_label':COHORT_LABEL,'manifest_hash':m['manifest_hash'],'experimental_threshold':m.get('experimental_threshold'),'production_eligible':False,'methodology':base['methodology']+' Experimental cohort is isolated and cannot override Production.'})
+    if m.get('experimental_threshold') is not None:
+        base.update({'cohort_label':COHORT_LABEL,'manifest_hash':m['manifest_hash'],'experimental_threshold':m.get('experimental_threshold'),'production_eligible':False,'methodology':base['methodology']+' Experimental cohort is isolated and cannot override Production. Execution fee/spread/slippage is frozen at enrollment; missing cost evidence fails closed.'})
+        base['cost_adjusted']={'gross_net_r':round(sum(rs),4),'gross_avg_r':round(sum(rs)/len(rs),4) if rs else None,'net_r':round(sum(cost_net),4) if cost_valid and cost_invalid==0 else None,'avg_r':round(sum(cost_net)/len(cost_net),4) if cost_net and cost_invalid==0 else None,'cost_validated_closed':cost_valid,'cost_unvalidated_closed':cost_invalid,'all_closed_cost_validated':bool(closed) and cost_invalid==0,'minimum_matured_sample_required':30,'minimum_sample_met':len(closed)>=30,'edge_evaluable_after_costs':len(closed)>=30 and cost_invalid==0}
     return base
 def main():
     m=load_manifest(); start=parse(m['cohort_start_at']); rows=snapshots(start); cohort=jsonl(COHORT); prev_i=json.loads(INTEGRITY.read_text()) if INTEGRITY.exists() else None; prev=json.loads(LATEST.read_text()) if LATEST.exists() else None; verify_append_only(cohort,prev_i)
     cursor=parse(prev['observed_through_at']) if prev and prev.get('observed_through_at') else start-dt.timedelta(microseconds=1); equity=num((prev or {}).get('portfolio',{}).get('equity_usd')) or float(m['starting_equity_usd']); added,newest=enroll(m,cohort,rows,cursor,equity); now=int(time.time()*1000); settlements=[]; cps={}
     for i,row in enumerate(cohort):cps[row['id']]=[checkpoint(row,h,now) for h in CHECKPOINTS]; settlements.append(settle(row,now)); time.sleep(.1 if i and i%12==0 else 0)
     rep=report(m,cohort,settlements,cps,newest); COHORT.parent.mkdir(parents=True,exist_ok=True); LATEST.parent.mkdir(parents=True,exist_ok=True); INTEGRITY.parent.mkdir(parents=True,exist_ok=True); COHORT.write_text('\n'.join(canon(r) for r in cohort)+('\n' if cohort else '')); LATEST.write_text(json.dumps(rep,indent=2,sort_keys=True)); hashes=verify_append_only(cohort,prev_i); integ={'schema':INTEGRITY_SCHEMA,'generated_at':rep['generated_at'],'manifest_hash':m['manifest_hash'],'append_only_verified':True,'row_count':len(cohort),'new_row_count':len(added),'row_hashes':hashes,'chain_sha256':hashlib.sha256(''.join(hashes).encode()).hexdigest(),'paper_only':True,'live_execution':False,'can_override_production':False};
-    if m.get('experimental_threshold') is not None:integ.update({'cohort_label':COHORT_LABEL,'production_eligible':False})
-    INTEGRITY.write_text(json.dumps(integ,indent=2,sort_keys=True)); print(json.dumps({'cohort_label':COHORT_LABEL,'added':len(added),'portfolio':rep['portfolio'],'checkpoint_summary':rep['checkpoint_summary']},indent=2))
+    if m.get('experimental_threshold') is not None:integ.update({'cohort_label':COHORT_LABEL,'production_eligible':False,'entry_cost_snapshot_required':True})
+    INTEGRITY.write_text(json.dumps(integ,indent=2,sort_keys=True)); print(json.dumps({'cohort_label':COHORT_LABEL,'added':len(added),'portfolio':rep['portfolio'],'cost_adjusted':rep.get('cost_adjusted'),'checkpoint_summary':rep['checkpoint_summary']},indent=2))
 if __name__=='__main__':main()
