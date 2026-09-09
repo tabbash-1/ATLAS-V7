@@ -193,8 +193,12 @@ def estimate(symbol, *, notional_usdt=None, taker_fee_bps=None, venue=None, ua='
         buy_vwap, buy_filled = _vwap_for_quote(asks, notional, base_per_contract)
         sell_vwap, sell_filled = _vwap_for_quote(bids, notional, base_per_contract)
 
-    buy_impact = ((buy_vwap / best_ask) - 1.0) * 10000.0 if buy_vwap is not None else None
-    sell_impact = ((best_bid / sell_vwap) - 1.0) * 10000.0 if sell_vwap is not None and sell_vwap > 0 else None
+    # This model defines impact as additional adverse execution beyond the touch.
+    # Exact-touch fills can produce tiny negative floating-point noise (for
+    # example -1e-12 bps); clamp at zero rather than treating that noise as a
+    # rebate or invalid negative trading cost.
+    buy_impact = max(0.0, ((buy_vwap / best_ask) - 1.0) * 10000.0) if buy_vwap is not None else None
+    sell_impact = max(0.0, ((best_bid / sell_vwap) - 1.0) * 10000.0) if sell_vwap is not None and sell_vwap > 0 else None
     impact_values = [x for x in (buy_impact, sell_impact) if x is not None]
     one_way_slippage = sum(impact_values) / len(impact_values) if len(impact_values) == 2 else None
 
