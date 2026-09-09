@@ -6,7 +6,7 @@ BASE=os.environ.get('ATLAS_ANALYST_CAPTURE_BASE','https://atlas-v7.onrender.com'
 SYMBOLS=tuple(x.strip().upper() for x in os.environ.get('ATLAS_ANALYST_CAPTURE_SYMBOLS','BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,BNBUSDT,DOGEUSDT,ZECUSDT,HYPEUSDT').split(',') if x.strip())
 OUT=pathlib.Path(os.environ.get('ATLAS_ANALYST_CAPTURE_OUT',str(ROOT/'status/history/analyst-output-snapshots.jsonl')))
 CAPTURE_SCHEMA=os.environ.get('ATLAS_ANALYST_CAPTURE_SCHEMA','ATLAS_ANALYST_OUTPUT_FORWARD_CAPTURE_V1')
-COHORT_LABEL=os.environ.get('ATLAS_ANALYST_CAPTURE_COHORT_LABEL','PRODUCTION_T68')
+COHORT_LABEL=os.environ.get('ATLAS_ANALYST_CAPTURE_COHORT_LABEL','')
 EXPECTED='PRODUCT_QUALITY_GATE_V2_CANONICAL_ANALYST_OUTPUT'
 def get(url):
     req=urllib.request.Request(url,headers={'User-Agent':'ATLAS-Forward-Capture/1.0','Cache-Control':'no-cache'})
@@ -27,8 +27,9 @@ def main():
                 errors[s]=str(e)[:280]; time.sleep(3)
         if ok: errors.pop(s,None)
     if not decisions:raise RuntimeError('NO_VALID_CANONICAL_DECISIONS')
-    row={'schema':CAPTURE_SCHEMA,'cohort_label':COHORT_LABEL,'captured_at':captured,'source':BASE,'contract_version':EXPECTED,'product_horizon':'4-12H','analysis_only':True,'live_execution':False,'decisions':decisions,'errors':errors}
+    row={'schema':CAPTURE_SCHEMA,'captured_at':captured,'source':BASE,'contract_version':EXPECTED,'product_horizon':'4-12H','analysis_only':True,'live_execution':False,'decisions':decisions,'errors':errors}
+    if COHORT_LABEL:row['cohort_label']=COHORT_LABEL
     OUT.parent.mkdir(parents=True,exist_ok=True)
     with OUT.open('a',encoding='utf-8') as f:f.write(json.dumps(row,sort_keys=True,separators=(',',':'))+'\n')
-    print(json.dumps({'captured_at':captured,'cohort_label':COHORT_LABEL,'source':BASE,'valid_symbols':sorted(decisions),'errors':errors},sort_keys=True))
+    print(json.dumps({'captured_at':captured,'cohort_label':COHORT_LABEL or None,'source':BASE,'valid_symbols':sorted(decisions),'errors':errors},sort_keys=True))
 if __name__=='__main__':main()
