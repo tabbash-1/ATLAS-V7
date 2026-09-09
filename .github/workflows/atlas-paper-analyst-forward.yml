@@ -156,13 +156,24 @@ jobs:
               ATLAS_DATA_DIR=/tmp/atlas-t64 \
               ATLAS_CLOUD_FORWARD_MIN_SCORE=64 \
               ATLAS_CLOUD_FORWARD_ENABLED=0 \
-              python3 collector_server.py >/tmp/atlas-t64-server.log 2>&1 &
+              python3 cloud_web_only_final.py >/tmp/atlas-t64-server.log 2>&1 &
           echo $! >/tmp/atlas-t64-server.pid
-          for i in $(seq 1 30); do
+          for i in $(seq 1 45); do
             if curl -fsS --max-time 10 'http://127.0.0.1:8765/api/decision/current?symbol=BTCUSDT' >/tmp/atlas-t64-probe.json; then break; fi
             sleep 2
           done
           test -s /tmp/atlas-t64-probe.json || { cat /tmp/atlas-t64-server.log; exit 1; }
+          python3 - <<'PY'
+          import json
+          x=json.load(open('/tmp/atlas-t64-probe.json'))
+          assert x['ok'] is True
+          assert x['canonical_product_contract']=='analyst_output'
+          assert x['analyst_output']['horizon']=='4-12H'
+          assert float(x['analyst_output']['signal_threshold'])==64.0
+          assert x['analyst_output']['analysis_only'] is True
+          assert x['analyst_output']['live_execution'] is False
+          print('T64_CANONICAL_DECISION_PATH_OK')
+          PY
       - name: Capture isolated threshold-64 analyst output
         env:
           ATLAS_ANALYST_CAPTURE_BASE: http://127.0.0.1:8765
