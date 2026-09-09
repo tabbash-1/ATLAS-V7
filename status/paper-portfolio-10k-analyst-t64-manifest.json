@@ -7,7 +7,7 @@
   "max_aggregate_open_risk_pct": 3.0,
   "max_concurrent_positions": 3,
   "holding_horizon_hours": 12,
-  "eligible_decision_rule": "analyst_output.decision in [LONG,SHORT] AND analyst_output.analysis_ready=true from isolated local collector with ATLAS_CLOUD_FORWARD_MIN_SCORE=64",
+  "eligible_decision_rule": "analyst_output.decision in [LONG,SHORT] AND analyst_output.analysis_ready=true from isolated local canonical web runtime with ATLAS_CLOUD_FORWARD_MIN_SCORE=64",
   "entry_semantics": "FIRST_ISOLATED_T64_ANALYST_OUTPUT_LONG_SHORT_TRANSITION_PER_SYMBOL_DIRECTION_EPISODE_AFTER_COHORT_START",
   "exit_semantics": "FIRST_SL_OR_TP_TOUCH_ON_5M; REFINE_SAME_5M_CONFLICT_ON_1M; OTHERWISE_MARK_TO_MARKET_AT_12H",
   "missing_market_data_policy": "DO_NOT_SETTLE_DO_NOT_ZERO_FILL",
@@ -23,5 +23,11 @@
   "experimental_threshold": 64,
   "cohort_role": "EVIDENCE_COLLECTION_ONLY",
   "production_eligible": false,
-  "manifest_hash": "77d503f614f0557e312716629b510ced6630334fb664255c07330f6c367057f0"
+  "execution_cost_policy": {
+    "venue": "OKX_USDT_SWAP",
+    "taker_fee_bps_per_side": 5.0,
+    "spread_and_slippage": "LIVE_L2_FROZEN_AT_ENTRY",
+    "missing_cost_policy": "FAIL_CLOSED_NO_NET_EDGE_CLAIM"
+  },
+  "manifest_hash": "2d31a2147e6ff87426cd2b5ea7725ec57fbfa12314e5d32e24599d318ce529e1"
 }
