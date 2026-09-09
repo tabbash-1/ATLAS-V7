@@ -44,6 +44,7 @@ def test_complete_live_cost_contract_can_validate():
     assert out['spread_bps'] > 0
     assert out['fee_bps'] == 5.0
     assert out['slippage_bps'] >= 0
+    assert out['round_trip_cost_bps'] == 2 * (out['fee_bps'] + out['spread_bps'] + out['slippage_bps'])
     assert out['buy_quote_filled'] == 50
     assert out['sell_quote_filled'] == 50
 
@@ -64,3 +65,33 @@ def test_insufficient_depth_is_not_extrapolated():
     )
     assert out['validated'] is False
     assert 'INSUFFICIENT_L2_DEPTH_FOR_NOTIONAL' in out['blockers']
+
+
+def test_round_trip_cost_to_net_r_uses_frozen_geometry():
+    out = ecm.apply_cost_to_r(
+        2.0,
+        entry=100.0,
+        risk_abs=1.0,
+        fee_bps=5.0,
+        spread_bps=1.0,
+        slippage_bps=2.0,
+    )
+    assert out['round_trip_cost_bps'] == 16.0
+    assert out['execution_cost_r'] == 0.16
+    assert out['net_r'] == 1.84
+    assert out['validated_cost_inputs'] is True
+
+
+def test_missing_cost_component_fails_closed_for_net_r():
+    out = ecm.apply_cost_to_r(
+        -1.0,
+        entry=100.0,
+        risk_abs=1.0,
+        fee_bps=5.0,
+        spread_bps=None,
+        slippage_bps=2.0,
+    )
+    assert out['gross_r'] == -1.0
+    assert out['net_r'] is None
+    assert out['execution_cost_r'] is None
+    assert out['validated_cost_inputs'] is False
