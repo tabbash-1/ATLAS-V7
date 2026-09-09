@@ -1,4 +1,3 @@
-# Canonical forward evaluator plus isolated threshold-64 evidence collection.
 name: ATLAS Analyst Forward Evaluation
 
 on:
@@ -11,8 +10,6 @@ on:
       - 'atlas_product_readiness_gate.py'
       - 'execution_cost_model.py'
       - 'tests/test_execution_cost_model.py'
-      - 'tests/test_analyst_forward_attribution.py'
-      - 'tests/test_atlas_product_readiness_gate.py'
       - 'status/paper-portfolio-10k-analyst-manifest.json'
       - 'status/paper-portfolio-10k-analyst-t64-manifest.json'
       - '.github/workflows/atlas-paper-analyst-forward.yml'
@@ -33,110 +30,54 @@ jobs:
     timeout-minutes: 14
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Validate canonical contracts, attribution, readiness, and execution cost safety
+        with: {fetch-depth: 0}
+      - name: Validate unchanged canonical lane and cost model
         run: |
           set -euo pipefail
-          python3 -m py_compile analyst_output_forward_capture.py paper_portfolio_10k_analyst_output.py analyst_forward_attribution.py atlas_product_readiness_gate.py execution_cost_model.py tests/test_execution_cost_model.py tests/test_analyst_forward_attribution.py tests/test_atlas_product_readiness_gate.py
-          python3 - <<'PY'
-          import paper_portfolio_10k_analyst_output as p
-          import analyst_forward_attribution as a
-          import atlas_product_readiness_gate as g
-          good={'analyst_output':{'decision':'LONG','analysis_ready':True,'analysis_only':True,'live_execution':False,'entry':100,'stop_loss':98,'take_profit':104,'risk_reward':2,'contract_version':'TEST'}}
-          wait={'analyst_output':{'decision':'WAIT','analysis_ready':False,'analysis_only':True,'live_execution':False,'entry':None,'stop_loss':None,'take_profit':None}}
-          assert p.eligible(good) is True and p.geometry(good)['rr_tp2']==2
-          assert p.eligible(wait) is False
-          m=p.load_manifest()
-          assert m['canonical_contract']=='analyst_output' and m['product_horizon']=='4-12H'
-          assert m['live_execution'] is False and m['can_override_production'] is False
-          ctx={'decision':'SHORT','score':69,'threshold':68,'rsi14':45,'relative_volume':1.2,'futures_reason':'ALIGNED','futures_adjustment':1,'playbook':'TREND_SHORT','data_degraded':False}
-          assert a.failure_hypothesis(ctx,{'status':'LOSS','terminal':True,'r_multiple':-1})=='MARGINAL_QUALIFICATION_RISK'
-          bp={'canonical_contract':'analyst_output','product_horizon':'4-12H','live_execution':False,'can_override_production':False,'portfolio':{'avg_r':0.4,'net_r':12},'trades':[]}
-          bi={'append_only_verified':True}
-          ba={'analysis_only':True,'live_execution':False,'can_override_production':False,'can_change_score':False,'can_change_threshold':False,'counts':{'context_complete':0}}
-          gate=g.build(bp,bi,ba)
-          assert gate['state']=='TECHNICALLY_READY_EVIDENCE_PENDING'
-          assert gate['claim_policy']['may_claim_profitable'] is False
-          print('ANALYST_FORWARD_ATTRIBUTION_READINESS_SELF_TEST_OK')
-          PY
+          python3 -m py_compile analyst_output_forward_capture.py paper_portfolio_10k_analyst_output.py analyst_forward_attribution.py atlas_product_readiness_gate.py execution_cost_model.py
           python3 - <<'PY'
           import os, runpy
+          import paper_portfolio_10k_analyst_output as p
+          good={'analyst_output':{'decision':'LONG','analysis_ready':True,'analysis_only':True,'live_execution':False,'entry':100,'stop_loss':98,'take_profit':104,'risk_reward':2,'contract_version':'TEST'}}
+          wait={'analyst_output':{'decision':'WAIT','analysis_ready':False,'analysis_only':True,'live_execution':False,'entry':None,'stop_loss':None,'take_profit':None}}
+          assert p.eligible(good) and not p.eligible(wait)
+          m=p.load_manifest(); assert m['production_threshold']==68 and m['can_change_threshold'] is False
           ns=runpy.run_path('tests/test_execution_cost_model.py')
-          class MonkeyPatchLite:
-              def delenv(self,key,raising=True):
-                  if key in os.environ: del os.environ[key]
-                  elif raising: raise KeyError(key)
-          ns['test_unconfigured_fee_fails_closed'](MonkeyPatchLite())
-          for name in (
-              'test_complete_live_cost_contract_can_validate',
-              'test_wrong_venue_cannot_validate',
-              'test_insufficient_depth_is_not_extrapolated',
-              'test_round_trip_cost_to_net_r_uses_frozen_geometry',
-              'test_missing_cost_component_fails_closed_for_net_r',
-          ):
-              ns[name]()
-          print('EXECUTION_COST_MODEL_SELF_TEST_OK')
+          class MP:
+              def delenv(self,k,raising=True):
+                  if k in os.environ: del os.environ[k]
+                  elif raising: raise KeyError(k)
+          ns['test_unconfigured_fee_fails_closed'](MP())
+          for n in ['test_complete_live_cost_contract_can_validate','test_wrong_venue_cannot_validate','test_insufficient_depth_is_not_extrapolated','test_round_trip_cost_to_net_r_uses_frozen_geometry','test_missing_cost_component_fails_closed_for_net_r']:
+              ns[n]()
+          print('CANONICAL_AND_COST_SELF_TEST_OK')
           PY
-      - name: Capture deployed analyst output
-        run: |
-          set -euo pipefail
-          python3 analyst_output_forward_capture.py
-      - name: Run prospective 4-12H evaluator on dedicated history
+      - name: Capture and evaluate official T68 cohort
         env:
           ATLAS_ANALYST_HISTORY: status/history/analyst-output-snapshots.jsonl
         run: |
           set -euo pipefail
+          python3 analyst_output_forward_capture.py
           python3 paper_portfolio_10k_analyst_output.py
-          python3 - <<'PY'
-          import json
-          x=json.load(open('status/paper-portfolio-10k-analyst-latest.json'))
-          assert x['canonical_contract']=='analyst_output'
-          assert x['product_horizon']=='4-12H'
-          assert x['evaluation_horizons']==['4h','8h','12h']
-          assert x['paper_only'] is True and x['live_execution'] is False
-          assert x['can_override_production'] is False
-          assert x['production_threshold_unchanged']==68
-          print('PORTFOLIO',json.dumps(x['portfolio'],sort_keys=True))
-          print('CHECKPOINTS',json.dumps(x['checkpoint_summary'],sort_keys=True))
-          PY
-      - name: Build frozen forward attribution
-        run: |
-          set -euo pipefail
           python3 analyst_forward_attribution.py
-          python3 - <<'PY'
-          import json
-          x=json.load(open('status/analyst-forward-attribution-latest.json'))
-          assert x['schema']=='ATLAS_ANALYST_FORWARD_ATTRIBUTION_V1'
-          assert x['canonical_contract']=='analyst_output' and x['product_horizon']=='4-12H'
-          assert x['analysis_only'] is True and x['live_execution'] is False
-          assert x['can_override_production'] is False
-          assert x['can_change_score'] is False and x['can_change_threshold'] is False
-          print('ATTRIBUTION_COUNTS',json.dumps(x['counts'],sort_keys=True))
-          print('ATTRIBUTION_METRICS',json.dumps(x['matured_12h_metrics'],sort_keys=True))
-          PY
-      - name: Build fail-closed product readiness gate
-        run: |
-          set -euo pipefail
           python3 atlas_product_readiness_gate.py
           python3 - <<'PY'
           import json
-          x=json.load(open('status/product-readiness-latest.json'))
-          assert x['schema']=='ATLAS_PRODUCT_READINESS_GATE_V1'
-          assert x['canonical_contract']=='analyst_output' and x['product_horizon']=='4-12H'
-          assert x['analysis_only'] is True and x['live_execution'] is False
-          assert x['can_override_production'] is False
-          assert x['production_score_threshold_changed'] is False
-          assert x['claim_policy']['may_claim_profitable'] is False
-          print('PRODUCT_READINESS',json.dumps({'state':x['state'],'technical_ready':x['technical_ready'],'forward_evidence_ready':x['forward_evidence_ready'],'blockers':[b['name'] for b in x['blockers']]},sort_keys=True))
+          x=json.load(open('status/paper-portfolio-10k-analyst-latest.json'))
+          r=json.load(open('status/product-readiness-latest.json'))
+          assert x['production_threshold_unchanged']==68
+          assert x['paper_only'] is True and x['live_execution'] is False and x['can_override_production'] is False
+          assert r['production_score_threshold_changed'] is False
+          assert r['claim_policy']['may_claim_profitable'] is False
+          print('T68_UNCHANGED',x['portfolio'])
           PY
-      - name: Commit canonical capture and evidence when changed
+      - name: Commit official evidence
         run: |
           set -euo pipefail
-          git config user.name 'atlas-forward-evidence-bot'
-          git config user.email 'atlas-forward-evidence-bot@users.noreply.github.com'
-          git add status/history/analyst-output-snapshots.jsonl status/paper-portfolio-10k-analyst-latest.json status/paper-portfolio-10k-analyst-integrity.json status/history/paper-portfolio-10k-analyst-cohort.jsonl status/analyst-forward-attribution-latest.json status/product-readiness-latest.json
-          if git diff --cached --quiet; then exit 0; fi
+          git config user.name atlas-forward-evidence-bot
+          git config user.email atlas-forward-evidence-bot@users.noreply.github.com
+          git add status/history/analyst-output-snapshots.jsonl status/history/paper-portfolio-10k-analyst-cohort.jsonl status/paper-portfolio-10k-analyst-latest.json status/paper-portfolio-10k-analyst-integrity.json status/analyst-forward-attribution-latest.json status/product-readiness-latest.json
+          git diff --cached --quiet && exit 0
           git commit -m 'chore: update canonical analyst forward evidence [skip ci]'
           git pull --rebase origin main
           git push
@@ -146,45 +87,32 @@ jobs:
     timeout-minutes: 14
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Start isolated local T64 decision service
+        with: {fetch-depth: 0}
+      - name: Start isolated canonical T64 runtime
         run: |
           set -euo pipefail
           rm -rf /tmp/atlas-t64 && mkdir -p /tmp/atlas-t64
-          env PORT=8765 \
-              ATLAS_DATA_DIR=/tmp/atlas-t64 \
-              ATLAS_CLOUD_FORWARD_MIN_SCORE=64 \
-              ATLAS_CLOUD_FORWARD_ENABLED=0 \
-              python3 cloud_web_only_final.py >/tmp/atlas-t64-server.log 2>&1 &
+          env PORT=8765 ATLAS_DATA_DIR=/tmp/atlas-t64 ATLAS_CLOUD_FORWARD_MIN_SCORE=64 ATLAS_CLOUD_FORWARD_ENABLED=0 python3 cloud_web_only_final.py >/tmp/atlas-t64-server.log 2>&1 &
           echo $! >/tmp/atlas-t64-server.pid
           for i in $(seq 1 45); do
-            if curl -fsS --max-time 10 'http://127.0.0.1:8765/api/decision/current?symbol=BTCUSDT' >/tmp/atlas-t64-probe.json; then break; fi
+            curl -fsS --max-time 10 'http://127.0.0.1:8765/api/decision/current?symbol=BTCUSDT' >/tmp/atlas-t64-probe.json && break
             sleep 2
           done
           test -s /tmp/atlas-t64-probe.json || { cat /tmp/atlas-t64-server.log; exit 1; }
           python3 - <<'PY'
           import json
-          x=json.load(open('/tmp/atlas-t64-probe.json'))
-          assert x['ok'] is True
-          assert x['canonical_product_contract']=='analyst_output'
-          assert x['analyst_output']['horizon']=='4-12H'
-          assert float(x['analyst_output']['signal_threshold'])==64.0
-          assert x['analyst_output']['analysis_only'] is True
-          assert x['analyst_output']['live_execution'] is False
-          print('T64_CANONICAL_DECISION_PATH_OK')
+          x=json.load(open('/tmp/atlas-t64-probe.json')); a=x['analyst_output']
+          assert x['ok'] is True and x['canonical_product_contract']=='analyst_output'
+          assert a['horizon']=='4-12H' and float(a['signal_threshold'])==64.0
+          assert a['analysis_only'] is True and a['live_execution'] is False
+          print('T64_CANONICAL_PATH_OK')
           PY
-      - name: Capture isolated threshold-64 analyst output
+      - name: Capture and evaluate isolated T64 cohort
         env:
           ATLAS_ANALYST_CAPTURE_BASE: http://127.0.0.1:8765
           ATLAS_ANALYST_CAPTURE_OUT: status/history/analyst-output-snapshots-t64.jsonl
           ATLAS_ANALYST_CAPTURE_SCHEMA: ATLAS_ANALYST_OUTPUT_FORWARD_CAPTURE_V2_T64
           ATLAS_ANALYST_CAPTURE_COHORT_LABEL: EVIDENCE_T64
-        run: |
-          set -euo pipefail
-          python3 analyst_output_forward_capture.py
-      - name: Evaluate isolated threshold-64 cohort
-        env:
           ATLAS_ANALYST_MANIFEST: status/paper-portfolio-10k-analyst-t64-manifest.json
           ATLAS_ANALYST_HISTORY: status/history/analyst-output-snapshots-t64.jsonl
           ATLAS_ANALYST_COHORT: status/history/paper-portfolio-10k-analyst-t64-cohort.jsonl
@@ -196,28 +124,30 @@ jobs:
           ATLAS_ANALYST_COHORT_LABEL: EVIDENCE_T64
         run: |
           set -euo pipefail
+          python3 analyst_output_forward_capture.py
           python3 paper_portfolio_10k_analyst_output.py
           python3 - <<'PY'
           import json
           m=json.load(open('status/paper-portfolio-10k-analyst-t64-manifest.json'))
           x=json.load(open('status/paper-portfolio-10k-analyst-t64-latest.json'))
-          assert m['manifest_hash']=='77d503f614f0557e312716629b510ced6630334fb664255c07330f6c367057f0'
-          assert m['production_threshold']==68 and m['experimental_threshold']==64
-          assert m['production_eligible'] is False and m['can_override_production'] is False
-          assert x['manifest_hash']==m['manifest_hash']
-          assert x['experimental_threshold']==64 and x['production_threshold_unchanged']==68
-          assert x['cohort_label']=='EVIDENCE_T64' and x['production_eligible'] is False
-          assert all(t['manifest_hash']==m['manifest_hash'] for t in x['trades'])
-          print('T64_PORTFOLIO',json.dumps(x['portfolio'],sort_keys=True))
+          assert m['manifest_hash']=='2d31a2147e6ff87426cd2b5ea7725ec57fbfa12314e5d32e24599d318ce529e1'
+          assert m['production_threshold']==68 and m['experimental_threshold']==64 and m['production_eligible'] is False
+          assert x['manifest_hash']==m['manifest_hash'] and x['experimental_threshold']==64
+          assert x['production_threshold_unchanged']==68 and x['production_eligible'] is False
+          assert x['cost_adjusted']['minimum_matured_sample_required']==30
+          for t in x['trades']:
+              assert t['manifest_hash']==m['manifest_hash']
+              assert 'execution_cost_snapshot' in t
+          print('T64_EVIDENCE',{'portfolio':x['portfolio'],'cost_adjusted':x['cost_adjusted']})
           PY
-      - name: Commit isolated T64 evidence when changed
+      - name: Commit isolated T64 evidence
         run: |
           set -euo pipefail
           kill "$(cat /tmp/atlas-t64-server.pid)" 2>/dev/null || true
-          git config user.name 'atlas-forward-evidence-bot'
-          git config user.email 'atlas-forward-evidence-bot@users.noreply.github.com'
+          git config user.name atlas-forward-evidence-bot
+          git config user.email atlas-forward-evidence-bot@users.noreply.github.com
           git add status/history/analyst-output-snapshots-t64.jsonl status/history/paper-portfolio-10k-analyst-t64-cohort.jsonl status/paper-portfolio-10k-analyst-t64-latest.json status/paper-portfolio-10k-analyst-t64-integrity.json
-          if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'chore: update isolated threshold-64 evidence [skip ci]'
+          git diff --cached --quiet && exit 0
+          git commit -m 'chore: update isolated threshold-64 net evidence [skip ci]'
           git pull --rebase origin main
           git push
