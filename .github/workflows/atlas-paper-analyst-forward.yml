@@ -79,6 +79,9 @@ jobs:
           git add status/history/analyst-output-snapshots.jsonl status/history/paper-portfolio-10k-analyst-cohort.jsonl status/paper-portfolio-10k-analyst-latest.json status/paper-portfolio-10k-analyst-integrity.json status/analyst-forward-attribution-latest.json status/product-readiness-latest.json
           git diff --cached --quiet && exit 0
           git commit -m 'chore: update canonical analyst forward evidence [skip ci]'
+          # Runtime evaluation can touch non-evidence files. They must never block or leak into the evidence commit.
+          git reset --hard HEAD
+          git clean -fd
           git pull --rebase origin main
           git push
 
@@ -149,5 +152,8 @@ jobs:
           git add status/history/analyst-output-snapshots-t64.jsonl status/history/paper-portfolio-10k-analyst-t64-cohort.jsonl status/paper-portfolio-10k-analyst-t64-latest.json status/paper-portfolio-10k-analyst-t64-integrity.json
           git diff --cached --quiet && exit 0
           git commit -m 'chore: update isolated threshold-64 net evidence [skip ci]'
+          # Keep only the committed evidence. Runtime side effects are intentionally discarded before rebasing.
+          git reset --hard HEAD
+          git clean -fd
           git pull --rebase origin main
           git push
