@@ -18,7 +18,7 @@ import os
 import urllib.parse
 import urllib.request
 
-VERSION = 'EXECUTION_COST_MODEL_V1_OKX_SWAP_L2'
+VERSION = 'EXECUTION_COST_MODEL_V2_NET_R'
 SUPPORTED_VENUE = 'OKX_USDT_SWAP'
 
 
@@ -104,6 +104,67 @@ def _vwap_for_quote(levels, notional_usdt, base_per_contract):
     return quote_filled / base_filled, quote_filled
 
 
+def round_trip_cost_bps(*, fee_bps, spread_bps, slippage_bps):
+    """Return explicit round-trip trading cost in basis points.
+
+    Inputs are per-side components, matching :func:`estimate`. No fallback fee or
+    slippage is invented here; callers must pass an evidence-backed or explicitly
+    preregistered assumption. Entry and exit each pay fee, half-spread and
+    slippage, hence the factor of two.
+    """
+    fee = _f(fee_bps)
+    spread = _f(spread_bps)
+    slippage = _f(slippage_bps)
+    if fee is None or spread is None or slippage is None:
+        return None
+    if fee < 0 or spread < 0 or slippage < 0:
+        raise ValueError('cost components must be non-negative')
+    return 2.0 * (fee + spread + slippage)
+
+
+def cost_bps_to_r(cost_bps, *, entry, risk_abs):
+    """Convert a round-trip bps cost into R using frozen trade geometry."""
+    cost = _f(cost_bps)
+    px = _f(entry)
+    risk = _f(risk_abs)
+    if cost is None or px is None or risk is None:
+        return None
+    if cost < 0:
+        raise ValueError('cost_bps must be non-negative')
+    if px <= 0 or risk <= 0:
+        raise ValueError('entry and risk_abs must be positive')
+    risk_fraction = risk / px
+    return (cost / 10000.0) / risk_fraction
+
+
+def apply_cost_to_r(gross_r, *, entry, risk_abs, fee_bps, spread_bps, slippage_bps):
+    """Return gross and net R with transparent execution-cost attribution."""
+    gross = _f(gross_r)
+    if gross is None:
+        return None
+    total_bps = round_trip_cost_bps(
+        fee_bps=fee_bps,
+        spread_bps=spread_bps,
+        slippage_bps=slippage_bps,
+    )
+    if total_bps is None:
+        return {
+            'gross_r': gross,
+            'net_r': None,
+            'execution_cost_r': None,
+            'round_trip_cost_bps': None,
+            'validated_cost_inputs': False,
+        }
+    cost_r = cost_bps_to_r(total_bps, entry=entry, risk_abs=risk_abs)
+    return {
+        'gross_r': round(gross, 6),
+        'net_r': round(gross - cost_r, 6),
+        'execution_cost_r': round(cost_r, 6),
+        'round_trip_cost_bps': round(total_bps, 6),
+        'validated_cost_inputs': True,
+    }
+
+
 def estimate(symbol, *, notional_usdt=None, taker_fee_bps=None, venue=None, ua='ATLAS-Research/1.0', getter=_get_json):
     venue = str(venue if venue is not None else os.environ.get('ATLAS_EXECUTION_VENUE', '')).strip().upper()
     raw_fee = taker_fee_bps if taker_fee_bps is not None else os.environ.get('ATLAS_EXECUTION_TAKER_FEE_BPS')
@@ -149,6 +210,12 @@ def estimate(symbol, *, notional_usdt=None, taker_fee_bps=None, venue=None, ua='
     if not contract_ok: blockers.append(contract_basis)
     if not depth_ok: blockers.append('INSUFFICIENT_L2_DEPTH_FOR_NOTIONAL')
 
+    rt_cost = round_trip_cost_bps(
+        fee_bps=fee if fee_ok else None,
+        spread_bps=half_spread_bps,
+        slippage_bps=one_way_slippage,
+    )
+
     return {
         'version': VERSION,
         'symbol': str(symbol).upper().replace('BINANCE:', ''),
@@ -157,11 +224,11 @@ def estimate(symbol, *, notional_usdt=None, taker_fee_bps=None, venue=None, ua='
         'validated': validated,
         'blockers': blockers,
         'research_notional_usdt': round(notional, 2),
-        # profit_engine expects per-side components; 2x these values equals the
-        # estimated round-trip crossing/impact/fee cost.
+        # Per-side components. 2x their sum is the estimated round-trip cost.
         'spread_bps': round(half_spread_bps, 6) if half_spread_bps is not None else None,
         'fee_bps': round(fee, 6) if fee_ok else None,
         'slippage_bps': round(one_way_slippage, 6) if one_way_slippage is not None else None,
+        'round_trip_cost_bps': round(rt_cost, 6) if rt_cost is not None else None,
         'full_spread_bps': round(full_spread_bps, 6) if full_spread_bps is not None else None,
         'buy_vwap': buy_vwap,
         'sell_vwap': sell_vwap,
