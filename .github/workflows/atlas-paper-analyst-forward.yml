@@ -1,4 +1,4 @@
-# Canonical forward evaluator for the deployed analyst_output contract.
+# Canonical forward evaluator plus isolated threshold-64 evidence collection.
 name: ATLAS Analyst Forward Evaluation
 
 on:
@@ -9,9 +9,12 @@ on:
       - 'paper_portfolio_10k_analyst_output.py'
       - 'analyst_forward_attribution.py'
       - 'atlas_product_readiness_gate.py'
+      - 'execution_cost_model.py'
+      - 'tests/test_execution_cost_model.py'
       - 'tests/test_analyst_forward_attribution.py'
       - 'tests/test_atlas_product_readiness_gate.py'
       - 'status/paper-portfolio-10k-analyst-manifest.json'
+      - 'status/paper-portfolio-10k-analyst-t64-manifest.json'
       - '.github/workflows/atlas-paper-analyst-forward.yml'
   schedule:
     - cron: '25 * * * *'
@@ -32,10 +35,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Validate canonical contracts, attribution, and readiness safety
+      - name: Validate canonical contracts, attribution, readiness, and execution cost safety
         run: |
           set -euo pipefail
-          python3 -m py_compile analyst_output_forward_capture.py paper_portfolio_10k_analyst_output.py analyst_forward_attribution.py atlas_product_readiness_gate.py tests/test_analyst_forward_attribution.py tests/test_atlas_product_readiness_gate.py
+          python3 -m py_compile analyst_output_forward_capture.py paper_portfolio_10k_analyst_output.py analyst_forward_attribution.py atlas_product_readiness_gate.py execution_cost_model.py tests/test_execution_cost_model.py tests/test_analyst_forward_attribution.py tests/test_atlas_product_readiness_gate.py
           python3 - <<'PY'
           import paper_portfolio_10k_analyst_output as p
           import analyst_forward_attribution as a
@@ -57,19 +60,17 @@ jobs:
           assert gate['claim_policy']['may_claim_profitable'] is False
           print('ANALYST_FORWARD_ATTRIBUTION_READINESS_SELF_TEST_OK')
           PY
+          python3 -m pytest -q tests/test_execution_cost_model.py
       - name: Capture deployed analyst output
         run: |
           set -euo pipefail
           python3 analyst_output_forward_capture.py
       - name: Run prospective 4-12H evaluator on dedicated history
+        env:
+          ATLAS_ANALYST_HISTORY: status/history/analyst-output-snapshots.jsonl
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          import pathlib
-          import paper_portfolio_10k_analyst_output as p
-          p.HISTORY = pathlib.Path('status/history/analyst-output-snapshots.jsonl')
-          p.main()
-          PY
+          python3 paper_portfolio_10k_analyst_output.py
           python3 - <<'PY'
           import json
           x=json.load(open('status/paper-portfolio-10k-analyst-latest.json'))
@@ -78,6 +79,7 @@ jobs:
           assert x['evaluation_horizons']==['4h','8h','12h']
           assert x['paper_only'] is True and x['live_execution'] is False
           assert x['can_override_production'] is False
+          assert x['production_threshold_unchanged']==68
           print('PORTFOLIO',json.dumps(x['portfolio'],sort_keys=True))
           print('CHECKPOINTS',json.dumps(x['checkpoint_summary'],sort_keys=True))
           PY
@@ -111,7 +113,7 @@ jobs:
           assert x['claim_policy']['may_claim_profitable'] is False
           print('PRODUCT_READINESS',json.dumps({'state':x['state'],'technical_ready':x['technical_ready'],'forward_evidence_ready':x['forward_evidence_ready'],'blockers':[b['name'] for b in x['blockers']]},sort_keys=True))
           PY
-      - name: Commit capture, evidence, attribution, and readiness when changed
+      - name: Commit canonical capture and evidence when changed
         run: |
           set -euo pipefail
           git config user.name 'atlas-forward-evidence-bot'
@@ -119,5 +121,75 @@ jobs:
           git add status/history/analyst-output-snapshots.jsonl status/paper-portfolio-10k-analyst-latest.json status/paper-portfolio-10k-analyst-integrity.json status/history/paper-portfolio-10k-analyst-cohort.jsonl status/analyst-forward-attribution-latest.json status/product-readiness-latest.json
           if git diff --cached --quiet; then exit 0; fi
           git commit -m 'chore: update canonical analyst forward evidence [skip ci]'
+          git pull --rebase origin main
+          git push
+
+  collect_threshold_64:
+    needs: evaluate
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Start isolated local T64 decision service
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/atlas-t64 && mkdir -p /tmp/atlas-t64
+          env PORT=8765 \
+              ATLAS_DATA_DIR=/tmp/atlas-t64 \
+              ATLAS_CLOUD_FORWARD_MIN_SCORE=64 \
+              ATLAS_CLOUD_FORWARD_ENABLED=0 \
+              python3 collector_server.py >/tmp/atlas-t64-server.log 2>&1 &
+          echo $! >/tmp/atlas-t64-server.pid
+          for i in $(seq 1 30); do
+            if curl -fsS --max-time 10 'http://127.0.0.1:8765/api/decision/current?symbol=BTCUSDT' >/tmp/atlas-t64-probe.json; then break; fi
+            sleep 2
+          done
+          test -s /tmp/atlas-t64-probe.json || { cat /tmp/atlas-t64-server.log; exit 1; }
+      - name: Capture isolated threshold-64 analyst output
+        env:
+          ATLAS_ANALYST_CAPTURE_BASE: http://127.0.0.1:8765
+          ATLAS_ANALYST_CAPTURE_OUT: status/history/analyst-output-snapshots-t64.jsonl
+          ATLAS_ANALYST_CAPTURE_SCHEMA: ATLAS_ANALYST_OUTPUT_FORWARD_CAPTURE_V2_T64
+          ATLAS_ANALYST_CAPTURE_COHORT_LABEL: EVIDENCE_T64
+        run: |
+          set -euo pipefail
+          python3 analyst_output_forward_capture.py
+      - name: Evaluate isolated threshold-64 cohort
+        env:
+          ATLAS_ANALYST_MANIFEST: status/paper-portfolio-10k-analyst-t64-manifest.json
+          ATLAS_ANALYST_HISTORY: status/history/analyst-output-snapshots-t64.jsonl
+          ATLAS_ANALYST_COHORT: status/history/paper-portfolio-10k-analyst-t64-cohort.jsonl
+          ATLAS_ANALYST_LATEST: status/paper-portfolio-10k-analyst-t64-latest.json
+          ATLAS_ANALYST_INTEGRITY: status/paper-portfolio-10k-analyst-t64-integrity.json
+          ATLAS_ANALYST_PORTFOLIO_SCHEMA: ATLAS_PAPER_10K_ANALYST_OUTPUT_V2_T64
+          ATLAS_ANALYST_ENTRY_SCHEMA: ATLAS_PAPER_10K_ANALYST_ENTRY_V2_T64
+          ATLAS_ANALYST_COHORT_LABEL: EVIDENCE_T64
+        run: |
+          set -euo pipefail
+          python3 paper_portfolio_10k_analyst_output.py
+          python3 - <<'PY'
+          import json
+          m=json.load(open('status/paper-portfolio-10k-analyst-t64-manifest.json'))
+          x=json.load(open('status/paper-portfolio-10k-analyst-t64-latest.json'))
+          assert m['manifest_hash']=='77d503f614f0557e312716629b510ced6630334fb664255c07330f6c367057f0'
+          assert m['production_threshold']==68 and m['experimental_threshold']==64
+          assert m['production_eligible'] is False and m['can_override_production'] is False
+          assert x['manifest_hash']==m['manifest_hash']
+          assert x['experimental_threshold']==64 and x['production_threshold_unchanged']==68
+          assert x['cohort_label']=='EVIDENCE_T64' and x['production_eligible'] is False
+          assert all(t['manifest_hash']==m['manifest_hash'] for t in x['trades'])
+          print('T64_PORTFOLIO',json.dumps(x['portfolio'],sort_keys=True))
+          PY
+      - name: Commit isolated T64 evidence when changed
+        run: |
+          set -euo pipefail
+          kill "$(cat /tmp/atlas-t64-server.pid)" 2>/dev/null || true
+          git config user.name 'atlas-forward-evidence-bot'
+          git config user.email 'atlas-forward-evidence-bot@users.noreply.github.com'
+          git add status/history/analyst-output-snapshots-t64.jsonl status/history/paper-portfolio-10k-analyst-t64-cohort.jsonl status/paper-portfolio-10k-analyst-t64-latest.json status/paper-portfolio-10k-analyst-t64-integrity.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'chore: update isolated threshold-64 evidence [skip ci]'
           git pull --rebase origin main
           git push
