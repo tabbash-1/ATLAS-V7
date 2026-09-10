@@ -162,8 +162,15 @@ jobs:
           grep -q '"score_or_threshold_changed_by_release": False' atlas_release_contract.py
           grep -q 'ATLAS_CANONICAL_GEOMETRY_TRUTH_V1' canonical_geometry_overlay.py
           grep -q 'RECOMPUTED_FROM_EXACT_ENTRY_STOP_TARGET' canonical_geometry_overlay.py
-          ! grep -q 'TRADE READY' atlas-paper-portfolio-ui.js
-          ! grep -qi 'execution stays WAIT' atlas-unified-terminal-polish.js
-          grep -q 'Research Shadow Cohorts' atlas-research-validation-ui.js
-          grep -q 'Canonical Forward Evaluation' atlas-paper-portfolio-ui.js
+          PYTHONPATH=. python - <<'PY'
+          from tests.test_user_facing_analyzer_semantics import (
+              test_unified_polish_has_no_execution_language,
+              test_canonical_forward_ui_is_distinct_and_stale_aware,
+              test_research_ui_is_explicit_shadow_cohort,
+          )
+          test_unified_polish_has_no_execution_language()
+          test_canonical_forward_ui_is_distinct_and_stale_aware()
+          test_research_ui_is_explicit_shadow_cohort()
+          print('USER_FACING_SEMANTIC_SAFETY: PASS')
+          PY
           echo 'ATLAS V1.0 RELEASE GATE: PASS — READY FOR ANALYSIS; FORWARD EVIDENCE REMAINS SEPARATE'
