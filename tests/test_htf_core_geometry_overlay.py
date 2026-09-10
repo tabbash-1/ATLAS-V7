@@ -35,6 +35,9 @@ def test_long_geometry_uses_htf_structure_and_rr():
     assert g['tp1']==105.5
     assert g['tp2']==112.0
     assert g['rr_tp1'] >= 1.0
+    assert g['extended_target'] > g['tp2']
+    assert g['rr_extended'] > g['rr_tp2']
+    assert g['extended_target_evidence_only'] is True
     assert g['geometry_provenance']['direction_authority']=='HTF_12H_4H'
     assert g['geometry_provenance']['stop_reference_timeframe']=='4h'
     assert g['geometry_provenance']['tp1_reference_timeframe']=='4h'
@@ -49,6 +52,8 @@ def test_short_geometry_uses_htf_structure_and_rr():
     assert g['tp1']==94.5
     assert g['tp2']==89.0
     assert g['rr_tp1'] >= 1.0
+    assert g['extended_target'] < g['tp2']
+    assert g['rr_extended'] > g['rr_tp2']
 
 
 def test_opposed_one_hour_confirmation_withholds_geometry():
@@ -79,6 +84,8 @@ def test_install_promotes_only_aligned_htf_geometry_and_preserves_score_threshol
     assert out['trade_plan']['geometry_authority']=='HTF_4H_12H'
     assert out['trade_plan']['legacy_entry_geometry']['geometry_provenance']['geometry_version']=='LEGACY_1H'
     assert out['entry']==out['htf_core_geometry']['entry']
+    assert out['extended_target']==out['htf_core_geometry']['extended_target']
+    assert out['trade_plan']['extended_target_evidence_only'] is True
     assert out['score']==76.0 and out['signal_threshold']==68.0
     assert out['htf_core_geometry_score_preserved'] is True
     assert out['htf_core_geometry_threshold_preserved'] is True
