@@ -9,7 +9,9 @@ on:
       - 'analyst_forward_attribution.py'
       - 'atlas_product_readiness_gate.py'
       - 'execution_cost_model.py'
+      - 'final_trade_ready_guard.py'
       - 'tests/test_execution_cost_model.py'
+      - 'tests/test_final_trade_ready_guard.py'
       - 'status/paper-portfolio-10k-analyst-manifest.json'
       - 'status/paper-portfolio-10k-analyst-t64-manifest.json'
       - '.github/workflows/atlas-paper-analyst-forward.yml'
@@ -34,7 +36,8 @@ jobs:
       - name: Validate unchanged canonical lane and cost model
         run: |
           set -euo pipefail
-          python3 -m py_compile analyst_output_forward_capture.py paper_portfolio_10k_analyst_output.py analyst_forward_attribution.py atlas_product_readiness_gate.py execution_cost_model.py
+          python3 -m py_compile analyst_output_forward_capture.py paper_portfolio_10k_analyst_output.py analyst_forward_attribution.py atlas_product_readiness_gate.py execution_cost_model.py final_trade_ready_guard.py
+          python3 tests/test_final_trade_ready_guard.py
           python3 - <<'PY'
           import os, runpy
           import paper_portfolio_10k_analyst_output as p
@@ -57,6 +60,7 @@ jobs:
           ATLAS_ANALYST_HISTORY: status/history/analyst-output-snapshots.jsonl
         run: |
           set -euo pipefail
+          test -z "${ATLAS_EXPERIMENTAL_FINAL_EVIDENCE_PROMOTION:-}"
           python3 analyst_output_forward_capture.py
           python3 paper_portfolio_10k_analyst_output.py
           python3 analyst_forward_attribution.py
@@ -94,7 +98,7 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf /tmp/atlas-t64 && mkdir -p /tmp/atlas-t64
-          env PORT=8765 ATLAS_DATA_DIR=/tmp/atlas-t64 ATLAS_CLOUD_FORWARD_MIN_SCORE=64 ATLAS_CLOUD_FORWARD_ENABLED=0 python3 cloud_web_only_final.py >/tmp/atlas-t64-server.log 2>&1 &
+          env PORT=8765 ATLAS_DATA_DIR=/tmp/atlas-t64 ATLAS_CLOUD_FORWARD_MIN_SCORE=64 ATLAS_CLOUD_FORWARD_ENABLED=0 ATLAS_EXPERIMENTAL_FINAL_EVIDENCE_PROMOTION=1 python3 cloud_web_only_final.py >/tmp/atlas-t64-server.log 2>&1 &
           echo $! >/tmp/atlas-t64-server.pid
           for i in $(seq 1 45); do
             curl -fsS --max-time 10 'http://127.0.0.1:8765/api/decision/current?symbol=BTCUSDT' >/tmp/atlas-t64-probe.json && break
@@ -103,10 +107,12 @@ jobs:
           test -s /tmp/atlas-t64-probe.json || { cat /tmp/atlas-t64-server.log; exit 1; }
           python3 - <<'PY'
           import json
-          x=json.load(open('/tmp/atlas-t64-probe.json')); a=x['analyst_output']
+          x=json.load(open('/tmp/atlas-t64-probe.json')); a=x['analyst_output']; g=x['final_trade_gate']
           assert x['ok'] is True and x['canonical_product_contract']=='analyst_output'
           assert a['horizon']=='4-12H' and float(a['signal_threshold'])==64.0
           assert a['analysis_only'] is True and a['live_execution'] is False
+          assert g['experimental_final_evidence_promotion'] is True
+          assert g['score_changed'] is False and g['threshold_changed'] is False
           print('T64_CANONICAL_PATH_OK')
           PY
       - name: Capture and evaluate isolated T64 cohort
@@ -147,7 +153,7 @@ jobs:
                   try: sc=float(sc); scores.append((sc,sym,cand,row.get('captured_at'),gate.get('primary_blocker')))
                   except Exception: pass
                   for b in (gate.get('blockers') or []): blockers[str(b)]+=1
-                  recent.append({'captured_at':row.get('captured_at'),'symbol':sym,'analyst_decision':dec,'candidate_direction':cand,'score':sc if isinstance(sc,(int,float)) else (d or {}).get('score'),'threshold':(d or {}).get('signal_threshold'),'final_gate_primary_blocker':gate.get('primary_blocker'),'final_gate_blockers':gate.get('blockers') or [],'product_direction':gate.get('product_direction'),'entry_confirmation_direction':gate.get('entry_confirmation_direction'),'direction_alignment':gate.get('direction_alignment'),'production_signal_qualified':gate.get('production_signal_qualified'),'canonical_geometry_ready':gate.get('canonical_geometry_ready')})
+                  recent.append({'captured_at':row.get('captured_at'),'symbol':sym,'analyst_decision':dec,'candidate_direction':cand,'score':sc if isinstance(sc,(int,float)) else (d or {}).get('score'),'threshold':(d or {}).get('signal_threshold'),'final_gate_primary_blocker':gate.get('primary_blocker'),'final_gate_blockers':gate.get('blockers') or [],'product_direction':gate.get('product_direction'),'entry_confirmation_direction':gate.get('entry_confirmation_direction'),'direction_alignment':gate.get('direction_alignment'),'production_signal_qualified':gate.get('production_signal_qualified'),'canonical_geometry_ready':gate.get('canonical_geometry_ready'),'stale_pre_final_wait_bypassed':gate.get('stale_pre_final_wait_bypassed')})
           x=json.load(open(latest))
           x['decision_diagnostics']={'snapshot_rows':len(rows),'symbol_observations':sum(counts.values()),'analyst_decisions':dict(counts),'candidate_directions':dict(candidates),'final_gate_blockers':dict(blockers),'score_max':max((s[0] for s in scores),default=None),'score_ge_64':sum(s[0]>=64 for s in scores),'top_scores':[{'score':s,'symbol':sym,'candidate_direction':cand,'captured_at':ts,'primary_blocker':pb} for s,sym,cand,ts,pb in sorted(scores,reverse=True)[:20]],'recent_observations':recent[-32:]}
           with open(latest,'w',encoding='utf-8') as f: json.dump(x,f,indent=2,sort_keys=True)
