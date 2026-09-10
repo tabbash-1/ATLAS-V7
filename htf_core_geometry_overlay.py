@@ -9,12 +9,17 @@ A legacy WAIT may be cleared only when the raw Production score was already
 qualified and the sole blocker came from the superseded short-horizon geometry.
 Consensus, threshold, data-health, reliability and quality vetoes are never
 cleared here.
+
+The extended target is informational/evidence-only. It never replaces canonical
+TP2, never changes trade readiness, and never changes settlement semantics.
 """
 from __future__ import annotations
 
-VERSION = 'HTF_CORE_GEOMETRY_V2_LEGACY_WAIT_CLEARANCE'
+VERSION = 'HTF_CORE_GEOMETRY_V3_EXTENDED_TARGET'
 PRODUCT_HORIZON = '4-12H'
 MIN_RR = 1.0
+EXTENDED_MIN_R = 3.5
+EXTENDED_ATR12_MULT = 1.5
 LEGACY_GEOMETRY_ONLY_BLOCKERS = frozenset({
     'RR_BELOW_ONE_TO_ONE',
     'GEOMETRY_INCOMPLETE',
@@ -51,6 +56,26 @@ def _candidate_levels(pa4, pa12, direction, entry):
             items.append({'timeframe':tf,'price':price,'zone':zone})
     items.sort(key=lambda x:x['price'], reverse=(direction=='SHORT'))
     return items
+
+
+def _extended_target(entry, risk, atr12, tp2, direction):
+    """Project a farther 4-12H runner without changing canonical TP2.
+
+    The runner must be beyond TP2 and is supported by both a minimum R expansion
+    and a 12H volatility expansion. This is evidence-only until forward outcomes
+    demonstrate that the extra room is useful.
+    """
+    s=1 if direction=='LONG' else -1
+    by_r=entry+s*risk*EXTENDED_MIN_R
+    by_atr=entry+s*atr12*EXTENDED_ATR12_MULT
+    candidate=by_r if abs(by_r-entry)>=abs(by_atr-entry) else by_atr
+    minimum_beyond_tp2=tp2+s*max(risk*.5,atr12*.20)
+    if abs(candidate-entry)<abs(minimum_beyond_tp2-entry):
+        candidate=minimum_beyond_tp2
+    rr=_rr(entry, entry-s*risk, candidate)
+    move_pct=abs(candidate-entry)/abs(entry)*100 if entry else None
+    basis='MAX_3_5R_OR_1_5_12H_ATR_BEYOND_TP2'
+    return candidate, rr, move_pct, basis
 
 
 def build(row):
@@ -131,6 +156,7 @@ def build(row):
     else:
         tp2=entry+s*max(risk*2.0,atr12*.8); tp2_basis='2R_OR_0_8_12H_ATR_EXTENSION'
     rr2=_rr(entry,stop,tp2)
+    extended_target, rr_extended, extended_move_pct, extended_basis = _extended_target(entry,risk,atr12,tp2,direction)
 
     provenance={
         'geometry_version':VERSION,
@@ -139,6 +165,8 @@ def build(row):
         'stop_basis':'NEAREST_4H_12H_STRUCTURAL_INVALIDATION_PLUS_0_15_4H_ATR',
         'tp1_basis':'NEAREST_4H_12H_STRUCTURAL_TARGET',
         'tp2_basis':tp2_basis,
+        'extended_target_basis':extended_basis,
+        'extended_target_role':'EVIDENCE_ONLY_RUNNER_NOT_CANONICAL_EXIT',
         'stop_reference_timeframe':stop_ref['timeframe'],
         'stop_reference_zone':stop_ref['zone'],
         'tp1_reference_timeframe':targets[0]['timeframe'],
@@ -151,6 +179,9 @@ def build(row):
         **base,'status':'READY','reason':'HTF_DIRECTION_AND_GEOMETRY_ALIGNED','ready':True,
         'entry_mode':entry_mode,'entry':round(entry,10),'stop_loss':round(stop,10),
         'tp1':round(tp1,10),'tp2':round(tp2,10),'rr_tp1':round(rr1,3),'rr_tp2':round(rr2,3),
+        'extended_target':round(extended_target,10),'rr_extended':round(rr_extended,3),
+        'extended_move_pct':round(extended_move_pct,3) if extended_move_pct is not None else None,
+        'extended_target_basis':extended_basis,'extended_target_evidence_only':True,
         'geometry_provenance':provenance,
         'entry_trigger': selected.get('trigger_condition') or thesis.get('trigger'),
         'invalidation': selected.get('invalidation_condition') or '4H/12H structural invalidation is breached.',
@@ -200,9 +231,12 @@ def install(atlas):
                 'entry':geom.get('entry'),'stop_loss':geom.get('stop_loss'),'tp1':geom.get('tp1'),'tp2':geom.get('tp2'),
                 'rr_tp1':geom.get('rr_tp1'),'rr_tp2':geom.get('rr_tp2'),'entry_trigger':geom.get('entry_trigger'),
                 'invalidation':geom.get('invalidation'),'geometry_provenance':geom.get('geometry_provenance'),
-                'geometry_authority':'HTF_4H_12H',
+                'geometry_authority':'HTF_4H_12H','extended_target':geom.get('extended_target'),
+                'rr_extended':geom.get('rr_extended'),'extended_move_pct':geom.get('extended_move_pct'),
+                'extended_target_basis':geom.get('extended_target_basis'),'extended_target_evidence_only':True,
             })
             row['entry']=geom.get('entry'); row['stop_loss']=geom.get('stop_loss'); row['take_profit']=geom.get('tp2'); row['risk_reward']=geom.get('rr_tp2')
+            row['extended_target']=geom.get('extended_target'); row['extended_target_rr']=geom.get('rr_extended'); row['extended_target_move_pct']=geom.get('extended_move_pct')
             can_clear, legacy_reason=_legacy_geometry_only_wait(row)
             if can_clear:
                 row['pre_htf_geometry_actionable_decision']=row.get('actionable_decision')
@@ -214,7 +248,6 @@ def install(atlas):
                 row['setup_ready']=True
                 row['opportunity_state']='ACTIONABLE'
                 row['opportunity_state_reason']='RAW_SCORE_QUALIFIED_HTF_DIRECTION_AND_GEOMETRY_READY'
-                # Execution routing remains disabled; this is an analysis signal promotion only.
                 row['execution_ready']=False
                 row['htf_analysis_promotion_only']=True
         elif row.get('actionable_decision') in ('LONG','SHORT'):
@@ -230,6 +263,7 @@ def install(atlas):
     atlas.HTF_CORE_GEOMETRY_STATE={
         'enabled':True,'version':VERSION,'product_horizon':PRODUCT_HORIZON,'min_rr':MIN_RR,
         'requires_direction_alignment':True,'uses_timeframes':['4h','12h'],
+        'extended_target':{'enabled':True,'evidence_only':True,'min_r':EXTENDED_MIN_R,'atr12_mult':EXTENDED_ATR12_MULT,'can_override_tp2':False},
         'legacy_geometry_only_wait_clearance':sorted(LEGACY_GEOMETRY_ONLY_BLOCKERS),
         'can_clear_consensus_wait':False,'can_clear_threshold_wait':False,'can_clear_data_wait':False,
         'score_threshold_unchanged':True,'analysis_only':True,'live_execution':False,
