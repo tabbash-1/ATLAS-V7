@@ -17,7 +17,7 @@ import os
 from canonical_decision_contract import from_decision
 from golden_thesis_engine import VERSION as GOLDEN_THESIS_VERSION, build as build_golden_thesis
 
-VERSION = "FINAL_TRADE_READY_GUARD_V2_EXPERIMENTAL_STALE_WAIT_ISOLATION"
+VERSION = "FINAL_TRADE_READY_GUARD_V3_EXPERIMENTAL_GEOMETRY_RESTORE"
 PRODUCT_HORIZON = "4-12H"
 EXPERIMENTAL_PROMOTION_ENV = "ATLAS_EXPERIMENTAL_FINAL_EVIDENCE_PROMOTION"
 
@@ -51,6 +51,42 @@ def _geometry_ready(row):
     return bool(legacy.get("qualified")), _norm(legacy.get("reason") or "GEOMETRY_NOT_READY")
 
 
+def _candidate_plan_geometry(row, direction):
+    """Return a complete, directionally valid candidate plan or a fail-closed reason."""
+    analyst = row.get("analyst_output") or {}
+    plan = analyst.get("candidate_plan") or {}
+    if not isinstance(plan, dict):
+        return None, "EXPERIMENTAL_CANDIDATE_PLAN_INCOMPLETE"
+    try:
+        entry = float(plan.get("entry"))
+        stop = float(plan.get("stop_loss"))
+        target = float(plan.get("take_profit"))
+    except (TypeError, ValueError):
+        return None, "EXPERIMENTAL_CANDIDATE_PLAN_INCOMPLETE"
+    risk = abs(entry - stop)
+    if risk <= 0:
+        return None, "EXPERIMENTAL_CANDIDATE_PLAN_INVALID_GEOMETRY"
+    if direction == "LONG" and not (stop < entry < target):
+        return None, "EXPERIMENTAL_CANDIDATE_PLAN_INVALID_GEOMETRY"
+    if direction == "SHORT" and not (target < entry < stop):
+        return None, "EXPERIMENTAL_CANDIDATE_PLAN_INVALID_GEOMETRY"
+    rr = plan.get("risk_reward")
+    try:
+        rr = float(rr) if rr is not None else abs(target - entry) / risk
+    except (TypeError, ValueError):
+        rr = abs(target - entry) / risk
+    if rr <= 0:
+        return None, "EXPERIMENTAL_CANDIDATE_PLAN_INVALID_GEOMETRY"
+    return {
+        "entry": entry,
+        "stop_loss": stop,
+        "take_profit": target,
+        "tp1": plan.get("tp1"),
+        "risk_reward": rr,
+        "geometry_provenance": plan.get("geometry_provenance") or {},
+    }, None
+
+
 def assess(row):
     product, entry, alignment, candidate = _direction_state(row)
     action = _norm(row.get("actionable_decision"))
@@ -64,10 +100,6 @@ def assess(row):
     if alignment != "ALIGNED": blockers.append("HTF_4H_12H_NOT_ALIGNED")
     if product in {"LONG", "SHORT"} and entry != product: blockers.append("ENTRY_CONFIRMATION_NOT_ALIGNED")
     if product in {"LONG", "SHORT"} and candidate != product: blockers.append("SCORE_DIRECTION_NOT_HTF_DIRECTION")
-    # A pre-final LONG/SHORT that contradicts the authoritative HTF direction is
-    # always a blocker. A legacy WAIT remains a blocker in Production. Only the
-    # isolated evidence cohort may test whether that WAIT is stale/redundant when
-    # all authoritative final evidence below independently passes.
     if action in {"LONG", "SHORT"}:
         if product in {"LONG", "SHORT"} and action != product: blockers.append("ACTION_NOT_HTF_DIRECTION")
     elif not experimental_promotion:
@@ -76,9 +108,15 @@ def assess(row):
     if not geometry_ready: blockers.append(geometry_reason or "CANONICAL_GEOMETRY_NOT_READY")
     if quality_blocked: blockers.append("SETUP_QUALITY_GATE_BLOCKED")
     if degraded: blockers.append("DATA_DEGRADED")
+    candidate_geometry = None
+    stale_wait_candidate = bool(experimental_promotion and action not in {"LONG", "SHORT"})
+    if stale_wait_candidate and not blockers and product in {"LONG", "SHORT"}:
+        candidate_geometry, candidate_geometry_error = _candidate_plan_geometry(row, product)
+        if candidate_geometry_error:
+            blockers.append(candidate_geometry_error)
     blockers = list(dict.fromkeys(x for x in blockers if x))
     ready = not blockers
-    stale_wait_bypassed = bool(experimental_promotion and action not in {"LONG", "SHORT"} and ready)
+    stale_wait_bypassed = bool(stale_wait_candidate and ready)
     return {
         "version": VERSION,
         "status": "TRADE_READY" if ready else "WAIT",
@@ -99,6 +137,8 @@ def assess(row):
         "threshold_changed": False,
         "experimental_final_evidence_promotion": experimental_promotion,
         "stale_pre_final_wait_bypassed": stale_wait_bypassed,
+        "experimental_candidate_geometry_restored": bool(stale_wait_bypassed and candidate_geometry),
+        "candidate_geometry": candidate_geometry if stale_wait_bypassed else None,
         "can_promote_wait": experimental_promotion,
         "paper_trade_eligible": ready,
         "analysis_only": True,
@@ -161,6 +201,16 @@ def apply(row):
             analyst["final_trade_gate"] = gate
             analyst["analysis_ready"] = True
             analyst["decision"] = gate["direction"]
+            if gate.get("stale_pre_final_wait_bypassed"):
+                restored = gate.get("candidate_geometry") or {}
+                analyst.update({
+                    "entry": restored.get("entry"),
+                    "stop_loss": restored.get("stop_loss"),
+                    "take_profit": restored.get("take_profit"),
+                    "tp1": restored.get("tp1"),
+                    "risk_reward": restored.get("risk_reward"),
+                    "geometry_provenance": restored.get("geometry_provenance") or {},
+                })
             row["analyst_output"] = analyst
         plan = row.get("trade_plan")
         if isinstance(plan, dict):
