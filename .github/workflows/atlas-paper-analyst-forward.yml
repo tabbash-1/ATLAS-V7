@@ -61,6 +61,7 @@ jobs:
         run: |
           set -euo pipefail
           test -z "${ATLAS_EXPERIMENTAL_FINAL_EVIDENCE_PROMOTION:-}"
+          test -z "${ATLAS_ANALYST_CAPTURE_FREEZE_CANDIDATE_COSTS:-}"
           python3 analyst_output_forward_capture.py
           python3 paper_portfolio_10k_analyst_output.py
           python3 analyst_forward_attribution.py
@@ -121,6 +122,10 @@ jobs:
           ATLAS_ANALYST_CAPTURE_OUT: status/history/analyst-output-snapshots-t64.jsonl
           ATLAS_ANALYST_CAPTURE_SCHEMA: ATLAS_ANALYST_OUTPUT_FORWARD_CAPTURE_V2_T64
           ATLAS_ANALYST_CAPTURE_COHORT_LABEL: EVIDENCE_T64
+          ATLAS_ANALYST_CAPTURE_FREEZE_CANDIDATE_COSTS: '1'
+          ATLAS_EXECUTION_VENUE: OKX_USDT_SWAP
+          ATLAS_EXECUTION_TAKER_FEE_BPS: '5'
+          ATLAS_EXECUTION_RESEARCH_NOTIONAL_USDT: '1000'
           ATLAS_ANALYST_MANIFEST: status/paper-portfolio-10k-analyst-t64-manifest.json
           ATLAS_ANALYST_HISTORY: status/history/analyst-output-snapshots-t64.jsonl
           ATLAS_ANALYST_COHORT: status/history/paper-portfolio-10k-analyst-t64-cohort.jsonl
@@ -136,6 +141,7 @@ jobs:
           python3 paper_portfolio_10k_analyst_output.py
           python3 - <<'PY'
           import collections, datetime as dt, json, math, time
+          from execution_cost_model import cost_bps_to_r
           from offline_production_path_settlement import market_klines, event_from
           history='status/history/analyst-output-snapshots-t64.jsonl'
           latest='status/paper-portfolio-10k-analyst-t64-latest.json'
@@ -153,7 +159,7 @@ jobs:
                   try: sc=float(sc); scores.append((sc,sym,cand,row.get('captured_at'),gate.get('primary_blocker')))
                   except Exception: pass
                   for b in (gate.get('blockers') or []): blockers[str(b)]+=1
-                  recent.append({'captured_at':row.get('captured_at'),'symbol':sym,'analyst_decision':dec,'candidate_direction':cand,'score':sc if isinstance(sc,(int,float)) else (d or {}).get('score'),'threshold':(d or {}).get('signal_threshold'),'final_gate_primary_blocker':gate.get('primary_blocker'),'final_gate_blockers':gate.get('blockers') or [],'product_direction':gate.get('product_direction'),'entry_confirmation_direction':gate.get('entry_confirmation_direction'),'direction_alignment':gate.get('direction_alignment'),'production_signal_qualified':gate.get('production_signal_qualified'),'canonical_geometry_ready':gate.get('canonical_geometry_ready'),'stale_pre_final_wait_bypassed':gate.get('stale_pre_final_wait_bypassed')})
+                  recent.append({'captured_at':row.get('captured_at'),'symbol':sym,'analyst_decision':dec,'candidate_direction':cand,'score':sc if isinstance(sc,(int,float)) else (d or {}).get('score'),'threshold':(d or {}).get('signal_threshold'),'final_gate_primary_blocker':gate.get('primary_blocker'),'final_gate_blockers':gate.get('blockers') or [],'product_direction':gate.get('product_direction'),'entry_confirmation_direction':gate.get('entry_confirmation_direction'),'direction_alignment':gate.get('direction_alignment'),'production_signal_qualified':gate.get('production_signal_qualified'),'canonical_geometry_ready':gate.get('canonical_geometry_ready'),'stale_pre_final_wait_bypassed':gate.get('stale_pre_final_wait_bypassed'),'candidate_cost_validated':((d or {}).get('candidate_execution_cost_snapshot') or {}).get('validated')})
 
           def n(v):
               try:
@@ -188,7 +194,8 @@ jobs:
                           active.pop(sym,None); continue
                       ep=active.get(sym)
                       if ep is None:
-                          ep={'symbol':sym,'started_at':t.isoformat(),'started_at_ms':int(t.timestamp()*1000),'geometry':g,'initial_decision':str(a.get('decision') or 'WAIT').upper(),'initial_blockers':list(gate.get('blockers') or []),'initial_primary_blocker':gate.get('primary_blocker'),'initial_score':sc,'initial_direction_state':direction_state(gate),'initial_product_direction':gate.get('product_direction'),'initial_direction_alignment':gate.get('direction_alignment'),'initial_entry_confirmation_direction':gate.get('entry_confirmation_direction'),'observations':0,'accepted_at':None,'accepted_delay_minutes':None,'max_score':None}
+                          frozen_cost=(d or {}).get('candidate_execution_cost_snapshot') or None
+                          ep={'symbol':sym,'started_at':t.isoformat(),'started_at_ms':int(t.timestamp()*1000),'geometry':g,'initial_decision':str(a.get('decision') or 'WAIT').upper(),'initial_blockers':list(gate.get('blockers') or []),'initial_primary_blocker':gate.get('primary_blocker'),'initial_score':sc,'initial_direction_state':direction_state(gate),'initial_product_direction':gate.get('product_direction'),'initial_direction_alignment':gate.get('direction_alignment'),'initial_entry_confirmation_direction':gate.get('entry_confirmation_direction'),'entry_cost_snapshot':frozen_cost,'observations':0,'accepted_at':None,'accepted_delay_minutes':None,'max_score':None}
                           eps.append(ep); active[sym]=ep
                       ep['observations']+=1
                       if sc is not None: ep['max_score']=sc if ep['max_score'] is None else max(ep['max_score'],sc)
@@ -218,6 +225,32 @@ jobs:
           def summarize(items,h):
               vals=[e['outcomes'][f'{h}h']['r_multiple'] for e in items if e['outcomes'][f'{h}h'].get('matured') and e['outcomes'][f'{h}h'].get('r_multiple') is not None]
               return {'episodes':len(items),'matured':len(vals),'avg_r':round(sum(vals)/len(vals),4) if vals else None,'positive_pct':round(sum(v>0 for v in vals)/len(vals)*100,1) if vals else None,'tp2_hits':sum(e['outcomes'][f'{h}h'].get('status')=='TP2' for e in items if e['outcomes'][f'{h}h'].get('matured')),'sl_hits':sum(e['outcomes'][f'{h}h'].get('status')=='SL' for e in items if e['outcomes'][f'{h}h'].get('matured'))}
+          def cost_summary(items,h):
+              matured=[e for e in items if e['outcomes'][f'{h}h'].get('matured') and e['outcomes'][f'{h}h'].get('r_multiple') is not None]
+              exact=[]
+              for e in matured:
+                  snap=e.get('entry_cost_snapshot') or {}; rt=n(snap.get('round_trip_cost_bps'))
+                  if snap.get('validated') is True and rt is not None:
+                      cr=cost_bps_to_r(rt,entry=e['geometry']['entry'],risk_abs=e['geometry']['risk_abs'])
+                      exact.append(e['outcomes'][f'{h}h']['r_multiple']-cr)
+              sensitivity={}
+              for bps in (10,12,16,20):
+                  vals=[]
+                  for e in matured:
+                      cr=cost_bps_to_r(bps,entry=e['geometry']['entry'],risk_abs=e['geometry']['risk_abs'])
+                      vals.append(e['outcomes'][f'{h}h']['r_multiple']-cr)
+                  sensitivity[f'{bps}bps_round_trip']={'n':len(vals),'avg_net_r':round(sum(vals)/len(vals),4) if vals else None,'positive_pct':round(sum(v>0 for v in vals)/len(vals)*100,1) if vals else None}
+              all_valid=bool(matured) and len(exact)==len(matured)
+              minimum_sample_met=len(matured)>=30
+              return {'matured':len(matured),'exact_cost_validated':len(exact),'all_matured_have_frozen_validated_cost':all_valid,'exact_avg_net_r':round(sum(exact)/len(exact),4) if exact else None,'minimum_matured_sample_required':30,'minimum_sample_met':minimum_sample_met,'exact_net_edge_evaluable':bool(all_valid and minimum_sample_met),'missing_frozen_cost_fail_closed':len(exact)!=len(matured),'sensitivity_only_not_validated_net':sensitivity}
+          def score_band(score):
+              if score is None:return 'UNKNOWN'
+              if score<=67:return '64_67'
+              if score<69:return '68'
+              if score<=71:return '69_71'
+              return '72_PLUS'
+          def evidence_bundle(items):
+              return {f'{h}h':{'gross':summarize(items,h),'cost':cost_summary(items,h)} for h in (4,8,12)}
 
           episodes=build_episodes(False); attach_outcomes(episodes)
           accepted=[e for e in episodes if e['ever_accepted']]; rejected=[e for e in episodes if not e['ever_accepted']]
@@ -229,7 +262,10 @@ jobs:
 
           qualified=build_episodes(True); attach_outcomes(qualified)
           qgroups={state:[e for e in qualified if e['initial_direction_state']==state] for state in ('ALIGNED','UNRESOLVED','OPPOSED','OTHER')}
-          qreport={'schema':'ATLAS_T64_QUALIFIED_SHORT_TRANSITION_EVIDENCE_V1','observational_only':True,'included_in_paper_pnl':False,'can_override_production':False,'qualification_rule':'CANDIDATE_SHORT_AND_SCORE_GTE_64_AND_PRODUCTION_SIGNAL_QUALIFIED_AND_VALID_CANDIDATE_GEOMETRY','independence_rule':'ONE_CONTINUOUS_QUALIFIED_SHORT_RUN_PER_SYMBOL_IS_ONE_EPISODE','qualified_short_episodes':len(qualified),'by_initial_htf_state':{state:{f'{h}h':summarize(group,h) for h in (4,8,12)} for state,group in qgroups.items()},'episodes':qualified}
+          unresolved=qgroups['UNRESOLVED']
+          bands={b:[e for e in unresolved if score_band(e.get('initial_score'))==b] for b in ('64_67','68','69_71','72_PLUS')}
+          sweeps={f'GTE_{cut}':[e for e in unresolved if (e.get('initial_score') or -1)>=cut] for cut in (68,69,70,72)}
+          qreport={'schema':'ATLAS_T64_QUALIFIED_SHORT_TRANSITION_EVIDENCE_V2_SCORE_NET','observational_only':True,'included_in_paper_pnl':False,'can_override_production':False,'qualification_rule':'CANDIDATE_SHORT_AND_SCORE_GTE_64_AND_PRODUCTION_SIGNAL_QUALIFIED_AND_VALID_CANDIDATE_GEOMETRY','independence_rule':'ONE_CONTINUOUS_QUALIFIED_SHORT_RUN_PER_SYMBOL_IS_ONE_EPISODE','qualified_short_episodes':len(qualified),'by_initial_htf_state':{state:{f'{h}h':summarize(group,h) for h in (4,8,12)} for state,group in qgroups.items()},'unresolved_score_bands':{b:evidence_bundle(group) for b,group in bands.items()},'unresolved_threshold_sweep':{k:evidence_bundle(group) for k,group in sweeps.items()},'net_cost_policy':{'exact_net_requires_entry_time_frozen_validated_l2_cost':True,'retroactive_missing_cost':'FAIL_CLOSED_NO_EXACT_NET_CLAIM','sensitivity_round_trip_bps':[10,12,16,20],'sensitivity_role':'ROBUSTNESS_ONLY_NOT_VALIDATED_NET','minimum_matured_sample_required':30},'episodes':qualified}
 
           x=json.load(open(latest))
           x['decision_diagnostics']={'snapshot_rows':len(rows),'symbol_observations':sum(counts.values()),'analyst_decisions':dict(counts),'candidate_directions':dict(candidates),'final_gate_blockers':dict(blockers),'score_max':max((s[0] for s in scores),default=None),'score_ge_64':sum(s[0]>=64 for s in scores),'top_scores':[{'score':s,'symbol':sym,'candidate_direction':cand,'captured_at':ts,'primary_blocker':pb} for s,sym,cand,ts,pb in sorted(scores,reverse=True)[:20]],'recent_observations':recent[-32:]}
@@ -245,6 +281,8 @@ jobs:
           assert x['candidate_short_episode_evidence']['included_in_paper_pnl'] is False
           assert x['qualified_short_transition_evidence']['included_in_paper_pnl'] is False
           assert x['qualified_short_transition_evidence']['can_override_production'] is False
+          assert x['qualified_short_transition_evidence']['net_cost_policy']['retroactive_missing_cost']=='FAIL_CLOSED_NO_EXACT_NET_CLAIM'
+          assert all(not v[f'{h}h']['cost']['exact_net_edge_evaluable'] for v in x['qualified_short_transition_evidence']['unresolved_score_bands'].values() for h in (4,8,12) if v[f'{h}h']['cost']['matured']<30)
           for t in x['trades']:
               assert t['manifest_hash']==m['manifest_hash']
               assert 'execution_cost_snapshot' in t
