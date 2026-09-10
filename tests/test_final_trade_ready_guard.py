@@ -1,3 +1,4 @@
+import os
 import types
 
 import final_trade_ready_guard as guard
@@ -42,6 +43,44 @@ def test_aligned_actionable_is_certified_trade_ready():
     assert r['final_trade_gate']['status'] == 'TRADE_READY'
     assert r['final_trade_gate']['direction'] == 'SHORT'
     assert paper_final.strict_trade_ready(r) is True
+
+
+def test_production_stale_wait_still_fails_closed_by_default():
+    old=os.environ.pop(guard.EXPERIMENTAL_PROMOTION_ENV, None)
+    try:
+        r=guard.apply(base_row(actionable_decision='WAIT'))
+        assert r['trade_ready'] is False
+        assert 'PRE_FINAL_DECISION_NOT_ACTIONABLE' in r['final_trade_gate']['blockers']
+        assert r['final_trade_gate']['experimental_final_evidence_promotion'] is False
+    finally:
+        if old is not None: os.environ[guard.EXPERIMENTAL_PROMOTION_ENV]=old
+
+
+def test_isolated_evidence_can_bypass_only_stale_pre_final_wait():
+    old=os.environ.get(guard.EXPERIMENTAL_PROMOTION_ENV)
+    os.environ[guard.EXPERIMENTAL_PROMOTION_ENV]='1'
+    try:
+        r=guard.apply(base_row(actionable_decision='WAIT'))
+        assert r['trade_ready'] is True
+        assert r['final_trade_gate']['direction'] == 'SHORT'
+        assert r['final_trade_gate']['stale_pre_final_wait_bypassed'] is True
+        assert r['final_trade_gate']['score_changed'] is False
+        assert r['final_trade_gate']['threshold_changed'] is False
+    finally:
+        if old is None: os.environ.pop(guard.EXPERIMENTAL_PROMOTION_ENV, None)
+        else: os.environ[guard.EXPERIMENTAL_PROMOTION_ENV]=old
+
+
+def test_experimental_bypass_does_not_override_real_safety_blocker():
+    old=os.environ.get(guard.EXPERIMENTAL_PROMOTION_ENV)
+    os.environ[guard.EXPERIMENTAL_PROMOTION_ENV]='1'
+    try:
+        r=guard.apply(base_row(actionable_decision='WAIT', setup_quality_gate={'status':'BLOCK'}))
+        assert r['trade_ready'] is False
+        assert 'SETUP_QUALITY_GATE_BLOCKED' in r['final_trade_gate']['blockers']
+    finally:
+        if old is None: os.environ.pop(guard.EXPERIMENTAL_PROMOTION_ENV, None)
+        else: os.environ[guard.EXPERIMENTAL_PROMOTION_ENV]=old
 
 
 def test_unresolved_product_direction_fails_closed_and_collapses_nested_plan():
