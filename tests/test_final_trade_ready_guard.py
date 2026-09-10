@@ -1,5 +1,9 @@
 import os
+import pathlib
+import sys
 import types
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 import final_trade_ready_guard as guard
 import paper_portfolio_10k_final as paper_final
