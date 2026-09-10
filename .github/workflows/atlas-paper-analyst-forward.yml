@@ -146,8 +146,7 @@ jobs:
           counts=collections.Counter(); blockers=collections.Counter(); candidates=collections.Counter(); scores=[]; recent=[]
           for row in rows:
               for sym,d in (row.get('decisions') or {}).items():
-                  a=(d or {}).get('analyst_output') or {}
-                  gate=(d or {}).get('final_trade_gate') or a.get('final_trade_gate') or {}
+                  a=(d or {}).get('analyst_output') or {}; gate=(d or {}).get('final_trade_gate') or a.get('final_trade_gate') or {}
                   dec=str(a.get('decision') or 'MISSING').upper(); counts[dec]+=1
                   cand=str((d or {}).get('candidate_direction') or gate.get('candidate_direction') or 'NONE').upper(); candidates[cand]+=1
                   sc=(d or {}).get('score')
@@ -156,8 +155,6 @@ jobs:
                   for b in (gate.get('blockers') or []): blockers[str(b)]+=1
                   recent.append({'captured_at':row.get('captured_at'),'symbol':sym,'analyst_decision':dec,'candidate_direction':cand,'score':sc if isinstance(sc,(int,float)) else (d or {}).get('score'),'threshold':(d or {}).get('signal_threshold'),'final_gate_primary_blocker':gate.get('primary_blocker'),'final_gate_blockers':gate.get('blockers') or [],'product_direction':gate.get('product_direction'),'entry_confirmation_direction':gate.get('entry_confirmation_direction'),'direction_alignment':gate.get('direction_alignment'),'production_signal_qualified':gate.get('production_signal_qualified'),'canonical_geometry_ready':gate.get('canonical_geometry_ready'),'stale_pre_final_wait_bypassed':gate.get('stale_pre_final_wait_bypassed')})
 
-          # Independent SHORT episodes: a continuous candidate SHORT condition is one event,
-          # not one event per hourly snapshot. Outcomes are observational only and never enter P&L.
           def n(v):
               try:
                   x=float(v); return x if math.isfinite(x) else None
@@ -169,50 +166,60 @@ jobs:
               risk=stop-entry
               if risk<=0:return None
               return {'direction':'SHORT','entry':entry,'stop_loss':stop,'tp1':n(p.get('tp1')) or entry-risk,'tp2':tp,'rr_tp2':n(p.get('risk_reward')) or (entry-tp)/risk,'risk_abs':risk}
-          episodes=[]; active={}
-          for row in rows:
-              ts=row.get('captured_at')
-              try:t=dt.datetime.fromisoformat(str(ts).replace('Z','+00:00'))
-              except Exception:continue
-              if t.tzinfo is None:t=t.replace(tzinfo=dt.timezone.utc)
-              for sym,d in (row.get('decisions') or {}).items():
-                  a=(d or {}).get('analyst_output') or {}; gate=(d or {}).get('final_trade_gate') or a.get('final_trade_gate') or {}
-                  cand=str((d or {}).get('candidate_direction') or gate.get('candidate_direction') or 'NONE').upper(); g=candidate_short_geometry(d)
-                  is_short=(cand=='SHORT' and g is not None)
-                  if not is_short:
-                      active.pop(sym,None); continue
-                  ep=active.get(sym)
-                  if ep is None:
-                      ep={'symbol':sym,'started_at':t.isoformat(),'started_at_ms':int(t.timestamp()*1000),'geometry':g,'initial_decision':str(a.get('decision') or 'WAIT').upper(),'initial_blockers':list(gate.get('blockers') or []),'initial_primary_blocker':gate.get('primary_blocker'),'initial_score':n((d or {}).get('score') or a.get('confidence')),'observations':0,'accepted_at':None,'accepted_delay_minutes':None,'max_score':None}
-                      episodes.append(ep); active[sym]=ep
-                  ep['observations']+=1
-                  sc=n((d or {}).get('score') or a.get('confidence'))
-                  if sc is not None: ep['max_score']=sc if ep['max_score'] is None else max(ep['max_score'],sc)
-                  if ep['accepted_at'] is None and str(a.get('decision') or '').upper()=='SHORT' and not (gate.get('blockers') or []):
-                      ep['accepted_at']=t.isoformat(); ep['accepted_delay_minutes']=round((t-dt.datetime.fromisoformat(ep['started_at'])).total_seconds()/60,1)
-          now_ms=int(time.time()*1000)
-          for ep in episodes:
-              ep['ever_accepted']=ep['accepted_at'] is not None
-              ep['outcomes']={}
-              for h in (4,8,12):
-                  end=ep['started_at_ms']+h*3600_000
-                  if now_ms<end:
-                      ep['outcomes'][f'{h}h']={'matured':False,'r_multiple':None,'status':'NOT_MATURED'}; continue
-                  try:
-                      candles,provider=market_klines(ep['symbol'],'5',ep['started_at_ms'],end)
-                      if not candles: raise RuntimeError('no_5m_candles')
-                      ev,c,_=event_from(candles,ep['geometry'])
-                      if ev=='SL':r=-1.0; status='SL'
-                      elif ev=='TP2':r=float(ep['geometry']['rr_tp2']); status='TP2'
-                      elif ev=='AMBIGUOUS':r=None; status='AMBIGUOUS'
-                      else:
-                          last=float(candles[-1]['close']); r=(ep['geometry']['entry']-last)/ep['geometry']['risk_abs']; status='MARK_TO_MARKET'
-                      ep['outcomes'][f'{h}h']={'matured':True,'r_multiple':None if r is None else round(r,4),'status':status,'positive':None if r is None else r>0,'market_source':provider}
-                  except Exception as exc:
-                      ep['outcomes'][f'{h}h']={'matured':True,'r_multiple':None,'status':'MARKET_DATA_ERROR','error':str(exc)[:300]}
+          def direction_state(gate):
+              pd=str(gate.get('product_direction') or '').upper(); align=str(gate.get('direction_alignment') or '').upper(); bs=set(gate.get('blockers') or [])
+              if pd=='SHORT' and align=='ALIGNED': return 'ALIGNED'
+              if pd=='LONG' or align=='OPPOSED' or 'SCORE_DIRECTION_NOT_HTF_DIRECTION' in bs: return 'OPPOSED'
+              if not pd or 'HTF_PRODUCT_DIRECTION_UNRESOLVED' in bs: return 'UNRESOLVED'
+              return 'OTHER'
+          def build_episodes(qualified_only):
+              eps=[]; active={}
+              for row in rows:
+                  ts=row.get('captured_at')
+                  try:t=dt.datetime.fromisoformat(str(ts).replace('Z','+00:00'))
+                  except Exception:continue
+                  if t.tzinfo is None:t=t.replace(tzinfo=dt.timezone.utc)
+                  for sym,d in (row.get('decisions') or {}).items():
+                      a=(d or {}).get('analyst_output') or {}; gate=(d or {}).get('final_trade_gate') or a.get('final_trade_gate') or {}
+                      cand=str((d or {}).get('candidate_direction') or gate.get('candidate_direction') or 'NONE').upper(); g=candidate_short_geometry(d); sc=n((d or {}).get('score') or a.get('confidence'))
+                      is_short=(cand=='SHORT' and g is not None)
+                      if qualified_only: is_short=is_short and sc is not None and sc>=64 and gate.get('production_signal_qualified') is True
+                      if not is_short:
+                          active.pop(sym,None); continue
+                      ep=active.get(sym)
+                      if ep is None:
+                          ep={'symbol':sym,'started_at':t.isoformat(),'started_at_ms':int(t.timestamp()*1000),'geometry':g,'initial_decision':str(a.get('decision') or 'WAIT').upper(),'initial_blockers':list(gate.get('blockers') or []),'initial_primary_blocker':gate.get('primary_blocker'),'initial_score':sc,'initial_direction_state':direction_state(gate),'initial_product_direction':gate.get('product_direction'),'initial_direction_alignment':gate.get('direction_alignment'),'initial_entry_confirmation_direction':gate.get('entry_confirmation_direction'),'observations':0,'accepted_at':None,'accepted_delay_minutes':None,'max_score':None}
+                          eps.append(ep); active[sym]=ep
+                      ep['observations']+=1
+                      if sc is not None: ep['max_score']=sc if ep['max_score'] is None else max(ep['max_score'],sc)
+                      if ep['accepted_at'] is None and str(a.get('decision') or '').upper()=='SHORT' and not (gate.get('blockers') or []):
+                          ep['accepted_at']=t.isoformat(); ep['accepted_delay_minutes']=round((t-dt.datetime.fromisoformat(ep['started_at'])).total_seconds()/60,1)
+              return eps
+          def attach_outcomes(eps):
+              now_ms=int(time.time()*1000)
+              for ep in eps:
+                  ep['ever_accepted']=ep['accepted_at'] is not None; ep['outcomes']={}
+                  for h in (4,8,12):
+                      end=ep['started_at_ms']+h*3600_000
+                      if now_ms<end:
+                          ep['outcomes'][f'{h}h']={'matured':False,'r_multiple':None,'status':'NOT_MATURED'}; continue
+                      try:
+                          candles,provider=market_klines(ep['symbol'],'5',ep['started_at_ms'],end)
+                          if not candles: raise RuntimeError('no_5m_candles')
+                          ev,c,_=event_from(candles,ep['geometry'])
+                          if ev=='SL':r=-1.0; status='SL'
+                          elif ev=='TP2':r=float(ep['geometry']['rr_tp2']); status='TP2'
+                          elif ev=='AMBIGUOUS':r=None; status='AMBIGUOUS'
+                          else:
+                              last=float(candles[-1]['close']); r=(ep['geometry']['entry']-last)/ep['geometry']['risk_abs']; status='MARK_TO_MARKET'
+                          ep['outcomes'][f'{h}h']={'matured':True,'r_multiple':None if r is None else round(r,4),'status':status,'positive':None if r is None else r>0,'market_source':provider}
+                      except Exception as exc:
+                          ep['outcomes'][f'{h}h']={'matured':True,'r_multiple':None,'status':'MARKET_DATA_ERROR','error':str(exc)[:300]}
           def summarize(items,h):
               vals=[e['outcomes'][f'{h}h']['r_multiple'] for e in items if e['outcomes'][f'{h}h'].get('matured') and e['outcomes'][f'{h}h'].get('r_multiple') is not None]
-              return {'episodes':len(items),'matured':len(vals),'avg_r':round(sum(vals)/len(vals),4) if vals else None,'positive_pct':round(sum(v>0 for v in vals)/len(vals)*100,1) if vals else None}
+              return {'episodes':len(items),'matured':len(vals),'avg_r':round(sum(vals)/len(vals),4) if vals else None,'positive_pct':round(sum(v>0 for v in vals)/len(vals)*100,1) if vals else None,'tp2_hits':sum(e['outcomes'][f'{h}h'].get('status')=='TP2' for e in items if e['outcomes'][f'{h}h'].get('matured')),'sl_hits':sum(e['outcomes'][f'{h}h'].get('status')=='SL' for e in items if e['outcomes'][f'{h}h'].get('matured'))}
+
+          episodes=build_episodes(False); attach_outcomes(episodes)
           accepted=[e for e in episodes if e['ever_accepted']]; rejected=[e for e in episodes if not e['ever_accepted']]
           blocker_groups={}
           for b in sorted({b for e in rejected for b in e['initial_blockers']}):
@@ -220,9 +227,14 @@ jobs:
               blocker_groups[b]={f'{h}h':summarize(group,h) for h in (4,8,12)}
           episode_report={'schema':'ATLAS_T64_SHORT_EPISODE_EVIDENCE_V1','observational_only':True,'included_in_paper_pnl':False,'independence_rule':'ONE_CONTINUOUS_CANDIDATE_SHORT_RUN_PER_SYMBOL_IS_ONE_EPISODE','candidate_short_observations':candidates.get('SHORT',0),'independent_short_episodes':len(episodes),'ever_accepted_episodes':len(accepted),'never_accepted_episodes':len(rejected),'accepted':{f'{h}h':summarize(accepted,h) for h in (4,8,12)},'rejected':{f'{h}h':summarize(rejected,h) for h in (4,8,12)},'rejected_by_initial_blocker_nonexclusive':blocker_groups,'episodes':episodes}
 
+          qualified=build_episodes(True); attach_outcomes(qualified)
+          qgroups={state:[e for e in qualified if e['initial_direction_state']==state] for state in ('ALIGNED','UNRESOLVED','OPPOSED','OTHER')}
+          qreport={'schema':'ATLAS_T64_QUALIFIED_SHORT_TRANSITION_EVIDENCE_V1','observational_only':True,'included_in_paper_pnl':False,'can_override_production':False,'qualification_rule':'CANDIDATE_SHORT_AND_SCORE_GTE_64_AND_PRODUCTION_SIGNAL_QUALIFIED_AND_VALID_CANDIDATE_GEOMETRY','independence_rule':'ONE_CONTINUOUS_QUALIFIED_SHORT_RUN_PER_SYMBOL_IS_ONE_EPISODE','qualified_short_episodes':len(qualified),'by_initial_htf_state':{state:{f'{h}h':summarize(group,h) for h in (4,8,12)} for state,group in qgroups.items()},'episodes':qualified}
+
           x=json.load(open(latest))
           x['decision_diagnostics']={'snapshot_rows':len(rows),'symbol_observations':sum(counts.values()),'analyst_decisions':dict(counts),'candidate_directions':dict(candidates),'final_gate_blockers':dict(blockers),'score_max':max((s[0] for s in scores),default=None),'score_ge_64':sum(s[0]>=64 for s in scores),'top_scores':[{'score':s,'symbol':sym,'candidate_direction':cand,'captured_at':ts,'primary_blocker':pb} for s,sym,cand,ts,pb in sorted(scores,reverse=True)[:20]],'recent_observations':recent[-32:]}
           x['candidate_short_episode_evidence']=episode_report
+          x['qualified_short_transition_evidence']=qreport
           with open(latest,'w',encoding='utf-8') as f: json.dump(x,f,indent=2,sort_keys=True)
           m=json.load(open('status/paper-portfolio-10k-analyst-t64-manifest.json'))
           assert m['manifest_hash']=='2d31a2147e6ff87426cd2b5ea7725ec57fbfa12314e5d32e24599d318ce529e1'
@@ -231,11 +243,14 @@ jobs:
           assert x['production_threshold_unchanged']==68 and x['production_eligible'] is False
           assert x['cost_adjusted']['minimum_matured_sample_required']==30
           assert x['candidate_short_episode_evidence']['included_in_paper_pnl'] is False
+          assert x['qualified_short_transition_evidence']['included_in_paper_pnl'] is False
+          assert x['qualified_short_transition_evidence']['can_override_production'] is False
           for t in x['trades']:
               assert t['manifest_hash']==m['manifest_hash']
               assert 'execution_cost_snapshot' in t
           print('T64_DIAGNOSTICS',json.dumps(x['decision_diagnostics'],sort_keys=True))
           print('T64_SHORT_EPISODES',json.dumps(episode_report,sort_keys=True))
+          print('T64_QUALIFIED_SHORT_TRANSITIONS',json.dumps(qreport,sort_keys=True))
           print('T64_EVIDENCE',{'portfolio':x['portfolio'],'cost_adjusted':x['cost_adjusted']})
           PY
       - name: Commit isolated T64 evidence
