@@ -34,6 +34,11 @@ def base_row(**extra):
         'analyst_output': {
             'decision': 'SHORT', 'analysis_ready': True, 'entry': 100.0, 'stop_loss': 102.0,
             'take_profit': 96.0, 'tp1': 98.0, 'risk_reward': 2.0,
+            'candidate_plan': {
+                'direction': 'SHORT', 'entry': 100.0, 'stop_loss': 102.0,
+                'take_profit': 96.0, 'tp1': 98.0, 'risk_reward': 2.0,
+                'geometry_provenance': {'geometry_version': 'TEST'},
+            },
             'geometry_readiness': {'ready': True, 'reason': 'HTF_DIRECTION_AND_GEOMETRY_ALIGNED'},
         },
     }
@@ -60,16 +65,39 @@ def test_production_stale_wait_still_fails_closed_by_default():
         if old is not None: os.environ[guard.EXPERIMENTAL_PROMOTION_ENV]=old
 
 
-def test_isolated_evidence_can_bypass_only_stale_pre_final_wait():
+def test_isolated_evidence_can_bypass_only_stale_pre_final_wait_and_restore_geometry():
     old=os.environ.get(guard.EXPERIMENTAL_PROMOTION_ENV)
     os.environ[guard.EXPERIMENTAL_PROMOTION_ENV]='1'
     try:
-        r=guard.apply(base_row(actionable_decision='WAIT'))
+        d=base_row(actionable_decision='WAIT')
+        d['analyst_output']=dict(d['analyst_output'])
+        d['analyst_output'].update({'decision':'WAIT','analysis_ready':False,'entry':None,'stop_loss':None,'take_profit':None,'tp1':None,'risk_reward':None})
+        r=guard.apply(d)
         assert r['trade_ready'] is True
         assert r['final_trade_gate']['direction'] == 'SHORT'
         assert r['final_trade_gate']['stale_pre_final_wait_bypassed'] is True
+        assert r['final_trade_gate']['experimental_candidate_geometry_restored'] is True
         assert r['final_trade_gate']['score_changed'] is False
         assert r['final_trade_gate']['threshold_changed'] is False
+        a=r['analyst_output']
+        assert a['decision']=='SHORT' and a['analysis_ready'] is True
+        assert a['entry']==100.0 and a['stop_loss']==102.0 and a['take_profit']==96.0
+        assert a['tp1']==98.0 and a['risk_reward']==2.0
+    finally:
+        if old is None: os.environ.pop(guard.EXPERIMENTAL_PROMOTION_ENV, None)
+        else: os.environ[guard.EXPERIMENTAL_PROMOTION_ENV]=old
+
+
+def test_experimental_bypass_fails_closed_when_candidate_geometry_is_missing():
+    old=os.environ.get(guard.EXPERIMENTAL_PROMOTION_ENV)
+    os.environ[guard.EXPERIMENTAL_PROMOTION_ENV]='1'
+    try:
+        d=base_row(actionable_decision='WAIT')
+        d['analyst_output']=dict(d['analyst_output'])
+        d['analyst_output']['candidate_plan']={'direction':'SHORT','entry':100.0,'stop_loss':102.0,'take_profit':None}
+        r=guard.apply(d)
+        assert r['trade_ready'] is False
+        assert 'EXPERIMENTAL_CANDIDATE_PLAN_INCOMPLETE' in r['final_trade_gate']['blockers']
     finally:
         if old is None: os.environ.pop(guard.EXPERIMENTAL_PROMOTION_ENV, None)
         else: os.environ[guard.EXPERIMENTAL_PROMOTION_ENV]=old
