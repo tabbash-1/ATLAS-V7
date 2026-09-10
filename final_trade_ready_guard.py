@@ -1,22 +1,33 @@
 """ATLAS final fail-closed 4-12H TRADE READY guard.
 
-Installed after every Production decision overlay. It never promotes WAIT, changes
-scores/thresholds, or routes orders. It only certifies an already-actionable
+Installed after every Production decision overlay. By default it never promotes WAIT,
+changes scores/thresholds, or routes orders. It only certifies an already-actionable
 LONG/SHORT when HTF direction, entry confirmation, canonical geometry and raw
 Production qualification all agree. Any contradiction is collapsed to WAIT
 across user-facing/nested plan fields so no stale actionable flag can escape.
+
+An explicitly isolated evidence cohort may opt in to testing whether a stale legacy
+pre-final WAIT is redundant when every authoritative final condition already passes.
+That experiment is disabled by default and cannot change the Production threshold.
 """
 from __future__ import annotations
+
+import os
 
 from canonical_decision_contract import from_decision
 from golden_thesis_engine import VERSION as GOLDEN_THESIS_VERSION, build as build_golden_thesis
 
-VERSION = "FINAL_TRADE_READY_GUARD_V1_HTF_FAIL_CLOSED"
+VERSION = "FINAL_TRADE_READY_GUARD_V2_EXPERIMENTAL_STALE_WAIT_ISOLATION"
 PRODUCT_HORIZON = "4-12H"
+EXPERIMENTAL_PROMOTION_ENV = "ATLAS_EXPERIMENTAL_FINAL_EVIDENCE_PROMOTION"
 
 
 def _norm(v):
     return str(v or "").strip().upper()
+
+
+def _experimental_final_evidence_promotion():
+    return str(os.environ.get(EXPERIMENTAL_PROMOTION_ENV, "")).strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _direction_state(row):
@@ -47,19 +58,27 @@ def assess(row):
     geometry_ready, geometry_reason = _geometry_ready(row)
     quality_blocked = _norm((row.get("setup_quality_gate") or {}).get("status")) == "BLOCK"
     degraded = bool(row.get("data_degraded", False))
+    experimental_promotion = _experimental_final_evidence_promotion()
     blockers = []
     if product not in {"LONG", "SHORT"}: blockers.append("HTF_PRODUCT_DIRECTION_UNRESOLVED")
     if alignment != "ALIGNED": blockers.append("HTF_4H_12H_NOT_ALIGNED")
     if product in {"LONG", "SHORT"} and entry != product: blockers.append("ENTRY_CONFIRMATION_NOT_ALIGNED")
     if product in {"LONG", "SHORT"} and candidate != product: blockers.append("SCORE_DIRECTION_NOT_HTF_DIRECTION")
-    if action not in {"LONG", "SHORT"}: blockers.append("PRE_FINAL_DECISION_NOT_ACTIONABLE")
-    elif product in {"LONG", "SHORT"} and action != product: blockers.append("ACTION_NOT_HTF_DIRECTION")
+    # A pre-final LONG/SHORT that contradicts the authoritative HTF direction is
+    # always a blocker. A legacy WAIT remains a blocker in Production. Only the
+    # isolated evidence cohort may test whether that WAIT is stale/redundant when
+    # all authoritative final evidence below independently passes.
+    if action in {"LONG", "SHORT"}:
+        if product in {"LONG", "SHORT"} and action != product: blockers.append("ACTION_NOT_HTF_DIRECTION")
+    elif not experimental_promotion:
+        blockers.append("PRE_FINAL_DECISION_NOT_ACTIONABLE")
     if not qualified: blockers.append("PRODUCTION_SIGNAL_NOT_QUALIFIED")
     if not geometry_ready: blockers.append(geometry_reason or "CANONICAL_GEOMETRY_NOT_READY")
     if quality_blocked: blockers.append("SETUP_QUALITY_GATE_BLOCKED")
     if degraded: blockers.append("DATA_DEGRADED")
     blockers = list(dict.fromkeys(x for x in blockers if x))
     ready = not blockers
+    stale_wait_bypassed = bool(experimental_promotion and action not in {"LONG", "SHORT"} and ready)
     return {
         "version": VERSION,
         "status": "TRADE_READY" if ready else "WAIT",
@@ -78,7 +97,9 @@ def assess(row):
         "product_horizon": PRODUCT_HORIZON,
         "score_changed": False,
         "threshold_changed": False,
-        "can_promote_wait": False,
+        "experimental_final_evidence_promotion": experimental_promotion,
+        "stale_pre_final_wait_bypassed": stale_wait_bypassed,
+        "can_promote_wait": experimental_promotion,
         "paper_trade_eligible": ready,
         "analysis_only": True,
         "live_execution": False,
@@ -199,6 +220,8 @@ def install(atlas):
         "canonical_decision_contract":"ATLAS_CANONICAL_DECISION_TRUTH_V1",
         "golden_thesis_version":GOLDEN_THESIS_VERSION,"golden_thesis_shadow_only":True,
         "golden_thesis_can_override":False,"analysis_only":True,"live_execution":False,
+        "experimental_final_evidence_promotion_env":EXPERIMENTAL_PROMOTION_ENV,
+        "experimental_final_evidence_promotion_default":False,
     }
     atlas.FINAL_TRADE_READY_GUARD_STATE = state
     return state
