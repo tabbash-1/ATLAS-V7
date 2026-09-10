@@ -58,7 +58,13 @@ def geometry(d):
     if direction=='SHORT' and not(stop>entry>tp):return None
     rr=rr or abs(tp-entry)/risk
     tp1=entry+risk if direction=='LONG' else entry-risk
-    return {'direction':direction,'entry':entry,'stop_loss':stop,'tp1':tp1,'tp2':tp,'rr_tp2':rr,'risk_abs':risk,'product_horizon':'4-12H','canonical_lane':'CORE_4_12H','contract_version':a.get('contract_version')}
+    g={'direction':direction,'entry':entry,'stop_loss':stop,'tp1':tp1,'tp2':tp,'rr_tp2':rr,'risk_abs':risk,'product_horizon':'4-12H','canonical_lane':'CORE_4_12H','contract_version':a.get('contract_version')}
+    htf=(d or {}).get('htf_core_geometry') or {}
+    extended=num(htf.get('extended_target')); rr_extended=num(htf.get('rr_extended')); move_pct=num(htf.get('extended_move_pct'))
+    valid_extended=(extended is not None and ((direction=='LONG' and extended>tp) or (direction=='SHORT' and extended<tp)))
+    if valid_extended:
+        g.update({'extended_target':extended,'rr_extended':rr_extended or abs(extended-entry)/risk,'extended_move_pct':move_pct,'extended_target_basis':htf.get('extended_target_basis'),'extended_target_evidence_only':True})
+    return g
 def eligible(d):
     a=(d or {}).get('analyst_output') or {}; g=geometry(d)
     return bool(g and a.get('analysis_only') is True and a.get('live_execution') is False and str(a.get('decision') or '').upper() in {'LONG','SHORT'})
@@ -86,41 +92,14 @@ def freeze_execution_cost(m,symbol,notional,g,entry_captured_at):
     measured_at=dt.datetime.now(dt.timezone.utc).isoformat()
     try:
         est=execution_cost.estimate(symbol,notional_usdt=notional,taker_fee_bps=fee,venue=venue)
-        return {
-            'schema':'ATLAS_ENTRY_EXECUTION_COST_SNAPSHOT_V1',
-            'entry_captured_at':entry_captured_at,
-            'measured_at':measured_at,
-            'version':est.get('version'),
-            'venue':est.get('venue'),
-            'instrument':est.get('instrument'),
-            'validated':bool(est.get('validated')),
-            'blockers':est.get('blockers') or [],
-            'research_notional_usdt':est.get('research_notional_usdt'),
-            'fee_bps_per_side':est.get('fee_bps'),
-            'half_spread_bps_per_side':est.get('spread_bps'),
-            'slippage_bps_per_side':est.get('slippage_bps'),
-            'round_trip_cost_bps':est.get('round_trip_cost_bps'),
-            'basis':est.get('basis'),
-            'entry':g['entry'],'risk_abs':g['risk_abs'],
-            'paper_only':True,'live_execution':False,
-        }
+        return {'schema':'ATLAS_ENTRY_EXECUTION_COST_SNAPSHOT_V1','entry_captured_at':entry_captured_at,'measured_at':measured_at,'version':est.get('version'),'venue':est.get('venue'),'instrument':est.get('instrument'),'validated':bool(est.get('validated')),'blockers':est.get('blockers') or [],'research_notional_usdt':est.get('research_notional_usdt'),'fee_bps_per_side':est.get('fee_bps'),'half_spread_bps_per_side':est.get('spread_bps'),'slippage_bps_per_side':est.get('slippage_bps'),'round_trip_cost_bps':est.get('round_trip_cost_bps'),'basis':est.get('basis'),'entry':g['entry'],'risk_abs':g['risk_abs'],'paper_only':True,'live_execution':False}
     except Exception as exc:
-        return {
-            'schema':'ATLAS_ENTRY_EXECUTION_COST_SNAPSHOT_V1','entry_captured_at':entry_captured_at,
-            'measured_at':measured_at,'venue':venue or None,'validated':False,
-            'blockers':['EXECUTION_COST_SNAPSHOT_ERROR'],'error':f'{type(exc).__name__}: {exc}'[:500],
-            'fee_bps_per_side':fee,'half_spread_bps_per_side':None,'slippage_bps_per_side':None,
-            'round_trip_cost_bps':None,'entry':g['entry'],'risk_abs':g['risk_abs'],
-            'paper_only':True,'live_execution':False,
-        }
+        return {'schema':'ATLAS_ENTRY_EXECUTION_COST_SNAPSHOT_V1','entry_captured_at':entry_captured_at,'measured_at':measured_at,'venue':venue or None,'validated':False,'blockers':['EXECUTION_COST_SNAPSHOT_ERROR'],'error':f'{type(exc).__name__}: {exc}'[:500],'fee_bps_per_side':fee,'half_spread_bps_per_side':None,'slippage_bps_per_side':None,'round_trip_cost_bps':None,'entry':g['entry'],'risk_abs':g['risk_abs'],'paper_only':True,'live_execution':False}
 
 def cost_adjusted(gross_r,row):
     snap=row.get('execution_cost_snapshot') or {}
     if gross_r is None or snap.get('validated') is not True:return None
-    return execution_cost.apply_cost_to_r(
-        gross_r,entry=row['geometry']['entry'],risk_abs=row['geometry']['risk_abs'],
-        fee_bps=snap.get('fee_bps_per_side'),spread_bps=snap.get('half_spread_bps_per_side'),
-        slippage_bps=snap.get('slippage_bps_per_side'))
+    return execution_cost.apply_cost_to_r(gross_r,entry=row['geometry']['entry'],risk_abs=row['geometry']['risk_abs'],fee_bps=snap.get('fee_bps_per_side'),spread_bps=snap.get('half_spread_bps_per_side'),slippage_bps=snap.get('slippage_bps_per_side'))
 
 def enroll(m,cohort,rows,cursor,equity):
     ids={r['id'] for r in cohort}; state={}; added=[]; newest=cursor; horizon=dt.timedelta(hours=12); risk_pct=float(m['risk_per_trade_pct'])/100
@@ -143,13 +122,19 @@ def enroll(m,cohort,rows,cursor,equity):
             cohort.append(row); added.append(row); ids.add(eid)
     return added,newest
 
+def extended_target_hit(candles,g):
+    target=num(g.get('extended_target'))
+    if target is None:return None
+    if g['direction']=='LONG':return any(num(c.get('high')) is not None and num(c.get('high'))>=target for c in candles)
+    return any(num(c.get('low')) is not None and num(c.get('low'))<=target for c in candles)
+
 def checkpoint(row,h,now_ms):
     start=int(row['captured_at_ms']); end=start+h*3600_000; g=row['geometry']
-    if now_ms<end:return {'checkpoint_h':h,'matured':False,'status':'NOT_MATURED','r_multiple':None}
+    if now_ms<end:return {'checkpoint_h':h,'matured':False,'status':'NOT_MATURED','r_multiple':None,'extended_target_reached':None}
     try:
         candles,provider=market_klines(row['symbol'],'5',start,end)
         if not candles:raise RuntimeError('no_5m_candles')
-        ev,c,tp1=event_from(candles,g)
+        ext_hit=extended_target_hit(candles,g); ev,c,tp1=event_from(candles,g)
         if ev=='AMBIGUOUS' and c:
             one,p1=market_klines(row['symbol'],'1',c['open_time'],c['open_time']+5*60_000-1); ev1,c1,tp11=event_from(one,g); tp1=tp1 or tp11
             if ev1 in {'SL','TP2'}:ev,c=ev1,c1 or c
@@ -159,15 +144,15 @@ def checkpoint(row,h,now_ms):
         elif ev=='AMBIGUOUS':status,r='AMBIGUOUS',None
         else:
             last=candles[-1]['close']; directional=(last-g['entry']) if g['direction']=='LONG' else (g['entry']-last); r=directional/g['risk_abs']; status='MARK_TO_MARKET'
-        return {'checkpoint_h':h,'matured':True,'status':status,'r_multiple':None if r is None else round(float(r),4),'tp1_reached':bool(tp1),'market_source':provider}
-    except Exception as e:return {'checkpoint_h':h,'matured':True,'status':'MARKET_DATA_ERROR','r_multiple':None,'error':str(e)[:500]}
+        return {'checkpoint_h':h,'matured':True,'status':status,'r_multiple':None if r is None else round(float(r),4),'tp1_reached':bool(tp1),'extended_target_reached':ext_hit,'extended_target':g.get('extended_target'),'rr_extended':g.get('rr_extended'),'market_source':provider}
+    except Exception as e:return {'checkpoint_h':h,'matured':True,'status':'MARKET_DATA_ERROR','r_multiple':None,'extended_target_reached':None,'error':str(e)[:500]}
 def settle(row,now_ms):
     start=int(row['captured_at_ms']); end=start+12*3600_000; g=row['geometry']
-    if now_ms<end:return {'status':'OPEN','terminal':False,'r_multiple':None,'exit_at_ms':None}
+    if now_ms<end:return {'status':'OPEN','terminal':False,'r_multiple':None,'exit_at_ms':None,'extended_target_reached':None}
     try:
         candles,provider=market_klines(row['symbol'],'5',start,end)
         if not candles:raise RuntimeError('no_5m_candles')
-        ev,c,tp1=event_from(candles,g)
+        ext_hit=extended_target_hit(candles,g); ev,c,tp1=event_from(candles,g)
         if ev=='AMBIGUOUS' and c:
             one,p1=market_klines(row['symbol'],'1',c['open_time'],c['open_time']+5*60_000-1); ev1,c1,tp11=event_from(one,g); tp1=tp1 or tp11
             if ev1 in {'SL','TP2'}:ev,c=ev1,c1 or c
@@ -178,8 +163,8 @@ def settle(row,now_ms):
         elif ev=='AMBIGUOUS':status,r,terminal,exit_ms='AMBIGUOUS',None,False,None
         else:
             last=candles[-1]['close']; directional=(last-g['entry']) if g['direction']=='LONG' else (g['entry']-last); r=directional/g['risk_abs']; status='EXPIRED_TP1' if tp1 else 'EXPIRED'; terminal=True; exit_ms=end
-        return {'status':status,'terminal':terminal,'r_multiple':None if r is None else round(float(r),4),'exit_at_ms':exit_ms,'tp1_reached':bool(tp1),'mfe_r':mfe,'mae_r':mae,'market_source':provider}
-    except Exception as e:return {'status':'MARKET_DATA_ERROR','terminal':False,'r_multiple':None,'exit_at_ms':None,'error':str(e)[:500]}
+        return {'status':status,'terminal':terminal,'r_multiple':None if r is None else round(float(r),4),'exit_at_ms':exit_ms,'tp1_reached':bool(tp1),'extended_target_reached':ext_hit,'extended_target':g.get('extended_target'),'rr_extended':g.get('rr_extended'),'mfe_r':mfe,'mae_r':mae,'market_source':provider}
+    except Exception as e:return {'status':'MARKET_DATA_ERROR','terminal':False,'r_multiple':None,'exit_at_ms':None,'extended_target_reached':None,'error':str(e)[:500]}
 def report(m,cohort,settlements,cps,observed):
     start=float(m['starting_equity_usd']); equity=start; peak=start; maxdd=0; detail=[]; rs=[]; wins=losses=0; closed=[]; cost_net=[]; cost_valid=cost_invalid=0
     for row,s in zip(cohort,settlements):
@@ -195,8 +180,12 @@ def report(m,cohort,settlements,cps,observed):
     for row,s in zip(cohort,settlements):detail.append({**row,'product_window_checkpoints':cps[row['id']],'settlement':s,'cost_adjusted_settlement':costmap.get(row['id']),**eqmap.get(row['id'],{'pnl_usd':None,'equity_after_usd':None,'drawdown_after_pct':None})})
     summary={}
     for h in CHECKPOINTS:
-        vals=[num(cp.get('r_multiple')) for arr in cps.values() for cp in arr if cp.get('checkpoint_h')==h and cp.get('matured')]; vals=[x for x in vals if x is not None]; summary[f'{h}h']={'matured':len(vals),'avg_r':round(sum(vals)/len(vals),4) if vals else None,'positive_pct':round(100*sum(x>0 for x in vals)/len(vals),2) if vals else None}
-    base={'schema':SCHEMA,'generated_at':dt.datetime.now(dt.timezone.utc).isoformat(),'observed_through_at':observed.isoformat(),'canonical_contract':'analyst_output','product_horizon':'4-12H','evaluation_horizons':['4h','8h','12h'],'paper_only':True,'live_execution':False,'can_override_production':False,'production_threshold_unchanged':m['production_threshold'],'methodology':'Prospective canonical analyst_output LONG/SHORT transitions only; frozen Entry/SL/TP; 4h/8h/12h checkpoints; 12h terminal evaluation.','checkpoint_summary':summary,'portfolio':{'starting_equity_usd':start,'equity_usd':round(equity,2),'net_pnl_usd':round(equity-start,2),'return_pct':round((equity/start-1)*100,4),'entries':len(cohort),'closed':len(closed),'open_or_unresolved':len(cohort)-len(closed),'wins':wins,'losses':losses,'win_rate_pct':round(100*wins/len(closed),2) if closed else None,'net_r':round(sum(rs),4),'avg_r':round(sum(rs)/len(rs),4) if rs else None,'max_drawdown_pct':round(maxdd,4)},'trades':detail}
+        items=[cp for arr in cps.values() for cp in arr if cp.get('checkpoint_h')==h and cp.get('matured')]
+        vals=[num(cp.get('r_multiple')) for cp in items]; vals=[x for x in vals if x is not None]
+        ext=[cp for cp in items if cp.get('extended_target') is not None]
+        hits=sum(cp.get('extended_target_reached') is True for cp in ext)
+        summary[f'{h}h']={'matured':len(vals),'avg_r':round(sum(vals)/len(vals),4) if vals else None,'positive_pct':round(100*sum(x>0 for x in vals)/len(vals),2) if vals else None,'extended_target_evaluable':len(ext),'extended_target_hits':hits,'extended_target_hit_rate_pct':round(100*hits/len(ext),2) if ext else None}
+    base={'schema':SCHEMA,'generated_at':dt.datetime.now(dt.timezone.utc).isoformat(),'observed_through_at':observed.isoformat(),'canonical_contract':'analyst_output','product_horizon':'4-12H','evaluation_horizons':['4h','8h','12h'],'paper_only':True,'live_execution':False,'can_override_production':False,'production_threshold_unchanged':m['production_threshold'],'methodology':'Prospective canonical analyst_output LONG/SHORT transitions only; frozen Entry/SL/TP; 4h/8h/12h checkpoints; 12h terminal evaluation. Extended target is frozen at enrollment and measured evidence-only; it never changes canonical TP2 settlement.','checkpoint_summary':summary,'portfolio':{'starting_equity_usd':start,'equity_usd':round(equity,2),'net_pnl_usd':round(equity-start,2),'return_pct':round((equity/start-1)*100,4),'entries':len(cohort),'closed':len(closed),'open_or_unresolved':len(cohort)-len(closed),'wins':wins,'losses':losses,'win_rate_pct':round(100*wins/len(closed),2) if closed else None,'net_r':round(sum(rs),4),'avg_r':round(sum(rs)/len(rs),4) if rs else None,'max_drawdown_pct':round(maxdd,4)},'trades':detail}
     if m.get('experimental_threshold') is not None:
         base.update({'cohort_label':COHORT_LABEL,'manifest_hash':m['manifest_hash'],'experimental_threshold':m.get('experimental_threshold'),'production_eligible':False,'methodology':base['methodology']+' Experimental cohort is isolated and cannot override Production. Execution fee/spread/slippage is frozen at enrollment; missing cost evidence fails closed.'})
         base['cost_adjusted']={'gross_net_r':round(sum(rs),4),'gross_avg_r':round(sum(rs)/len(rs),4) if rs else None,'net_r':round(sum(cost_net),4) if cost_valid and cost_invalid==0 else None,'avg_r':round(sum(cost_net)/len(cost_net),4) if cost_net and cost_invalid==0 else None,'cost_validated_closed':cost_valid,'cost_unvalidated_closed':cost_invalid,'all_closed_cost_validated':bool(closed) and cost_invalid==0,'minimum_matured_sample_required':30,'minimum_sample_met':len(closed)>=30,'edge_evaluable_after_costs':len(closed)>=30 and cost_invalid==0}
