@@ -31,8 +31,13 @@ def test_canonical_forward_ui_is_distinct_and_stale_aware():
 def test_research_ui_is_explicit_shadow_cohort():
     js = Path('atlas-research-validation-ui.js').read_text()
     assert 'Research Shadow Cohorts' in js
-    assert 'Separate dataset from the $10K Canonical Forward Evaluation' in js
+    assert 'Separate research dataset.' in js
+    assert 'never Final Trade Gate portfolio entries' in js
+    assert 'Research cannot change the canonical LONG / SHORT / WAIT decision' in js
     assert 'shadow observations' in js
     assert 'RESEARCH ONLY' in js
+    assert 'no automatic promotion' in js
+    assert 'shadow_only:true' in js
     assert 'can_override_production:false' in js
     assert 'can_change_threshold:false' in js
+    assert 'can_change_portfolio:false' in js
