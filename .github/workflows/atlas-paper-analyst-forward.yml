@@ -79,7 +79,6 @@ jobs:
           git add status/history/analyst-output-snapshots.jsonl status/history/paper-portfolio-10k-analyst-cohort.jsonl status/paper-portfolio-10k-analyst-latest.json status/paper-portfolio-10k-analyst-integrity.json status/analyst-forward-attribution-latest.json status/product-readiness-latest.json
           git diff --cached --quiet && exit 0
           git commit -m 'chore: update canonical analyst forward evidence [skip ci]'
-          # Runtime evaluation can touch non-evidence files. They must never block or leak into the evidence commit.
           git reset --hard HEAD
           git clean -fd
           git pull --rebase origin main
@@ -130,9 +129,29 @@ jobs:
           python3 analyst_output_forward_capture.py
           python3 paper_portfolio_10k_analyst_output.py
           python3 - <<'PY'
-          import json
+          import collections, json
+          history='status/history/analyst-output-snapshots-t64.jsonl'
+          latest='status/paper-portfolio-10k-analyst-t64-latest.json'
+          rows=[]
+          with open(history,encoding='utf-8') as f:
+              for line in f:
+                  if line.strip(): rows.append(json.loads(line))
+          counts=collections.Counter(); blockers=collections.Counter(); candidates=collections.Counter(); scores=[]; recent=[]
+          for row in rows:
+              for sym,d in (row.get('decisions') or {}).items():
+                  a=(d or {}).get('analyst_output') or {}
+                  gate=(d or {}).get('final_trade_gate') or a.get('final_trade_gate') or {}
+                  dec=str(a.get('decision') or 'MISSING').upper(); counts[dec]+=1
+                  cand=str((d or {}).get('candidate_direction') or gate.get('candidate_direction') or 'NONE').upper(); candidates[cand]+=1
+                  sc=(d or {}).get('score')
+                  try: sc=float(sc); scores.append((sc,sym,cand,row.get('captured_at'),gate.get('primary_blocker')))
+                  except Exception: pass
+                  for b in (gate.get('blockers') or []): blockers[str(b)]+=1
+                  recent.append({'captured_at':row.get('captured_at'),'symbol':sym,'analyst_decision':dec,'candidate_direction':cand,'score':sc if isinstance(sc,(int,float)) else (d or {}).get('score'),'threshold':(d or {}).get('signal_threshold'),'final_gate_primary_blocker':gate.get('primary_blocker'),'final_gate_blockers':gate.get('blockers') or [],'product_direction':gate.get('product_direction'),'entry_confirmation_direction':gate.get('entry_confirmation_direction'),'direction_alignment':gate.get('direction_alignment'),'production_signal_qualified':gate.get('production_signal_qualified'),'canonical_geometry_ready':gate.get('canonical_geometry_ready')})
+          x=json.load(open(latest))
+          x['decision_diagnostics']={'snapshot_rows':len(rows),'symbol_observations':sum(counts.values()),'analyst_decisions':dict(counts),'candidate_directions':dict(candidates),'final_gate_blockers':dict(blockers),'score_max':max((s[0] for s in scores),default=None),'score_ge_64':sum(s[0]>=64 for s in scores),'top_scores':[{'score':s,'symbol':sym,'candidate_direction':cand,'captured_at':ts,'primary_blocker':pb} for s,sym,cand,ts,pb in sorted(scores,reverse=True)[:20]],'recent_observations':recent[-32:]}
+          with open(latest,'w',encoding='utf-8') as f: json.dump(x,f,indent=2,sort_keys=True)
           m=json.load(open('status/paper-portfolio-10k-analyst-t64-manifest.json'))
-          x=json.load(open('status/paper-portfolio-10k-analyst-t64-latest.json'))
           assert m['manifest_hash']=='2d31a2147e6ff87426cd2b5ea7725ec57fbfa12314e5d32e24599d318ce529e1'
           assert m['production_threshold']==68 and m['experimental_threshold']==64 and m['production_eligible'] is False
           assert x['manifest_hash']==m['manifest_hash'] and x['experimental_threshold']==64
@@ -141,6 +160,7 @@ jobs:
           for t in x['trades']:
               assert t['manifest_hash']==m['manifest_hash']
               assert 'execution_cost_snapshot' in t
+          print('T64_DIAGNOSTICS',json.dumps(x['decision_diagnostics'],sort_keys=True))
           print('T64_EVIDENCE',{'portfolio':x['portfolio'],'cost_adjusted':x['cost_adjusted']})
           PY
       - name: Commit isolated T64 evidence
@@ -152,7 +172,6 @@ jobs:
           git add status/history/analyst-output-snapshots-t64.jsonl status/history/paper-portfolio-10k-analyst-t64-cohort.jsonl status/paper-portfolio-10k-analyst-t64-latest.json status/paper-portfolio-10k-analyst-t64-integrity.json
           git diff --cached --quiet && exit 0
           git commit -m 'chore: update isolated threshold-64 net evidence [skip ci]'
-          # Keep only the committed evidence. Runtime side effects are intentionally discarded before rebasing.
           git reset --hard HEAD
           git clean -fd
           git pull --rebase origin main
