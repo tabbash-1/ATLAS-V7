@@ -28,6 +28,14 @@ RULES={
   'promotion_policy':'NO_PRODUCTION_CHANGE_FROM_THIS REPORT ALONE',
 }
 
+SCORE_BANDS=(
+  ('64_67',64.0,68.0),
+  ('68',68.0,69.0),
+  ('69_71',69.0,72.0),
+  ('72_PLUS',72.0,None),
+)
+SCORE_THRESHOLDS=(64.0,68.0,69.0,70.0,72.0)
+
 def now():return dt.datetime.now(dt.timezone.utc)
 def parse_ts(v):
     try:return dt.datetime.fromisoformat(str(v).replace('Z','+00:00')).astimezone(dt.timezone.utc)
@@ -110,19 +118,41 @@ def metrics(vals):
     vals=[x for x in vals if x is not None]
     if not vals:return {'n':0,'mean_pct':None,'positive_rate_pct':None}
     return {'n':len(vals),'mean_pct':round(sum(vals)/len(vals),6),'positive_rate_pct':round(100*sum(x>0 for x in vals)/len(vals),4)}
+def scored_metrics(items):
+    return metrics([x.get('directional_return_pct') for x in items])
+def score_analysis(short_items):
+    bands={}
+    for label,lo,hi in SCORE_BANDS:
+        subset=[x for x in short_items if x.get('score') is not None and x['score']>=lo and (hi is None or x['score']<hi)]
+        bands[label]=scored_metrics(subset)
+    sweep={}
+    for threshold in SCORE_THRESHOLDS:
+        subset=[x for x in short_items if x.get('score') is not None and x['score']>=threshold]
+        key=f"GTE_{int(threshold)}"
+        sweep[key]=scored_metrics(subset)
+    return {
+      'metric_basis':'4H_DIRECTIONAL_RETURN_PCT_NOT_R_OR_PNL',
+      'execution_costs_included':False,
+      'funding_included':False,
+      'production_effect':'NONE_OBSERVATIONAL_ONLY',
+      'score_bands':bands,
+      'threshold_sweep':sweep,
+    }
 def evaluate(rows,cohort,manifest):
     by={g:[] for g in RULES['groups']}
+    detailed={g:[] for g in RULES['groups']}
     for x in cohort:
         t=parse_ts(x['captured_at']); hit=nearest(rows,x['symbol'],t+dt.timedelta(hours=TARGET_HOURS))
         if not hit:continue
         _,p1=hit; p0=float(x['entry_price']); market=(p1/p0-1)*100; dr=market if x['direction']=='LONG' else -market
         by[x['group']].append(dr)
+        detailed[x['group']].append({'score':f(x.get('score')),'directional_return_pct':dr,'symbol':x.get('symbol'),'captured_at':x.get('captured_at')})
     gm={g:metrics(v) for g,v in by.items()}; s=gm['SHORT_TREND_DOWN_4H']; l=gm['LONG_TREND_UP_CAUTION_4H']
     short_ready=s['n']>=MIN_MATURED; long_ready=l['n']>=MIN_MATURED
     short_supported=bool(short_ready and s['mean_pct']>=RULES['short_support_thresholds']['mean_pct_min'] and s['positive_rate_pct']>=RULES['short_support_thresholds']['positive_rate_pct_min'])
     long_caution=bool(long_ready and l['mean_pct']<=RULES['long_caution_thresholds']['mean_pct_max'] and l['positive_rate_pct']<=RULES['long_caution_thresholds']['positive_rate_pct_max'])
-    return {'schema':SCHEMA,'generated_at':now().isoformat(),'manifest_hash':manifest['manifest_hash'],'cohort_start_at':manifest['cohort_start_at'],'research_only':True,'shadow_only':True,'live_execution':False,'can_override_production':False,'can_change_threshold':False,'target_horizon_hours':4,'groups':gm,'sample_progress':{g:{'matured':gm[g]['n'],'target':MIN_MATURED,'remaining':max(0,MIN_MATURED-gm[g]['n'])} for g in gm},'claims':{'short_4h_edge_supported':short_supported,'long_trend_up_caution_supported':long_caution,'claims_ready':short_ready and long_ready},'promotion_policy':RULES['promotion_policy']}
+    return {'schema':SCHEMA,'generated_at':now().isoformat(),'manifest_hash':manifest['manifest_hash'],'cohort_start_at':manifest['cohort_start_at'],'research_only':True,'shadow_only':True,'live_execution':False,'can_override_production':False,'can_change_threshold':False,'target_horizon_hours':4,'groups':gm,'short_score_analysis':score_analysis(detailed['SHORT_TREND_DOWN_4H']),'sample_progress':{g:{'matured':gm[g]['n'],'target':MIN_MATURED,'remaining':max(0,MIN_MATURED-gm[g]['n'])} for g in gm},'claims':{'short_4h_edge_supported':short_supported,'long_trend_up_caution_supported':long_caution,'claims_ready':short_ready and long_ready},'promotion_policy':RULES['promotion_policy']}
 def main():
     ap=argparse.ArgumentParser(); ap.add_argument('--history',default='status/history/production-snapshots.jsonl'); ap.add_argument('--manifest',default='status/prospective-direction-guardrail-manifest.json'); ap.add_argument('--cohort',default='status/history/prospective-direction-guardrail-cohort.jsonl'); ap.add_argument('--report',default='status/prospective-direction-guardrail-latest.json'); a=ap.parse_args()
-    m=load_or_create_manifest(Path(a.manifest)); rows=load_history(Path(a.history)); cohort,added=freeze_entries(rows,m,Path(a.cohort)); report=evaluate(rows,cohort,m); Path(a.report).write_text(json.dumps(report,indent=2,sort_keys=True)); print(json.dumps({'manifest_hash':m['manifest_hash'],'added':len(added),'cohort':len(cohort),'progress':report['sample_progress'],'claims':report['claims']},sort_keys=True))
+    m=load_or_create_manifest(Path(a.manifest)); rows=load_history(Path(a.history)); cohort,added=freeze_entries(rows,m,Path(a.cohort)); report=evaluate(rows,cohort,m); Path(a.report).write_text(json.dumps(report,indent=2,sort_keys=True)); print(json.dumps({'manifest_hash':m['manifest_hash'],'added':len(added),'cohort':len(cohort),'progress':report['sample_progress'],'claims':report['claims'],'short_score_analysis':report['short_score_analysis']},sort_keys=True))
 if __name__=='__main__':main()
