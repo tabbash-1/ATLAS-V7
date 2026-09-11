@@ -58,10 +58,17 @@ jobs:
           assert r['manifest_hash']==m['manifest_hash']==i['manifest_hash']
           assert i['append_only_verified'] is True
           assert i['can_override_production'] is False
+          sa=r['short_score_analysis']
+          assert sa['metric_basis']=='4H_DIRECTIONAL_RETURN_PCT_NOT_R_OR_PNL'
+          assert sa['execution_costs_included'] is False and sa['funding_included'] is False
+          assert sa['production_effect']=='NONE_OBSERVATIONAL_ONLY'
+          assert set(sa['score_bands'])=={'64_67','68','69_71','72_PLUS'}
+          assert set(sa['threshold_sweep'])=={'GTE_64','GTE_68','GTE_69','GTE_70','GTE_72'}
           print('COHORT_START',m['cohort_start_at'])
           print('INTEGRITY',json.dumps({k:i[k] for k in ('append_only_verified','previous_row_count','row_count','new_row_count','ordered_chain_sha256')},sort_keys=True))
           print('PROGRESS',json.dumps(r['sample_progress'],sort_keys=True))
           print('CLAIMS',json.dumps(r['claims'],sort_keys=True))
+          print('SHORT_SCORE_ANALYSIS',json.dumps(sa,sort_keys=True))
           PY
       - name: Commit immutable manifest, cohort, integrity and report
         run: |
