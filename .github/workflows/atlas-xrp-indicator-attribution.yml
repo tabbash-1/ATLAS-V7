@@ -1,0 +1,23 @@
+name: ATLAS XRP Indicator Attribution
+on:
+  pull_request:
+    paths:
+      - 'indicator_attribution_audit.py'
+      - 'historical_core_4_12h_replay.py'
+      - '.github/workflows/atlas-xrp-indicator-attribution.yml'
+  workflow_dispatch:
+jobs:
+  xrp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Focus XRP attribution
+        run: |
+          python3 - <<'PY'
+          import json
+          import indicator_attribution_audit as a
+          rows=a.build('XRPUSDT')
+          focus=[x for x in rows if x['side']=='LONG']
+          print('XRP_LONG_ATTRIBUTION='+json.dumps(a.report(focus),sort_keys=True))
+          PY
