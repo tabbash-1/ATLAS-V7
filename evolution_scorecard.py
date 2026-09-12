@@ -87,6 +87,17 @@ def _delta(current: float | int | None, baseline: float | int | None) -> float |
     return round(float(current) - float(baseline), 4)
 
 
+def _canonical_forward_counts(payload: dict[str, Any]) -> tuple[Any, Any]:
+    summary = payload.get("summary") or {}
+    trade_ready = payload.get("forward_trade_ready_count")
+    wait_directional = payload.get("forward_wait_directional_count")
+    if trade_ready is None:
+        trade_ready = summary.get("forward_trade_ready_count")
+    if wait_directional is None:
+        wait_directional = summary.get("forward_wait_directional_count")
+    return trade_ready, wait_directional
+
+
 def build_scorecard(
     portfolio: dict[str, Any],
     canonical_outcomes: dict[str, Any] | None = None,
@@ -150,10 +161,11 @@ def build_scorecard(
         },
     }
     if canonical_outcomes:
+        forward_trade_ready_count, forward_wait_directional_count = _canonical_forward_counts(canonical_outcomes)
         evidence["canonical_outcomes"] = {
             "role": "SUPPORTING_FORWARD_EVIDENCE",
-            "forward_trade_ready_count": canonical_outcomes.get("forward_trade_ready_count"),
-            "forward_wait_directional_count": canonical_outcomes.get("forward_wait_directional_count"),
+            "forward_trade_ready_count": forward_trade_ready_count,
+            "forward_wait_directional_count": forward_wait_directional_count,
             "note": "Counts are not merged into official $10k KPI unless present as canonical portfolio entries.",
         }
     if analyst_forward:
