@@ -1,6 +1,12 @@
 name: ATLAS Evolution Scorecard
 
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'evolution_scorecard.py'
+      - 'tests/test_evolution_scorecard.py'
+      - '.github/workflows/atlas-evolution-scorecard.yml'
   push:
     branches: [main]
     paths:
@@ -18,7 +24,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: atlas-evolution-scorecard
+  group: atlas-evolution-scorecard-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -49,6 +55,7 @@ jobs:
           jq -e '.integrity.historical_or_shadow_in_official_kpi == false' status/atlas-evolution-scorecard-latest.json >/dev/null
           jq -e '.integrity.direction_entries_sum == .canonical_forward_performance.entries' status/atlas-evolution-scorecard-latest.json >/dev/null
       - name: Commit scorecard evidence
+        if: github.event_name != 'pull_request'
         run: |
           set -euo pipefail
           git config user.name "atlas-evolution-scorecard"
