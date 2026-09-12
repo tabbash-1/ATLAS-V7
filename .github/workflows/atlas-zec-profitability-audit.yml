@@ -9,10 +9,12 @@ on:
 jobs:
   audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Syntax
         run: python3 -m py_compile zec_profitability_audit.py historical_core_4_12h_replay.py
       - name: ZEC 365-day profitability audit
         run: python3 zec_profitability_audit.py --days 365
+      - name: ZEC 730-day profitability audit
+        run: python3 zec_profitability_audit.py --days 730
