@@ -3,8 +3,9 @@
 Installed after every Production decision overlay. By default it never promotes WAIT,
 changes scores/thresholds, or routes orders. It only certifies an already-actionable
 LONG/SHORT when HTF direction, entry confirmation, canonical geometry and raw
-Production qualification all agree. Any contradiction is collapsed to WAIT
-across user-facing/nested plan fields so no stale actionable flag can escape.
+Production qualification all agree. Breakout-family setups additionally require
+explicit canonical structure-break confirmation. Any contradiction is collapsed to
+WAIT across user-facing/nested plan fields so no stale actionable flag can escape.
 
 An explicitly isolated evidence cohort may opt in to testing whether a stale legacy
 pre-final WAIT is redundant when every authoritative final condition already passes.
@@ -17,7 +18,7 @@ import os
 from canonical_decision_contract import from_decision
 from golden_thesis_engine import VERSION as GOLDEN_THESIS_VERSION, build as build_golden_thesis
 
-VERSION = "FINAL_TRADE_READY_GUARD_V3_EXPERIMENTAL_GEOMETRY_RESTORE"
+VERSION = "FINAL_TRADE_READY_GUARD_V4_STRUCTURE_CONFIRMATION"
 PRODUCT_HORIZON = "4-12H"
 EXPERIMENTAL_PROMOTION_ENV = "ATLAS_EXPERIMENTAL_FINAL_EVIDENCE_PROMOTION"
 
@@ -49,6 +50,56 @@ def _geometry_ready(row):
         return bool(canonical.get("ready")), _norm(canonical.get("reason") or "CANONICAL_GEOMETRY_NOT_READY")
     legacy = row.get("geometry_gate") or {}
     return bool(legacy.get("qualified")), _norm(legacy.get("reason") or "GEOMETRY_NOT_READY")
+
+
+def _breakout_structure_state(row):
+    """Return whether this setup requires breakout confirmation and its evidence.
+
+    The guard intentionally scopes the new rule to breakout-family setups only. Other
+    valid setup families (for example trend pullbacks) keep their existing gate path.
+    Confirmation is accepted only from canonical structure/plan fields; playbook names
+    can declare the requirement but can never manufacture confirmation evidence.
+    """
+    analyst = row.get("analyst_output") or {}
+    trade_plan = row.get("trade_plan") or {}
+    core_plan = trade_plan.get("core_plan") or {}
+    structural = row.get("structural_geometry") or {}
+    breakout = structural.get("breakout") or {}
+    provenance = trade_plan.get("geometry_provenance") or core_plan.get("geometry_provenance") or {}
+
+    playbook = _norm(
+        row.get("playbook")
+        or row.get("playbook_primary")
+        or analyst.get("playbook")
+        or analyst.get("playbook_primary")
+    )
+    entry_mode = _norm(trade_plan.get("entry_mode") or core_plan.get("entry_mode"))
+    requires_confirmation = bool("BREAKOUT" in playbook or entry_mode == "BREAKOUT")
+
+    evidence_present = False
+    confirmed = False
+    evidence_source = None
+    candidates = (
+        ("STRUCTURAL_GEOMETRY", breakout, "confirmed"),
+        ("TRADE_PLAN", trade_plan, "breakout_confirmed"),
+        ("CORE_PLAN", core_plan, "breakout_confirmed"),
+        ("GEOMETRY_PROVENANCE", provenance, "breakout_confirmed"),
+    )
+    for source, obj, key in candidates:
+        if isinstance(obj, dict) and key in obj:
+            evidence_present = True
+            confirmed = obj.get(key) is True
+            evidence_source = source
+            break
+
+    return {
+        "requires_confirmation": requires_confirmation,
+        "confirmed": confirmed,
+        "evidence_present": evidence_present,
+        "evidence_source": evidence_source,
+        "playbook": playbook or None,
+        "entry_mode": entry_mode or None,
+    }
 
 
 def _candidate_plan_geometry(row, direction):
@@ -92,6 +143,7 @@ def assess(row):
     action = _norm(row.get("actionable_decision"))
     qualified = row.get("production_signal_qualified") is True
     geometry_ready, geometry_reason = _geometry_ready(row)
+    structure_state = _breakout_structure_state(row)
     quality_blocked = _norm((row.get("setup_quality_gate") or {}).get("status")) == "BLOCK"
     degraded = bool(row.get("data_degraded", False))
     experimental_promotion = _experimental_final_evidence_promotion()
@@ -106,6 +158,11 @@ def assess(row):
         blockers.append("PRE_FINAL_DECISION_NOT_ACTIONABLE")
     if not qualified: blockers.append("PRODUCTION_SIGNAL_NOT_QUALIFIED")
     if not geometry_ready: blockers.append(geometry_reason or "CANONICAL_GEOMETRY_NOT_READY")
+    if structure_state["requires_confirmation"]:
+        if not structure_state["evidence_present"]:
+            blockers.append("BREAKOUT_CONFIRMATION_EVIDENCE_MISSING")
+        elif not structure_state["confirmed"]:
+            blockers.append("BREAKOUT_STRUCTURE_NOT_CONFIRMED")
     if quality_blocked: blockers.append("SETUP_QUALITY_GATE_BLOCKED")
     if degraded: blockers.append("DATA_DEGRADED")
     candidate_geometry = None
@@ -129,9 +186,10 @@ def assess(row):
         "direction_alignment": alignment or None,
         "production_signal_qualified": qualified,
         "canonical_geometry_ready": geometry_ready,
+        "structure_confirmation": structure_state,
         "blockers": blockers,
         "primary_blocker": blockers[0] if blockers else None,
-        "authority": "FINAL_12H_4H_DIRECTION_PLUS_1H_CONFIRMATION",
+        "authority": "FINAL_12H_4H_DIRECTION_PLUS_1H_CONFIRMATION_PLUS_STRUCTURE",
         "product_horizon": PRODUCT_HORIZON,
         "score_changed": False,
         "threshold_changed": False,
@@ -270,6 +328,8 @@ def install(atlas):
         "canonical_decision_contract":"ATLAS_CANONICAL_DECISION_TRUTH_V1",
         "golden_thesis_version":GOLDEN_THESIS_VERSION,"golden_thesis_shadow_only":True,
         "golden_thesis_can_override":False,"analysis_only":True,"live_execution":False,
+        "breakout_structure_confirmation_required":True,
+        "breakout_structure_confirmation_scope":"BREAKOUT_FAMILY_ONLY",
         "experimental_final_evidence_promotion_env":EXPERIMENTAL_PROMOTION_ENV,
         "experimental_final_evidence_promotion_default":False,
     }
