@@ -1,0 +1,18 @@
+name: ATLAS ZEC Profitability Audit
+on:
+  pull_request:
+    paths:
+      - 'zec_profitability_audit.py'
+      - 'historical_core_4_12h_replay.py'
+      - '.github/workflows/atlas-zec-profitability-audit.yml'
+  workflow_dispatch:
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax
+        run: python3 -m py_compile zec_profitability_audit.py historical_core_4_12h_replay.py
+      - name: ZEC 365-day profitability audit
+        run: python3 zec_profitability_audit.py --days 365
