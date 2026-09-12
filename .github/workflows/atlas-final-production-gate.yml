@@ -47,15 +47,24 @@ jobs:
           node --check production-web-autoload.js
           node --check atlas-product-shell.js
           node --check atlas-unified-terminal.js
-          grep -q "contract:'canonical_decision'" production-web-autoload.js
-          grep -q "sourceOfTruth:'FINAL_TRADE_GATE'" production-web-autoload.js
-          grep -q "canonicalContract:'canonical_decision'" atlas-product-shell.js
-          grep -q "sourceOfTruth:'FINAL_TRADE_GATE'" atlas-product-shell.js
-          grep -q "canonicalContract:'canonical_decision'" atlas-unified-terminal.js
-          grep -q "sourceOfTruth:'FINAL_TRADE_GATE'" atlas-unified-terminal.js
-          ! grep -q "contract:'analyst_output'" production-web-autoload.js
-          ! grep -q "canonicalContract:'analyst_output'" atlas-product-shell.js
-          ! grep -q "canonicalContract:'analyst_output'" atlas-unified-terminal.js
+
+          # Production autoload publishes the canonical decision contract explicitly.
+          grep -Fq "ATLAS_PRODUCTION_WEB_AUTOLOAD_V6_STRICT_FINAL_TRUTH" production-web-autoload.js
+          grep -Fq "contract:'canonical_decision'" production-web-autoload.js
+          grep -Fq "sourceOfTruth:'FINAL_TRADE_GATE'" production-web-autoload.js
+          ! grep -Fq "contract:'analyst_output'" production-web-autoload.js
+
+          # Product shell V7 validates canonical truth directly inside truth().
+          grep -Fq "ATLAS_PRODUCT_SHELL_V7_BOUND_ANALYST_GEOMETRY" atlas-product-shell.js
+          grep -Fq "c?.schema!=='ATLAS_CANONICAL_DECISION_TRUTH_V1'" atlas-product-shell.js
+          grep -Fq "c?.source_of_truth!=='FINAL_TRADE_GATE'" atlas-product-shell.js
+          grep -Fq "a?.geometry_bound_to_canonical_decision!==true" atlas-product-shell.js
+
+          # Unified terminal still exposes its canonical authority metadata.
+          grep -Fq "ATLAS_UNIFIED_TERMINAL_V5_STRICT_FINAL_GATE" atlas-unified-terminal.js
+          grep -Fq "canonicalContract:'canonical_decision'" atlas-unified-terminal.js
+          grep -Fq "sourceOfTruth:'FINAL_TRADE_GATE'" atlas-unified-terminal.js
+          ! grep -Fq "canonicalContract:'analyst_output'" atlas-unified-terminal.js
           echo 'STATIC_CANONICAL_AUTHORITY_OK'
 
       - name: Wait for exact deployed final runtime
@@ -128,25 +137,26 @@ jobs:
           for f in production-web-autoload.js atlas-unified-terminal.js atlas-product-shell.js; do
             curl -L --retry 6 --retry-delay 5 --retry-all-errors --connect-timeout 20 --max-time 120 -fsS "$BASE_URL/$f?t=$(date +%s%N)" -o "/tmp/$f"
           done
-          grep -q 'ATLAS_PRODUCTION_WEB_AUTOLOAD_V5_CANONICAL_FINAL_TRUTH' /tmp/production-web-autoload.js
-          grep -q "contract:'canonical_decision'" /tmp/production-web-autoload.js
-          grep -q "sourceOfTruth:'FINAL_TRADE_GATE'" /tmp/production-web-autoload.js
-          grep -q 'ATLAS_PRODUCT_SHELL_V6_CANONICAL_FINAL_TRUTH' /tmp/atlas-product-shell.js
-          grep -q "canonicalContract:'canonical_decision'" /tmp/atlas-product-shell.js
-          grep -q "sourceOfTruth:'FINAL_TRADE_GATE'" /tmp/atlas-product-shell.js
-          grep -q 'ATLAS_UNIFIED_TERMINAL_V4_CANONICAL_FINAL_TRUTH' /tmp/atlas-unified-terminal.js
-          grep -q "canonicalContract:'canonical_decision'" /tmp/atlas-unified-terminal.js
-          grep -q "sourceOfTruth:'FINAL_TRADE_GATE'" /tmp/atlas-unified-terminal.js
-          ! grep -q "contract:'analyst_output'" /tmp/production-web-autoload.js
-          ! grep -q "canonicalContract:'analyst_output'" /tmp/atlas-product-shell.js
-          ! grep -q "canonicalContract:'analyst_output'" /tmp/atlas-unified-terminal.js
+          grep -Fq 'ATLAS_PRODUCTION_WEB_AUTOLOAD_V6_STRICT_FINAL_TRUTH' /tmp/production-web-autoload.js
+          grep -Fq "contract:'canonical_decision'" /tmp/production-web-autoload.js
+          grep -Fq "sourceOfTruth:'FINAL_TRADE_GATE'" /tmp/production-web-autoload.js
+          grep -Fq 'ATLAS_PRODUCT_SHELL_V7_BOUND_ANALYST_GEOMETRY' /tmp/atlas-product-shell.js
+          grep -Fq "c?.schema!=='ATLAS_CANONICAL_DECISION_TRUTH_V1'" /tmp/atlas-product-shell.js
+          grep -Fq "c?.source_of_truth!=='FINAL_TRADE_GATE'" /tmp/atlas-product-shell.js
+          grep -Fq "a?.geometry_bound_to_canonical_decision!==true" /tmp/atlas-product-shell.js
+          grep -Fq 'ATLAS_UNIFIED_TERMINAL_V5_STRICT_FINAL_GATE' /tmp/atlas-unified-terminal.js
+          grep -Fq "canonicalContract:'canonical_decision'" /tmp/atlas-unified-terminal.js
+          grep -Fq "sourceOfTruth:'FINAL_TRADE_GATE'" /tmp/atlas-unified-terminal.js
+          ! grep -Fq "contract:'analyst_output'" /tmp/production-web-autoload.js
+          ! grep -Fq "canonicalContract:'analyst_output'" /tmp/atlas-unified-terminal.js
           echo 'LIVE_UI_CANONICAL_FINAL_TRUTH_OK'
 
       - name: Final invariant
         shell: bash
         run: |
           set -euo pipefail
-          grep -q 'ATLAS_CANONICAL_DECISION_TRUTH_V1' canonical_decision_contract.py
-          grep -q 'FINAL_TRADE_READY_GUARD_V4_STRUCTURE_CONFIRMATION' final_trade_ready_guard.py
-          grep -q 'BREAKOUT_STRUCTURE_NOT_CONFIRMED' final_trade_ready_guard.py
+          grep -Fq 'ATLAS_CANONICAL_DECISION_TRUTH_V1' canonical_decision_contract.py
+          grep -Fq 'FINAL_TRADE_READY_GUARD_V4_STRUCTURE_CONFIRMATION' final_trade_ready_guard.py
+          grep -Fq 'BREAKOUT_STRUCTURE_NOT_CONFIRMED' final_trade_ready_guard.py
+          grep -Fq 'BREAKOUT_CONFIRMATION_EVIDENCE_MISSING' final_trade_ready_guard.py
           echo 'ATLAS FINAL PRODUCTION GATE: PASS · SOURCE_OF_TRUTH=FINAL_TRADE_GATE · STRUCTURE_CONFIRMATION=REQUIRED_FOR_BREAKOUT'
