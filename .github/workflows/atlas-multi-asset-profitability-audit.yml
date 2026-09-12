@@ -3,16 +3,19 @@ on:
   pull_request:
     paths:
       - 'multi_asset_profitability_audit.py'
+      - 'indicator_attribution_audit.py'
       - 'historical_core_4_12h_replay.py'
       - '.github/workflows/atlas-multi-asset-profitability-audit.yml'
   workflow_dispatch:
 jobs:
   audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - name: Syntax
-        run: python3 -m py_compile multi_asset_profitability_audit.py historical_core_4_12h_replay.py
+        run: python3 -m py_compile multi_asset_profitability_audit.py indicator_attribution_audit.py historical_core_4_12h_replay.py
       - name: Run 730-day multi-asset audit
         run: python3 multi_asset_profitability_audit.py
+      - name: Run 730-day indicator attribution audit
+        run: python3 indicator_attribution_audit.py
