@@ -1,8 +1,9 @@
-"""Prospective research-only LONG+CLOSE structure veto shadow.
+"""Prospective research-only structure-confirmation shadow.
 
-Builds on the frozen fourth-vote shadow logic but does not mutate Production.
-It exposes what the combined research candidate would decide while preserving
-and reporting the real Production score/qualification separately.
+Evaluates whether a continuation setup that is close to prior structure also has
+a verified closed-candle break and hold. This layer NEVER mutates Production,
+score, threshold, qualification, geometry, or live execution. It exists only to
+collect prospective evidence before any production veto is considered.
 """
 from __future__ import annotations
 
@@ -10,26 +11,123 @@ import urllib.parse
 
 from prospective_fourth_vote_shadow import shadow_from_row as fourth_vote_shadow_from_row
 
-VERSION = 'ATLAS_PROSPECTIVE_LONG_CLOSE_STRUCTURE_SHADOW_V1'
+VERSION = 'ATLAS_PROSPECTIVE_STRUCTURE_CONFIRMATION_SHADOW_V2'
 
 
-def combined_shadow_from_row(row, threshold=68.0):
+def _f(value, default=None):
+    try:
+        return float(value)
+    except Exception:
+        return default
+
+
+def _atr_from_klines(klines, period=14):
+    rows = list(klines or [])
+    if len(rows) < 2:
+        return None
+    trs = []
+    for i in range(max(1, len(rows) - period), len(rows)):
+        high = _f(rows[i].get('high'))
+        low = _f(rows[i].get('low'))
+        prev_close = _f(rows[i - 1].get('close'))
+        if high is None or low is None or prev_close is None:
+            continue
+        trs.append(max(high - low, abs(high - prev_close), abs(low - prev_close)))
+    return sum(trs) / len(trs) if trs else None
+
+
+def structure_confirmation_from_row(row, klines=None):
+    row = row or {}
+    direction = str(row.get('direction') or '')
+    attr = row.get('score_attribution') or {}
+    obstacle_reason = str(attr.get('obstacle_reason') or '')
+    level = _f(row.get('structural_obstacle_price'))
+    if level is None:
+        level = _f(attr.get('structural_obstacle_price'))
+    if level is None:
+        level = _f(attr.get('obstacle_price'))
+
+    relevant = bool(direction in ('LONG', 'SHORT') and obstacle_reason == 'CLOSE_PRIOR_STRUCTURE')
+    result = {
+        'version': VERSION,
+        'relevant': relevant,
+        'direction': direction,
+        'obstacle_reason': obstacle_reason,
+        'structure_level': level,
+        'state': 'NOT_APPLICABLE' if not relevant else 'UNKNOWN_NO_MARKET_EVIDENCE',
+        'closed_candle_close': None,
+        'current_price': None,
+        'confirmation_buffer': None,
+        'closed_break_confirmed': False,
+        'hold_confirmed': False,
+        'confirmed': False,
+        'rule': 'CLOSED_1H_BREAK_BEYOND_STRUCTURE_PLUS_CURRENT_HOLD_ON_BREAKOUT_SIDE',
+        'research_only': True,
+        'shadow_only': True,
+        'can_override_production': False,
+        'production_threshold_changed': False,
+        'production_scoring_changed': False,
+        'live_execution': False,
+    }
+    if not relevant or level is None:
+        if relevant and level is None:
+            result['state'] = 'UNKNOWN_NO_STRUCTURE_LEVEL'
+        return result
+
+    rows = list(klines or [])
+    if len(rows) < 2:
+        return result
+
+    closed = _f(rows[-2].get('close'))
+    current = _f(rows[-1].get('close'))
+    if closed is None or current is None:
+        return result
+
+    atr = _atr_from_klines(rows, 14)
+    buffer_abs = max(abs(level) * 0.0005, (atr or 0.0) * 0.10)
+    if direction == 'LONG':
+        break_ok = closed >= level + buffer_abs
+        hold_ok = current >= level
+    else:
+        break_ok = closed <= level - buffer_abs
+        hold_ok = current <= level
+
+    confirmed = bool(break_ok and hold_ok)
+    result.update({
+        'state': 'CONFIRMED_CLOSE_HOLD' if confirmed else 'UNCONFIRMED_STRUCTURE_BREAK',
+        'closed_candle_close': round(closed, 10),
+        'current_price': round(current, 10),
+        'confirmation_buffer': round(buffer_abs, 10),
+        'closed_break_confirmed': bool(break_ok),
+        'hold_confirmed': bool(hold_ok),
+        'confirmed': confirmed,
+    })
+    return result
+
+
+def combined_shadow_from_row(row, threshold=68.0, klines=None):
     base = fourth_vote_shadow_from_row(row, threshold)
-    obstacle = str((row or {}).get('score_attribution', {}).get('obstacle_reason') or '')
+    structure = structure_confirmation_from_row(row, klines)
     direction = str((row or {}).get('direction') or '')
-    long_close_veto = bool(direction == 'LONG' and obstacle == 'CLOSE_PRIOR_STRUCTURE')
     fourth_qualified = bool(base.get('shadow_qualified'))
-    combined_qualified = bool(fourth_qualified and not long_close_veto)
+
+    # Fail closed inside SHADOW only when close-prior-structure evidence is relevant.
+    # UNKNOWN is deliberately treated as unconfirmed for research classification,
+    # but this never mutates Production.
+    structure_veto = bool(structure.get('relevant') and not structure.get('confirmed'))
+    combined_qualified = bool(fourth_qualified and not structure_veto)
     return {
         **base,
         'source': VERSION,
         'fourth_vote_shadow_qualified': fourth_qualified,
-        'obstacle_reason': obstacle,
-        'long_close_structure_veto': long_close_veto,
+        'structure_confirmation': structure,
+        'structure_confirmation_veto': structure_veto,
+        # Compatibility field retained for existing consumers.
+        'long_close_structure_veto': bool(direction == 'LONG' and structure_veto),
         'combined_shadow_qualified': combined_qualified,
         'combined_shadow_decision': 'QUALIFIED' if combined_qualified else 'WAIT',
         'combined_qualification_changed_vs_production': bool(base.get('production_qualified') != combined_qualified),
-        'methodology': 'FOURTH_VOTE_PREMIUM_DEMOTION_THEN_VETO_LONG_WITH_CLOSE_PRIOR_STRUCTURE',
+        'methodology': 'FOURTH_VOTE_SHADOW_PLUS_SYMMETRIC_CLOSED_1H_STRUCTURE_BREAK_AND_HOLD',
         'research_only': True,
         'shadow_only': True,
         'can_override_production': False,
@@ -60,8 +158,10 @@ def install(atlas):
                 'research_only': True, 'shadow_only': True,
                 'can_override_production': False, 'live_execution': False,
             }
-        payload = combined_shadow_from_row(row, float(atlas.CLOUD_FORWARD_MIN_SCORE))
+        market_klines = atlas._spot_klines(symbol)
+        payload = combined_shadow_from_row(row, float(atlas.CLOUD_FORWARD_MIN_SCORE), market_klines)
         payload['ok'] = True
+        payload['symbol'] = symbol
         payload['scoring_version'] = row.get('scoring_version')
         payload['score_attribution'] = row.get('score_attribution')
         return payload
@@ -89,7 +189,10 @@ def install(atlas):
         'version': VERSION,
         'endpoint': '/api/research/long-close-structure-shadow',
         'research_only': True,
+        'shadow_only': True,
         'can_override_production': False,
+        'production_scoring_changed': False,
         'production_threshold_changed': False,
         'live_execution': False,
+        'confirmation_rule': 'CLOSED_1H_BREAK_BEYOND_STRUCTURE_PLUS_CURRENT_HOLD_ON_BREAKOUT_SIDE',
     }
