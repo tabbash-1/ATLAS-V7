@@ -53,10 +53,10 @@ def _portfolio():
             "win_rate_pct": 66.67,
             "net_r": 1.5592,
             "avg_r": 0.5197,
-            "profit_factor": 2.5592,
+            "profit_factor": 2.5336,
             "max_drawdown_pct": 1.0,
-            "return_pct": 1.53,
-            "equity_usd": 10153.0,
+            "return_pct": 1.5336,
+            "equity_usd": 10153.36,
             "starting_equity_usd": 10000.0,
         },
     }
@@ -102,6 +102,17 @@ def test_shadow_or_historical_cannot_override_kpi():
     assert report["evidence_lanes"]["shadow"]["may_override_kpi"] is False
     assert report["evidence_lanes"]["analyst_forward_attribution"]["may_override_kpi"] is False
     assert report["integrity"]["historical_or_shadow_in_official_kpi"] is False
+
+
+def test_nested_canonical_outcome_counts_are_exposed_but_not_merged():
+    report = build_scorecard(
+        _portfolio(),
+        {"summary": {"forward_trade_ready_count": 10, "forward_wait_directional_count": 218}},
+    )
+    lane = report["evidence_lanes"]["canonical_outcomes"]
+    assert lane["forward_trade_ready_count"] == 10
+    assert lane["forward_wait_directional_count"] == 218
+    assert report["canonical_forward_performance"]["entries"] == 3
 
 
 def test_direction_cohorts_sum_to_canonical_entries():
