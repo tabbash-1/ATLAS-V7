@@ -1,0 +1,28 @@
+name: ATLAS CORE 4-12H Historical Replay
+
+on:
+  pull_request:
+    paths:
+      - 'historical_core_4_12h_replay.py'
+      - '.github/workflows/atlas-core-4-12h-historical-replay.yml'
+  workflow_dispatch:
+
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax check
+        run: python3 -m py_compile historical_core_4_12h_replay.py
+      - name: Run 180-day point-in-time replay
+        run: |
+          set -euo pipefail
+          python3 historical_core_4_12h_replay.py --days 180 | tee /tmp/atlas-replay.log
+          grep -q 'ATLAS_REPLAY_RESULT=' /tmp/atlas-replay.log
+      - name: Replay contract
+        run: |
+          set -euo pipefail
+          grep -q 'forward_proof_equivalent.*False' historical_core_4_12h_replay.py
+          grep -q 'can_override_production.*False' historical_core_4_12h_replay.py
+          grep -q 'score_is_theory_proxy_not_exact_production_score' historical_core_4_12h_replay.py
