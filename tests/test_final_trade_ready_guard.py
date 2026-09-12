@@ -54,6 +54,48 @@ def test_aligned_actionable_is_certified_trade_ready():
     assert paper_final.strict_trade_ready(r) is True
 
 
+def test_unconfirmed_breakout_continuation_fails_closed():
+    d = base_row(
+        playbook='BREAKOUT_CONTINUATION_SHORT',
+        structural_geometry={'breakout': {'confirmed': False}},
+    )
+    r = guard.apply(d)
+    assert r['trade_ready'] is False
+    assert r['actionable_decision'] == 'WAIT'
+    assert 'BREAKOUT_STRUCTURE_NOT_CONFIRMED' in r['final_trade_gate']['blockers']
+    assert r['final_trade_gate']['structure_confirmation']['requires_confirmation'] is True
+    assert r['final_trade_gate']['structure_confirmation']['confirmed'] is False
+    assert paper_final.strict_trade_ready(r) is False
+
+
+def test_confirmed_breakout_still_can_pass_final_gate():
+    d = base_row(
+        playbook='BREAKOUT_CONFIRMED_SHORT',
+        structural_geometry={'breakout': {'confirmed': True}},
+    )
+    r = guard.apply(d)
+    assert r['trade_ready'] is True
+    assert r['final_trade_gate']['status'] == 'TRADE_READY'
+    assert r['final_trade_gate']['structure_confirmation']['requires_confirmation'] is True
+    assert r['final_trade_gate']['structure_confirmation']['confirmed'] is True
+    assert r['final_trade_gate']['score_changed'] is False
+    assert r['final_trade_gate']['threshold_changed'] is False
+
+
+def test_breakout_without_canonical_confirmation_evidence_fails_closed():
+    d = base_row(playbook='BREAKOUT_CONTINUATION_SHORT')
+    r = guard.apply(d)
+    assert r['trade_ready'] is False
+    assert 'BREAKOUT_CONFIRMATION_EVIDENCE_MISSING' in r['final_trade_gate']['blockers']
+
+
+def test_non_breakout_pullback_path_is_not_regressed():
+    d = base_row(playbook='TREND_PULLBACK_SHORT')
+    r = guard.apply(d)
+    assert r['trade_ready'] is True
+    assert r['final_trade_gate']['structure_confirmation']['requires_confirmation'] is False
+
+
 def test_production_stale_wait_still_fails_closed_by_default():
     old=os.environ.pop(guard.EXPERIMENTAL_PROMOTION_ENV, None)
     try:
