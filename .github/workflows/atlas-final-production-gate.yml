@@ -33,7 +33,7 @@ jobs:
     timeout-minutes: 15
     env:
       BASE_URL: https://atlas-v7.onrender.com
-      EXPECTED_FINAL_GUARD: FINAL_TRADE_READY_GUARD_V1_HTF_FAIL_CLOSED
+      EXPECTED_FINAL_GUARD: FINAL_TRADE_READY_GUARD_V4_STRUCTURE_CONFIRMATION
       EXPECTED_CANONICAL: ATLAS_CANONICAL_DECISION_TRUTH_V1
       EXPECTED_GEOMETRY: ATLAS_CANONICAL_GEOMETRY_TRUTH_V1
     steps:
@@ -44,6 +44,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m py_compile canonical_decision_contract.py final_trade_ready_guard.py cloud_web_only_final.py
+          python3 tests/test_final_trade_ready_guard.py
           node --check production-web-autoload.js
           node --check atlas-product-shell.js
           node --check atlas-unified-terminal.js
@@ -147,5 +148,6 @@ jobs:
         run: |
           set -euo pipefail
           grep -q 'ATLAS_CANONICAL_DECISION_TRUTH_V1' canonical_decision_contract.py
-          grep -q 'FINAL_TRADE_READY_GUARD_V1_HTF_FAIL_CLOSED' final_trade_ready_guard.py
-          echo 'ATLAS FINAL PRODUCTION GATE: PASS · SOURCE_OF_TRUTH=FINAL_TRADE_GATE'
+          grep -q 'FINAL_TRADE_READY_GUARD_V4_STRUCTURE_CONFIRMATION' final_trade_ready_guard.py
+          grep -q 'BREAKOUT_STRUCTURE_NOT_CONFIRMED' final_trade_ready_guard.py
+          echo 'ATLAS FINAL PRODUCTION GATE: PASS · SOURCE_OF_TRUTH=FINAL_TRADE_GATE · STRUCTURE_CONFIRMATION=REQUIRED_FOR_BREAKOUT'
