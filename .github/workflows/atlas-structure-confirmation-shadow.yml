@@ -1,0 +1,42 @@
+name: ATLAS Structure Confirmation Shadow
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'prospective_long_close_shadow.py'
+      - 'tests/test_prospective_long_close_shadow.py'
+      - '.github/workflows/atlas-structure-confirmation-shadow.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'prospective_long_close_shadow.py'
+      - 'tests/test_prospective_long_close_shadow.py'
+      - '.github/workflows/atlas-structure-confirmation-shadow.yml'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax
+        run: python -m py_compile prospective_long_close_shadow.py tests/test_prospective_long_close_shadow.py
+      - name: Structure confirmation regressions
+        run: PYTHONPATH=. python tests/test_prospective_long_close_shadow.py
+      - name: Shadow safety invariants
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          src = Path('prospective_long_close_shadow.py').read_text()
+          assert "can_override_production': False" in src
+          assert "production_threshold_changed': False" in src
+          assert "production_scoring_changed': False" in src
+          assert "live_execution': False" in src
+          assert 'CLOSED_1H_BREAK_BEYOND_STRUCTURE_PLUS_CURRENT_HOLD_ON_BREAKOUT_SIDE' in src
+          print('Structure confirmation shadow safety: OK')
+          PY
