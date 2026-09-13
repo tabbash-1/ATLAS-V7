@@ -1,0 +1,50 @@
+name: ATLAS Adaptive Evidence Live Prospective
+
+on:
+  pull_request:
+    paths:
+      - 'adaptive_evidence_engine.py'
+      - 'adaptive_evidence_live_snapshot.py'
+      - 'tests/test_adaptive_evidence_live_snapshot.py'
+      - '.github/workflows/atlas-adaptive-evidence-live.yml'
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atlas-adaptive-evidence-live
+  cancel-in-progress: false
+
+jobs:
+  prospective:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax and contract tests
+        run: |
+          python3 -m py_compile adaptive_evidence_engine.py adaptive_evidence_live_snapshot.py tests/test_adaptive_evidence_live_snapshot.py
+          python3 - <<'PY'
+          import tests.test_adaptive_evidence_live_snapshot as t
+          for name in sorted(n for n in dir(t) if n.startswith('test_')):
+              getattr(t,name)()
+              print('PASS',name)
+          PY
+      - name: Capture prospective XRP/ZEC shadow observations
+        if: github.event_name != 'pull_request'
+        run: |
+          python3 adaptive_evidence_live_snapshot.py --symbols XRPUSDT ZECUSDT
+          jq -e '.research_only == true and .live_execution == false and .can_override_production == false and .production_threshold_unchanged == 68 and (.observations | length) == 2' status/adaptive-evidence-shadow-latest.json >/dev/null
+      - name: Commit prospective shadow evidence
+        if: github.event_name != 'pull_request'
+        run: |
+          git config user.name "atlas-adaptive-evidence-bot"
+          git config user.email "atlas-adaptive-evidence-bot@users.noreply.github.com"
+          git add status/adaptive-evidence-shadow-latest.json status/history/adaptive-evidence-shadow-observations.jsonl
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "research: record adaptive evidence shadow observation [skip ci]"
+          git pull --rebase origin main
+          git push
