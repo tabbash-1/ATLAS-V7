@@ -37,7 +37,7 @@ def test_product_shell_binds_geometry_to_canonical_final_gate_snapshot():
 
 def test_unified_terminal_is_final_gate_only_and_wait_hides_candidate_direction():
     src = text('atlas-unified-terminal.js')
-    assert "ATLAS_UNIFIED_TERMINAL_V5_STRICT_FINAL_GATE" in src
+    assert "ATLAS_UNIFIED_TERMINAL_V6_SINGLE_SNAPSHOT_HTF" in src
     assert "const PRODUCT_FRAMES=['1d','12h','4h','1h']" in src
     assert "['1d','12h','6h','4h','1h']" not in src
     assert 'p.product_direction||p.candidate_direction' not in src
@@ -45,6 +45,26 @@ def test_unified_terminal_is_final_gate_only_and_wait_hides_candidate_direction(
     assert "$('auDir').textContent=actionable?decision:'—'" in src
     assert "a?.canonical_decision_id!==c.decision_id" in src
     assert "a?.decision_source_of_truth!=='FINAL_TRADE_GATE'" in src
+
+
+def test_unified_terminal_market_map_uses_only_canonical_production_frames():
+    src = text('atlas-unified-terminal.js')
+    assert "function canonicalFrame(p,tf)" in src
+    assert "p?.htf_thesis?.frames?.[tf]" in src
+    assert "deep?.mtf_states?.[tf]" not in src
+    assert "const z=canonicalFrame(p,tf)" in src
+    assert "market_map_source:'production.htf_thesis.frames'" in src
+    assert "canonical_decision_id:c.decision_id" in src
+    assert "Canonical · RSI" in src
+
+
+def test_unified_terminal_core_asset_authority_is_asset_agnostic():
+    terminal = text('atlas-unified-terminal.js')
+    production = text('atlas-production-decision.js')
+    for symbol in ['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT']:
+        assert symbol in production
+    assert "marketMapSource:'production.htf_thesis.frames'" in terminal
+    assert "sourceOfTruth:'FINAL_TRADE_GATE'" in terminal
 
 
 def test_paper_ui_consumes_only_canonical_outcome_summary():
@@ -78,6 +98,8 @@ if __name__ == '__main__':
     test_product_shell_does_not_fetch_or_publish_production_decision()
     test_product_shell_binds_geometry_to_canonical_final_gate_snapshot()
     test_unified_terminal_is_final_gate_only_and_wait_hides_candidate_direction()
+    test_unified_terminal_market_map_uses_only_canonical_production_frames()
+    test_unified_terminal_core_asset_authority_is_asset_agnostic()
     test_paper_ui_consumes_only_canonical_outcome_summary()
     test_production_decision_rejects_stale_responses()
     test_snapshot_guard_is_the_only_acceptance_surface()
