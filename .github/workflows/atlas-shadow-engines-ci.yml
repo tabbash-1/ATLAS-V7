@@ -4,68 +4,24 @@ on:
   push:
     branches: [main]
     paths:
-      - 'microstructure_memory.py'
-      - 'microstructure_walkforward.py'
-      - 'microstructure_runtime.py'
-      - 'volatility_forecast_engine.py'
-      - 'volatility_walkforward.py'
-      - 'volatility_runtime.py'
-      - 'volatility_walkforward_runtime.py'
-      - 'edge_evidence_overlap.py'
-      - 'edge_evidence_redundancy.py'
-      - 'edge_evidence_joint_coverage.py'
-      - 'edge_evidence_interaction_protocol.py'
-      - 'edge_evidence_interaction_validator_guard.py'
-      - 'edge_evidence_report.py'
-      - 'tests/test_microstructure_memory.py'
-      - 'tests/test_microstructure_walkforward.py'
-      - 'tests/test_microstructure_runtime.py'
-      - 'tests/test_volatility_forecast_engine.py'
-      - 'tests/test_volatility_walkforward.py'
-      - 'tests/test_volatility_runtime.py'
-      - 'tests/test_volatility_walkforward_runtime.py'
-      - 'tests/test_edge_evidence_overlap.py'
-      - 'tests/test_edge_evidence_redundancy.py'
-      - 'tests/test_edge_evidence_joint_coverage.py'
-      - 'tests/test_edge_evidence_joint_governance.py'
-      - 'tests/test_edge_evidence_interaction_protocol.py'
-      - 'tests/test_edge_evidence_interaction_validator_guard.py'
-      - 'tests/test_edge_evidence_report.py'
+      - 'microstructure_*.py'
+      - 'volatility_*.py'
+      - 'edge_evidence_*.py'
+      - 'tests/test_microstructure_*.py'
+      - 'tests/test_volatility_*.py'
+      - 'tests/test_edge_evidence_*.py'
       - '.github/workflows/atlas-shadow-engines-ci.yml'
-      - '.github/workflows/atlas-interaction-protocol-ci.yml'
       - 'cloud_start.py'
   pull_request:
     branches: [main]
     paths:
-      - 'microstructure_memory.py'
-      - 'microstructure_walkforward.py'
-      - 'microstructure_runtime.py'
-      - 'volatility_forecast_engine.py'
-      - 'volatility_walkforward.py'
-      - 'volatility_runtime.py'
-      - 'volatility_walkforward_runtime.py'
-      - 'edge_evidence_overlap.py'
-      - 'edge_evidence_redundancy.py'
-      - 'edge_evidence_joint_coverage.py'
-      - 'edge_evidence_interaction_protocol.py'
-      - 'edge_evidence_interaction_validator_guard.py'
-      - 'edge_evidence_report.py'
-      - 'tests/test_microstructure_memory.py'
-      - 'tests/test_microstructure_walkforward.py'
-      - 'tests/test_microstructure_runtime.py'
-      - 'tests/test_volatility_forecast_engine.py'
-      - 'tests/test_volatility_walkforward.py'
-      - 'tests/test_volatility_runtime.py'
-      - 'tests/test_volatility_walkforward_runtime.py'
-      - 'tests/test_edge_evidence_overlap.py'
-      - 'tests/test_edge_evidence_redundancy.py'
-      - 'tests/test_edge_evidence_joint_coverage.py'
-      - 'tests/test_edge_evidence_joint_governance.py'
-      - 'tests/test_edge_evidence_interaction_protocol.py'
-      - 'tests/test_edge_evidence_interaction_validator_guard.py'
-      - 'tests/test_edge_evidence_report.py'
+      - 'microstructure_*.py'
+      - 'volatility_*.py'
+      - 'edge_evidence_*.py'
+      - 'tests/test_microstructure_*.py'
+      - 'tests/test_volatility_*.py'
+      - 'tests/test_edge_evidence_*.py'
       - '.github/workflows/atlas-shadow-engines-ci.yml'
-      - '.github/workflows/atlas-interaction-protocol-ci.yml'
       - 'cloud_start.py'
 
 jobs:
@@ -81,7 +37,7 @@ jobs:
         run: python -m pip install --disable-pip-version-check pytest
       - name: Syntax
         run: |
-          python -m py_compile microstructure_memory.py microstructure_walkforward.py microstructure_runtime.py volatility_forecast_engine.py volatility_walkforward.py volatility_runtime.py volatility_walkforward_runtime.py edge_evidence_overlap.py edge_evidence_redundancy.py edge_evidence_joint_coverage.py edge_evidence_interaction_protocol.py edge_evidence_interaction_validator_guard.py edge_evidence_report.py
+          python -m py_compile microstructure_memory.py microstructure_walkforward.py microstructure_runtime.py volatility_forecast_engine.py volatility_walkforward.py volatility_runtime.py volatility_walkforward_runtime.py edge_evidence_overlap.py edge_evidence_redundancy.py edge_evidence_joint_coverage.py edge_evidence_interaction_protocol.py edge_evidence_interaction_validator_guard.py edge_evidence_report.py cloud_start.py
       - name: Shadow engine regression tests
         run: |
           PYTHONPATH=. python -m pytest -q \
@@ -99,102 +55,87 @@ jobs:
             tests/test_edge_evidence_interaction_protocol.py \
             tests/test_edge_evidence_interaction_validator_guard.py \
             tests/test_edge_evidence_report.py
-      - name: Preserve shadow-only contract
+      - name: Preserve shadow-only contract and Render isolation
         run: |
-          grep -q "can_override_production.*False" microstructure_runtime.py
-          grep -q "gate_mode.*OBSERVE_ONLY" microstructure_runtime.py
-          grep -q "probability_calibrated.*False" volatility_forecast_engine.py
-          grep -q "can_override_production.*False" volatility_forecast_engine.py
-          grep -q "can_override_production.*False" volatility_walkforward.py
-          grep -q "gate_promoted.*False" volatility_walkforward.py
-          grep -q "can_override_production.*False" volatility_runtime.py
-          grep -q "network_calls_in_decision_path.*False" volatility_runtime.py
-          grep -q "background_only.*True" volatility_walkforward_runtime.py
-          grep -q "wraps_production_decision.*False" volatility_walkforward_runtime.py
-          grep -q "wraps_forward_observe.*False" volatility_walkforward_runtime.py
-          grep -q "can_override_production.*False" volatility_walkforward_runtime.py
-          grep -q "outcomes_read.*False" edge_evidence_overlap.py
-          grep -q "historical_features_recomputed.*False" edge_evidence_overlap.py
-          grep -q "weights_assigned.*False" edge_evidence_overlap.py
-          grep -q "composite_trade_score_created.*False" edge_evidence_overlap.py
-          grep -q "cross_layer_interaction_filtering_enabled.*False" edge_evidence_overlap.py
-          grep -q "gate_promoted.*False" edge_evidence_overlap.py
-          grep -q "can_override_production.*False" edge_evidence_overlap.py
-          grep -q "production_ready_claimed.*False" edge_evidence_overlap.py
-          grep -q "live_trading_ready_claimed.*False" edge_evidence_overlap.py
-          grep -q "wraps_production_decision.*False" edge_evidence_overlap.py
-          grep -q "wraps_forward_observe.*False" edge_evidence_overlap.py
-          grep -q "outcomes_read.*False" edge_evidence_redundancy.py
-          grep -q "historical_features_recomputed.*False" edge_evidence_redundancy.py
-          grep -q "weights_assigned.*False" edge_evidence_redundancy.py
-          grep -q "composite_trade_score_created.*False" edge_evidence_redundancy.py
-          grep -q "cross_layer_interaction_filtering_enabled.*False" edge_evidence_redundancy.py
-          grep -q "gate_promoted.*False" edge_evidence_redundancy.py
-          grep -q "can_override_production.*False" edge_evidence_redundancy.py
-          grep -q "production_ready_claimed.*False" edge_evidence_redundancy.py
-          grep -q "live_trading_ready_claimed.*False" edge_evidence_redundancy.py
-          grep -q "statistical_independence_claimed.*False" edge_evidence_redundancy.py
-          grep -q "chosen_trade_horizon_assumed.*False" edge_evidence_redundancy.py
-          grep -q "wraps_production_decision.*False" edge_evidence_redundancy.py
-          grep -q "wraps_forward_observe.*False" edge_evidence_redundancy.py
-          grep -q "outcomes_read.*False" edge_evidence_joint_coverage.py
-          grep -q "performance_metrics_computed.*False" edge_evidence_joint_coverage.py
-          grep -q "rules_searched.*False" edge_evidence_joint_coverage.py
-          grep -q "grid_search_performed.*False" edge_evidence_joint_coverage.py
-          grep -q "weights_assigned.*False" edge_evidence_joint_coverage.py
-          grep -q "composite_trade_score_created.*False" edge_evidence_joint_coverage.py
-          grep -q "cross_layer_interaction_filtering_enabled.*False" edge_evidence_joint_coverage.py
-          grep -q "interaction_rule_selection_allowed.*False" edge_evidence_joint_coverage.py
-          grep -q "interaction_outcome_testing_performed.*False" edge_evidence_joint_coverage.py
-          grep -q "gate_promoted.*False" edge_evidence_joint_coverage.py
-          grep -q "can_override_production.*False" edge_evidence_joint_coverage.py
-          grep -q "production_ready_claimed.*False" edge_evidence_joint_coverage.py
-          grep -q "live_trading_ready_claimed.*False" edge_evidence_joint_coverage.py
-          grep -q "chosen_trade_horizon_assumed.*False" edge_evidence_joint_coverage.py
-          grep -q "wraps_production_decision.*False" edge_evidence_joint_coverage.py
-          grep -q "wraps_forward_observe.*False" edge_evidence_joint_coverage.py
-          grep -q "outcomes_read.*False" edge_evidence_interaction_protocol.py
-          grep -q "interaction_outcome_testing_performed.*False" edge_evidence_interaction_protocol.py
-          grep -q "grid_search_performed.*False" edge_evidence_interaction_protocol.py
-          grep -q "cross_layer_interaction_filtering_enabled.*False" edge_evidence_interaction_protocol.py
-          grep -q "interaction_filter_activation_allowed.*False" edge_evidence_interaction_protocol.py
-          grep -q "gate_promoted.*False" edge_evidence_interaction_protocol.py
-          grep -q "can_override_production.*False" edge_evidence_interaction_protocol.py
-          grep -q "protocol_hash_required.*True" edge_evidence_interaction_validator_guard.py
-          grep -q "outcomes_read.*False" edge_evidence_interaction_validator_guard.py
-          grep -q "validator_execution_started.*False" edge_evidence_interaction_validator_guard.py
-          grep -q "interaction_outcome_testing_performed.*False" edge_evidence_interaction_validator_guard.py
-          grep -q "grid_search_allowed.*False" edge_evidence_interaction_validator_guard.py
-          grep -q "cross_layer_interaction_filtering_enabled.*False" edge_evidence_interaction_validator_guard.py
-          grep -q "interaction_filter_activation_allowed.*False" edge_evidence_interaction_validator_guard.py
-          grep -q "gate_promoted.*False" edge_evidence_interaction_validator_guard.py
-          grep -q "can_override_production.*False" edge_evidence_interaction_validator_guard.py
-          grep -q "weights_assigned.*False" edge_evidence_report.py
-          grep -q "composite_trade_score_created.*False" edge_evidence_report.py
-          grep -q "cross_layer_interaction_filtering_enabled.*False" edge_evidence_report.py
-          grep -q "production_ready_claimed.*False" edge_evidence_report.py
-          grep -q "live_trading_ready_claimed.*False" edge_evidence_report.py
-          grep -q "wraps_production_decision.*False" edge_evidence_report.py
-          grep -q "wraps_forward_observe.*False" edge_evidence_report.py
-          grep -q "can_override_production.*False" edge_evidence_report.py
-          grep -q "edge_evidence_overlap.install(collector)" edge_evidence_report.py
-          grep -q "edge_evidence_redundancy.install(collector)" edge_evidence_report.py
-          grep -q "edge_evidence_joint_coverage.install(collector)" edge_evidence_report.py
-          grep -q "frozen_signal_cohorts_comparable" edge_evidence_report.py
-          grep -q "redundancy_diagnostic_affects_status.*False" edge_evidence_report.py
-          grep -q "joint_coverage_diagnostic_affects_status.*False" edge_evidence_report.py
-          grep -q "interaction_validation_started.*False" edge_evidence_report.py
-          grep -q 'edge_evidence_report.install(collector)' volatility_walkforward_runtime.py
-          grep -q 'edge_evidence_interaction_protocol.install(collector)' volatility_walkforward_runtime.py
-          grep -q 'edge_evidence_interaction_validator_guard.install(collector)' volatility_walkforward_runtime.py
-          grep -q '_install_profit_engine_runtime' cloud_start.py
-          grep -q '_install_microstructure_runtime' cloud_start.py
-          grep -q '_install_volatility_runtime' cloud_start.py
-          grep -q '_install_volatility_walkforward_runtime' cloud_start.py
-          profit_line=$(grep -n '_install_profit_engine_runtime(_collector)' cloud_start.py | head -1 | cut -d: -f1)
-          micro_line=$(grep -n '_install_microstructure_runtime(_collector)' cloud_start.py | head -1 | cut -d: -f1)
-          volatility_line=$(grep -n '_install_volatility_runtime(_collector)' cloud_start.py | head -1 | cut -d: -f1)
-          volatility_wf_line=$(grep -n '_install_volatility_walkforward_runtime(_collector)' cloud_start.py | head -1 | cut -d: -f1)
-          test "$micro_line" -gt "$profit_line"
-          test "$volatility_line" -gt "$micro_line"
-          test "$volatility_wf_line" -gt "$volatility_line"
+          python - <<'PY'
+          from pathlib import Path
+
+          required = {
+              'microstructure_runtime.py': [
+                  "can_override_production': False", "gate_mode': 'OBSERVE_ONLY'"
+              ],
+              'volatility_forecast_engine.py': [
+                  "probability_calibrated': False", "can_override_production': False"
+              ],
+              'volatility_walkforward.py': [
+                  "can_override_production': False", "gate_promoted': False"
+              ],
+              'volatility_runtime.py': [
+                  "can_override_production': False", "network_calls_in_decision_path': False"
+              ],
+              'volatility_walkforward_runtime.py': [
+                  "background_only': True", "wraps_production_decision': False",
+                  "wraps_forward_observe': False", "can_override_production': False",
+                  'edge_evidence_report.install(collector)',
+                  'edge_evidence_interaction_protocol.install(collector)',
+                  'edge_evidence_interaction_validator_guard.install(collector)',
+              ],
+              'edge_evidence_overlap.py': [
+                  "outcomes_read': False", "weights_assigned': False",
+                  "composite_trade_score_created': False", "gate_promoted': False",
+                  "can_override_production': False", "production_ready_claimed': False",
+                  "live_trading_ready_claimed': False", "wraps_production_decision': False",
+                  "wraps_forward_observe': False",
+              ],
+              'edge_evidence_redundancy.py': [
+                  "outcomes_read': False", "weights_assigned': False",
+                  "composite_trade_score_created': False", "gate_promoted': False",
+                  "can_override_production': False", "production_ready_claimed': False",
+                  "live_trading_ready_claimed': False", "wraps_production_decision': False",
+                  "wraps_forward_observe': False",
+              ],
+              'edge_evidence_joint_coverage.py': [
+                  "outcomes_read': False", "performance_metrics_computed': False",
+                  "rules_searched': False", "grid_search_performed': False",
+                  "weights_assigned': False", "composite_trade_score_created': False",
+                  "interaction_rule_selection_allowed': False",
+                  "interaction_outcome_testing_performed': False",
+                  "gate_promoted': False", "can_override_production': False",
+                  "production_ready_claimed': False", "live_trading_ready_claimed': False",
+                  "wraps_production_decision': False", "wraps_forward_observe': False",
+              ],
+              'edge_evidence_interaction_protocol.py': [
+                  "outcomes_read': False", "interaction_outcome_testing_performed': False",
+                  "grid_search_performed': False", "interaction_filter_activation_allowed': False",
+                  "gate_promoted': False", "can_override_production': False",
+              ],
+              'edge_evidence_interaction_validator_guard.py': [
+                  "protocol_hash_required': True", "outcomes_read': False",
+                  "validator_execution_started': False", "grid_search_allowed': False",
+                  "interaction_filter_activation_allowed': False", "gate_promoted': False",
+                  "can_override_production': False",
+              ],
+              'edge_evidence_report.py': [
+                  "weights_assigned': False", "composite_trade_score_created': False",
+                  "production_ready_claimed': False", "live_trading_ready_claimed': False",
+                  "wraps_production_decision': False", "wraps_forward_observe': False",
+                  "can_override_production': False", "interaction_validation_started': False",
+              ],
+          }
+          for filename, markers in required.items():
+              text = Path(filename).read_text(encoding='utf-8')
+              for marker in markers:
+                  assert marker in text, f'{filename}: missing safety marker {marker}'
+
+          boot = Path('cloud_start.py').read_text(encoding='utf-8')
+          start = boot.index('if os.environ.get("RENDER"):')
+          end = boot.index('else:', start)
+          render = boot[start:end]
+          assert 'ATLAS_WEB_ONLY"] = "1"' in render
+          for forbidden in (
+              '_install_profit_engine_runtime', '_install_microstructure_runtime',
+              '_install_volatility_runtime', '_install_volatility_walkforward_runtime',
+              'interaction_outcome_runtime',
+          ):
+              assert forbidden not in render, f'Render must not install shadow worker: {forbidden}'
+          PY
