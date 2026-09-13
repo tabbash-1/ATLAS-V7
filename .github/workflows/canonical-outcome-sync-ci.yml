@@ -1,0 +1,50 @@
+name: Canonical Outcome Sync CI
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/atlas-paper-portfolio-10k.yml'
+      - '.github/workflows/atlas-offline-forward-evaluation.yml'
+      - '.github/workflows/canonical-outcome-sync-ci.yml'
+      - 'canonical_outcome_snapshot.py'
+      - 'tests/test_canonical_outcome_sync_workflows.py'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/atlas-paper-portfolio-10k.yml'
+      - '.github/workflows/atlas-offline-forward-evaluation.yml'
+      - '.github/workflows/canonical-outcome-sync-ci.yml'
+      - 'canonical_outcome_snapshot.py'
+      - 'tests/test_canonical_outcome_sync_workflows.py'
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify producer synchronization contract
+        run: |
+          set -euo pipefail
+          PYTHONPATH=. python tests/test_canonical_outcome_sync_workflows.py
+          python -m py_compile canonical_outcome_snapshot.py
+      - name: Rebuild canonical snapshot from committed authoritative inputs
+        run: |
+          set -euo pipefail
+          python canonical_outcome_snapshot.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          x=json.loads(Path('status/canonical-outcomes-latest.json').read_text())
+          assert x['schema']=='ATLAS_CANONICAL_OUTCOME_SNAPSHOT_V1'
+          assert x['decision_source_of_truth']=='FINAL_TRADE_GATE'
+          assert x['evaluation_horizons_h']==[4,8,12]
+          assert x['legacy_backfill_allowed'] is False
+          assert x['legacy_score_path_research_included'] is False
+          assert x['safety']['live_execution'] is False
+          assert x['safety']['can_override_production'] is False
+          print('CANONICAL_OUTCOME_SYNC_OK')
+          PY
