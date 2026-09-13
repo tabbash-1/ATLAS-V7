@@ -1,0 +1,53 @@
+name: ATLAS Production Asset Universe CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'production_asset_universe.py'
+      - 'canonical_asset_ui_boot_patch.py'
+      - 'cloud_production_canonical.py'
+      - 'cloud_start.py'
+      - 'app.js'
+      - 'tests/test_production_asset_universe.py'
+      - '.github/workflows/atlas-production-asset-universe-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'production_asset_universe.py'
+      - 'canonical_asset_ui_boot_patch.py'
+      - 'cloud_production_canonical.py'
+      - 'cloud_start.py'
+      - 'app.js'
+      - 'tests/test_production_asset_universe.py'
+      - '.github/workflows/atlas-production-asset-universe-ci.yml'
+
+jobs:
+  canonical-seven-assets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test runner
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Syntax
+        run: python -m py_compile production_asset_universe.py canonical_asset_ui_boot_patch.py cloud_production_canonical.py tests/test_production_asset_universe.py
+      - name: Canonical Production asset regression
+        run: PYTHONPATH=. python -m pytest -q tests/test_production_asset_universe.py
+      - name: Safety invariants
+        run: |
+          python - <<'PY'
+          from production_asset_universe import CANONICAL_PRODUCTION_ASSETS
+          expected = ('BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT')
+          assert CANONICAL_PRODUCTION_ASSETS == expected
+          assert len(CANONICAL_PRODUCTION_ASSETS) == 7
+          assert 'HYPEUSDT' not in CANONICAL_PRODUCTION_ASSETS
+          PY
+          grep -q 'score_changed.*False' production_asset_universe.py
+          grep -q 'threshold_changed.*False' production_asset_universe.py
+          grep -q 'live_execution.*False' production_asset_universe.py
+          grep -q 'HYPEUSDT' canonical_asset_ui_boot_patch.py
+          grep -q 'CANONICAL_PRODUCTION_SYMBOLS.has' canonical_asset_ui_boot_patch.py
