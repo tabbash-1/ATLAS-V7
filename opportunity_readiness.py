@@ -22,6 +22,7 @@ def assess(decision):
     gate = decision.get("final_trade_gate") or {}
     htf = decision.get("htf_thesis") or {}
     trade_ready = bool(gate.get("trade_ready"))
+    production_qualified = bool(decision.get("production_signal_qualified"))
 
     checks = {
         "htf_direction_resolved": bool(decision.get("product_direction") in ("LONG", "SHORT"))
@@ -29,7 +30,7 @@ def assess(decision):
         "htf_4h_12h_aligned": not _has(blockers, "HTF_4H_12H_NOT_ALIGNED")
             and htf.get("reason") != "4H_12H_NOT_ALIGNED",
         "entry_confirmation_aligned": not _has(blockers, "ENTRY_CONFIRMATION_NOT_ALIGNED"),
-        "production_score_qualified": bool(decision.get("production_signal_qualified"))
+        "production_score_qualified": production_qualified
             and not _has(blockers, "PRODUCTION_SIGNAL_NOT_QUALIFIED"),
         "score_direction_matches_htf": decision.get("direction_alignment") == "ALIGNED"
             and not _has(blockers, "SCORE_DIRECTION_NOT_HTF_DIRECTION"),
@@ -75,6 +76,7 @@ def assess(decision):
         "score": score,
         "signal_threshold": threshold,
         "score_gap_to_threshold": round(score_gap, 3) if score_gap is not None else None,
+        "production_signal_qualified": production_qualified,
         "trade_ready": trade_ready,
         "readiness_score": readiness,
         "readiness_tier": tier,
@@ -111,7 +113,7 @@ def install(atlas):
         rows.sort(key=lambda row: (
             1 if row.get("trade_ready") else 0,
             row.get("readiness_score") or 0,
-            1 if row.get("production_score_qualified") else 0,
+            1 if row.get("production_signal_qualified") else 0,
             row.get("score") if row.get("score") is not None else -1,
         ), reverse=True)
         for idx, row in enumerate(rows, 1):
