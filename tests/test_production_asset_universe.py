@@ -1,6 +1,7 @@
 from pathlib import Path
 from types import SimpleNamespace
 
+from canonical_asset_ui_boot_patch import apply as apply_canonical_asset_ui_patch
 from canonical_asset_ui_boot_patch import transform_app_js
 from production_asset_universe import (
     CANONICAL_PRODUCTION_ASSETS,
@@ -69,6 +70,34 @@ let assets = Array.isArray(savedAssets) && savedAssets.length
     assert "HYPEUSDT" not in patched.upper()
     assert "BINANCE:BTCUSDT" in patched
     assert "CANONICAL_PRODUCTION_SYMBOLS.has(String(a.symbol || '').toUpperCase())" in patched
+
+
+def test_hype_exposure_diagnostic_ignores_legacy_chart_conditional(tmp_path):
+    # Render's legacy chart compatibility patch leaves HYPEUSDT inside a
+    # conditional expression even though HYPE is no longer a selectable asset.
+    # The runtime health flag must report actual asset exposure, not token text.
+    app = """const defaultAssets = [
+  { name: 'Bitcoin / USDT', symbol: 'BINANCE:BTCUSDT', cls: 'Crypto' }
+];
+const savedAssets = JSON.parse(localStorage.getItem('atlas.assets') || 'null');
+let assets = Array.isArray(savedAssets) && savedAssets.length
+  ? savedAssets.filter(a => a && a.cls === 'Crypto' && String(a.symbol || '').toUpperCase().endsWith('USDT'))
+  : defaultAssets;
+function openAsset(asset) {
+  loadTradingView(asset.symbol==='BINANCE:HYPEUSDT'?'BYBIT:HYPEUSDT':asset.symbol);
+}
+"""
+    (tmp_path / "app.js").write_text(app, encoding="utf-8")
+
+    state = apply_canonical_asset_ui_patch(tmp_path)
+    patched = (tmp_path / "app.js").read_text(encoding="utf-8")
+
+    assert "HYPEUSDT" in patched.upper()  # compatibility token may remain
+    assert state["hype_exposed"] is False
+    assert state["count"] == 7
+    assert state["saved_assets_filtered"] is True
+    assert state["score_changed"] is False
+    assert state["threshold_changed"] is False
 
 
 def test_render_entrypoint_routes_through_canonical_universe_launcher():
