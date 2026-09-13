@@ -10,52 +10,41 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
-      - name: Fetch live Production decisions across core assets
+      - name: Verify live opportunity readiness ranking
         run: |
           set -euo pipefail
-          for symbol in BTCUSDT ETHUSDT SOLUSDT BNBUSDT XRPUSDT DOGEUSDT ZECUSDT; do
-            echo "=== ${symbol} ==="
-            out="/tmp/${symbol}.json"
-            ok=0
-            for attempt in $(seq 1 8); do
-              code="$(curl -L --connect-timeout 20 --max-time 90 -sS -w '%{http_code}' -o "$out" "https://atlas-v7.onrender.com/api/decision/current?symbol=${symbol}" || true)"
-              if [[ "$code" =~ ^2 ]] && jq -e '.ok == true' "$out" >/dev/null 2>&1; then
-                ok=1
-                break
-              fi
-              echo "probe retry ${attempt}/8 for ${symbol}, HTTP ${code:-none}"
-              sleep 5
-            done
-            if [[ "$ok" != "1" ]]; then
-              echo "FAILED_TO_FETCH_VALID_JSON ${symbol}" >&2
-              cat "$out" >&2 || true
-              exit 1
+          out=/tmp/ranked.json
+          ok=0
+          url='https://atlas-v7.onrender.com/api/opportunities/ranked?symbols=BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT,XRPUSDT,DOGEUSDT,ZECUSDT'
+          for attempt in $(seq 1 12); do
+            code="$(curl -L --connect-timeout 20 --max-time 120 -sS -w '%{http_code}' -o "$out" "$url" || true)"
+            if [[ "$code" =~ ^2 ]] && jq -e '
+              .ok == true
+              and .version == "ATLAS_OPPORTUNITY_READINESS_V1"
+              and .decision_source_of_truth == "FINAL_TRADE_GATE"
+              and .threshold_changed == false
+              and .score_changed == false
+              and .production_decision_changed == false
+              and .readiness_score_is_probability == false
+              and .live_execution == false
+              and (.opportunities | length == 7)
+              and (.opportunities | all(
+                (.rank | type == "number")
+                and (.checks | type == "object")
+                and (.missing_conditions | type == "array")
+                and (.trade_ready | type == "boolean")
+                and (.readiness_score_is_probability == false)
+                and (.can_override_production == false)
+                and (.live_execution == false)
+              ))
+            ' "$out" >/dev/null 2>&1; then
+              ok=1
+              break
             fi
-            jq '{
-              ok,
-              symbol,
-              actionable_decision,
-              actionable_reason,
-              score,
-              signal_threshold,
-              production_signal_qualified,
-              candidate_direction,
-              product_direction,
-              direction_alignment,
-              direction_authority,
-              htf_status:.htf_thesis.status,
-              htf_reason:.htf_thesis.reason,
-              htf_version:.htf_thesis.version,
-              candle_policy:.htf_thesis.candle_policy,
-              final_trade_gate:{status:.final_trade_gate.status,trade_ready:.final_trade_gate.trade_ready,reason:.final_trade_gate.reason,blockers:.final_trade_gate.blockers},
-              analyst_decision:.analyst_output.decision,
-              analyst_primary_reason:.analyst_output.primary_reason,
-              geometry_ready:.analyst_output.geometry_ready_canonical,
-              entry:.analyst_output.entry,
-              stop_loss:.analyst_output.stop_loss,
-              tp1:.analyst_output.tp1,
-              take_profit:.analyst_output.take_profit,
-              risk_reward:.analyst_output.risk_reward,
-              live_execution
-            }' "$out"
+            echo "ranking probe retry ${attempt}/12, HTTP ${code:-none}"
+            cat "$out" || true
+            sleep 5
           done
+          test "$ok" = 1
+          echo '=== OPPORTUNITY_RANKING_LIVE_OK ==='
+          jq '{version,decision_source_of_truth,threshold_changed,score_changed,production_decision_changed,readiness_score_is_probability,live_execution,opportunities:[.opportunities[]|{rank,symbol,actionable_decision,candidate_direction,product_direction,score,signal_threshold,production_signal_qualified,trade_ready,readiness_score,readiness_tier,next_required_condition,missing_conditions,htf_status,htf_reason,blockers}]}' "$out"
