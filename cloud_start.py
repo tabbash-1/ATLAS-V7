@@ -26,6 +26,9 @@ if os.environ.get("RENDER"):
     # is downstream of FINAL_TRADE_GATE and cannot influence trade eligibility.
     from opportunity_readiness_boot_patch import apply as _apply_opportunity_readiness_patch
     _apply_opportunity_readiness_patch()
+    # UI is diagnostic-only and refreshes only on explicit user action.
+    from opportunity_ranking_ui_boot_patch import apply as _apply_opportunity_ranking_ui_patch
+    _apply_opportunity_ranking_ui_patch()
     # Keep the final guard as the last authority in the deployed request path.
     print("ATLAS cloud_start compatibility guard: RENDER -> cloud_web_only_final.py", flush=True)
     runpy.run_path(str(BASE / "cloud_web_only_final.py"), run_name="__main__")
