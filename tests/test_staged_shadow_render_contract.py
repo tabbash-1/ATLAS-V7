@@ -1,13 +1,18 @@
 from pathlib import Path
 
 
-def test_render_entrypoint_keeps_final_guard_runtime_after_shadow_install():
+def test_cloud_start_remains_untouched_by_staged_shadow_wiring():
     text = Path('cloud_start.py').read_text(encoding='utf-8')
-    shadow = text.index('_install_staged_shadow_api')
-    final_runtime = text.index('runpy.run_path(str(BASE / "cloud_web_only_final.py")')
-    assert shadow < final_runtime
+    assert 'staged_shadow_api' not in text
+    assert 'staged_decision_shadow' not in text
     assert 'ATLAS_CLOUD_FORWARD_MIN_SCORE", "68"' in text
-    assert 'STAGED_SHADOW_API' in text
+    assert 'runpy.run_path(str(BASE / "cloud_web_only_final.py")' in text
+
+
+def test_shadow_is_wired_through_existing_research_bootstrap():
+    text = Path('committed_research_api.py').read_text(encoding='utf-8')
+    assert 'install_staged_shadow_api' in text
+    assert "'staged_shadow_api':staged_shadow_api" in text
 
 
 def test_shadow_wiring_does_not_assign_production_decision():
