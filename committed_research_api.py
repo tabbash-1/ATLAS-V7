@@ -11,10 +11,10 @@ from pathlib import Path
 
 from staged_shadow_api_overlay import install as install_staged_shadow_api
 
-VERSION='ATLAS_COMMITTED_RESEARCH_API_V4_LEARNING_ENGINE'
+VERSION='ATLAS_COMMITTED_RESEARCH_API_V5_CURRENT_SCHEMAS'
 REPORTS={
-    '/api/research/offline-forward-evaluation':('offline-forward-evaluation-latest.json','ATLAS_OFFLINE_FORWARD_EVALUATION_V3_ROBUSTNESS','research'),
-    '/api/research/forward-robustness-guardrails':('forward-robustness-guardrails-latest.json','ATLAS_FORWARD_ROBUSTNESS_GUARDRAILS_V1_SHADOW_ONLY','research'),
+    '/api/research/offline-forward-evaluation':('offline-forward-evaluation-latest.json','ATLAS_OFFLINE_FORWARD_EVALUATION_V4_CANONICAL_TRUTH','research'),
+    '/api/research/forward-robustness-guardrails':('forward-robustness-guardrails-latest.json','ATLAS_FORWARD_ROBUSTNESS_GUARDRAILS_V2_CANONICAL_TRUTH','research'),
     '/api/research/prospective-direction-guardrail':('prospective-direction-guardrail-latest.json','ATLAS_PROSPECTIVE_DIRECTION_GUARDRAIL_V1_4H','research'),
     '/api/research/paper-portfolio-10k':('paper-portfolio-10k-analyst-latest.json','ATLAS_PAPER_10K_ANALYST_OUTPUT_V1','paper'),
     '/api/research/learning-engine':('learning-engine-latest.json','ATLAS_LEARNING_ENGINE_V1','research'),

@@ -8,6 +8,7 @@ on:
       - 'analyst_forward_attribution.py'
       - 'wait_diagnostics.py'
       - 'tests/test_atlas_learning_engine.py'
+      - 'tests/test_committed_research_api_schema_sync.py'
       - 'committed_research_api.py'
       - '.github/workflows/atlas-learning-engine.yml'
   pull_request:
@@ -17,6 +18,7 @@ on:
       - 'analyst_forward_attribution.py'
       - 'wait_diagnostics.py'
       - 'tests/test_atlas_learning_engine.py'
+      - 'tests/test_committed_research_api_schema_sync.py'
       - 'committed_research_api.py'
       - '.github/workflows/atlas-learning-engine.yml'
   schedule:
@@ -39,7 +41,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Safety regression
-        run: python3 tests/test_atlas_learning_engine.py
+        run: |
+          python3 tests/test_atlas_learning_engine.py
+          python3 tests/test_committed_research_api_schema_sync.py
       - name: Build canonical learning evidence
         run: python3 atlas_learning_engine.py
       - name: Verify immutable Production boundary
