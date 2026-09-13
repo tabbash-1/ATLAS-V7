@@ -11,7 +11,7 @@
     "research_snapshot_serving": "COMMITTED_SNAPSHOT_ONLY",
     "research_snapshot_stale_hours": 6.0,
     "committed_research_api": {
-      "version": "ATLAS_COMMITTED_RESEARCH_API_V4_LEARNING_ENGINE",
+      "version": "ATLAS_COMMITTED_RESEARCH_API_V5_CURRENT_SCHEMAS",
       "cached_only": true,
       "background_workers": false,
       "endpoints": [
@@ -22,11 +22,29 @@
         "/api/research/learning-engine"
       ],
       "loaded": {
-        "/api/research/offline-forward-evaluation": false,
-        "/api/research/forward-robustness-guardrails": false,
+        "/api/research/offline-forward-evaluation": true,
+        "/api/research/forward-robustness-guardrails": true,
         "/api/research/prospective-direction-guardrail": true,
         "/api/research/paper-portfolio-10k": true,
         "/api/research/learning-engine": true
+      },
+      "staged_shadow_api": {
+        "enabled": true,
+        "version": "ATLAS_STAGED_DECISION_SHADOW_V1",
+        "path": "/api/research/staged-decision-shadow",
+        "canonical_assets": [
+          "BTCUSDT",
+          "ETHUSDT",
+          "SOLUSDT",
+          "XRPUSDT",
+          "BNBUSDT",
+          "DOGEUSDT",
+          "ZECUSDT"
+        ],
+        "shadow_only": true,
+        "research_only": true,
+        "can_override_production": false,
+        "live_execution": false
       }
     },
     "rc10_1_deep_analysis": "RC10_1_SITE_DEEP_ANALYSIS_V1",
