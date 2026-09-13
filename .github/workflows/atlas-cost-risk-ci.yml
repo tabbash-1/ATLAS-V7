@@ -1,0 +1,24 @@
+name: ATLAS Cost Risk CI
+
+on:
+  pull_request:
+    paths:
+      - 'atlas_execution_cost.py'
+      - 'atlas_risk_geometry.py'
+      - 'tests/test_execution_cost_and_risk_geometry.py'
+      - 'tests/test_cost_risk_isolation.py'
+      - '.github/workflows/atlas-cost-risk-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  cost-risk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test dependencies
+        run: python -m pip install --upgrade pip pytest
+      - name: Run cost and risk tests
+        run: python -m pytest -q tests/test_execution_cost_and_risk_geometry.py tests/test_cost_risk_isolation.py
