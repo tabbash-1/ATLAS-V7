@@ -33,22 +33,8 @@ if os.environ.get("RENDER"):
     # is read-only and cannot alter score, threshold, geometry, or Final Gate.
     from actionable_wait_evidence_boot_patch import apply as _apply_actionable_wait_evidence_patch
     _apply_actionable_wait_evidence_patch()
-
-    # Install the staged-decision research endpoint at the same safe initialization
-    # point used by cloud_web_only_final.py: Render/closed-candle patches run before
-    # collector_server is imported. The overlay intercepts one read-only endpoint
-    # and never wraps or replaces production_decision.
-    from render_boot_patch import apply as _apply_render_boot_patch
-    from closed_candle_htf_boot_patch import apply as _apply_closed_candle_htf_boot_patch
-    _apply_render_boot_patch()
-    _apply_closed_candle_htf_boot_patch()
-    import collector_server as _atlas_web_runtime
-    from staged_shadow_api_overlay import install as _install_staged_shadow_api
-    STAGED_SHADOW_API = _install_staged_shadow_api(_atlas_web_runtime)
-
     # Keep the final guard as the last authority in the deployed request path.
     print("ATLAS cloud_start compatibility guard: RENDER -> cloud_web_only_final.py", flush=True)
-    print(f"Staged shadow API: {STAGED_SHADOW_API['version']} (research only)", flush=True)
     runpy.run_path(str(BASE / "cloud_web_only_final.py"), run_name="__main__")
 else:
     # Local/manual invocations use the memory-safe web stack by default too.
