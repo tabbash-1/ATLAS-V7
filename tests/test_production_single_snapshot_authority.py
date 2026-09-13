@@ -79,6 +79,21 @@ def test_final_production_gate_tracks_current_unified_terminal_contract():
     assert "sourceOfTruth:'FINAL_TRADE_GATE'" in workflow
 
 
+def test_final_trade_gate_live_smoke_tracks_current_guard_contract():
+    guard = text('final_trade_ready_guard.py')
+    workflow = text('.github/workflows/atlas-final-trade-gate-live-smoke.yml')
+    current_version = 'FINAL_TRADE_READY_GUARD_V4_STRUCTURE_CONFIRMATION'
+    stale_version = 'FINAL_TRADE_READY_GUARD_V1_HTF_FAIL_CLOSED'
+    assert current_version in guard
+    assert current_version in workflow
+    assert stale_version not in workflow
+    assert 'EXPECTED_FINAL_GUARD' in workflow
+    assert 'ATLAS_CANONICAL_DECISION_TRUTH_V1' in workflow
+    assert 'FINAL_TRADE_GATE' in workflow
+    assert '4-12H' in workflow
+    assert '[4,8,12]' in workflow
+
+
 def test_paper_ui_consumes_only_canonical_outcome_summary():
     src = text('atlas-paper-portfolio-ui.js')
     assert '/api/outcomes/summary?scope=signals&horizon=12' in src
@@ -113,6 +128,7 @@ if __name__ == '__main__':
     test_unified_terminal_market_map_uses_only_canonical_production_frames()
     test_unified_terminal_core_asset_authority_is_asset_agnostic()
     test_final_production_gate_tracks_current_unified_terminal_contract()
+    test_final_trade_gate_live_smoke_tracks_current_guard_contract()
     test_paper_ui_consumes_only_canonical_outcome_summary()
     test_production_decision_rejects_stale_responses()
     test_snapshot_guard_is_the_only_acceptance_surface()
