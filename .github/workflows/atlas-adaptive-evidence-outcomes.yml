@@ -47,7 +47,10 @@ jobs:
         run: |
           git config user.name "atlas-adaptive-evidence-bot"
           git config user.email "atlas-adaptive-evidence-bot@users.noreply.github.com"
-          git add status/adaptive-evidence-shadow-outcomes-latest.json status/history/adaptive-evidence-shadow-outcomes.jsonl 2>/dev/null || true
+          git add status/adaptive-evidence-shadow-outcomes-latest.json
+          if [ -f status/history/adaptive-evidence-shadow-outcomes.jsonl ]; then
+            git add status/history/adaptive-evidence-shadow-outcomes.jsonl
+          fi
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "research: settle adaptive evidence shadow outcomes [skip ci]"
           git pull --rebase origin main
