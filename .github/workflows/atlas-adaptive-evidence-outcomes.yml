@@ -1,0 +1,54 @@
+name: ATLAS Adaptive Evidence Outcomes
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'adaptive_evidence_outcome_recorder.py'
+      - '.github/workflows/atlas-adaptive-evidence-outcomes.yml'
+  pull_request:
+    paths:
+      - 'adaptive_evidence_outcome_recorder.py'
+      - 'tests/test_adaptive_evidence_outcome_recorder.py'
+      - '.github/workflows/atlas-adaptive-evidence-outcomes.yml'
+  schedule:
+    - cron: '37 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atlas-adaptive-evidence-outcomes
+  cancel-in-progress: false
+
+jobs:
+  settle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax and contract tests
+        run: |
+          python3 -m py_compile adaptive_evidence_outcome_recorder.py tests/test_adaptive_evidence_outcome_recorder.py
+          python3 - <<'PY'
+          import tests.test_adaptive_evidence_outcome_recorder as t
+          for name in sorted(n for n in dir(t) if n.startswith('test_')):
+              getattr(t,name)()
+              print('PASS',name)
+          PY
+      - name: Settle matured prospective shadow candidates
+        if: github.event_name != 'pull_request'
+        run: |
+          python3 adaptive_evidence_outcome_recorder.py
+          jq -e '.research_only == true and .paper_only == true and .live_execution == false and .can_override_production == false and .production_threshold_unchanged == 68' status/adaptive-evidence-shadow-outcomes-latest.json >/dev/null
+      - name: Commit prospective outcome evidence
+        if: github.event_name != 'pull_request'
+        run: |
+          git config user.name "atlas-adaptive-evidence-bot"
+          git config user.email "atlas-adaptive-evidence-bot@users.noreply.github.com"
+          git add status/adaptive-evidence-shadow-outcomes-latest.json status/history/adaptive-evidence-shadow-outcomes.jsonl 2>/dev/null || true
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "research: settle adaptive evidence shadow outcomes [skip ci]"
+          git pull --rebase origin main
+          git push
