@@ -20,7 +20,7 @@ def test_all_committed_reports_load_without_schema_mismatch():
         payload = api._load(base, *spec)
         assert payload['ok'] is True, (route, payload.get('error'))
         assert payload['schema'] == spec[1]
-        assert payload['live_execution'] is False or (payload.get('safety') or {}).get('live_execution') is False
+        assert payload.get('live_execution') is False or (payload.get('safety') or {}).get('live_execution') is False
         assert payload.get('can_override_production') is False or (payload.get('safety') or {}).get('can_override_production') is False
 
 
