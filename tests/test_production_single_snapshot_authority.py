@@ -67,6 +67,18 @@ def test_unified_terminal_core_asset_authority_is_asset_agnostic():
     assert "sourceOfTruth:'FINAL_TRADE_GATE'" in terminal
 
 
+def test_final_production_gate_tracks_current_unified_terminal_contract():
+    terminal = text('atlas-unified-terminal.js')
+    workflow = text('.github/workflows/atlas-final-production-gate.yml')
+    current_version = 'ATLAS_UNIFIED_TERMINAL_V6_SINGLE_SNAPSHOT_HTF'
+    stale_version = 'ATLAS_UNIFIED_TERMINAL_V5_STRICT_FINAL_GATE'
+    assert current_version in terminal
+    assert current_version in workflow
+    assert stale_version not in workflow
+    assert "canonicalContract:'canonical_decision'" in workflow
+    assert "sourceOfTruth:'FINAL_TRADE_GATE'" in workflow
+
+
 def test_paper_ui_consumes_only_canonical_outcome_summary():
     src = text('atlas-paper-portfolio-ui.js')
     assert '/api/outcomes/summary?scope=signals&horizon=12' in src
@@ -100,6 +112,7 @@ if __name__ == '__main__':
     test_unified_terminal_is_final_gate_only_and_wait_hides_candidate_direction()
     test_unified_terminal_market_map_uses_only_canonical_production_frames()
     test_unified_terminal_core_asset_authority_is_asset_agnostic()
+    test_final_production_gate_tracks_current_unified_terminal_contract()
     test_paper_ui_consumes_only_canonical_outcome_summary()
     test_production_decision_rejects_stale_responses()
     test_snapshot_guard_is_the_only_acceptance_surface()
