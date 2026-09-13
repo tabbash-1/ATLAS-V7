@@ -32,9 +32,16 @@ def _load_json(path: Path, default: Any):
 
 
 def _wait_horizon(hours: int) -> int:
-    # Existing WAIT evidence is collected at 1/3/6/12/24H. Never interpolate
-    # future outcomes; use the nearest matured checkpoint at-or-after product time.
-    return 6 if hours == 4 else 12
+    """Map learning-engine horizons to canonical WAIT-diagnostics checkpoints.
+
+    WAIT diagnostics now use the canonical 4/8/12H product evaluation horizons.
+    Keep the mapping explicit and fail closed instead of silently requesting a
+    legacy 6H checkpoint that the canonical diagnostics contract no longer accepts.
+    """
+    hours = int(hours)
+    if hours not in HORIZONS:
+        raise ValueError('hours must be one of 4,8,12')
+    return hours
 
 
 def _trade_checkpoint_metrics(report: dict, hours: int) -> dict:
