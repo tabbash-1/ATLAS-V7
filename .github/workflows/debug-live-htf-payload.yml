@@ -8,7 +8,7 @@ on:
 jobs:
   capture:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 12
     steps:
       - name: Fetch live Production decisions across core assets
         run: |
@@ -16,7 +16,21 @@ jobs:
           for symbol in BTCUSDT ETHUSDT SOLUSDT BNBUSDT XRPUSDT DOGEUSDT ZECUSDT; do
             echo "=== ${symbol} ==="
             out="/tmp/${symbol}.json"
-            curl -L --connect-timeout 20 --max-time 90 -sS "https://atlas-v7.onrender.com/api/decision/current?symbol=${symbol}" -o "$out"
+            ok=0
+            for attempt in $(seq 1 8); do
+              code="$(curl -L --connect-timeout 20 --max-time 90 -sS -w '%{http_code}' -o "$out" "https://atlas-v7.onrender.com/api/decision/current?symbol=${symbol}" || true)"
+              if [[ "$code" =~ ^2 ]] && jq -e '.ok == true' "$out" >/dev/null 2>&1; then
+                ok=1
+                break
+              fi
+              echo "probe retry ${attempt}/8 for ${symbol}, HTTP ${code:-none}"
+              sleep 5
+            done
+            if [[ "$ok" != "1" ]]; then
+              echo "FAILED_TO_FETCH_VALID_JSON ${symbol}" >&2
+              cat "$out" >&2 || true
+              exit 1
+            fi
             jq '{
               ok,
               symbol,
