@@ -24,10 +24,16 @@ def test_safety_contract():
     assert r['next_actions']['auto_promote'] is False
 
 
-def test_wait_mapping_never_uses_earlier_checkpoint():
-    assert l._wait_horizon(4)==6
-    assert l._wait_horizon(8)==12
+def test_wait_mapping_uses_canonical_product_checkpoints():
+    assert l._wait_horizon(4)==4
+    assert l._wait_horizon(8)==8
     assert l._wait_horizon(12)==12
+    try:
+        l._wait_horizon(6)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError('legacy 6H checkpoint must not be accepted')
 
 
 def test_blocker_small_sample_cannot_authorize_change():
@@ -48,7 +54,7 @@ def test_output_is_serializable():
 
 if __name__=='__main__':
     test_safety_contract()
-    test_wait_mapping_never_uses_earlier_checkpoint()
+    test_wait_mapping_uses_canonical_product_checkpoints()
     test_blocker_small_sample_cannot_authorize_change()
     test_output_is_serializable()
     print('PASS atlas learning engine')
