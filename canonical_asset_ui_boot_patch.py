@@ -4,7 +4,7 @@ The browser historically exposed HYPE as an eighth selectable symbol. Earlier
 Render boot patches can rewrite its provider from BINANCE to BYBIT before this
 patch runs, so removal must be provider-agnostic. The Production decision API is
 contractually limited to seven assets; research-only symbols must not be shown or
-resurrected from localStorage.
+resurrected from localStorage. This guard is intentionally strategy-neutral.
 """
 from __future__ import annotations
 
