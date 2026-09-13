@@ -80,3 +80,13 @@ def test_render_entrypoint_routes_through_canonical_universe_launcher():
     assert 'enforce_production_asset_universe(atlas)' in launcher
     assert 'apply_canonical_asset_ui_patch(BASE)' in launcher
     assert 'cloud_web_only_final.py' in launcher
+
+
+def test_consensus_shadow_workflow_uses_canonical_seven_asset_universe():
+    root = Path(__file__).resolve().parents[1]
+    source = (root / ".github/workflows/consensus-tiebreak-shadow-prospective.yml").read_text(encoding="utf-8")
+    expected = "BTCUSDT ETHUSDT SOLUSDT XRPUSDT BNBUSDT DOGEUSDT ZECUSDT"
+
+    assert f"symbols='{expected}'" in source
+    assert "for s in $symbols; do" in source
+    assert "HYPEUSDT" not in source
