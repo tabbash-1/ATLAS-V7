@@ -8,6 +8,7 @@ on:
       - 'horizon_fit_overlay.py'
       - 'quick_reentry_guard.py'
       - 'cloud_start.py'
+      - 'cloud_web_only.py'
       - 'production_decision_api.py'
       - 'tests/test_horizon_fit_policy.py'
       - 'tests/test_quick_reentry_guard_policy_cancel.py'
@@ -20,6 +21,7 @@ on:
       - 'horizon_fit_overlay.py'
       - 'quick_reentry_guard.py'
       - 'cloud_start.py'
+      - 'cloud_web_only.py'
       - 'production_decision_api.py'
       - 'tests/test_horizon_fit_policy.py'
       - 'tests/test_quick_reentry_guard_policy_cancel.py'
@@ -52,7 +54,8 @@ jobs:
           grep -q "production_override_allowed.*False" horizon_fit_policy.py
           grep -q "production_threshold_changed_by_horizon_policy.*False" horizon_fit_overlay.py
           grep -q "production_score_adjustment.*0" horizon_fit_policy.py
-          grep -q "_install_horizon_fit_overlay" cloud_start.py
+          grep -q "from horizon_fit_overlay import install as install_horizon_fit" cloud_web_only.py
+          grep -q "install_horizon_fit(atlas)" cloud_web_only.py
           grep -q "QUICK_SCORE_GAP_MAX = 4.0" horizon_fit_policy.py
           grep -q "SWING_RESEARCH_SCORE_GAP_MAX = 8.0" horizon_fit_policy.py
           grep -q "MIN_INDEPENDENT_EPISODES_FOR_VALIDATED_TIER = 5" horizon_fit_policy.py
