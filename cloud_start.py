@@ -17,6 +17,7 @@ import runpy
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent
+os.environ.setdefault("ATLAS_CLOUD_FORWARD_MIN_SCORE", "68")
 
 if os.environ.get("RENDER"):
     os.environ["ATLAS_CLOUD_FORWARD_ENABLED"] = "0"
