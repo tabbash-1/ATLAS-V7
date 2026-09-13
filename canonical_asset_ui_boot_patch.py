@@ -1,14 +1,17 @@
 """Production UI patch for the canonical seven-asset ATLAS universe.
 
-The browser historically exposed HYPE as an eighth selectable symbol. The
-Production decision API is contractually limited to seven assets, so the UI
-must not advertise or resurrect research-only symbols from localStorage.
+The browser historically exposed HYPE as an eighth selectable symbol. Earlier
+Render boot patches can rewrite its provider from BINANCE to BYBIT before this
+patch runs, so removal must be provider-agnostic. The Production decision API is
+contractually limited to seven assets; research-only symbols must not be shown or
+resurrected from localStorage.
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
-VERSION = "ATLAS_CANONICAL_ASSET_UI_PATCH_V1"
+VERSION = "ATLAS_CANONICAL_ASSET_UI_PATCH_V2_PROVIDER_AGNOSTIC"
 CANONICAL_UI_SYMBOLS = (
     "BINANCE:BTCUSDT",
     "BINANCE:ETHUSDT",
@@ -18,17 +21,23 @@ CANONICAL_UI_SYMBOLS = (
     "BINANCE:DOGEUSDT",
     "BINANCE:ZECUSDT",
 )
-
-_HYPE_ROW = "  { name: 'Hyperliquid / USDT', symbol: 'BINANCE:HYPEUSDT', cls: 'Crypto' }\n"
-_HYPE_ROW_COMMA = "  { name: 'Hyperliquid / USDT', symbol: 'BINANCE:HYPEUSDT', cls: 'Crypto' },\n"
 _FILTER_OLD = "? savedAssets.filter(a => a && a.cls === 'Crypto' && String(a.symbol || '').toUpperCase().endsWith('USDT'))"
 
 
+def _remove_research_only_hype_rows(text: str) -> str:
+    # Remove a complete JS object-list row containing HYPEUSDT regardless of the
+    # chart provider prefix (BINANCE/BYBIT/etc.). Keep this narrowly scoped to a
+    # single asset row rather than rewriting arbitrary JavaScript.
+    return re.sub(
+        r"^[ \t]*\{[^\n{}]*HYPEUSDT[^\n{}]*\},?[ \t]*\n?",
+        "",
+        text,
+        flags=re.MULTILINE | re.IGNORECASE,
+    )
+
+
 def transform_app_js(text: str) -> str:
-    text = str(text)
-    text = text.replace(_HYPE_ROW_COMMA, "").replace(_HYPE_ROW, "")
-    # If HYPE was the final array element, removing it leaves the previous ZEC
-    # row with a trailing comma, which is valid JavaScript.
+    text = _remove_research_only_hype_rows(str(text))
     if "const CANONICAL_PRODUCTION_SYMBOLS" not in text:
         marker = "const savedAssets = JSON.parse(localStorage.getItem('atlas.assets') || 'null');"
         allowed = ",".join(repr(s) for s in CANONICAL_UI_SYMBOLS)
@@ -51,12 +60,13 @@ def apply(base: Path | str) -> dict:
     patched = transform_app_js(original)
     if patched != original:
         path.write_text(patched, encoding="utf-8")
+    hype_exposed = "HYPEUSDT" in patched.upper()
     return {
         "enabled": True,
         "version": VERSION,
         "assets": list(CANONICAL_UI_SYMBOLS),
         "count": len(CANONICAL_UI_SYMBOLS),
-        "hype_exposed": "BINANCE:HYPEUSDT" in patched,
+        "hype_exposed": hype_exposed,
         "saved_assets_filtered": "CANONICAL_PRODUCTION_SYMBOLS.has" in patched,
         "score_changed": False,
         "threshold_changed": False,
