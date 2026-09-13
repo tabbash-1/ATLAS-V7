@@ -1,0 +1,21 @@
+name: Debug Live HTF Payload
+
+on:
+  push:
+    branches:
+      - atlas/debug-live-htf-payload-20260913
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fetch raw Production decision payload
+        run: |
+          set -euo pipefail
+          curl -L --connect-timeout 20 --max-time 90 -sS "https://atlas-v7.onrender.com/api/decision/current?symbol=BNBUSDT" -o /tmp/decision.json
+          echo '=== RAW_PAYLOAD ==='
+          cat /tmp/decision.json
+          echo
+          echo '=== HTF_EXTRACT ==='
+          jq '{ok,symbol,actionable_decision,direction_authority,htf_thesis:.htf_thesis,htf_thesis_version:.htf_thesis_version,product_direction,direction_alignment,final_trade_gate}' /tmp/decision.json
