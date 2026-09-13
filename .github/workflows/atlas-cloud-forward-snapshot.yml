@@ -8,6 +8,8 @@ on:
       - 'collector_server.py'
       - 'cloud_start.py'
       - 'cloud_web_only.py'
+      - 'closed_candle_htf_boot_patch.py'
+      - 'htf_structural_thesis.py'
       - 'production_signal_scoring.py'
       - 'production_decision_api.py'
       - '.github/workflows/atlas-cloud-forward-snapshot.yml'
@@ -25,16 +27,18 @@ concurrency:
 jobs:
   snapshot:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     env:
       BASE_URL: https://atlas-v7.onrender.com
     steps:
       - uses: actions/checkout@v4
-      - name: Verify deployed web-only runtime
+      - name: Verify deployed web-only runtime and closed-candle HTF authority
         run: |
           set -euo pipefail
           mkdir -p status/history
           tmp="status/web-runtime-latest.json.tmp"
+          decision_tmp="status/web-runtime-decision.tmp.json"
+
           ok=0
           for attempt in $(seq 1 8); do
             code="$(curl -L --connect-timeout 20 --max-time 60 -sS -w '%{http_code}' -o "$tmp" "${BASE_URL}/api/web-mode" || true)"
@@ -52,7 +56,57 @@ jobs:
             cat "$tmp" >&2 || true
             exit 1
           fi
-          mv "$tmp" status/web-runtime-latest.json
+
+          htf_ok=0
+          for attempt in $(seq 1 12); do
+            decision_code="$(curl -L --connect-timeout 20 --max-time 60 -sS -w '%{http_code}' -o "$decision_tmp" "${BASE_URL}/api/decision/current?symbol=BNBUSDT" || true)"
+            if [[ "$decision_code" =~ ^2 ]] && jq -e . "$decision_tmp" >/dev/null 2>&1 && \
+               jq -e '
+                 .ok == true
+                 and .htf_thesis.version == "HTF_STRUCTURAL_THESIS_V4_CLOSED_CANDLE_AUTHORITY"
+                 and .htf_thesis.candle_policy == "CLOSED_CANDLES_ONLY"
+                 and .htf_thesis.in_progress_candles_can_change_authority == false
+                 and .htf_thesis.authority_timeframes == ["12h","4h"]
+                 and .htf_thesis.context_timeframe == "1d"
+                 and .htf_thesis.confirmation_timeframe == "1h"
+                 and .direction_authority == "HTF_12H_4H"
+                 and (["1h","4h","12h","1d"] | all(. as $tf | (.htf_thesis.frame_data_quality[$tf].closed_candles // 0) >= 60))
+               ' "$decision_tmp" >/dev/null 2>&1; then
+              htf_ok=1
+              break
+            fi
+            echo "Waiting for live closed-candle HTF authority (attempt ${attempt}/12, HTTP ${decision_code:-none})"
+            sleep 10
+          done
+          if [[ "$htf_ok" != "1" ]]; then
+            echo "ATLAS live decision did not expose the V4 closed-candle HTF contract." >&2
+            echo "Last HTTP code: ${decision_code:-none}" >&2
+            jq '{ok,symbol,actionable_decision,direction_authority,htf_thesis:{version,candle_policy,in_progress_candles_can_change_authority,authority_timeframes,context_timeframe,confirmation_timeframe,frame_data_quality,status,reason}}' "$decision_tmp" >&2 || cat "$decision_tmp" >&2 || true
+            exit 1
+          fi
+
+          jq -s '
+            .[0] + {
+              htf_closed_candle_authority: {
+                verified: true,
+                symbol: .[1].symbol,
+                actionable_decision: .[1].actionable_decision,
+                direction_authority: .[1].direction_authority,
+                version: .[1].htf_thesis.version,
+                candle_policy: .[1].htf_thesis.candle_policy,
+                in_progress_candles_can_change_authority: .[1].htf_thesis.in_progress_candles_can_change_authority,
+                authority_timeframes: .[1].htf_thesis.authority_timeframes,
+                context_timeframe: .[1].htf_thesis.context_timeframe,
+                confirmation_timeframe: .[1].htf_thesis.confirmation_timeframe,
+                frame_data_quality: .[1].htf_thesis.frame_data_quality,
+                status: .[1].htf_thesis.status,
+                reason: .[1].htf_thesis.reason
+              }
+            }
+          ' "$tmp" "$decision_tmp" > "${tmp}.merged"
+          mv "${tmp}.merged" status/web-runtime-latest.json
+          rm -f "$tmp" "$decision_tmp"
+
           python3 - <<'PY'
           import datetime,json,pathlib
           p=pathlib.Path('status/web-runtime-latest.json')
