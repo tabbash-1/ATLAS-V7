@@ -1,0 +1,22 @@
+name: ATLAS Staged Decision CI
+
+on:
+  pull_request:
+    paths:
+      - 'atlas_decision_architecture.py'
+      - 'tests/test_staged_decision_architecture.py'
+      - '.github/workflows/atlas-staged-decision-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  staged-decision:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test dependencies
+        run: python -m pip install --upgrade pip pytest
+      - name: Run staged decision tests
+        run: python -m pytest -q tests/test_staged_decision_architecture.py
