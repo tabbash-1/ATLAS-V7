@@ -1,11 +1,15 @@
-"""Cached-only API for committed ATLAS research and paper reports.
+"""Cached ATLAS research API plus explicitly isolated staged shadow diagnostics.
 
-Loaded once at web boot from repository status files. No background worker,
-request-time evaluation, market-data fetch, outcome read, or Production mutation.
+Committed reports are loaded once at web boot from repository status files. They
+never trigger background work or mutate Production. A separate staged shadow
+endpoint may evaluate the already-final Production decision on request, but it is
+strictly research-only and cannot override FINAL_TRADE_GATE.
 """
 from __future__ import annotations
 import copy, datetime as dt, json, urllib.parse
 from pathlib import Path
+
+from staged_shadow_api_overlay import install as install_staged_shadow_api
 
 VERSION='ATLAS_COMMITTED_RESEARCH_API_V4_LEARNING_ENGINE'
 REPORTS={
@@ -53,5 +57,13 @@ def install(atlas,base=None):
         if path in payloads:return self._json(copy.deepcopy(payloads[path]))
         return original(self)
     atlas.Handler.do_GET=do_GET
-    atlas.COMMITTED_RESEARCH_API={'version':VERSION,'cached_only':True,'background_workers':False,'endpoints':list(REPORTS),'loaded':{k:v.get('ok') for k,v in payloads.items()}}
+    staged_shadow_api=install_staged_shadow_api(atlas)
+    atlas.COMMITTED_RESEARCH_API={
+        'version':VERSION,
+        'cached_only':True,
+        'background_workers':False,
+        'endpoints':list(REPORTS),
+        'loaded':{k:v.get('ok') for k,v in payloads.items()},
+        'staged_shadow_api':staged_shadow_api,
+    }
     return atlas.COMMITTED_RESEARCH_API
