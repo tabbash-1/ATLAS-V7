@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Render entrypoint that installs the final ATLAS trade-ready guard last."""
+"""Render entrypoint that installs the final ATLAS trade-ready guard last.
+
+The final entrypoint self-applies the stable Render and closed-candle HTF
+patches before loading the web runtime. This keeps Production correct even when
+an existing Render service still uses an older startCommand that launches this
+file directly.
+"""
 from __future__ import annotations
 import os
 import runpy
@@ -7,6 +13,15 @@ import urllib.parse
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent
+
+# FINAL_ENTRYPOINT_SELF_PATCH_V1
+# Idempotent: safe whether Render invoked these patches earlier or launches
+# cloud_web_only_final.py directly from an older service configuration.
+from render_boot_patch import apply as _apply_render_boot_patch
+from closed_candle_htf_boot_patch import apply as _apply_closed_candle_htf_boot_patch
+_apply_render_boot_patch()
+_apply_closed_candle_htf_boot_patch()
+
 ns = runpy.run_path(str(BASE / "cloud_web_only.py"), run_name="atlas_cloud_web_only_base")
 atlas = ns["atlas"]
 from final_trade_ready_guard import install as install_final_trade_ready_guard
