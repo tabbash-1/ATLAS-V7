@@ -65,6 +65,15 @@ class ClosedCandleHTFTests(unittest.TestCase):
         self.assertEqual(module.PRODUCT_HORIZON, "4-12H")
         self.assertEqual(module.AUTHORITY_TIMEFRAMES, ("12h", "4h"))
 
+    def test_final_entrypoint_self_applies_patches_before_runtime_load(self):
+        text = Path(__file__).with_name("cloud_web_only_final.py").read_text(encoding="utf-8")
+        self.assertIn("FINAL_ENTRYPOINT_SELF_PATCH_V1", text)
+        render_apply = text.index("_apply_render_boot_patch()")
+        closed_apply = text.index("_apply_closed_candle_htf_boot_patch()")
+        runtime_load = text.index('runpy.run_path(str(BASE / "cloud_web_only.py")')
+        self.assertLess(render_apply, runtime_load)
+        self.assertLess(closed_apply, runtime_load)
+
 
 if __name__ == "__main__":
     unittest.main()
