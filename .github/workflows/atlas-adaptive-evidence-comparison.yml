@@ -1,0 +1,54 @@
+name: ATLAS Adaptive Evidence Comparison
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'adaptive_evidence_comparison_scorecard.py'
+      - '.github/workflows/atlas-adaptive-evidence-comparison.yml'
+  pull_request:
+    paths:
+      - 'adaptive_evidence_comparison_scorecard.py'
+      - 'tests/test_adaptive_evidence_comparison_scorecard.py'
+      - '.github/workflows/atlas-adaptive-evidence-comparison.yml'
+  schedule:
+    - cron: '45 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atlas-adaptive-evidence-comparison
+  cancel-in-progress: false
+
+jobs:
+  scorecard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax and contract tests
+        run: |
+          python3 -m py_compile adaptive_evidence_comparison_scorecard.py tests/test_adaptive_evidence_comparison_scorecard.py
+          python3 - <<'PY'
+          import tests.test_adaptive_evidence_comparison_scorecard as t
+          for name in sorted(n for n in dir(t) if n.startswith('test_')):
+              getattr(t,name)()
+              print('PASS',name)
+          PY
+      - name: Build comparison scorecard
+        if: github.event_name != 'pull_request'
+        run: |
+          python3 adaptive_evidence_comparison_scorecard.py
+          jq -e '.lanes_are_separate == true and .samples_are_not_pooled == true and .live_execution == false and .can_override_production == false and .production_threshold_unchanged == 68' status/adaptive-evidence-comparison-latest.json >/dev/null
+      - name: Commit comparison scorecard
+        if: github.event_name != 'pull_request'
+        run: |
+          git config user.name "atlas-adaptive-comparison-bot"
+          git config user.email "atlas-adaptive-comparison-bot@users.noreply.github.com"
+          git add status/adaptive-evidence-comparison-latest.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "research: update adaptive evidence comparison [skip ci]"
+          git pull --rebase origin main
+          git push
