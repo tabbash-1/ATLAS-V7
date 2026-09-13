@@ -7,11 +7,13 @@ on:
       - 'canonical_decision_contract.py'
       - 'paper_portfolio_10k.py'
       - 'paper_portfolio_10k_final.py'
+      - 'canonical_outcome_snapshot.py'
       - 'final_trade_ready_guard.py'
       - 'offline_production_path_settlement.py'
       - 'status/paper-portfolio-10k-manifest.json'
       - 'tests/test_paper_portfolio_10k.py'
       - 'tests/test_final_trade_ready_guard.py'
+      - 'tests/test_canonical_outcome_sync_workflows.py'
       - '.github/workflows/atlas-paper-portfolio-10k.yml'
       - 'status/history/production-snapshots.jsonl'
   schedule:
@@ -41,7 +43,8 @@ jobs:
           set -euo pipefail
           PYTHONPATH=. python tests/test_paper_portfolio_10k.py
           PYTHONPATH=. python tests/test_final_trade_ready_guard.py
-          python -m py_compile canonical_decision_contract.py paper_portfolio_10k.py paper_portfolio_10k_final.py final_trade_ready_guard.py cloud_web_only_final.py
+          PYTHONPATH=. python tests/test_canonical_outcome_sync_workflows.py
+          python -m py_compile canonical_decision_contract.py paper_portfolio_10k.py paper_portfolio_10k_final.py canonical_outcome_snapshot.py final_trade_ready_guard.py cloud_web_only_final.py
       - name: Run prospective paper portfolio
         run: |
           set -euo pipefail
@@ -52,6 +55,11 @@ jobs:
           jq -e '.paper_only == true and .live_execution == false and .can_override_production == false and .production_threshold_unchanged == 68' status/paper-portfolio-10k-latest.json >/dev/null
           jq -e '.portfolio.starting_equity_usd == 10000 and .portfolio.equity_usd >= 0' status/paper-portfolio-10k-latest.json >/dev/null
           jq -e '.append_only_verified == true and .decision_source_of_truth == "FINAL_TRADE_GATE" and .paper_only == true and .live_execution == false' status/paper-portfolio-10k-integrity.json >/dev/null
+      - name: Refresh canonical outcome snapshot from authoritative inputs
+        run: |
+          set -euo pipefail
+          python canonical_outcome_snapshot.py
+          jq -e '.schema == "ATLAS_CANONICAL_OUTCOME_SNAPSHOT_V1" and .decision_source_of_truth == "FINAL_TRADE_GATE" and .evaluation_horizons_h == [4,8,12]' status/canonical-outcomes-latest.json >/dev/null
       - name: Verify no retrospective backfill
         run: |
           set -euo pipefail
@@ -78,7 +86,7 @@ jobs:
           set -euo pipefail
           git config user.name "atlas-paper-portfolio"
           git config user.email "atlas-paper@users.noreply.github.com"
-          git add status/history/paper-portfolio-10k-cohort.jsonl status/paper-portfolio-10k-latest.json status/paper-portfolio-10k-integrity.json
+          git add status/history/paper-portfolio-10k-cohort.jsonl status/paper-portfolio-10k-latest.json status/paper-portfolio-10k-integrity.json status/canonical-outcomes-latest.json
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "paper: update prospective 10k portfolio [skip ci]"
           git pull --rebase origin main
