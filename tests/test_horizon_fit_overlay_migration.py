@@ -48,7 +48,7 @@ def test_overlay_rejects_unversioned_legacy_active_and_cleans_geometry():
         horizon_fit_overlay.install(atlas)
         out = atlas.production_decision('BTCUSDT')
         q = out['quick_trade_shadow']
-        assert out['horizon_fit_overlay_version'] == 'HORIZON_FIT_OVERLAY_V7_PROVISIONAL_EPISODE_QUALITY'
+        assert out['horizon_fit_overlay_version'] == horizon_fit_overlay.VERSION
         assert q['status'] == 'WATCH_ONLY'
         assert q['legacy_guard_cleanup']['cancelled'] is True
         for stale in ('entry', 'stop_loss', 'target', 'risk_reward', 'active_remaining_seconds'):
@@ -56,6 +56,16 @@ def test_overlay_rejects_unversioned_legacy_active_and_cleans_geometry():
         assert out['production_threshold_changed_by_horizon_policy'] is False
         inspected = guard.inspect('BTCUSDT', 'LONG', 100, now=1001)
         assert inspected['state'] == 'POLICY_REJECTED'
+
+
+def test_overlay_version_contract_tracks_runtime_version():
+    atlas = SimpleNamespace(production_decision=lambda symbol: _decision(), QUICK_REENTRY_GUARD=None)
+    horizon_fit_overlay.install(atlas)
+    out = atlas.production_decision('BTCUSDT')
+    assert horizon_fit_overlay.VERSION == 'HORIZON_FIT_OVERLAY_V8_CORE_4_12H'
+    assert out['horizon_fit_overlay_version'] == horizon_fit_overlay.VERSION
+    assert out['preferred_horizon'] == '4-12H'
+    assert out['production_threshold_changed_by_horizon_policy'] is False
 
 
 def test_overlay_preserves_current_policy_active():
@@ -106,6 +116,7 @@ def test_overlay_marks_negative_combo_provisional_research_only():
 
 if __name__ == '__main__':
     test_overlay_rejects_unversioned_legacy_active_and_cleans_geometry()
+    test_overlay_version_contract_tracks_runtime_version()
     test_overlay_preserves_current_policy_active()
     test_overlay_marks_positive_combo_provisional_research_only()
     test_overlay_marks_negative_combo_provisional_research_only()
