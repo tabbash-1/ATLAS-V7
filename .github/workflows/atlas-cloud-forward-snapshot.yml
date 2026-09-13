@@ -63,7 +63,8 @@ jobs:
             decision_code="$(curl -L --connect-timeout 20 --max-time 60 -sS -w '%{http_code}' -o "$decision_tmp" "${BASE_URL}/api/decision/current?symbol=BNBUSDT" || true)"
             if [[ "$decision_code" =~ ^2 ]] && jq -e . "$decision_tmp" >/dev/null 2>&1 && \
                jq -e '
-                 .ok == true
+                 . as $root
+                 | .ok == true
                  and .htf_thesis.version == "HTF_STRUCTURAL_THESIS_V4_CLOSED_CANDLE_AUTHORITY"
                  and .htf_thesis.candle_policy == "CLOSED_CANDLES_ONLY"
                  and .htf_thesis.in_progress_candles_can_change_authority == false
@@ -71,7 +72,7 @@ jobs:
                  and .htf_thesis.context_timeframe == "1d"
                  and .htf_thesis.confirmation_timeframe == "1h"
                  and .direction_authority == "HTF_12H_4H"
-                 and (["1h","4h","12h","1d"] | all(. as $tf | (.htf_thesis.frame_data_quality[$tf].closed_candles // 0) >= 60))
+                 and (["1h","4h","12h","1d"] | all(. as $tf | (($root.htf_thesis.frame_data_quality[$tf].closed_candles // 0) >= 60)))
                ' "$decision_tmp" >/dev/null 2>&1; then
               htf_ok=1
               break
@@ -82,7 +83,7 @@ jobs:
           if [[ "$htf_ok" != "1" ]]; then
             echo "ATLAS live decision did not expose the V4 closed-candle HTF contract." >&2
             echo "Last HTTP code: ${decision_code:-none}" >&2
-            jq '{ok,symbol,actionable_decision,direction_authority,htf_thesis:{version,candle_policy,in_progress_candles_can_change_authority,authority_timeframes,context_timeframe,confirmation_timeframe,frame_data_quality,status,reason}}' "$decision_tmp" >&2 || cat "$decision_tmp" >&2 || true
+            jq '{ok,symbol,actionable_decision,direction_authority,htf_thesis:.htf_thesis}' "$decision_tmp" >&2 || cat "$decision_tmp" >&2 || true
             exit 1
           fi
 
