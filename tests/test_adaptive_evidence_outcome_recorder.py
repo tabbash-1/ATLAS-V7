@@ -1,3 +1,6 @@
+import pathlib
+import tempfile
+
 import adaptive_evidence_outcome_recorder as m
 
 
@@ -17,7 +20,7 @@ def _obs(side="LONG"):
 def _bars(prices, start=1_000_000):
     out=[]
     for i,(lo,hi,close) in enumerate(prices):
-        out.append({"t":start+i*3600_000,"o":close,"h":hi,"l":lo,"c":close,"v":1})
+        out.append({'t':start+i*3600_000,'o':close,'h':hi,'l':lo,'c':close,'v':1})
     return out
 
 
@@ -63,11 +66,12 @@ def test_summary_uses_after_cost_r():
     assert s["net_r"]==0.7
 
 
-def test_contract_flags_are_fail_closed(tmp_path):
-    status=tmp_path/"status"
-    (status/"history").mkdir(parents=True)
-    (status/"history"/"adaptive-evidence-shadow-observations.jsonl").write_text("")
-    r=m.record(str(status),now_ms=1,fetcher=lambda *a:[])
+def test_contract_flags_are_fail_closed():
+    with tempfile.TemporaryDirectory() as d:
+        status=pathlib.Path(d)/"status"
+        (status/"history").mkdir(parents=True)
+        (status/"history"/"adaptive-evidence-shadow-observations.jsonl").write_text("")
+        r=m.record(str(status),now_ms=1,fetcher=lambda *a:[])
     assert r["research_only"] is True
     assert r["paper_only"] is True
     assert r["live_execution"] is False
