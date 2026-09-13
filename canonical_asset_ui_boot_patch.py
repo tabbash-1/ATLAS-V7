@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-VERSION = "ATLAS_CANONICAL_ASSET_UI_PATCH_V2_PROVIDER_AGNOSTIC"
+VERSION = "ATLAS_CANONICAL_ASSET_UI_PATCH_V3_EXPOSURE_DIAGNOSTIC"
 CANONICAL_UI_SYMBOLS = (
     "BINANCE:BTCUSDT",
     "BINANCE:ETHUSDT",
@@ -33,6 +33,24 @@ def _remove_research_only_hype_rows(text: str) -> str:
         "",
         text,
         flags=re.MULTILINE | re.IGNORECASE,
+    )
+
+
+def _has_research_only_hype_asset_reference(text: str) -> bool:
+    """Return true only when HYPE remains configured as a selectable asset.
+
+    Render's legacy TradingView compatibility patch intentionally leaves the
+    token HYPEUSDT in a conditional expression even after HYPE is removed from
+    the Production asset list. Treating any textual occurrence as UI exposure
+    creates a false-positive runtime diagnostic. A selectable asset definition,
+    by contrast, contains a JavaScript ``symbol: '...HYPEUSDT'`` property.
+    """
+    return bool(
+        re.search(
+            r"\bsymbol\s*:\s*['\"][^'\"]*HYPEUSDT['\"]",
+            str(text),
+            flags=re.IGNORECASE,
+        )
     )
 
 
@@ -60,7 +78,7 @@ def apply(base: Path | str) -> dict:
     patched = transform_app_js(original)
     if patched != original:
         path.write_text(patched, encoding="utf-8")
-    hype_exposed = "HYPEUSDT" in patched.upper()
+    hype_exposed = _has_research_only_hype_asset_reference(patched)
     return {
         "enabled": True,
         "version": VERSION,
