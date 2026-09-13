@@ -207,6 +207,24 @@ def checkpoint_entry(row: dict[str, Any], checkpoint_h: float, now_ms: int):
                 "r_multiple":None,"error":str(e)[:700]}
 
 
+def _excursion_rows_through_terminal(candles, terminal_candle, parent_5m_open=None, refinement_rows=None):
+    """Return only price bars observable through the terminal first-touch event.
+
+    For a normal 5m first touch this includes bars through the terminal 5m bar.
+    When an ambiguous 5m bar is refined to 1m, the parent 5m bar is excluded and
+    replaced by 1m bars only through the resolved terminal minute. This prevents
+    post-exit price action from contaminating MFE/MAE.
+    """
+    if not terminal_candle:
+        return candles
+    terminal_open = int(terminal_candle["open_time"])
+    if refinement_rows is not None and parent_5m_open is not None:
+        prior = [c for c in candles if int(c["open_time"]) < int(parent_5m_open)]
+        refined = [c for c in refinement_rows if int(c["open_time"]) <= terminal_open]
+        return prior + refined
+    return [c for c in candles if int(c["open_time"]) <= terminal_open]
+
+
 def settle_entry(row: dict[str, Any], horizon_h: float, now_ms: int):
     start = int(row["captured_at_ms"]); maturity = start + int(horizon_h*3600_000); g=row["geometry"]
     if now_ms < maturity:
@@ -215,13 +233,25 @@ def settle_entry(row: dict[str, Any], horizon_h: float, now_ms: int):
         candles, provider = market_klines(row["symbol"], "5", start, maturity)
         if not candles: raise RuntimeError("no_5m_candles")
         ev, candle, tp1_seen = event_from(candles, g)
+        parent_5m_open = None
+        refinement_rows = None
         if ev == "AMBIGUOUS" and candle:
+            parent_5m_open = int(candle["open_time"])
             one, p1 = market_klines(row["symbol"], "1", candle["open_time"], candle["open_time"]+5*60_000-1)
             ev1, c1, tp1_1 = event_from(one, g)
-            if ev1 in {"SL","TP2"}: ev, candle = ev1, c1 or candle
-            else: ev = "AMBIGUOUS"
+            if ev1 in {"SL","TP2"}:
+                ev, candle = ev1, c1 or candle
+                refinement_rows = one
+            else:
+                ev = "AMBIGUOUS"
             tp1_seen = tp1_seen or tp1_1; provider += "+1M:"+p1
-        mfe, mae = excursions(candles, g)
+        excursion_rows = _excursion_rows_through_terminal(
+            candles,
+            candle if ev in {"SL", "TP2"} else None,
+            parent_5m_open=parent_5m_open,
+            refinement_rows=refinement_rows,
+        )
+        mfe, mae = excursions(excursion_rows, g)
         if ev == "SL": status,r,terminal,exit_ms="LOSS",-1.0,True,int(candle["open_time"] if candle else maturity)
         elif ev == "TP2": status,r,terminal,exit_ms="WIN_TP2",float(g["rr_tp2"]),True,int(candle["open_time"] if candle else maturity)
         elif ev == "AMBIGUOUS": status,r,terminal,exit_ms="AMBIGUOUS",None,False,None
@@ -230,7 +260,9 @@ def settle_entry(row: dict[str, Any], horizon_h: float, now_ms: int):
             directional=(last-g["entry"]) if g["direction"]=="LONG" else (g["entry"]-last)
             r=directional/g["risk_abs"]; status="EXPIRED_TP1" if tp1_seen else "EXPIRED"; terminal=True; exit_ms=maturity
         return {"id":row["id"],"status":status,"terminal":terminal,"r_multiple":None if r is None else round(float(r),4),
-                "exit_at_ms":exit_ms,"tp1_reached":bool(tp1_seen),"mfe_r":mfe,"mae_r":mae,"market_source":provider}
+                "exit_at_ms":exit_ms,"tp1_reached":bool(tp1_seen),"mfe_r":mfe,"mae_r":mae,
+                "excursion_scope":"THROUGH_TERMINAL_EVENT" if ev in {"SL","TP2"} else "FULL_HORIZON",
+                "market_source":provider}
     except Exception as e:
         return {"id":row["id"],"status":"MARKET_DATA_ERROR","terminal":False,"r_multiple":None,"exit_at_ms":None,"error":str(e)[:700]}
 
