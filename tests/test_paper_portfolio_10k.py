@@ -86,6 +86,51 @@ def test_checkpoint_marks_directional_r_without_changing_terminal_settlement():
         p.event_from=old_event
 
 
+def test_terminal_excursions_ignore_post_exit_adverse_spike():
+    old_market=p.market_klines
+    try:
+        candles=[
+            {'open_time':0,'open':100.0,'high':100.2,'low':99.2,'close':99.5},
+            {'open_time':300_000,'open':99.5,'high':100.4,'low':97.8,'close':98.0},
+            {'open_time':600_000,'open':98.0,'high':105.4,'low':97.9,'close':104.0},
+        ]
+        p.market_klines=lambda symbol, interval, start, end: (candles,'TEST')
+        row={'id':'a','captured_at_ms':0,'symbol':'DOGEUSDT','geometry':{
+            'direction':'SHORT','entry':100.0,'stop_loss':101.0,'tp1':99.0,'tp2':98.0,'rr_tp2':2.0,'risk_abs':1.0}}
+        out=p.settle_entry(row,12,12*3600_000)
+        assert out['status']=='WIN_TP2'
+        assert out['r_multiple']==2.0
+        assert out['mae_r']==0.4
+        assert out['mfe_r']==2.2
+        assert out['excursion_scope']=='THROUGH_TERMINAL_EVENT'
+    finally:
+        p.market_klines=old_market
+
+
+def test_terminal_excursions_use_1m_refinement_only_through_resolved_exit():
+    old_market=p.market_klines
+    try:
+        five=[{'open_time':0,'open':100.0,'high':101.2,'low':97.8,'close':99.0}]
+        one=[
+            {'open_time':0,'open':100.0,'high':100.3,'low':99.0,'close':99.3},
+            {'open_time':60_000,'open':99.3,'high':100.4,'low':97.9,'close':98.0},
+            {'open_time':120_000,'open':98.0,'high':101.5,'low':98.0,'close':101.0},
+        ]
+        def fake_market(symbol, interval, start, end):
+            return (one if interval=='1' else five, 'TEST')
+        p.market_klines=fake_market
+        row={'id':'a','captured_at_ms':0,'symbol':'DOGEUSDT','geometry':{
+            'direction':'SHORT','entry':100.0,'stop_loss':101.0,'tp1':99.0,'tp2':98.0,'rr_tp2':2.0,'risk_abs':1.0}}
+        out=p.settle_entry(row,12,12*3600_000)
+        assert out['status']=='WIN_TP2'
+        assert out['r_multiple']==2.0
+        assert out['mae_r']==0.4
+        assert out['mfe_r']==2.1
+        assert out['excursion_scope']=='THROUGH_TERMINAL_EVENT'
+    finally:
+        p.market_klines=old_market
+
+
 def test_portfolio_report_computes_dollars_equity_drawdown_profit_factor_and_checkpoint_summary():
     m=manifest(); t0=dt.datetime.fromisoformat(m['cohort_start_at'])
     cohort=[
