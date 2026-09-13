@@ -8,8 +8,14 @@ def row(change=2.0, price=101.0, ema20=100.0, ema50=102.0, rsi=55.0, mom=-1.0):
             'direction_votes_long':2,'direction_votes_short':2,
             'ema20':ema20,'ema50':ema50,'rsi14':rsi,'momentum_24h_pct':mom,
         },
-        'horizons':{f'{h}h':{'change_pct':change} for h in (1,3,6,12,24)},
+        'horizons':{f'{h}h':{'change_pct':change} for h in (4,8,12)},
     }
+
+
+def test_fixture_tracks_canonical_product_horizons():
+    r=row()
+    assert sorted(r['horizons']) == ['12h','4h','8h']
+    assert n.HORIZONS == [4,8,12]
 
 
 def test_signature_reconstructs_exact_four_votes():
@@ -41,6 +47,7 @@ def test_repeated_bias_can_only_create_shadow_hypothesis():
     assert len(out['shadow_hypotheses'])==1
     h=out['shadow_hypotheses'][0]
     assert h['direction']=='UP'
+    assert h['confirming_horizons_h'] == [4,8,12]
     assert h['production_applied'] is False
     assert out['safety']['threshold_changed'] is False
     assert out['safety']['can_execute'] is False
@@ -50,17 +57,16 @@ def test_conflicting_horizon_directions_are_not_eligible():
     rows=[]
     for _ in range(20):
         r=row(change=2.0)
-        r['horizons']['1h']['change_pct']=2.0
-        r['horizons']['3h']['change_pct']=-2.0
-        r['horizons']['6h']['change_pct']=0.2
+        r['horizons']['4h']['change_pct']=2.0
+        r['horizons']['8h']['change_pct']=-2.0
         r['horizons']['12h']['change_pct']=0.2
-        r['horizons']['24h']['change_pct']=0.2
         rows.append(r)
     out=n.diagnose({'records':rows})
     assert out['shadow_hypotheses']==[]
 
 
 if __name__=='__main__':
+    test_fixture_tracks_canonical_product_horizons()
     test_signature_reconstructs_exact_four_votes()
     test_non_two_two_is_excluded()
     test_missing_context_is_reported_not_invented()

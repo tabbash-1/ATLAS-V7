@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import wait_diagnostics as w
 
 
@@ -11,6 +13,15 @@ def rec(direction='LONG', score=65, ret=2.0, raw=2.0, reason='SCORE_BELOW_SIGNAL
             '12h':{'directional_return_pct':ret,'change_pct':raw},
         }
     }
+
+
+def test_wait_calibration_workflow_tracks_canonical_horizons():
+    workflow=Path('.github/workflows/wait-opportunity-calibration.yml').read_text()
+    assert "'diagnostics_4h':w.diagnose(payload,4)" in workflow
+    assert "'diagnostics_8h':w.diagnose(payload,8)" in workflow
+    assert "'diagnostics_12h':w.diagnose(payload,12)" in workflow
+    for stale in ("diagnostics_1h", "diagnostics_3h", "diagnostics_6h", "diagnostics_24h"):
+        assert stale not in workflow
 
 
 def test_directional_gain_is_missed_opportunity():
@@ -88,6 +99,7 @@ def test_no_directional_consensus_is_never_auto_relaxed():
 
 
 if __name__ == '__main__':
+    test_wait_calibration_workflow_tracks_canonical_horizons()
     test_directional_gain_is_missed_opportunity()
     test_directional_loss_is_correct_wait_protection()
     test_no_consensus_big_move_is_not_called_missed_signal()

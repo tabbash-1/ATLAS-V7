@@ -39,12 +39,12 @@ jobs:
           else:
               payload=json.loads(src.read_text())
           report={
-              'schema':'ATLAS_WAIT_OPPORTUNITY_REPORT_V1',
-              'diagnostics_1h':w.diagnose(payload,1),
-              'diagnostics_3h':w.diagnose(payload,3),
-              'diagnostics_6h':w.diagnose(payload,6),
+              'schema':'ATLAS_WAIT_OPPORTUNITY_REPORT_V2_CANONICAL_4_12H',
+              'product_horizon':'4-12H',
+              'evaluation_horizons_h':[4,8,12],
+              'diagnostics_4h':w.diagnose(payload,4),
+              'diagnostics_8h':w.diagnose(payload,8),
               'diagnostics_12h':w.diagnose(payload,12),
-              'diagnostics_24h':w.diagnose(payload,24),
               'calibration':w.calibration(payload),
               'production_safety':{
                   'threshold':68,
