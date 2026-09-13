@@ -74,6 +74,19 @@ jobs:
             sleep 4; fetch_json "decision_${s}" "/api/decision/current?symbol=${s}" || true
             sleep 2; fetch_json "ai_${s}" "/api/ai/council?symbol=${s}" || true
           done
+
+          # Second-pass recovery for failed canonical decisions. A transient Render
+          # 5xx/non-JSON response must not silently become a successful-looking cycle.
+          sleep 10
+          for s in BTCUSDT ETHUSDT SOLUSDT XRPUSDT BNBUSDT DOGEUSDT ZECUSDT; do
+            f="status/raw/decision_${s}.json"
+            if ! jq -e '.ok == true and .canonical_decision.schema == "ATLAS_CANONICAL_DECISION_TRUTH_V1" and .canonical_decision.canonical_source_present == true and .canonical_decision.source_of_truth == "FINAL_TRADE_GATE"' "$f" >/dev/null 2>&1; then
+              echo "RECOVER_CANONICAL_DECISION ${s}"
+              sleep 4
+              fetch_json "decision_${s}" "/api/decision/current?symbol=${s}" || true
+            fi
+          done
+
           python3 - <<'PY'
           import json,pathlib,datetime
           root=pathlib.Path('status/raw')
@@ -87,7 +100,8 @@ jobs:
               if not p.exists(): return {'ok':False,'error':'missing_committed_report','path':str(p)}
               try:return json.loads(p.read_text())
               except Exception as e:return {'ok':False,'error':f'invalid_committed_report:{e}','path':str(p)}
-          symbols=['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT','HYPEUSDT']
+          core_symbols=['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT']
+          symbols=core_symbols+['HYPEUSDT']
           decisions={s:load('decision_'+s) for s in symbols}
           raw_councils={s:load('ai_'+s) for s in symbols}
           def truth(d):
@@ -143,6 +157,11 @@ jobs:
               d=decisions.get(s) or {}; observed=a.get('research_observed_production_reference') or {}; ref=canonical_ref(d)
               if a.get('error') or a.get('ok') is False: ai_failures.append({'symbol':s,'error':a.get('error'),'http_code':a.get('http_code')})
               else: ai_actions.append({'symbol':s,'direction':a.get('direction'),'verdict':a.get('verdict'),'confidence':a.get('confidence'),'reason':a.get('reason'),'canonical_decision_id':ref.get('decision_id'),'canonical_production_decision':ref.get('decision'),'canonical_production_score':ref.get('score'),'canonical_trade_ready':ref.get('trade_ready'),'ai_research_observed_production_score':observed.get('production_score'),'production_reference_mismatch':a.get('production_reference_mismatch'),'judge':a.get('judge')})
+          core_ok=[s for s in core_symbols if (decisions.get(s) or {}).get('ok') is True and truth(decisions.get(s) or {}) is not None]
+          failed_core_symbols=[s for s in core_symbols if s not in core_ok]
+          canonical_coverage_pct=round(len(core_ok)/len(core_symbols)*100,2)
+          canonical_snapshot_complete=not failed_core_symbols
+          canonical_coverage={'expected_core_symbols':core_symbols,'ok_core_symbols':core_ok,'failed_core_symbols':failed_core_symbols,'canonical_coverage_pct':canonical_coverage_pct,'canonical_snapshot_complete':canonical_snapshot_complete,'extra_monitored_symbols':['HYPEUSDT']}
           path_report=load_file('status/production-path-settlement-latest.json')
           path_overall=(path_report.get('summary') or {}) if isinstance(path_report,dict) else {}
           generated=path_report.get('generated_at') if isinstance(path_report,dict) else None
@@ -153,7 +172,7 @@ jobs:
           realized_r={'available':path_overall.get('terminal',0)>0 and path_overall.get('net_r') is not None,'terminal':path_overall.get('terminal'),'open_or_error':path_overall.get('open_or_error'),'wins':path_overall.get('wins'),'losses':path_overall.get('losses'),'net_r':path_overall.get('net_r'),'average_r':path_overall.get('average_r'),'profit_factor_r':path_overall.get('profit_factor_r'),'win_rate_pct':path_overall.get('win_rate_pct'),'ambiguous':path_overall.get('ambiguous'),'market_data_errors':path_overall.get('market_data_errors'),'by_direction':path_overall.get('by_direction'),'provider_counts':path_overall.get('provider_counts'),'report_generated_at':generated,'report_age_hours':report_age_h,'stale':bool(report_age_h is None or report_age_h>2.5),'source':'COMMITTED_OFFLINE_PRODUCTION_PATH_SETTLEMENT','research_only':True,'can_override_production':False}
           settlement_status={'ok':bool(path_report.get('schema')),'schema':path_report.get('schema'),'generated_at':generated,'report_age_hours':report_age_h,'cached_committed_report':True,'web_runtime_dependency':False,'research_only':True,'live_execution':False,'can_override_production':False}
           captured=datetime.datetime.now(datetime.timezone.utc)
-          summary={'schema':'ATLAS_PRODUCTION_SNAPSHOT_V12_CANONICAL_TRUTH','captured_at':captured.isoformat(),'source':'https://atlas-v7.onrender.com','monitor_mode':'PACED_PER_SYMBOL_READ_ONLY','production_authority':'FINAL_TRADE_GATE_VIA_CANONICAL_DECISION','decision_source_of_truth':'FINAL_TRADE_GATE','product_horizon':'4-12H','evaluation_horizons_h':[4,8,12],'ai_role':'SHADOW_RESEARCH_ONLY','snapshot_consistency':{'ok':len(consistency)==0 and len(noncanonical)==0,'mismatch_count':len(consistency),'mismatches':consistency,'noncanonical_count':len(noncanonical),'noncanonical':noncanonical},'runtime':load('runtime'),'readiness':load('readiness'),'outcomes':load('outcomes'),'geometry_status':load('geometry'),'path_summary':path_report,'realized_r':realized_r,'settlement_status':settlement_status,'ai_status':load('ai_status'),'decisions':decisions,'ai_council':councils,'decision_summary':{'supported_assets':symbols,'trade_ready_count':len(trade_ready),'trade_ready':trade_ready,'wait_count':len(waits),'waits':waits,'failed_count':len(failures),'failures':failures,'noncanonical_count':len(noncanonical),'noncanonical':noncanonical},'ai_summary':{'analyzed_count':len(ai_actions),'analyses':ai_actions,'failed_count':len(ai_failures),'failures':ai_failures}}
+          summary={'schema':'ATLAS_PRODUCTION_SNAPSHOT_V12_CANONICAL_TRUTH','captured_at':captured.isoformat(),'source':'https://atlas-v7.onrender.com','monitor_mode':'PACED_PER_SYMBOL_READ_ONLY','production_authority':'FINAL_TRADE_GATE_VIA_CANONICAL_DECISION','decision_source_of_truth':'FINAL_TRADE_GATE','product_horizon':'4-12H','evaluation_horizons_h':[4,8,12],'ai_role':'SHADOW_RESEARCH_ONLY','canonical_coverage':canonical_coverage,'snapshot_consistency':{'ok':canonical_snapshot_complete and len(consistency)==0 and len(noncanonical)==0,'mismatch_count':len(consistency),'mismatches':consistency,'noncanonical_count':len(noncanonical),'noncanonical':noncanonical},'runtime':load('runtime'),'readiness':load('readiness'),'outcomes':load('outcomes'),'geometry_status':load('geometry'),'path_summary':path_report,'realized_r':realized_r,'settlement_status':settlement_status,'ai_status':load('ai_status'),'decisions':decisions,'ai_council':councils,'decision_summary':{'supported_assets':symbols,'trade_ready_count':len(trade_ready),'trade_ready':trade_ready,'wait_count':len(waits),'waits':waits,'failed_count':len(failures),'failures':failures,'noncanonical_count':len(noncanonical),'noncanonical':noncanonical},'ai_summary':{'analyzed_count':len(ai_actions),'analyses':ai_actions,'failed_count':len(ai_failures),'failures':ai_failures}}
           pathlib.Path('status/atlas-production-latest.json').write_text(json.dumps(summary,indent=2,sort_keys=True))
           history=pathlib.Path('status/history/production-snapshots.jsonl')
           with history.open('a') as f:f.write(json.dumps(summary,separators=(',',':'))+'\n')
@@ -203,6 +222,8 @@ jobs:
                       item['horizons'][f'{h}h']={'observed_at':t1.isoformat(),'price':round(p1,10),'change_pct':round(change,4),'max_up_pct':round(max_up,4),'max_down_pct':round(max_down,4),'directional_return_pct':round(favorable,4) if favorable is not None else None}
                   if item['horizons']:tracker.append(item)
           pathlib.Path('status/wait-outcomes.json').write_text(json.dumps({'schema':'ATLAS_WAIT_OUTCOME_TRACKER_V4_CANONICAL_TRUTH','generated_at':captured.isoformat(),'decision_source_of_truth':'FINAL_TRADE_GATE','product_horizon':'4-12H','horizons_hours':list(horizons),'legacy_backfill_performed':False,'excluded_noncanonical_decision_rows':excluded_legacy,'note':'Measures opportunity cost only for canonical Final Trade Guard WAIT decisions; never alters trading thresholds and never reinterprets legacy snapshots.','records':tracker},indent=2,sort_keys=True))
+          if not canonical_snapshot_complete:
+              print('CANONICAL_CORE_SNAPSHOT_INCOMPLETE', ','.join(failed_core_symbols))
           PY
       - name: Verify canonical snapshot contract
         shell: bash
@@ -210,7 +231,7 @@ jobs:
           set -euo pipefail
           ! grep -q '/api/outcomes/path-summary' .github/workflows/atlas-production-snapshot.yml
           ! grep -q '/api/outcomes/settlement-status' .github/workflows/atlas-production-snapshot.yml
-          jq -e '.schema == "ATLAS_PRODUCTION_SNAPSHOT_V12_CANONICAL_TRUTH" and .decision_source_of_truth == "FINAL_TRADE_GATE" and .product_horizon == "4-12H" and .evaluation_horizons_h == [4,8,12] and .settlement_status.web_runtime_dependency == false and .realized_r.source == "COMMITTED_OFFLINE_PRODUCTION_PATH_SETTLEMENT" and .decision_summary.noncanonical_count == 0' status/atlas-production-latest.json >/dev/null
+          jq -e '.schema == "ATLAS_PRODUCTION_SNAPSHOT_V12_CANONICAL_TRUTH" and .decision_source_of_truth == "FINAL_TRADE_GATE" and .product_horizon == "4-12H" and .evaluation_horizons_h == [4,8,12] and .settlement_status.web_runtime_dependency == false and .realized_r.source == "COMMITTED_OFFLINE_PRODUCTION_PATH_SETTLEMENT" and .decision_summary.noncanonical_count == 0 and .canonical_coverage.canonical_snapshot_complete == true and .canonical_coverage.canonical_coverage_pct == 100' status/atlas-production-latest.json >/dev/null
           jq -e '.schema == "ATLAS_WAIT_OUTCOME_TRACKER_V4_CANONICAL_TRUTH" and .decision_source_of_truth == "FINAL_TRADE_GATE" and .horizons_hours == [4,8,12] and .legacy_backfill_performed == false' status/wait-outcomes.json >/dev/null
           jq -e '[.decisions[] | select(.ok == true) | .canonical_decision | select(.schema != "ATLAS_CANONICAL_DECISION_TRUTH_V1" or .canonical_source_present != true or .source_of_truth != "FINAL_TRADE_GATE")] | length == 0' status/atlas-production-latest.json >/dev/null
           echo 'CANONICAL_PRODUCTION_SNAPSHOT_OK'
