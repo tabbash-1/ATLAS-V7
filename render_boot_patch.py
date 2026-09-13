@@ -28,7 +28,7 @@ def patch_production_ui():
     for name in names:
         html = re.sub(rf'<script[^>]+src=["\']{re.escape(name)}(?:\?[^"\']*)?["\'][^>]*></script>', '', html)
     scripts = "\n".join([
-        '  <script src="atlas-production-decision.js?v=production-decision-v12-final-gate-only"></script>',
+        '  <script src="atlas-production-decision.js?v=production-decision-v13-extended-target-evidence"></script>',
         '  <script src="atlas-product-shell.js?v=product-shell-v7-bound-analyst-geometry"></script>',
         '  <script src="production-web-autoload.js?v=production-autoload-v6-strict-final-truth"></script>',
         '  <script src="atlas-deep-analysis-ui.js?v=rc10-1-deep-v2-primary-4-12h"></script>',
