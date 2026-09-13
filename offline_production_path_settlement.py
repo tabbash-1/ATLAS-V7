@@ -219,6 +219,21 @@ def excursions(candles, g):
     return round(mfe, 4), round(mae, 4)
 
 
+def excursion_window(candles, event, event_candle, refined_1m=None, refined_event_candle=None):
+    """Return only price bars observable through the terminal first-touch event."""
+    if event not in {"SL", "TP2"} or not event_candle:
+        return candles, "FULL_HORIZON"
+    event_open = int(event_candle["open_time"])
+    before = [c for c in candles if int(c["open_time"]) < event_open]
+    if refined_1m is not None:
+        if refined_event_candle is None:
+            return before, "THROUGH_TERMINAL_EVENT_1M_UNRESOLVED"
+        refined_open = int(refined_event_candle["open_time"])
+        scoped_1m = [c for c in refined_1m if int(c["open_time"]) <= refined_open]
+        return before + scoped_1m, "THROUGH_TERMINAL_EVENT_1M"
+    return before + [event_candle], "THROUGH_TERMINAL_EVENT"
+
+
 def settle(ep, now_ms):
     start = int(ep["captured_at_ms"]); maturity = start + HORIZON_H * 3600_000
     base = {**ep, "schema": SCHEMA, "research_only": True, "live_execution": False, "can_override_production": False}
@@ -230,13 +245,19 @@ def settle(ep, now_ms):
         if not candles:
             raise RuntimeError("no_5m_candles")
         ev, candle, tp1_seen = event_from(candles, ep["geometry"])
+        one = None
+        refined_candle = None
         if ev == "AMBIGUOUS" and candle:
             one, provider_1m = market_klines(ep["symbol"], "1", candle["open_time"], candle["open_time"] + 5*60_000 - 1)
-            ev1, _, tp1_before_1m = event_from(one, ep["geometry"])
-            ev = ev1 if ev1 in {"SL", "TP2"} else "AMBIGUOUS"
+            ev1, c1, tp1_before_1m = event_from(one, ep["geometry"])
+            if ev1 in {"SL", "TP2"}:
+                ev, refined_candle = ev1, c1
+            else:
+                ev = "AMBIGUOUS"
             tp1_seen = tp1_seen or tp1_before_1m
             provider = provider + "+1M:" + provider_1m
-        mfe, mae = excursions(candles, ep["geometry"])
+        scoped, excursion_scope = excursion_window(candles, ev, candle, one, refined_candle)
+        mfe, mae = excursions(scoped, ep["geometry"])
         if ev == "SL": status, r, terminal = "LOSS", -1.0, True
         elif ev == "TP2": status, r, terminal = "WIN_TP2", float(ep["geometry"]["rr_tp2"]), True
         elif ev == "AMBIGUOUS": status, r, terminal = "AMBIGUOUS", None, False
@@ -246,8 +267,8 @@ def settle(ep, now_ms):
             r = directional / g["risk_abs"]
             status, terminal = ("EXPIRED_TP1" if tp1_seen else "EXPIRED"), True
         return {**base, "status": status, "terminal": terminal, "r_multiple": None if r is None else round(r,4),
-                "tp1_reached": bool(tp1_seen), "mfe_r": mfe, "mae_r": mae, "settled_through_ms": end,
-                "market_source": provider}
+                "tp1_reached": bool(tp1_seen), "mfe_r": mfe, "mae_r": mae, "excursion_scope": excursion_scope,
+                "settled_through_ms": end, "market_source": provider}
     except Exception as e:
         return {**base, "status": "MARKET_DATA_ERROR", "terminal": False, "r_multiple": None, "error": str(e)[:700]}
 
@@ -283,7 +304,7 @@ def main():
     report = {"schema":SCHEMA, "generated_at":dt.datetime.now(dt.timezone.utc).isoformat(), "horizon_hours":HORIZON_H,
               "source_history":str(HISTORY.relative_to(ROOT)),
               "episode_semantics":"FIRST_QUALIFIED_OBSERVATION_PER_CONTIGUOUS_SYMBOL_DIRECTION_EPISODE",
-              "methodology":"Canonical Production entry/SL/TP2 frozen at episode start; public provider chain; first 5m touch, 1m refinement for same-5m ambiguity; expired positions marked to market at 12h.",
+              "methodology":"Canonical Production entry/SL/TP2 frozen at episode start; public provider chain; first 5m touch, 1m refinement for same-5m ambiguity; excursions stop at terminal first-touch; expired positions marked to market at 12h.",
               "research_only":True, "live_execution":False, "can_override_production":False, "can_change_threshold":False,
               "production_threshold_unchanged":68, "summary":summarize(rows), "records":rows}
     LATEST.parent.mkdir(parents=True, exist_ok=True); LATEST.write_text(json.dumps(report,indent=2,sort_keys=True))
