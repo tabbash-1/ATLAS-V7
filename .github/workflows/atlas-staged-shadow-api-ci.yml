@@ -10,6 +10,13 @@ on:
       - 'tests/test_staged_shadow_api_overlay.py'
       - 'tests/test_staged_shadow_render_contract.py'
       - '.github/workflows/atlas-staged-shadow-api-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'staged_decision_shadow.py'
+      - 'staged_shadow_api_overlay.py'
+      - 'committed_research_api.py'
+      - '.github/workflows/atlas-staged-shadow-api-ci.yml'
   workflow_dispatch:
 
 jobs:
@@ -24,3 +31,41 @@ jobs:
         run: python -m pip install --upgrade pip pytest
       - name: Run shadow API safety tests
         run: python -m pytest -q tests/test_staged_decision_shadow.py tests/test_staged_shadow_api_overlay.py tests/test_staged_shadow_render_contract.py
+
+  live-smoke:
+    if: github.event_name == 'push'
+    needs: shadow-api
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      BASE_URL: https://atlas-v7.onrender.com
+    steps:
+      - name: Verify staged shadow endpoint on live Render
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 18); do
+            JSON=$(curl -L --connect-timeout 10 --max-time 35 -fsS "$BASE_URL/api/research/staged-decision-shadow?symbol=BTCUSDT&t=$(date +%s)" || true)
+            if printf '%s' "$JSON" | jq -e '
+              .ok == true and
+              .version == "ATLAS_STAGED_DECISION_SHADOW_V1" and
+              .symbol == "BTCUSDT" and
+              .product_horizon == "4-12H" and
+              .evaluation_horizons_h == [4,8,12] and
+              .production_threshold == 68 and
+              .canonical_decision.source_of_truth == "FINAL_TRADE_GATE" and
+              .canonical_decision_unchanged == true and
+              .final_trade_gate_unchanged == true and
+              .production_decision_callable_unchanged == true and
+              .shadow_only == true and
+              .research_only == true and
+              .can_override_production == false and
+              .live_execution == false' >/dev/null 2>&1; then
+              echo "PASS live staged shadow API"
+              printf '%s' "$JSON" | jq '{version,symbol,canonical_decision,missing_evidence,failed_layers,shadow_ready,shadow_only,can_override_production,live_execution}'
+              exit 0
+            fi
+            echo "Render staged shadow endpoint not ready attempt $i/18"
+            sleep 10
+          done
+          echo "Live staged shadow API contract did not become ready"
+          exit 1
