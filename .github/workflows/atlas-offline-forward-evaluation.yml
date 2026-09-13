@@ -5,8 +5,10 @@ on:
     branches: [main]
     paths:
       - 'canonical_decision_contract.py'
+      - 'canonical_outcome_snapshot.py'
       - 'offline_forward_evaluation.py'
       - 'forward_robustness_guardrails.py'
+      - 'tests/test_canonical_outcome_sync_workflows.py'
       - 'status/history/production-snapshots.jsonl'
       - '.github/workflows/atlas-offline-forward-evaluation.yml'
   schedule:
@@ -31,7 +33,8 @@ jobs:
       - name: Build canonical offline forward evaluation and shadow guardrails
         run: |
           set -euo pipefail
-          python3 -m py_compile canonical_decision_contract.py offline_forward_evaluation.py forward_robustness_guardrails.py
+          PYTHONPATH=. python tests/test_canonical_outcome_sync_workflows.py
+          python3 -m py_compile canonical_decision_contract.py canonical_outcome_snapshot.py offline_forward_evaluation.py forward_robustness_guardrails.py
           python3 offline_forward_evaluation.py --history status/history/production-snapshots.jsonl --output status/offline-forward-evaluation-latest.json
           python3 forward_robustness_guardrails.py --input status/offline-forward-evaluation-latest.json --output status/forward-robustness-guardrails-latest.json
           python3 - <<'PY'
@@ -64,11 +67,16 @@ jobs:
           print('WAIT_REASONS',json.dumps(x['wait_reason_counts'],sort_keys=True))
           print('SHADOW_GUARDRAILS',json.dumps(g,sort_keys=True))
           PY
+      - name: Refresh canonical outcome snapshot from authoritative inputs
+        run: |
+          set -euo pipefail
+          python canonical_outcome_snapshot.py
+          jq -e '.schema == "ATLAS_CANONICAL_OUTCOME_SNAPSHOT_V1" and .decision_source_of_truth == "FINAL_TRADE_GATE" and .evaluation_horizons_h == [4,8,12]' status/canonical-outcomes-latest.json >/dev/null
       - name: Commit research reports only when data changed
         run: |
           git config user.name 'atlas-offline-research-bot'
           git config user.email 'atlas-offline-research-bot@users.noreply.github.com'
-          git add status/offline-forward-evaluation-latest.json status/forward-robustness-guardrails-latest.json
+          git add status/offline-forward-evaluation-latest.json status/forward-robustness-guardrails-latest.json status/canonical-outcomes-latest.json
           if git diff --cached --quiet; then exit 0; fi
           git commit -m 'chore: update canonical offline forward research [skip ci]'
           git pull --rebase origin main
