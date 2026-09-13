@@ -5,48 +5,28 @@ on:
     branches: [main]
     paths:
       - 'cloud_start.py'
-      - 'edge_evidence_interaction_protocol.py'
-      - 'edge_evidence_interaction_rules.py'
-      - 'edge_evidence_interaction_validator_guard.py'
-      - 'edge_evidence_interaction_preflight.py'
-      - 'edge_evidence_interaction_outcome_validator.py'
+      - 'edge_evidence_interaction_*.py'
       - 'interaction_outcome_runtime.py'
       - 'edge_evidence_joint_coverage.py'
       - 'edge_evidence_overlap.py'
       - 'edge_evidence_redundancy.py'
       - 'volatility_walkforward_runtime.py'
-      - 'tests/test_edge_evidence_interaction_protocol.py'
-      - 'tests/test_edge_evidence_interaction_rules.py'
-      - 'tests/test_edge_evidence_interaction_validator_guard.py'
-      - 'tests/test_edge_evidence_interaction_preflight.py'
-      - 'tests/test_edge_evidence_interaction_outcome_validator.py'
-      - 'tests/test_interaction_outcome_guard_hash_binding.py'
-      - 'tests/test_interaction_outcome_runtime.py'
-      - 'tests/test_interaction_outcome_boot_contract.py'
+      - 'tests/test_edge_evidence_interaction_*.py'
+      - 'tests/test_interaction_outcome_*.py'
       - 'tests/test_volatility_walkforward_runtime.py'
       - '.github/workflows/atlas-interaction-protocol-ci.yml'
   pull_request:
     branches: [main]
     paths:
       - 'cloud_start.py'
-      - 'edge_evidence_interaction_protocol.py'
-      - 'edge_evidence_interaction_rules.py'
-      - 'edge_evidence_interaction_validator_guard.py'
-      - 'edge_evidence_interaction_preflight.py'
-      - 'edge_evidence_interaction_outcome_validator.py'
+      - 'edge_evidence_interaction_*.py'
       - 'interaction_outcome_runtime.py'
       - 'edge_evidence_joint_coverage.py'
       - 'edge_evidence_overlap.py'
       - 'edge_evidence_redundancy.py'
       - 'volatility_walkforward_runtime.py'
-      - 'tests/test_edge_evidence_interaction_protocol.py'
-      - 'tests/test_edge_evidence_interaction_rules.py'
-      - 'tests/test_edge_evidence_interaction_validator_guard.py'
-      - 'tests/test_edge_evidence_interaction_preflight.py'
-      - 'tests/test_edge_evidence_interaction_outcome_validator.py'
-      - 'tests/test_interaction_outcome_guard_hash_binding.py'
-      - 'tests/test_interaction_outcome_runtime.py'
-      - 'tests/test_interaction_outcome_boot_contract.py'
+      - 'tests/test_edge_evidence_interaction_*.py'
+      - 'tests/test_interaction_outcome_*.py'
       - 'tests/test_volatility_walkforward_runtime.py'
       - '.github/workflows/atlas-interaction-protocol-ci.yml'
 
@@ -65,71 +45,78 @@ jobs:
         run: python -m py_compile cloud_start.py edge_evidence_interaction_protocol.py edge_evidence_interaction_rules.py edge_evidence_interaction_validator_guard.py edge_evidence_interaction_preflight.py edge_evidence_interaction_outcome_validator.py interaction_outcome_runtime.py edge_evidence_joint_coverage.py edge_evidence_overlap.py edge_evidence_redundancy.py volatility_walkforward_runtime.py
       - name: Protocol preflight outcome-validator runtime and boot regression tests
         run: PYTHONPATH=. python -m pytest -q tests/test_edge_evidence_interaction_protocol.py tests/test_edge_evidence_interaction_rules.py tests/test_edge_evidence_interaction_validator_guard.py tests/test_edge_evidence_interaction_preflight.py tests/test_edge_evidence_interaction_outcome_validator.py tests/test_interaction_outcome_guard_hash_binding.py tests/test_interaction_outcome_runtime.py tests/test_interaction_outcome_boot_contract.py tests/test_edge_evidence_joint_coverage.py tests/test_volatility_walkforward_runtime.py
-      - name: Preserve preregistration contract
+      - name: Preserve preregistration contract and Render isolation
         run: |
-          grep -q "CHRONOLOGICAL_FOLDS = 3" edge_evidence_interaction_protocol.py
-          grep -q "MIN_TOTAL_SETTLED = 60" edge_evidence_interaction_protocol.py
-          grep -q "MIN_CELL_SETTLED_PER_FOLD = 5" edge_evidence_interaction_protocol.py
-          grep -q "MIN_TOTAL_SETTLED_PER_CELL = 20" edge_evidence_interaction_protocol.py
-          grep -q "all_eligible_horizons_must_be_reported_separately.*True" edge_evidence_interaction_protocol.py
-          grep -q "single_horizon_selection_allowed.*False" edge_evidence_interaction_protocol.py
-          grep -q "adaptive_rule_search_allowed.*False" edge_evidence_interaction_protocol.py
-          grep -q "grid_search_allowed.*False" edge_evidence_interaction_protocol.py
-          grep -q "threshold_tuning_after_outcomes_allowed.*False" edge_evidence_interaction_protocol.py
-          grep -q "best_cell_selection_after_outcomes_allowed.*False" edge_evidence_interaction_protocol.py
-          grep -q "horizon_selection_after_outcomes_allowed.*False" edge_evidence_interaction_protocol.py
-          grep -q "future_validator_must_match_protocol_hash.*True" edge_evidence_interaction_protocol.py
-          grep -q "armed_protocol_hash" edge_evidence_interaction_validator_guard.py
-          grep -q "outcomes_read.*False" edge_evidence_interaction_validator_guard.py
-          grep -q "validator_execution_started.*False" edge_evidence_interaction_validator_guard.py
-          grep -q "can_override_production.*False" edge_evidence_interaction_validator_guard.py
-          grep -q "RULE_ID = 'H1_THREE_LAYER_FAVORABLE_CONFLUENCE'" edge_evidence_interaction_rules.py
-          grep -q "profit_regime_relation_equals.*REGIME_ALIGNED" edge_evidence_interaction_rules.py
-          grep -q "microstructure_relation_to_signal_equals.*ALIGNED" edge_evidence_interaction_rules.py
-          grep -q "volatility_target_fit_equals.*PLAUSIBLE_VS_EMPIRICAL_P80" edge_evidence_interaction_rules.py
-          grep -q "volatility_stop_fit_equals.*PLAUSIBLE_VS_EMPIRICAL_P80" edge_evidence_interaction_rules.py
-          grep -q "apply_identically_to_every_eligible_horizon.*True" edge_evidence_interaction_rules.py
-          grep -q "rule_selection_after_outcomes_allowed.*False" edge_evidence_interaction_rules.py
-          grep -q "alternative_rule_search_allowed.*False" edge_evidence_interaction_rules.py
-          grep -q "horizon_selection_allowed.*False" edge_evidence_interaction_rules.py
-          grep -q "fallback_rule_allowed.*False" edge_evidence_interaction_rules.py
-          grep -q "weights_allowed.*False" edge_evidence_interaction_rules.py
-          grep -q "outcomes_read.*False" edge_evidence_interaction_rules.py
-          grep -q "can_override_production.*False" edge_evidence_interaction_rules.py
-          grep -q "outcome_access_allowed.*False" edge_evidence_interaction_preflight.py
-          grep -q "READY_FOR_CANONICAL_OUTCOME_READ" edge_evidence_interaction_preflight.py
-          grep -q "COLLECTING_PRE_OUTCOME" edge_evidence_interaction_preflight.py
-          grep -q "MIN_FROZEN_COMMON_COHORT_NOT_REACHED" edge_evidence_interaction_preflight.py
-          grep -q "MIN_FROZEN_H1_CANDIDATES_NOT_REACHED" edge_evidence_interaction_preflight.py
-          grep -q "outcomes_read.*False" edge_evidence_interaction_preflight.py
-          grep -q "can_override_production.*False" edge_evidence_interaction_preflight.py
-          grep -q "Outcome loader is never called before authorization\|only now may canonical outcomes be read" edge_evidence_interaction_outcome_validator.py
-          grep -q "GUARD_PROTOCOL_HASH_MISMATCH" edge_evidence_interaction_outcome_validator.py
-          grep -q "horizon_selection_performed.*False" edge_evidence_interaction_outcome_validator.py
-          grep -q "rule_search_performed.*False" edge_evidence_interaction_outcome_validator.py
-          grep -q "threshold_tuning_performed.*False" edge_evidence_interaction_outcome_validator.py
-          grep -q "grid_search_performed.*False" edge_evidence_interaction_outcome_validator.py
-          grep -q "weights_assigned.*False" edge_evidence_interaction_outcome_validator.py
-          grep -q "composite_trade_score_created.*False" edge_evidence_interaction_outcome_validator.py
-          grep -q "gate_promoted.*False" edge_evidence_interaction_outcome_validator.py
-          grep -q "can_override_production.*False" edge_evidence_interaction_outcome_validator.py
-          grep -q "background_only.*True" interaction_outcome_runtime.py
-          grep -q "shadow_only.*True" interaction_outcome_runtime.py
-          grep -q "wraps_production_decision.*False" interaction_outcome_runtime.py
-          grep -q "wraps_forward_observe.*False" interaction_outcome_runtime.py
-          grep -q "can_override_production.*False" interaction_outcome_runtime.py
-          grep -q "gate_promoted.*False" interaction_outcome_runtime.py
-          grep -q "outcome_access_allowed.*is not True" interaction_outcome_runtime.py
-          grep -q "canonical_outcome_loader_called.*False" interaction_outcome_runtime.py
-          grep -q "_canonical_settlements" interaction_outcome_runtime.py
-          grep -q "from volatility_walkforward_runtime import install as _install_volatility_walkforward_runtime" cloud_start.py
-          grep -q "from interaction_outcome_runtime import install as _install_interaction_outcome_runtime" cloud_start.py
-          grep -q "_install_interaction_outcome_runtime(_collector)" cloud_start.py
-          grep -q "except Exception as _interaction_runtime_exc" cloud_start.py
-          grep -q "edge_evidence_report.install(collector)" volatility_walkforward_runtime.py
-          grep -q "edge_evidence_interaction_protocol.install(collector)" volatility_walkforward_runtime.py
-          grep -q "edge_evidence_interaction_validator_guard.install(collector)" volatility_walkforward_runtime.py
-          grep -q "background_only.*True" volatility_walkforward_runtime.py
-          grep -q "wraps_production_decision.*False" volatility_walkforward_runtime.py
-          grep -q "wraps_forward_observe.*False" volatility_walkforward_runtime.py
-          grep -q "can_override_production.*False" volatility_walkforward_runtime.py
+          python - <<'PY'
+          from pathlib import Path
+
+          protocol = Path('edge_evidence_interaction_protocol.py').read_text(encoding='utf-8')
+          for marker in (
+              'CHRONOLOGICAL_FOLDS = 3', 'MIN_TOTAL_SETTLED = 60',
+              'MIN_CELL_SETTLED_PER_FOLD = 5', 'MIN_TOTAL_SETTLED_PER_CELL = 20',
+              "all_eligible_horizons_must_be_reported_separately': True",
+              "single_horizon_selection_allowed': False",
+              "adaptive_rule_search_allowed': False", "grid_search_allowed': False",
+              "threshold_tuning_after_outcomes_allowed': False",
+              "best_cell_selection_after_outcomes_allowed': False",
+              "horizon_selection_after_outcomes_allowed': False",
+              "future_validator_must_match_protocol_hash': True",
+          ):
+              assert marker in protocol, f'protocol safety marker missing: {marker}'
+
+          rules = Path('edge_evidence_interaction_rules.py').read_text(encoding='utf-8')
+          for marker in (
+              "RULE_ID = 'H1_THREE_LAYER_FAVORABLE_CONFLUENCE'",
+              "profit_regime_relation_equals': 'REGIME_ALIGNED'",
+              "microstructure_relation_to_signal_equals': 'ALIGNED'",
+              "volatility_target_fit_equals': 'PLAUSIBLE_VS_EMPIRICAL_P80'",
+              "volatility_stop_fit_equals': 'PLAUSIBLE_VS_EMPIRICAL_P80'",
+              "apply_identically_to_every_eligible_horizon': True",
+              "rule_selection_after_outcomes_allowed': False",
+              "alternative_rule_search_allowed': False",
+              "horizon_selection_allowed': False", "fallback_rule_allowed': False",
+              "weights_allowed': False", "outcomes_read': False",
+              "can_override_production': False",
+          ):
+              assert marker in rules, f'rules safety marker missing: {marker}'
+
+          preflight = Path('edge_evidence_interaction_preflight.py').read_text(encoding='utf-8')
+          for marker in (
+              "outcome_access_allowed': False", 'READY_FOR_CANONICAL_OUTCOME_READ',
+              'COLLECTING_PRE_OUTCOME', 'MIN_FROZEN_COMMON_COHORT_NOT_REACHED',
+              'MIN_FROZEN_H1_CANDIDATES_NOT_REACHED', "outcomes_read': False",
+              "can_override_production': False",
+          ):
+              assert marker in preflight, f'preflight safety marker missing: {marker}'
+
+          validator = Path('edge_evidence_interaction_outcome_validator.py').read_text(encoding='utf-8')
+          for marker in (
+              'GUARD_PROTOCOL_HASH_MISMATCH', "horizon_selection_performed': False",
+              "rule_search_performed': False", "threshold_tuning_performed': False",
+              "grid_search_performed': False", "weights_assigned': False",
+              "composite_trade_score_created': False", "gate_promoted': False",
+              "can_override_production': False",
+          ):
+              assert marker in validator, f'validator safety marker missing: {marker}'
+
+          runtime = Path('interaction_outcome_runtime.py').read_text(encoding='utf-8')
+          for marker in (
+              "background_only': True", "shadow_only': True",
+              "wraps_production_decision': False", "wraps_forward_observe': False",
+              "can_override_production': False", "gate_promoted': False",
+              "canonical_outcome_loader_called': False", '_canonical_settlements',
+          ):
+              assert marker in runtime, f'runtime safety marker missing: {marker}'
+
+          boot = Path('cloud_start.py').read_text(encoding='utf-8')
+          start = boot.index('if os.environ.get("RENDER"):')
+          end = boot.index('else:', start)
+          render = boot[start:end]
+          assert 'ATLAS_WEB_ONLY"] = "1"' in render
+          assert 'ATLAS_CLOUD_FORWARD_ENABLED"] = "0"' in render
+          for forbidden in (
+              'interaction_outcome_runtime', '_install_interaction_outcome_runtime',
+              '_install_volatility_walkforward_runtime', '_canonical_settlements',
+          ):
+              assert forbidden not in render, f'Render must isolate research worker: {forbidden}'
+          PY

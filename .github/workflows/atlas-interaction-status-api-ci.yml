@@ -44,6 +44,15 @@ jobs:
           ! grep -q "interaction_outcome_refresh(" interaction_status_api.py
           ! grep -q "_canonical_settlements(" interaction_status_api.py
           ! grep -q "trade_path_settlement" interaction_status_api.py
-          grep -q "from interaction_status_api import install as _install_interaction_status_api" cloud_start.py
-          grep -q "_install_interaction_status_api(_collector)" cloud_start.py
-          grep -q "except Exception as _interaction_status_api_exc" cloud_start.py
+          grep -q "ATLAS_WEB_ONLY" cloud_start.py
+          grep -q "cloud_production_canonical.py" cloud_start.py
+          python - <<'PY'
+          from pathlib import Path
+          text = Path('cloud_start.py').read_text(encoding='utf-8')
+          start = text.index('if os.environ.get("RENDER"):')
+          end = text.index('else:', start)
+          block = text[start:end]
+          assert 'interaction_status_api' not in block
+          assert 'interaction_outcome_runtime' not in block
+          assert 'trade_path_settlement' not in block
+          PY

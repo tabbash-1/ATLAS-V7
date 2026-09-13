@@ -1,23 +1,24 @@
 from pathlib import Path
 
 
-def test_cached_status_api_boots_after_background_interaction_runtime():
+def test_render_boot_stays_web_only_and_routes_through_canonical_launcher():
     text = Path('cloud_start.py').read_text(encoding='utf-8')
-    runtime = text.index('from interaction_outcome_runtime import install as _install_interaction_outcome_runtime')
-    status_api = text.index('from interaction_status_api import install as _install_interaction_status_api')
-    entrypoint = text.index('entrypoint="atlas_research_runtime_server.py"')
-    assert runtime < status_api < entrypoint
-    block = text[status_api:entrypoint]
-    assert '_install_interaction_status_api(_collector)' in block
-    assert 'except Exception as _interaction_status_api_exc:' in block
-    assert 'ATLAS interaction status API unavailable' in block
+
+    render = text.index('if os.environ.get("RENDER"):')
+    forward_off = text.index('os.environ["ATLAS_CLOUD_FORWARD_ENABLED"] = "0"')
+    web_only = text.index('os.environ["ATLAS_WEB_ONLY"] = "1"')
+    launcher = text.index('cloud_production_canonical.py')
+
+    assert render < forward_off < web_only < launcher
 
 
-def test_status_api_boot_block_does_not_call_refresh_or_settlement():
+def test_render_boot_does_not_reintroduce_interaction_or_settlement_workers():
     text = Path('cloud_start.py').read_text(encoding='utf-8')
-    start = text.index('# Cached status endpoint only.')
-    end = text.index('entrypoint="atlas_research_runtime_server.py"')
+    start = text.index('if os.environ.get("RENDER"):')
+    end = text.index('else:', start)
     block = text[start:end]
+
+    assert 'interaction_outcome_runtime' not in block
     assert 'interaction_outcome_refresh' not in block
     assert '_canonical_settlements' not in block
     assert 'trade_path_settlement' not in block
