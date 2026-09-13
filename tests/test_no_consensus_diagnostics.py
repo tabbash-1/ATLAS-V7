@@ -15,7 +15,7 @@ def row(change=2.0, price=101.0, ema20=100.0, ema50=102.0, rsi=55.0, mom=-1.0):
 def test_fixture_tracks_canonical_product_horizons():
     r=row()
     assert sorted(r['horizons']) == ['12h','4h','8h']
-    assert n.HORIZONS == [4,8,12]
+    assert list(n.HORIZONS) == [4,8,12]
 
 
 def test_signature_reconstructs_exact_four_votes():
