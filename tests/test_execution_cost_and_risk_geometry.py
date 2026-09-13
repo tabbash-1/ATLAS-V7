@@ -14,7 +14,9 @@ def test_cost_gate_passes_only_with_safety_margin():
 
 
 def test_cost_gate_fails_when_expected_move_does_not_clear_buffer():
-    r = evaluate_execution_cost(expected_move_bps=18, fee_bps=5, spread_bps=4, slippage_bps=4, funding_bps=1, safety_multiplier=1.25)
+    r = evaluate_execution_cost(expected_move_bps=17, fee_bps=5, spread_bps=4, slippage_bps=4, funding_bps=1, safety_multiplier=1.25)
+    assert r.modeled_cost_bps == 14
+    assert r.required_edge_bps == 17.5
     assert r.passed is False
     assert r.reason == 'INSUFFICIENT_EDGE_AFTER_COST'
 
