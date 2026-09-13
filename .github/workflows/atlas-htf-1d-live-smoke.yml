@@ -6,6 +6,8 @@ on:
     paths:
       - 'htf_structural_thesis.py'
       - 'render_boot_patch.py'
+      - 'closed_candle_htf_boot_patch.py'
+      - 'render.yaml'
       - 'final_trade_ready_guard.py'
       - '.github/workflows/atlas-htf-1d-live-smoke.yml'
   workflow_dispatch:
@@ -22,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Verify 4H+12H authority, 1D macro context and 1H confirmation live
+      - name: Verify closed-candle 4H+12H authority, 1D context and 1H confirmation live
         shell: bash
         run: |
           set -euo pipefail
@@ -32,15 +34,25 @@ jobs:
             if curl -fsSL --connect-timeout 10 --max-time 60 "$base/api/decision/current?symbol=BNBUSDT" -o /tmp/d.json; then
               if jq -e '
                 .ok == true
-                and .htf_thesis.version == "HTF_STRUCTURAL_THESIS_V2_PRODUCT_DIRECTION_AUTHORITY"
+                and .htf_thesis.version == "HTF_STRUCTURAL_THESIS_V4_CLOSED_CANDLE_AUTHORITY"
                 and .htf_thesis.product_horizon == "4-12H"
                 and .htf_thesis.authority_timeframes == ["12h","4h"]
                 and .htf_thesis.context_timeframe == "1d"
                 and .htf_thesis.confirmation_timeframe == "1h"
+                and .htf_thesis.candle_policy == "CLOSED_CANDLES_ONLY"
+                and .htf_thesis.in_progress_candles_can_change_authority == false
                 and (.htf_thesis.frames["1h"].ok == true)
                 and (.htf_thesis.frames["4h"].ok == true)
                 and (.htf_thesis.frames["12h"].ok == true)
                 and (.htf_thesis.frames["1d"].ok == true)
+                and (.htf_thesis.frame_data_quality["1h"].closed_candles >= 60)
+                and (.htf_thesis.frame_data_quality["4h"].closed_candles >= 60)
+                and (.htf_thesis.frame_data_quality["12h"].closed_candles >= 60)
+                and (.htf_thesis.frame_data_quality["1d"].closed_candles >= 60)
+                and (.htf_thesis.frame_data_quality["1h"].dropped_in_progress >= 0)
+                and (.htf_thesis.frame_data_quality["4h"].dropped_in_progress >= 0)
+                and (.htf_thesis.frame_data_quality["12h"].dropped_in_progress >= 0)
+                and (.htf_thesis.frame_data_quality["1d"].dropped_in_progress >= 0)
                 and .htf_thesis.can_flip_from_1h_only == false
                 and .htf_thesis.score_changed == false
                 and .htf_thesis.threshold_changed == false
@@ -73,5 +85,5 @@ jobs:
             then .htf_thesis.status == "WAIT" else true end
           ' /tmp/d.json >/dev/null
 
-          echo 'LIVE_HTF_1D_MACRO_CONTEXT_OK'
-          jq '{symbol,actionable_decision,product_direction,direction_authority,htf_thesis:{version,status,reason,authority_timeframes,context_timeframe,confirmation_timeframe,daily_context,daily_context_confidence,can_flip_from_1h_only,frames}}' /tmp/d.json
+          echo 'LIVE_HTF_CLOSED_CANDLE_AUTHORITY_OK'
+          jq '{symbol,actionable_decision,product_direction,direction_authority,final_trade_gate,htf_thesis:{version,status,reason,candle_policy,in_progress_candles_can_change_authority,authority_timeframes,context_timeframe,confirmation_timeframe,daily_context,daily_context_confidence,can_flip_from_1h_only,frame_data_quality,frames}}' /tmp/d.json
