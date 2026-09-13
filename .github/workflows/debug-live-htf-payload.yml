@@ -8,14 +8,40 @@ on:
 jobs:
   capture:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
-      - name: Fetch raw Production decision payload
+      - name: Fetch live Production decisions across core assets
         run: |
           set -euo pipefail
-          curl -L --connect-timeout 20 --max-time 90 -sS "https://atlas-v7.onrender.com/api/decision/current?symbol=BNBUSDT" -o /tmp/decision.json
-          echo '=== RAW_PAYLOAD ==='
-          cat /tmp/decision.json
-          echo
-          echo '=== HTF_EXTRACT ==='
-          jq '{ok,symbol,actionable_decision,direction_authority,htf_thesis:.htf_thesis,htf_thesis_version:.htf_thesis_version,product_direction,direction_alignment,final_trade_gate}' /tmp/decision.json
+          for symbol in BTCUSDT ETHUSDT SOLUSDT BNBUSDT XRPUSDT DOGEUSDT ZECUSDT; do
+            echo "=== ${symbol} ==="
+            out="/tmp/${symbol}.json"
+            curl -L --connect-timeout 20 --max-time 90 -sS "https://atlas-v7.onrender.com/api/decision/current?symbol=${symbol}" -o "$out"
+            jq '{
+              ok,
+              symbol,
+              actionable_decision,
+              actionable_reason,
+              score,
+              signal_threshold,
+              production_signal_qualified,
+              candidate_direction,
+              product_direction,
+              direction_alignment,
+              direction_authority,
+              htf_status:.htf_thesis.status,
+              htf_reason:.htf_thesis.reason,
+              htf_version:.htf_thesis.version,
+              candle_policy:.htf_thesis.candle_policy,
+              final_trade_gate:{status:.final_trade_gate.status,trade_ready:.final_trade_gate.trade_ready,reason:.final_trade_gate.reason,blockers:.final_trade_gate.blockers},
+              analyst_decision:.analyst_output.decision,
+              analyst_primary_reason:.analyst_output.primary_reason,
+              geometry_ready:.analyst_output.geometry_ready_canonical,
+              entry:.analyst_output.entry,
+              stop_loss:.analyst_output.stop_loss,
+              tp1:.analyst_output.tp1,
+              take_profit:.analyst_output.take_profit,
+              risk_reward:.analyst_output.risk_reward,
+              live_execution
+            }' "$out"
+          done
