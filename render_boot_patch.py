@@ -32,7 +32,7 @@ def patch_production_ui():
         '  <script src="atlas-product-shell.js?v=product-shell-v7-bound-analyst-geometry"></script>',
         '  <script src="production-web-autoload.js?v=production-autoload-v6-strict-final-truth"></script>',
         '  <script src="atlas-deep-analysis-ui.js?v=rc10-1-deep-v2-primary-4-12h"></script>',
-        '  <script src="atlas-unified-terminal.js?v=unified-terminal-v5-strict-final-gate"></script>',
+        '  <script src="atlas-unified-terminal.js?v=unified-terminal-v6-single-snapshot-htf"></script>',
         '  <script src="atlas-unified-terminal-polish.js?v=unified-terminal-polish-v2-execution-semantics"></script>',
         '  <script src="atlas-paper-portfolio-ui.js?v=paper-portfolio-v3-final-gate-only"></script>',
         '  <script src="atlas-research-validation-ui.js?v=research-shadow-v3-target-status"></script>',
@@ -116,7 +116,7 @@ def patch_product_quality_gate_htf_install():
         )
         if needle not in text:
             raise RuntimeError("HTF price-action install tail changed; refusing silent scenario-engine patch")
-        text = text.replace(needle, replacement, 1)
+        text = text.replace(needle, replacement,1)
     QUALITY_GATE.write_text(text, encoding="utf-8")
     print("ATLAS Render boot patch: 4H/12H structural authority + 1D macro context + 1H confirmation + price action + scenario engine enabled", flush=True)
 
