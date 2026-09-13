@@ -53,6 +53,8 @@ def test_production_ui_removes_hype_and_filters_saved_assets():
 
 
 def test_production_ui_removes_hype_after_provider_rewrite():
+    # Mirrors the real Render boot ordering where the legacy chart patch can
+    # rewrite HYPE's provider before the canonical Production UI guard runs.
     rewritten = """const assets = [
   { name: 'Bitcoin / USDT', symbol: 'BINANCE:BTCUSDT', cls: 'Crypto' },
   { name: 'Hyperliquid / USDT', symbol: 'BYBIT:HYPEUSDT', cls: 'Crypto' }
