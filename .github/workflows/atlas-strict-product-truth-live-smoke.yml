@@ -42,7 +42,7 @@ jobs:
           PYTHONPATH=. python tests/test_production_single_snapshot_authority.py
           PYTHONPATH=. python tests/test_strict_product_truth_contract.py
 
-          grep -q "ATLAS_PRODUCTION_DECISION_UI_V12_FINAL_GATE_ONLY" atlas-production-decision.js
+          grep -q "ATLAS_PRODUCTION_DECISION_UI_V13_EXTENDED_TARGET_EVIDENCE" atlas-production-decision.js
           grep -q "canonicalContract:'canonical_decision'" atlas-production-decision.js
           grep -q "sourceOfTruth:'FINAL_TRADE_GATE'" atlas-production-decision.js
           ! grep -q "canonicalContract:'analyst_output'" atlas-production-decision.js
@@ -73,7 +73,7 @@ jobs:
           ! grep -q "d.product_direction||d.candidate_direction" production-web-autoload.js
           grep -q "geometrySource:'bound_analyst_output'" production-web-autoload.js
 
-          grep -q "production-decision-v12-final-gate-only" render_boot_patch.py
+          grep -q "production-decision-v13-extended-target-evidence" render_boot_patch.py
           grep -q "unified-terminal-v6-single-snapshot-htf" render_boot_patch.py
           grep -q "paper-portfolio-v3-final-gate-only" render_boot_patch.py
           grep -q "research-shadow-v3-target-status" render_boot_patch.py
@@ -96,11 +96,11 @@ jobs:
               && curl -fsSL --connect-timeout 10 --max-time 50 "$base/atlas-paper-portfolio-ui.js" -o /tmp/paper.js \
               && curl -fsSL --connect-timeout 10 --max-time 50 "$base/atlas-research-validation-ui.js" -o /tmp/research.js \
               && curl -fsSL --connect-timeout 10 --max-time 50 "$base/production-web-autoload.js" -o /tmp/autoload.js; then
-              if grep -q 'production-decision-v12-final-gate-only' /tmp/index.html \
+              if grep -q 'production-decision-v13-extended-target-evidence' /tmp/index.html \
                 && grep -q 'unified-terminal-v6-single-snapshot-htf' /tmp/index.html \
                 && grep -q 'paper-portfolio-v3-final-gate-only' /tmp/index.html \
                 && grep -q 'research-shadow-v3-target-status' /tmp/index.html \
-                && grep -q 'ATLAS_PRODUCTION_DECISION_UI_V12_FINAL_GATE_ONLY' /tmp/prod.js \
+                && grep -q 'ATLAS_PRODUCTION_DECISION_UI_V13_EXTENDED_TARGET_EVIDENCE' /tmp/prod.js \
                 && grep -q 'ATLAS_UNIFIED_TERMINAL_V6_SINGLE_SNAPSHOT_HTF' /tmp/unified.js \
                 && grep -q 'ATLAS_CANONICAL_PAPER_UI_V3_FINAL_GATE_ONLY' /tmp/paper.js \
                 && grep -q 'ATLAS_RESEARCH_SHADOW_UI_V3_TARGET_STATUS' /tmp/research.js \
