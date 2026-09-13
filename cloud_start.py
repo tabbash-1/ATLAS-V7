@@ -29,6 +29,10 @@ if os.environ.get("RENDER"):
     # UI is diagnostic-only and refreshes only on explicit user action.
     from opportunity_ranking_ui_boot_patch import apply as _apply_opportunity_ranking_ui_patch
     _apply_opportunity_ranking_ui_patch()
+    # Show the exact closed-candle evidence still required while WAIT. This layer
+    # is read-only and cannot alter score, threshold, geometry, or Final Gate.
+    from actionable_wait_evidence_boot_patch import apply as _apply_actionable_wait_evidence_patch
+    _apply_actionable_wait_evidence_patch()
     # Keep the final guard as the last authority in the deployed request path.
     print("ATLAS cloud_start compatibility guard: RENDER -> cloud_web_only_final.py", flush=True)
     runpy.run_path(str(BASE / "cloud_web_only_final.py"), run_name="__main__")
