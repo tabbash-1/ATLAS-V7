@@ -33,8 +33,9 @@ if os.environ.get("RENDER"):
     # is read-only and cannot alter score, threshold, geometry, or Final Gate.
     from actionable_wait_evidence_boot_patch import apply as _apply_actionable_wait_evidence_patch
     _apply_actionable_wait_evidence_patch()
-    # Keep the final guard as the last decision authority, then constrain the
-    # interactive Production surface to the canonical seven product assets.
+    # Underlying interactive stack remains cloud_web_only.py via
+    # cloud_web_only_final.py; the canonical launcher only constrains the
+    # Production symbol universe after that stack is loaded.
     print("ATLAS cloud_start compatibility guard: RENDER -> cloud_production_canonical.py", flush=True)
     runpy.run_path(str(BASE / "cloud_production_canonical.py"), run_name="__main__")
 else:
