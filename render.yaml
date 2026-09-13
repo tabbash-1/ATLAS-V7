@@ -4,7 +4,7 @@ services:
     runtime: python
     plan: starter
     buildCommand: pip install -r requirements.txt
-    # Apply the stable production patches, then force 1H/4H/12H/1D authority to closed candles only.
+    # cloud_web_only_final.py delegates to cloud_web_only.py; closed-candle hardening runs before the final entrypoint.
     startCommand: python3 render_boot_patch.py && python3 closed_candle_htf_boot_patch.py && python3 cloud_web_only_final.py
     healthCheckPath: /health
     envVars:
