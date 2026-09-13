@@ -45,11 +45,30 @@ def test_production_ui_removes_hype_and_filters_saved_assets():
     original = (root / "app.js").read_text(encoding="utf-8")
     patched = transform_app_js(original)
 
-    assert "BINANCE:HYPEUSDT" not in patched
+    assert "HYPEUSDT" not in patched.upper()
     assert "const CANONICAL_PRODUCTION_SYMBOLS = new Set(" in patched
     assert "CANONICAL_PRODUCTION_SYMBOLS.has(String(a.symbol || '').toUpperCase())" in patched
     for symbol in EXPECTED:
         assert f"BINANCE:{symbol}" in patched
+
+
+def test_production_ui_removes_hype_after_provider_rewrite():
+    # Mirrors the real Render boot ordering where the legacy chart patch can
+    # rewrite HYPE's provider before the canonical Production UI guard runs.
+    rewritten = """const assets = [
+  { name: 'Bitcoin / USDT', symbol: 'BINANCE:BTCUSDT', cls: 'Crypto' },
+  { name: 'Hyperliquid / USDT', symbol: 'BYBIT:HYPEUSDT', cls: 'Crypto' }
+];
+const savedAssets = JSON.parse(localStorage.getItem('atlas.assets') || 'null');
+let assets = Array.isArray(savedAssets) && savedAssets.length
+  ? savedAssets.filter(a => a && a.cls === 'Crypto' && String(a.symbol || '').toUpperCase().endsWith('USDT'))
+  : defaultAssets;
+"""
+    patched = transform_app_js(rewritten)
+
+    assert "HYPEUSDT" not in patched.upper()
+    assert "BINANCE:BTCUSDT" in patched
+    assert "CANONICAL_PRODUCTION_SYMBOLS.has(String(a.symbol || '').toUpperCase())" in patched
 
 
 def test_render_entrypoint_routes_through_canonical_universe_launcher():
