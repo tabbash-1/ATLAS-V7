@@ -46,6 +46,9 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
       - name: Collect Production state safely
         shell: bash
         env:
@@ -238,10 +241,66 @@ jobs:
       - name: Commit latest snapshot
         shell: bash
         run: |
+          set -euo pipefail
           git config user.name "atlas-production-monitor"
           git config user.email "atlas-monitor@users.noreply.github.com"
-          git add status/atlas-production-latest.json status/raw/*.json status/history/production-snapshots.jsonl status/wait-outcomes.json
-          if git diff --cached --quiet; then exit 0; fi
-          git commit -m "chore: update canonical ATLAS production snapshot [skip ci]"
-          git pull --rebase origin main
-          git push
+
+          SNAPSHOT_PAYLOAD_DIR="$(mktemp -d)"
+          export SNAPSHOT_PAYLOAD_DIR
+          trap 'rm -rf "$SNAPSHOT_PAYLOAD_DIR"' EXIT
+          mkdir -p "$SNAPSHOT_PAYLOAD_DIR/status/raw"
+          cp status/atlas-production-latest.json "$SNAPSHOT_PAYLOAD_DIR/status/atlas-production-latest.json"
+          cp status/wait-outcomes.json "$SNAPSHOT_PAYLOAD_DIR/status/wait-outcomes.json"
+          cp status/raw/*.json "$SNAPSHOT_PAYLOAD_DIR/status/raw/"
+          python3 - <<'PY'
+          import json, os, pathlib
+          payload = pathlib.Path(os.environ['SNAPSHOT_PAYLOAD_DIR'])
+          obj = json.loads(pathlib.Path('status/atlas-production-latest.json').read_text())
+          (payload / 'snapshot-history-line.jsonl').write_text(json.dumps(obj, separators=(',', ':')) + '\n')
+          PY
+
+          published=0
+          for publish_attempt in 1 2 3; do
+            echo "SNAPSHOT_PUBLISH_ATTEMPT=${publish_attempt}"
+            git fetch origin main
+            git reset --hard origin/main
+            mkdir -p status/raw status/history
+            cp "$SNAPSHOT_PAYLOAD_DIR/status/atlas-production-latest.json" status/atlas-production-latest.json
+            cp "$SNAPSHOT_PAYLOAD_DIR/status/wait-outcomes.json" status/wait-outcomes.json
+            cp "$SNAPSHOT_PAYLOAD_DIR/status/raw/"*.json status/raw/
+            python3 - <<'PY'
+          import json, os, pathlib
+          payload = pathlib.Path(os.environ['SNAPSHOT_PAYLOAD_DIR'])
+          history = pathlib.Path('status/history/production-snapshots.jsonl')
+          history.parent.mkdir(parents=True, exist_ok=True)
+          obj = json.loads((payload / 'snapshot-history-line.jsonl').read_text())
+          new_key=obj.get('captured_at')
+          exists=False
+          if history.exists():
+              for line in history.read_text().splitlines():
+                  if not line.strip():
+                      continue
+                  try:
+                      row=json.loads(line)
+                  except Exception:
+                      continue
+                  if row.get('captured_at') == new_key:
+                      exists=True
+                      break
+          if not exists:
+              with history.open('a') as f:
+                  f.write(json.dumps(obj, separators=(',', ':')) + '\n')
+          PY
+            git add status/atlas-production-latest.json status/raw/*.json status/history/production-snapshots.jsonl status/wait-outcomes.json
+            if git diff --cached --quiet; then
+              published=1
+              break
+            fi
+            git commit -m "chore: update canonical ATLAS production snapshot [skip ci]"
+            if git push origin HEAD:main; then
+              published=1
+              break
+            fi
+            echo "Snapshot publish raced with main; retrying from latest origin/main"
+          done
+          test "$published" = 1
