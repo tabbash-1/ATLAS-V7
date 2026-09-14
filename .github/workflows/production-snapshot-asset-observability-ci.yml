@@ -7,12 +7,14 @@ on:
       - '.github/workflows/atlas-production-snapshot.yml'
       - '.github/workflows/production-snapshot-asset-observability-ci.yml'
       - 'tests/test_production_snapshot_asset_observability.py'
+      - 'tests/test_production_snapshot_asset_observability_ci_contract.py'
   push:
     branches: [main]
     paths:
       - '.github/workflows/atlas-production-snapshot.yml'
       - '.github/workflows/production-snapshot-asset-observability-ci.yml'
       - 'tests/test_production_snapshot_asset_observability.py'
+      - 'tests/test_production_snapshot_asset_observability_ci_contract.py'
 
 jobs:
   snapshot-asset-contract:
@@ -23,5 +25,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Install test dependency
+        run: python -m pip install pytest
       - name: Regression contract
-        run: python -m pytest -q tests/test_production_snapshot_asset_observability.py
+        run: python -m pytest -q tests/test_production_snapshot_asset_observability.py tests/test_production_snapshot_asset_observability_ci_contract.py
