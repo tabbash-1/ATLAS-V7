@@ -1,0 +1,49 @@
+name: ATLAS HTF SR Decision V2
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'htf_sr_decision_v2.py'
+      - 'render_boot_patch.py'
+      - 'tests/test_htf_sr_decision_v2.py'
+      - 'tests/test_htf_structural_thesis.py'
+      - 'tests/test_final_trade_ready_guard.py'
+      - '.github/workflows/atlas-htf-sr-decision-v2.yml'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax
+        run: |
+          set -euo pipefail
+          python -m py_compile htf_sr_decision_v2.py render_boot_patch.py final_trade_ready_guard.py htf_structural_thesis.py tests/test_htf_sr_decision_v2.py tests/test_htf_structural_thesis.py tests/test_final_trade_ready_guard.py
+      - name: Neutral HTF and S/R regression
+        run: |
+          set -euo pipefail
+          PYTHONPATH=. python tests/test_htf_sr_decision_v2.py
+      - name: Existing HTF structural regressions
+        run: |
+          set -euo pipefail
+          PYTHONPATH=. python tests/test_htf_structural_thesis.py
+      - name: Existing Final Gate regressions
+        run: |
+          set -euo pipefail
+          PYTHONPATH=. python tests/test_final_trade_ready_guard.py
+      - name: Guard invariants
+        run: |
+          set -euo pipefail
+          grep -q 'score_changed.*False' htf_sr_decision_v2.py
+          grep -q 'threshold_changed.*False' htf_sr_decision_v2.py
+          grep -q 'PRODUCTION_SIGNAL_NOT_QUALIFIED' htf_sr_decision_v2.py
+          grep -q '12H_NOT_NEUTRAL' htf_sr_decision_v2.py
+          grep -q '1D_MACRO_STRONGLY_OPPOSES_4H' htf_sr_decision_v2.py
+          grep -q 'CANONICAL_GEOMETRY_NOT_READY' htf_sr_decision_v2.py
+          grep -q 'HTF_SR_DECISION_V2_BOOT_PATCH' render_boot_patch.py
