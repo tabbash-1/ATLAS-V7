@@ -1,0 +1,36 @@
+name: Snapshot Render Skip Contract
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/atlas-swing-targets.yml'
+      - '.github/workflows/atlas-canonical-outcome-snapshot.yml'
+      - '.github/workflows/atlas-adaptive-evidence-outcomes.yml'
+      - '.github/workflows/atlas-quick-trade-outcomes.yml'
+      - '.github/workflows/scenario-evidence-pipeline.yml'
+      - '.github/workflows/atlas-offline-production-path-settlement.yml'
+      - '.github/workflows/atlas-paper-analyst-forward.yml'
+      - 'tests/test_snapshot_workflows_skip_render.py'
+      - '.github/workflows/snapshot-render-skip-contract.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/atlas-swing-targets.yml'
+      - '.github/workflows/atlas-canonical-outcome-snapshot.yml'
+      - '.github/workflows/atlas-adaptive-evidence-outcomes.yml'
+      - '.github/workflows/atlas-quick-trade-outcomes.yml'
+      - '.github/workflows/scenario-evidence-pipeline.yml'
+      - '.github/workflows/atlas-offline-production-path-settlement.yml'
+      - '.github/workflows/atlas-paper-analyst-forward.yml'
+      - 'tests/test_snapshot_workflows_skip_render.py'
+      - '.github/workflows/snapshot-render-skip-contract.yml'
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify generated snapshot commits cannot trigger Render auto-deploy
+        run: python3 tests/test_snapshot_workflows_skip_render.py
