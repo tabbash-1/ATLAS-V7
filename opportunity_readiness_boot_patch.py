@@ -30,7 +30,7 @@ def apply():
 
     route_needle = '        if parsed.path == "/api/runtime/status":\n'
     route_replacement = (
-        '        if parsed.path == "/api/opportunities/ranked":\n'
+        '        if parsed.path in ("/api/opportunities/ranked", "/api/production/readiness"):\n'
         '            q = urllib.parse.parse_qs(parsed.query)\n'
         '            raw = (q.get("symbols") or [""])[0]\n'
         '            symbols = [x.strip().upper() for x in raw.split(",") if x.strip()] or None\n'
