@@ -1,0 +1,30 @@
+name: ATLAS Production Snapshot V2 Trigger
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'htf_sr_decision_v2.py'
+      - 'render_boot_patch.py'
+      - '.github/workflows/atlas-production-snapshot-v2-trigger.yml'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: atlas-production-snapshot-v2-trigger
+  cancel-in-progress: true
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Dispatch canonical Production snapshot
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh workflow run atlas-production-snapshot.yml --repo "${GITHUB_REPOSITORY}" --ref main
