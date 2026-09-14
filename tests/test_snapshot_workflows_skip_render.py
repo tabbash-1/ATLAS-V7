@@ -3,6 +3,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SNAPSHOT_WORKFLOWS = (
+    ".github/workflows/atlas-production-snapshot.yml",
     ".github/workflows/atlas-swing-targets.yml",
     ".github/workflows/atlas-canonical-outcome-snapshot.yml",
     ".github/workflows/atlas-adaptive-evidence-outcomes.yml",
@@ -25,7 +26,7 @@ def test_snapshot_writer_commits_skip_render():
             checked += 1
             if "[skip render]" not in line:
                 offenders.append(f"{rel}:{lineno}: {line.strip()}")
-    assert checked >= 8, f"expected at least 8 snapshot commit sites, found {checked}"
+    assert checked >= 9, f"expected at least 9 snapshot commit sites, found {checked}"
     assert not offenders, "snapshot commits can redeploy Render:\n" + "\n".join(offenders)
 
 
