@@ -78,6 +78,18 @@ LONG_CLOSE_STRUCTURE_SHADOW = install_long_close_shadow(atlas)
 from canonical_geometry_overlay import install as install_canonical_geometry
 CANONICAL_GEOMETRY = install_canonical_geometry(atlas)
 
+# Install the canonical HTF decision chain explicitly in the live runtime.
+# This removes reliance on boot-time source rewriting of product_quality_gate_overlay.py
+# and makes the final production_decision wrapper chain observable and deterministic.
+from htf_structural_thesis import install as install_htf_structural_thesis
+HTF_STRUCTURAL_THESIS = install_htf_structural_thesis(atlas)
+from htf_price_action_overlay import install as install_htf_price_action
+HTF_PRICE_ACTION = install_htf_price_action(atlas)
+from htf_scenario_engine import install as install_htf_scenario_engine
+HTF_SCENARIO_ENGINE = install_htf_scenario_engine(atlas)
+from htf_sr_decision_v2 import install as install_htf_sr_decision_v2
+HTF_SR_DECISION_V2 = install_htf_sr_decision_v2(atlas)
+
 # Final canonical product guard is intentionally installed after every component
 # that can alter the live Production decision. It may demote a score-qualified
 # setup to WAIT based on committed 4-12H evidence, but never changes the score,
@@ -186,6 +198,10 @@ atlas.WEB_SAFE_MODE = {
     'fourth_vote_shadow': FOURTH_VOTE_SHADOW,
     'long_close_structure_shadow': LONG_CLOSE_STRUCTURE_SHADOW,
     'canonical_geometry': CANONICAL_GEOMETRY,
+    'htf_structural_thesis': HTF_STRUCTURAL_THESIS,
+    'htf_price_action': HTF_PRICE_ACTION,
+    'htf_scenario_engine': HTF_SCENARIO_ENGINE,
+    'htf_sr_decision_v2': HTF_SR_DECISION_V2,
     'product_quality_gate': PRODUCT_QUALITY_GATE,
 }
 
@@ -251,6 +267,10 @@ if __name__ == '__main__':
     print('Production decision UI: ON + autoload', flush=True)
     print(f'Production scoring: {PRODUCTION_SCORING_VERSION}', flush=True)
     print(f'Canonical geometry: {CANONICAL_GEOMETRY["version"]}', flush=True)
+    print(f'HTF structural thesis: {HTF_STRUCTURAL_THESIS["version"]}', flush=True)
+    print(f'HTF price action: {HTF_PRICE_ACTION["version"]}', flush=True)
+    print(f'HTF scenario engine: {HTF_SCENARIO_ENGINE["version"]}', flush=True)
+    print(f'HTF/SR Decision V2: {HTF_SR_DECISION_V2["version"]}', flush=True)
     print(f'RC10.1 deep analysis: {atlas.RC10_1_DEEP_ANALYSIS_VERSION}', flush=True)
     print(f'Consensus tie-break shadow: {CONSENSUS_TIEBREAK_SHADOW["version"]}', flush=True)
     print(f'Fourth-vote prospective shadow: {FOURTH_VOTE_SHADOW["version"]}', flush=True)
