@@ -75,7 +75,7 @@ def patch_execution_semantics_install():
 
 
 def patch_product_quality_gate_htf_install():
-    """Install HTF direction authority + price action + scenarios before final quality gate."""
+    """Install HTF direction authority + price action + scenarios + neutral/SR V2 before final quality gate."""
     if not QUALITY_GATE.exists(): return
     text = QUALITY_GATE.read_text(encoding="utf-8")
     marker = "HTF_STRUCTURAL_THESIS_BOOT_PATCH_V1"
@@ -117,8 +117,21 @@ def patch_product_quality_gate_htf_install():
         if needle not in text:
             raise RuntimeError("HTF price-action install tail changed; refusing silent scenario-engine patch")
         text = text.replace(needle, replacement,1)
+    sr_marker = "HTF_SR_DECISION_V2_BOOT_PATCH"
+    if sr_marker not in text:
+        needle = "    _install_htf_scenario_engine(atlas)\n    original = atlas.production_decision"
+        replacement = (
+            "    _install_htf_scenario_engine(atlas)\n"
+            "    # HTF_SR_DECISION_V2_BOOT_PATCH\n"
+            "    from htf_sr_decision_v2 import install as _install_htf_sr_decision_v2\n"
+            "    _install_htf_sr_decision_v2(atlas)\n"
+            "    original = atlas.production_decision"
+        )
+        if needle not in text:
+            raise RuntimeError("HTF scenario install tail changed; refusing silent neutral/SR decision patch")
+        text = text.replace(needle, replacement, 1)
     QUALITY_GATE.write_text(text, encoding="utf-8")
-    print("ATLAS Render boot patch: 4H/12H structural authority + 1D macro context + 1H confirmation + price action + scenario engine enabled", flush=True)
+    print("ATLAS Render boot patch: 4H/12H structural authority + 1D macro + 1H confirmation + scenarios + neutral/SR Decision V2 enabled", flush=True)
 
 
 def apply():
