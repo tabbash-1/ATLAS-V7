@@ -1,0 +1,65 @@
+name: ATLAS Profitability Fresh Evidence Chain
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'status/history/analyst-output-snapshots.jsonl'
+      - 'status/history/paper-portfolio-10k-analyst-cohort.jsonl'
+      - 'status/paper-portfolio-10k-analyst-latest.json'
+      - 'analyst_forward_attribution.py'
+      - 'profitability_research_engine.py'
+      - 'tests/test_analyst_forward_attribution.py'
+      - 'tests/test_profitability_research_engine.py'
+      - '.github/workflows/atlas-profitability-fresh-chain.yml'
+  schedule:
+    - cron: '31 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atlas-profitability-fresh-chain-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fresh-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify attribution safety
+        run: PYTHONPATH=. pytest -q tests/test_analyst_forward_attribution.py
+      - name: Rebuild attribution from canonical frozen histories
+        run: python3 analyst_forward_attribution.py
+      - name: Verify profitability safety
+        run: PYTHONPATH=. python3 tests/test_profitability_research_engine.py
+      - name: Build profitability research from fresh attribution
+        run: python3 profitability_research_engine.py
+      - name: Enforce freshness and research-only boundary
+        run: |
+          python3 - <<'PY'
+          import json, pathlib
+          a=json.loads(pathlib.Path('status/analyst-forward-attribution-latest.json').read_text())
+          p=json.loads(pathlib.Path('status/profitability-research-latest.json').read_text())
+          assert a['product_horizon']=='4-12H'
+          assert a['analysis_only'] is True and a['live_execution'] is False
+          assert a['can_override_production'] is False and a['can_change_score'] is False and a['can_change_threshold'] is False
+          assert p['schema']=='ATLAS_PROFITABILITY_RESEARCH_V2'
+          assert p['product_horizon']=='4-12H'
+          assert p['safety']['research_only'] is True and p['safety']['live_execution'] is False
+          assert p['safety']['can_override_production'] is False
+          assert p['stage_status']['7_production_promotion']=='BLOCKED_PENDING_PROSPECTIVE_VALIDATION'
+          assert p['baseline']['n']==a['matured_12h_metrics']['n']
+          print({'fresh_matured_n':a['matured_12h_metrics']['n'],'candidate_count':p['candidate_count'],'holdout_eligible_count':p['holdout_eligible_count']})
+          PY
+      - name: Commit synchronized evidence
+        run: |
+          git config user.name "atlas-profitability-fresh-chain"
+          git config user.email "atlas-profitability-fresh-chain@users.noreply.github.com"
+          git add status/analyst-forward-attribution-latest.json status/profitability-research-latest.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "research: sync fresh attribution and profitability evidence [skip ci] [skip render]"
+          git pull --rebase origin main
+          git push
