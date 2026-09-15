@@ -23,6 +23,10 @@ LEDGER = ROOT / "status/history/wait-missed-opportunity.jsonl"
 SCHEMA = "ATLAS_WAIT_MISSED_OPPORTUNITY_V2_CANDLE_SETTLED"
 HORIZONS = (1, 2, 4, 8, 12)
 CORE = {"BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","BNBUSDT","DOGEUSDT","ZECUSDT"}
+# Strategy-semantic boundary: HTF neutral-regime V2 merged to main.
+POST_V2_EPOCH_ID = "HTF_SR_V2_2026-09-14"
+POST_V2_START = dt.datetime(2026, 9, 14, 12, 31, 29, tzinfo=dt.timezone.utc)
+POST_V2_RELEASE_SHA = "0e3db49b3511f845e4df52db49d41700d14a4eee"
 
 
 def fnum(v):
@@ -42,7 +46,6 @@ def canonical_truth(d):
 
 
 def observed_price(d):
-    # WAIT opportunity cost must start at observed market price, never a future trigger entry.
     for src in ((d or {}).get("indicators") or {}, d or {}):
         for k in ("price","current_price","market_price","last_price","close"):
             x=fnum(src.get(k))
@@ -103,7 +106,7 @@ def load_waits():
             key=did or hashlib.sha256(f"{symbol}|{at.isoformat()}|{direction}|{price}".encode()).hexdigest()[:24]
             if key in seen:continue
             seen.add(key)
-            rows.append({"id":key,"decision_id":did or None,"symbol":symbol,"captured_at":at,"captured_at_ms":int(at.timestamp()*1000),"direction":direction,"price":price,"invalidation":invalidation_price(d,direction),"score":fnum(t.get("score")),"threshold":fnum(t.get("threshold")),"reason":t.get("wait_reason"),"raw_reason":t.get("raw_wait_reason"),"blocker_family":blocker_family(d,t),"playbook":d.get("playbook"),"release":((r.get("runtime") or {}).get("release") or (r.get("runtime") or {}).get("commit_sha")),"v2_regime":((d.get("htf_sr_decision_v2") or {}).get("regime"))})
+            rows.append({"id":key,"decision_id":did or None,"symbol":symbol,"captured_at":at,"captured_at_ms":int(at.timestamp()*1000),"direction":direction,"price":price,"invalidation":invalidation_price(d,direction),"score":fnum(t.get("score")),"threshold":fnum(t.get("threshold")),"reason":t.get("wait_reason"),"raw_reason":t.get("raw_wait_reason"),"blocker_family":blocker_family(d,t),"playbook":d.get("playbook"),"release":((r.get("runtime") or {}).get("release") or (r.get("runtime") or {}).get("commit_sha")),"v2_regime":((d.get("htf_sr_decision_v2") or {}).get("regime")),"epoch_id":POST_V2_EPOCH_ID if at >= POST_V2_START else "LEGACY_BASELINE"})
     return rows
 
 
@@ -135,7 +138,6 @@ def settle(row, now):
         out["horizons"][f"{h}h"]={"close":round(last,10),"directional_return_pct":round(directional,4),"mfe_pct":round(mfe,4),"mae_pct":round(mae,4),"invalidation_hit":invalidated}
     out["market_source"]=provider
     h4=out["horizons"].get("4h"); h8=out["horizons"].get("8h"); h12=out["horizons"].get("12h")
-    # Classification is descriptive, not a trading rule: >=1% favorable MFE before invalidation.
     mature=h12 or h8 or h4
     if mature:
         out["missed_opportunity"] = bool(mature["mfe_pct"] >= 1.0 and not mature["invalidation_hit"])
@@ -158,12 +160,23 @@ def summarize(records):
     return {"records":len(records),"matured_classified":len(matured),"missed_n":sum(bool(r.get("missed_opportunity")) for r in matured),"missed_rate_pct":round(100*sum(bool(r.get("missed_opportunity")) for r in matured)/len(matured),2) if matured else None,"by_blocker_family":dict(sorted(by.items()))}
 
 
+def cohort_summary(records):
+    legacy=[r for r in records if r.get("epoch_id")=="LEGACY_BASELINE"]
+    post=[r for r in records if r.get("epoch_id")==POST_V2_EPOCH_ID]
+    neutral=[r for r in post if r.get("v2_regime")=="4H_DIRECTIONAL_12H_NEUTRAL"]
+    return {
+        "legacy_baseline": summarize(legacy),
+        "post_v2_forward": summarize(post),
+        "post_v2_neutral_regime": summarize(neutral),
+    }
+
+
 def main():
     now=dt.datetime.now(dt.timezone.utc); waits=load_waits(); records=[]
     for row in waits[-300:]:records.append(settle(row,now))
-    report={"schema":SCHEMA,"generated_at":now.isoformat(),"decision_source_of_truth":"FINAL_TRADE_GATE","product_horizon":"4-12H","evaluation_horizons_h":list(HORIZONS),"classification_is_research_only":True,"production_threshold_unchanged":68,"can_change_threshold":False,"can_override_production":False,"live_execution":False,"methodology":"Canonical WAIT capture; observed market price at decision time; public 5m candles; exact 1/2/4/8/12h close/MFE/MAE; invalidation-aware descriptive missed-opportunity classification.","summary":summarize(records),"records":records}
+    report={"schema":SCHEMA,"generated_at":now.isoformat(),"decision_source_of_truth":"FINAL_TRADE_GATE","product_horizon":"4-12H","evaluation_horizons_h":list(HORIZONS),"classification_is_research_only":True,"production_threshold_unchanged":68,"can_change_threshold":False,"can_override_production":False,"live_execution":False,"performance_epoch":{"id":POST_V2_EPOCH_ID,"start_at":POST_V2_START.isoformat(),"release_sha":POST_V2_RELEASE_SHA,"policy":"legacy and post-V2 evidence must never be mixed for current-version claims"},"methodology":"Canonical WAIT capture; observed market price at decision time; public 5m candles; exact 1/2/4/8/12h close/MFE/MAE; invalidation-aware descriptive missed-opportunity classification.","summary":summarize(records),"cohorts":cohort_summary(records),"records":records}
     LATEST.parent.mkdir(parents=True,exist_ok=True); LATEST.write_text(json.dumps(report,indent=2,sort_keys=True))
     LEDGER.parent.mkdir(parents=True,exist_ok=True); LEDGER.write_text("\n".join(json.dumps(r,separators=(",",":"),sort_keys=True) for r in records)+( "\n" if records else ""))
-    print(json.dumps({"schema":SCHEMA,"summary":report["summary"]},indent=2))
+    print(json.dumps({"schema":SCHEMA,"summary":report["summary"],"cohorts":report["cohorts"]},indent=2))
 
 if __name__=="__main__":main()
