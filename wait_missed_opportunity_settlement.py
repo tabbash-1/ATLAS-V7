@@ -1,0 +1,169 @@
+#!/usr/bin/env python3
+"""Canonical WAIT missed-opportunity forward settlement.
+
+Research-only observability. Reads immutable canonical Production snapshots and
+settles WAIT decisions against public 5m candles at 1/2/4/8/12h. It never changes
+Production score, threshold, decision, execution, or risk.
+"""
+from __future__ import annotations
+import datetime as dt
+import hashlib
+import json
+import math
+import pathlib
+from collections import defaultdict
+from typing import Any
+
+from offline_production_path_settlement import market_klines
+
+ROOT = pathlib.Path(__file__).resolve().parent
+HISTORY = ROOT / "status/history/production-snapshots.jsonl"
+LATEST = ROOT / "status/wait-missed-opportunity-latest.json"
+LEDGER = ROOT / "status/history/wait-missed-opportunity.jsonl"
+SCHEMA = "ATLAS_WAIT_MISSED_OPPORTUNITY_V2_CANDLE_SETTLED"
+HORIZONS = (1, 2, 4, 8, 12)
+CORE = {"BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","BNBUSDT","DOGEUSDT","ZECUSDT"}
+
+
+def fnum(v):
+    try:
+        x=float(v); return x if math.isfinite(x) else None
+    except Exception:return None
+
+
+def parse_time(v): return dt.datetime.fromisoformat(str(v).replace("Z","+00:00"))
+
+
+def canonical_truth(d):
+    t=(d or {}).get("canonical_decision") or {}
+    if t.get("schema") != "ATLAS_CANONICAL_DECISION_TRUTH_V1": return None
+    if t.get("canonical_source_present") is not True or t.get("source_of_truth") != "FINAL_TRADE_GATE": return None
+    return t
+
+
+def observed_price(d):
+    # WAIT opportunity cost must start at observed market price, never a future trigger entry.
+    for src in ((d or {}).get("indicators") or {}, d or {}):
+        for k in ("price","current_price","market_price","last_price","close"):
+            x=fnum(src.get(k))
+            if x and x>0:return x
+    pa=((d or {}).get("timeframe_matrix") or {}).get("htf_price_action") or {}
+    for frame in ("1h","4h","12h"):
+        x=fnum(((pa.get("frames") or {}).get(frame) or {}).get("price"))
+        if x and x>0:return x
+    return None
+
+
+def invalidation_price(d, direction):
+    plan=(d or {}).get("trade_plan") or {}
+    x=fnum(plan.get("stop_loss") or (d or {}).get("stop_loss"))
+    if not x:return None
+    p=observed_price(d)
+    if not p:return None
+    if direction=="LONG" and x>=p:return None
+    if direction=="SHORT" and x<=p:return None
+    return x
+
+
+def blocker_family(d,t):
+    v2=(d or {}).get("htf_sr_decision_v2") or {}
+    final=(d or {}).get("final_trade_gate") or {}
+    blocks=v2.get("blockers") or final.get("blockers") or []
+    raw=str(t.get("raw_wait_reason") or (d or {}).get("wait_reason") or "UNKNOWN")
+    primary=str(v2.get("primary_blocker") or final.get("primary_blocker") or raw)
+    joined="|".join([primary,raw]+[str(x) for x in blocks]).upper()
+    for key,needles in (
+        ("HTF_CONFLICT",("HTF_","1D_","12H","4H_")),
+        ("SCORE_BELOW_THRESHOLD",("SCORE","NOT_QUALIFIED")),
+        ("BREAKOUT_NOT_CONFIRMED",("BREAKOUT",)),
+        ("SETUP_QUALITY",("SETUP_QUALITY","FORWARD_EVIDENCE")),
+        ("GEOMETRY_RR",("GEOMETRY","RR_")),
+        ("VOLUME",("VOLUME",)),
+        ("FUTURES",("FUTURES","DERIVATIVES")),
+    ):
+        if any(n in joined for n in needles):return key
+    return primary or "OTHER"
+
+
+def load_waits():
+    rows=[]; seen=set()
+    if not HISTORY.exists():return rows
+    for line in HISTORY.read_text().splitlines():
+        try:r=json.loads(line); at=parse_time(r["captured_at"])
+        except Exception:continue
+        for symbol,d in (r.get("decisions") or {}).items():
+            if symbol not in CORE or not isinstance(d,dict) or not d.get("ok"):continue
+            t=canonical_truth(d)
+            if not t or t.get("trade_ready") is True:continue
+            direction=str(d.get("candidate_direction") or d.get("product_direction") or "").upper()
+            if direction not in {"LONG","SHORT"}:continue
+            price=observed_price(d)
+            if not price:continue
+            did=str(t.get("decision_id") or "")
+            key=did or hashlib.sha256(f"{symbol}|{at.isoformat()}|{direction}|{price}".encode()).hexdigest()[:24]
+            if key in seen:continue
+            seen.add(key)
+            rows.append({"id":key,"decision_id":did or None,"symbol":symbol,"captured_at":at,"captured_at_ms":int(at.timestamp()*1000),"direction":direction,"price":price,"invalidation":invalidation_price(d,direction),"score":fnum(t.get("score")),"threshold":fnum(t.get("threshold")),"reason":t.get("wait_reason"),"raw_reason":t.get("raw_wait_reason"),"blocker_family":blocker_family(d,t),"playbook":d.get("playbook"),"release":((r.get("runtime") or {}).get("release") or (r.get("runtime") or {}).get("commit_sha")),"v2_regime":((d.get("htf_sr_decision_v2") or {}).get("regime"))})
+    return rows
+
+
+def settle(row, now):
+    start=row["captured_at_ms"]; maturity=start+12*3600_000
+    out={k:v for k,v in row.items() if k not in {"captured_at","captured_at_ms"}}
+    out["captured_at"]=row["captured_at"].isoformat(); out["horizons"]={}; out.update({"research_only":True,"can_override_production":False,"live_execution":False})
+    if int(now.timestamp()*1000) < start+3600_000:
+        out["status"]="OPEN"; return out
+    end=min(int(now.timestamp()*1000),maturity)
+    try:candles,provider=market_klines(row["symbol"],"5",start,end)
+    except Exception as e:
+        out.update({"status":"MARKET_DATA_ERROR","error":str(e)[:500]}); return out
+    if not candles:
+        out["status"]="MARKET_DATA_ERROR"; out["error"]="no_candles"; return out
+    p0=row["price"]; direction=row["direction"]; inv=row["invalidation"]
+    for h in HORIZONS:
+        h_end=start+h*3600_000
+        if int(now.timestamp()*1000)<h_end:continue
+        cs=[c for c in candles if int(c["open_time"]) < h_end]
+        if not cs:continue
+        last=cs[-1]["close"]; change=(last/p0-1)*100; directional=change if direction=="LONG" else -change
+        highs=[c["high"] for c in cs]; lows=[c["low"] for c in cs]
+        mfe=((max(highs)/p0-1)*100) if direction=="LONG" else ((p0/min(lows)-1)*100)
+        mae=((p0/min(lows)-1)*100) if direction=="LONG" else ((max(highs)/p0-1)*100)
+        invalidated=False
+        if inv is not None:
+            invalidated=any((c["low"]<=inv if direction=="LONG" else c["high"]>=inv) for c in cs)
+        out["horizons"][f"{h}h"]={"close":round(last,10),"directional_return_pct":round(directional,4),"mfe_pct":round(mfe,4),"mae_pct":round(mae,4),"invalidation_hit":invalidated}
+    out["market_source"]=provider
+    h4=out["horizons"].get("4h"); h8=out["horizons"].get("8h"); h12=out["horizons"].get("12h")
+    # Classification is descriptive, not a trading rule: >=1% favorable MFE before invalidation.
+    mature=h12 or h8 or h4
+    if mature:
+        out["missed_opportunity"] = bool(mature["mfe_pct"] >= 1.0 and not mature["invalidation_hit"])
+        out["classification_rule"]="RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION"
+    else:out["missed_opportunity"]=None
+    out["status"]="MATURED" if h12 else "PARTIAL"
+    return out
+
+
+def summarize(records):
+    matured=[r for r in records if r.get("missed_opportunity") is not None]
+    groups=defaultdict(list)
+    for r in matured:groups[r.get("blocker_family") or "OTHER"].append(r)
+    by={}
+    for k,rs in groups.items():
+        by[k]={"n":len(rs),"missed_n":sum(bool(r.get("missed_opportunity")) for r in rs),"missed_rate_pct":round(100*sum(bool(r.get("missed_opportunity")) for r in rs)/len(rs),2)}
+        for h in (4,8,12):
+            vals=[r["horizons"][f"{h}h"]["directional_return_pct"] for r in rs if f"{h}h" in r.get("horizons",{})]
+            by[k][f"mean_{h}h_directional_return_pct"]=round(sum(vals)/len(vals),4) if vals else None
+    return {"records":len(records),"matured_classified":len(matured),"missed_n":sum(bool(r.get("missed_opportunity")) for r in matured),"missed_rate_pct":round(100*sum(bool(r.get("missed_opportunity")) for r in matured)/len(matured),2) if matured else None,"by_blocker_family":dict(sorted(by.items()))}
+
+
+def main():
+    now=dt.datetime.now(dt.timezone.utc); waits=load_waits(); records=[]
+    for row in waits[-300:]:records.append(settle(row,now))
+    report={"schema":SCHEMA,"generated_at":now.isoformat(),"decision_source_of_truth":"FINAL_TRADE_GATE","product_horizon":"4-12H","evaluation_horizons_h":list(HORIZONS),"classification_is_research_only":True,"production_threshold_unchanged":68,"can_change_threshold":False,"can_override_production":False,"live_execution":False,"methodology":"Canonical WAIT capture; observed market price at decision time; public 5m candles; exact 1/2/4/8/12h close/MFE/MAE; invalidation-aware descriptive missed-opportunity classification.","summary":summarize(records),"records":records}
+    LATEST.parent.mkdir(parents=True,exist_ok=True); LATEST.write_text(json.dumps(report,indent=2,sort_keys=True))
+    LEDGER.parent.mkdir(parents=True,exist_ok=True); LEDGER.write_text("\n".join(json.dumps(r,separators=(",",":"),sort_keys=True) for r in records)+( "\n" if records else ""))
+    print(json.dumps({"schema":SCHEMA,"summary":report["summary"]},indent=2))
+
+if __name__=="__main__":main()
