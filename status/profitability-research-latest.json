@@ -1,14 +1,126 @@
 {
   "baseline": {
     "avg_r": -0.2758,
+    "max_drawdown_r": 8.4122,
     "n": 16,
     "net_r": -4.4122,
     "positive_pct": 37.5,
     "profit_factor": 0.7312
   },
-  "candidate_count": 48,
+  "candidate_count": 34,
+  "challenger_registry": [
+    {
+      "challenger_id": "EDGE-01",
+      "discovery": {
+        "avg_r": 1.0,
+        "max_drawdown_r": 1.0,
+        "n": 3,
+        "net_r": 3.0,
+        "positive_pct": 66.67,
+        "profit_factor": 4.0
+      },
+      "frozen_filter": {
+        "relative_strength_reason": "ALIGNED_STRONG",
+        "score_bucket": "80+"
+      },
+      "holdout": {
+        "avg_r": 1.0,
+        "max_drawdown_r": 1.0,
+        "n": 3,
+        "net_r": 3.0,
+        "positive_pct": 66.67,
+        "profit_factor": 4.0
+      },
+      "new_prospective_n": 0,
+      "production_effect": "NONE",
+      "promotion_ready": false,
+      "stage": "PROSPECTIVE_SHADOW"
+    },
+    {
+      "challenger_id": "EDGE-02",
+      "discovery": {
+        "avg_r": 1.0,
+        "max_drawdown_r": 1.0,
+        "n": 3,
+        "net_r": 3.0,
+        "positive_pct": 66.67,
+        "profit_factor": 4.0
+      },
+      "frozen_filter": {
+        "extension_guard_reason": "RSI_SANE",
+        "score_bucket": "80+"
+      },
+      "holdout": {
+        "avg_r": 0.5,
+        "max_drawdown_r": 1.0,
+        "n": 4,
+        "net_r": 2.0,
+        "positive_pct": 50.0,
+        "profit_factor": 2.0
+      },
+      "new_prospective_n": 0,
+      "production_effect": "NONE",
+      "promotion_ready": false,
+      "stage": "PROSPECTIVE_SHADOW"
+    },
+    {
+      "challenger_id": "EDGE-03",
+      "discovery": {
+        "avg_r": 0.8,
+        "max_drawdown_r": 1.0,
+        "n": 5,
+        "net_r": 4.0,
+        "positive_pct": 60.0,
+        "profit_factor": 3.0
+      },
+      "frozen_filter": {
+        "score_bucket": "80+"
+      },
+      "holdout": {
+        "avg_r": 0.5,
+        "max_drawdown_r": 1.0,
+        "n": 4,
+        "net_r": 2.0,
+        "positive_pct": 50.0,
+        "profit_factor": 2.0
+      },
+      "new_prospective_n": 0,
+      "production_effect": "NONE",
+      "promotion_ready": false,
+      "stage": "PROSPECTIVE_SHADOW"
+    }
+  ],
+  "chronological_split": {
+    "discovery_baseline": {
+      "avg_r": 0.2,
+      "max_drawdown_r": 4.0,
+      "n": 10,
+      "net_r": 2.0,
+      "positive_pct": 40.0,
+      "profit_factor": 1.3333
+    },
+    "discovery_n": 10,
+    "holdout_baseline": {
+      "avg_r": -1.0687,
+      "max_drawdown_r": 7.4122,
+      "n": 6,
+      "net_r": -6.4122,
+      "positive_pct": 33.33,
+      "profit_factor": 0.3842
+    },
+    "holdout_n": 6,
+    "holdout_used_for_candidate_selection": false,
+    "method": "captured_at ascending"
+  },
+  "holdout_eligible_count": 4,
+  "limitations": {
+    "cost_action": "Do not promote until fees/slippage can be expressed consistently in R.",
+    "cost_adjusted_r_available": false,
+    "multiple_testing": "Candidate scan is exploratory; holdout separation reduces but does not eliminate selection bias.",
+    "small_sample_warning": true
+  },
   "product_horizon": "4-12H",
-  "purpose": "Find candidate positive-expectancy pockets before any Production change.",
+  "purpose": "Discover edge, reject leakage/overfit, and freeze only holdout-positive challengers.",
   "safety": {
     "can_change_score": false,
     "can_change_threshold": false,
@@ -17,404 +129,817 @@
     "paper_only": true,
     "research_only": true
   },
-  "schema": "ATLAS_PROFITABILITY_RESEARCH_V1",
+  "schema": "ATLAS_PROFITABILITY_RESEARCH_V2",
+  "stage_status": {
+    "1_dataset_and_baseline": "COMPLETE",
+    "2_edge_discovery": "COMPLETE",
+    "3_regime_setup_segmentation": "COMPLETE",
+    "4_chronological_holdout": "COMPLETE",
+    "5_bootstrap_uncertainty": "COMPLETE",
+    "6_prospective_shadow": "ACTIVE",
+    "7_production_promotion": "BLOCKED_PENDING_PROSPECTIVE_VALIDATION"
+  },
   "top_candidates": [
     {
-      "delta_avg_r_vs_baseline": 1.5258,
-      "filter": {
-        "structural_geometry_source": "ATR_EXTENSION_AFTER_CLEAR_STRUCTURE"
+      "delta_avg_r_vs_discovery_baseline": 1.05,
+      "discovery": {
+        "avg_r": 1.25,
+        "max_drawdown_r": 1.0,
+        "n": 4,
+        "net_r": 5.0,
+        "positive_pct": 75.0,
+        "profit_factor": 6.0
       },
+      "discovery_avg_r_ci95": [
+        -0.25,
+        2.0
+      ],
+      "filter": {
+        "breakout_confirmed": "True"
+      },
+      "holdout": {
+        "avg_r": -1.0,
+        "max_drawdown_r": 2.0,
+        "n": 2,
+        "net_r": -2.0,
+        "positive_pct": 0.0,
+        "profit_factor": 0.0
+      },
+      "holdout_avg_r_ci95": [
+        -1.0,
+        -1.0
+      ],
+      "holdout_status": "FAIL",
       "kind": "single",
-      "metrics": {
+      "proof_status": "DISCOVERY_ONLY"
+    },
+    {
+      "delta_avg_r_vs_discovery_baseline": 1.05,
+      "discovery": {
         "avg_r": 1.25,
+        "max_drawdown_r": 1.0,
         "n": 4,
         "net_r": 5.0,
         "positive_pct": 75.0,
         "profit_factor": 6.0
       },
-      "proof_status": "DISCOVERY_ONLY"
-    },
-    {
-      "delta_avg_r_vs_baseline": 1.5258,
+      "discovery_avg_r_ci95": [
+        -0.25,
+        2.0
+      ],
       "filter": {
-        "symbol": "ZECUSDT"
+        "playbook": "BREAKOUT_CONFIRMED_LONG"
       },
+      "holdout": {
+        "avg_r": -1.0,
+        "max_drawdown_r": 1.0,
+        "n": 1,
+        "net_r": -1.0,
+        "positive_pct": 0.0,
+        "profit_factor": 0.0
+      },
+      "holdout_avg_r_ci95": null,
+      "holdout_status": "INSUFFICIENT_N",
       "kind": "single",
-      "metrics": {
+      "proof_status": "DISCOVERY_ONLY"
+    },
+    {
+      "delta_avg_r_vs_discovery_baseline": 1.05,
+      "discovery": {
         "avg_r": 1.25,
+        "max_drawdown_r": 1.0,
         "n": 4,
         "net_r": 5.0,
         "positive_pct": 75.0,
         "profit_factor": 6.0
       },
+      "discovery_avg_r_ci95": [
+        -0.25,
+        2.0
+      ],
+      "filter": {
+        "regime": "BREAKOUT_UP"
+      },
+      "holdout": {
+        "avg_r": -1.0,
+        "max_drawdown_r": 2.0,
+        "n": 2,
+        "net_r": -2.0,
+        "positive_pct": 0.0,
+        "profit_factor": 0.0
+      },
+      "holdout_avg_r_ci95": [
+        -1.0,
+        -1.0
+      ],
+      "holdout_status": "FAIL",
+      "kind": "single",
       "proof_status": "DISCOVERY_ONLY"
     },
     {
-      "delta_avg_r_vs_baseline": 1.5258,
-      "filter": {
-        "relative_strength_reason": "ALIGNED_STRONG",
-        "structural_geometry_source": "ATR_EXTENSION_AFTER_CLEAR_STRUCTURE"
+      "delta_avg_r_vs_discovery_baseline": 1.05,
+      "discovery": {
+        "avg_r": 1.25,
+        "max_drawdown_r": 1.0,
+        "n": 4,
+        "net_r": 5.0,
+        "positive_pct": 75.0,
+        "profit_factor": 6.0
       },
+      "discovery_avg_r_ci95": [
+        -0.25,
+        2.0
+      ],
+      "filter": {
+        "breakout_confirmed": "True",
+        "direction": "LONG"
+      },
+      "holdout": {
+        "avg_r": -1.0,
+        "max_drawdown_r": 2.0,
+        "n": 2,
+        "net_r": -2.0,
+        "positive_pct": 0.0,
+        "profit_factor": 0.0
+      },
+      "holdout_avg_r_ci95": [
+        -1.0,
+        -1.0
+      ],
+      "holdout_status": "FAIL",
       "kind": "pair",
-      "metrics": {
+      "proof_status": "DISCOVERY_ONLY"
+    },
+    {
+      "delta_avg_r_vs_discovery_baseline": 1.05,
+      "discovery": {
         "avg_r": 1.25,
+        "max_drawdown_r": 1.0,
         "n": 4,
         "net_r": 5.0,
         "positive_pct": 75.0,
         "profit_factor": 6.0
       },
-      "proof_status": "DISCOVERY_ONLY"
-    },
-    {
-      "delta_avg_r_vs_baseline": 1.5258,
+      "discovery_avg_r_ci95": [
+        -0.25,
+        2.0
+      ],
       "filter": {
-        "score_bucket": "80+",
-        "structural_geometry_source": "ATR_EXTENSION_AFTER_CLEAR_STRUCTURE"
+        "breakout_confirmed": "True",
+        "playbook": "BREAKOUT_CONFIRMED_LONG"
       },
+      "holdout": {
+        "avg_r": -1.0,
+        "max_drawdown_r": 1.0,
+        "n": 1,
+        "net_r": -1.0,
+        "positive_pct": 0.0,
+        "profit_factor": 0.0
+      },
+      "holdout_avg_r_ci95": null,
+      "holdout_status": "INSUFFICIENT_N",
       "kind": "pair",
-      "metrics": {
+      "proof_status": "DISCOVERY_ONLY"
+    },
+    {
+      "delta_avg_r_vs_discovery_baseline": 1.05,
+      "discovery": {
         "avg_r": 1.25,
+        "max_drawdown_r": 1.0,
         "n": 4,
         "net_r": 5.0,
         "positive_pct": 75.0,
         "profit_factor": 6.0
       },
-      "proof_status": "DISCOVERY_ONLY"
-    },
-    {
-      "delta_avg_r_vs_baseline": 1.5258,
+      "discovery_avg_r_ci95": [
+        -0.25,
+        2.0
+      ],
       "filter": {
-        "direction": "LONG",
-        "symbol": "ZECUSDT"
+        "breakout_confirmed": "True",
+        "regime": "BREAKOUT_UP"
       },
+      "holdout": {
+        "avg_r": -1.0,
+        "max_drawdown_r": 2.0,
+        "n": 2,
+        "net_r": -2.0,
+        "positive_pct": 0.0,
+        "profit_factor": 0.0
+      },
+      "holdout_avg_r_ci95": [
+        -1.0,
+        -1.0
+      ],
+      "holdout_status": "FAIL",
       "kind": "pair",
-      "metrics": {
+      "proof_status": "DISCOVERY_ONLY"
+    },
+    {
+      "delta_avg_r_vs_discovery_baseline": 1.05,
+      "discovery": {
         "avg_r": 1.25,
+        "max_drawdown_r": 1.0,
         "n": 4,
         "net_r": 5.0,
         "positive_pct": 75.0,
         "profit_factor": 6.0
       },
-      "proof_status": "DISCOVERY_ONLY"
-    },
-    {
-      "delta_avg_r_vs_baseline": 1.5258,
+      "discovery_avg_r_ci95": [
+        -0.25,
+        2.0
+      ],
       "filter": {
-        "extension_guard_reason": "RSI_SANE",
-        "symbol": "ZECUSDT"
-      },
-      "kind": "pair",
-      "metrics": {
-        "avg_r": 1.25,
-        "n": 4,
-        "net_r": 5.0,
-        "positive_pct": 75.0,
-        "profit_factor": 6.0
-      },
-      "proof_status": "DISCOVERY_ONLY"
-    },
-    {
-      "delta_avg_r_vs_baseline": 1.2758,
-      "filter": {
-        "relative_strength_reason": "ALIGNED_STRONG",
+        "breakout_confirmed": "True",
         "score_bucket": "80+"
       },
+      "holdout": {
+        "avg_r": -1.0,
+        "max_drawdown_r": 2.0,
+        "n": 2,
+        "net_r": -2.0,
+        "positive_pct": 0.0,
+        "profit_factor": 0.0
+      },
+      "holdout_avg_r_ci95": [
+        -1.0,
+        -1.0
+      ],
+      "holdout_status": "FAIL",
       "kind": "pair",
-      "metrics": {
+      "proof_status": "DISCOVERY_ONLY"
+    },
+    {
+      "delta_avg_r_vs_discovery_baseline": 1.05,
+      "discovery": {
+        "avg_r": 1.25,
+        "max_drawdown_r": 1.0,
+        "n": 4,
+        "net_r": 5.0,
+        "positive_pct": 75.0,
+        "profit_factor": 6.0
+      },
+      "discovery_avg_r_ci95": [
+        -0.25,
+        2.0
+      ],
+      "filter": {
+        "direction": "LONG",
+        "playbook": "BREAKOUT_CONFIRMED_LONG"
+      },
+      "holdout": {
+        "avg_r": -1.0,
+        "max_drawdown_r": 1.0,
+        "n": 1,
+        "net_r": -1.0,
+        "positive_pct": 0.0,
+        "profit_factor": 0.0
+      },
+      "holdout_avg_r_ci95": null,
+      "holdout_status": "INSUFFICIENT_N",
+      "kind": "pair",
+      "proof_status": "DISCOVERY_ONLY"
+    },
+    {
+      "delta_avg_r_vs_discovery_baseline": 1.05,
+      "discovery": {
+        "avg_r": 1.25,
+        "max_drawdown_r": 1.0,
+        "n": 4,
+        "net_r": 5.0,
+        "positive_pct": 75.0,
+        "profit_factor": 6.0
+      },
+      "discovery_avg_r_ci95": [
+        -0.25,
+        2.0
+      ],
+      "filter": {
+        "direction": "LONG",
+        "regime": "BREAKOUT_UP"
+      },
+      "holdout": {
+        "avg_r": -1.0,
+        "max_drawdown_r": 2.0,
+        "n": 2,
+        "net_r": -2.0,
+        "positive_pct": 0.0,
+        "profit_factor": 0.0
+      },
+      "holdout_avg_r_ci95": [
+        -1.0,
+        -1.0
+      ],
+      "holdout_status": "FAIL",
+      "kind": "pair",
+      "proof_status": "DISCOVERY_ONLY"
+    },
+    {
+      "delta_avg_r_vs_discovery_baseline": 1.05,
+      "discovery": {
+        "avg_r": 1.25,
+        "max_drawdown_r": 1.0,
+        "n": 4,
+        "net_r": 5.0,
+        "positive_pct": 75.0,
+        "profit_factor": 6.0
+      },
+      "discovery_avg_r_ci95": [
+        -0.25,
+        2.0
+      ],
+      "filter": {
+        "playbook": "BREAKOUT_CONFIRMED_LONG",
+        "regime": "BREAKOUT_UP"
+      },
+      "holdout": {
+        "avg_r": -1.0,
+        "max_drawdown_r": 1.0,
+        "n": 1,
+        "net_r": -1.0,
+        "positive_pct": 0.0,
+        "profit_factor": 0.0
+      },
+      "holdout_avg_r_ci95": null,
+      "holdout_status": "INSUFFICIENT_N",
+      "kind": "pair",
+      "proof_status": "DISCOVERY_ONLY"
+    },
+    {
+      "delta_avg_r_vs_discovery_baseline": 1.05,
+      "discovery": {
+        "avg_r": 1.25,
+        "max_drawdown_r": 1.0,
+        "n": 4,
+        "net_r": 5.0,
+        "positive_pct": 75.0,
+        "profit_factor": 6.0
+      },
+      "discovery_avg_r_ci95": [
+        -0.25,
+        2.0
+      ],
+      "filter": {
+        "playbook": "BREAKOUT_CONFIRMED_LONG",
+        "score_bucket": "80+"
+      },
+      "holdout": {
+        "avg_r": -1.0,
+        "max_drawdown_r": 1.0,
+        "n": 1,
+        "net_r": -1.0,
+        "positive_pct": 0.0,
+        "profit_factor": 0.0
+      },
+      "holdout_avg_r_ci95": null,
+      "holdout_status": "INSUFFICIENT_N",
+      "kind": "pair",
+      "proof_status": "DISCOVERY_ONLY"
+    },
+    {
+      "delta_avg_r_vs_discovery_baseline": 1.05,
+      "discovery": {
+        "avg_r": 1.25,
+        "max_drawdown_r": 1.0,
+        "n": 4,
+        "net_r": 5.0,
+        "positive_pct": 75.0,
+        "profit_factor": 6.0
+      },
+      "discovery_avg_r_ci95": [
+        -0.25,
+        2.0
+      ],
+      "filter": {
+        "regime": "BREAKOUT_UP",
+        "score_bucket": "80+"
+      },
+      "holdout": {
+        "avg_r": -1.0,
+        "max_drawdown_r": 2.0,
+        "n": 2,
+        "net_r": -2.0,
+        "positive_pct": 0.0,
+        "profit_factor": 0.0
+      },
+      "holdout_avg_r_ci95": [
+        -1.0,
+        -1.0
+      ],
+      "holdout_status": "FAIL",
+      "kind": "pair",
+      "proof_status": "DISCOVERY_ONLY"
+    },
+    {
+      "delta_avg_r_vs_discovery_baseline": 0.8,
+      "discovery": {
         "avg_r": 1.0,
-        "n": 6,
-        "net_r": 6.0,
+        "max_drawdown_r": 1.0,
+        "n": 3,
+        "net_r": 3.0,
         "positive_pct": 66.67,
         "profit_factor": 4.0
       },
+      "discovery_avg_r_ci95": [
+        -1.0,
+        2.0
+      ],
+      "filter": {
+        "structural_geometry_source": "ATR_EXTENSION_AFTER_CLEAR_STRUCTURE"
+      },
+      "holdout": {
+        "avg_r": 2.0,
+        "max_drawdown_r": 0.0,
+        "n": 1,
+        "net_r": 2.0,
+        "positive_pct": 100.0,
+        "profit_factor": "INF"
+      },
+      "holdout_avg_r_ci95": null,
+      "holdout_status": "INSUFFICIENT_N",
+      "kind": "single",
       "proof_status": "DISCOVERY_ONLY"
     },
     {
-      "delta_avg_r_vs_baseline": 1.2758,
+      "delta_avg_r_vs_discovery_baseline": 0.8,
+      "discovery": {
+        "avg_r": 1.0,
+        "max_drawdown_r": 1.0,
+        "n": 3,
+        "net_r": 3.0,
+        "positive_pct": 66.67,
+        "profit_factor": 4.0
+      },
+      "discovery_avg_r_ci95": [
+        -1.0,
+        2.0
+      ],
+      "filter": {
+        "breakout_confirmed": "True",
+        "relative_strength_reason": "ALIGNED_STRONG"
+      },
+      "holdout": {
+        "avg_r": -1.0,
+        "max_drawdown_r": 1.0,
+        "n": 1,
+        "net_r": -1.0,
+        "positive_pct": 0.0,
+        "profit_factor": 0.0
+      },
+      "holdout_avg_r_ci95": null,
+      "holdout_status": "INSUFFICIENT_N",
+      "kind": "pair",
+      "proof_status": "DISCOVERY_ONLY"
+    },
+    {
+      "delta_avg_r_vs_discovery_baseline": 0.8,
+      "discovery": {
+        "avg_r": 1.0,
+        "max_drawdown_r": 1.0,
+        "n": 3,
+        "net_r": 3.0,
+        "positive_pct": 66.67,
+        "profit_factor": 4.0
+      },
+      "discovery_avg_r_ci95": [
+        -1.0,
+        2.0
+      ],
       "filter": {
         "breakout_confirmed": "True",
         "structural_geometry_source": "ATR_EXTENSION_AFTER_CLEAR_STRUCTURE"
       },
+      "holdout": {
+        "avg_r": null,
+        "max_drawdown_r": null,
+        "n": 0,
+        "net_r": null,
+        "positive_pct": null,
+        "profit_factor": null
+      },
+      "holdout_avg_r_ci95": null,
+      "holdout_status": "INSUFFICIENT_N",
       "kind": "pair",
-      "metrics": {
+      "proof_status": "DISCOVERY_ONLY"
+    },
+    {
+      "delta_avg_r_vs_discovery_baseline": 0.8,
+      "discovery": {
         "avg_r": 1.0,
+        "max_drawdown_r": 1.0,
         "n": 3,
         "net_r": 3.0,
         "positive_pct": 66.67,
         "profit_factor": 4.0
       },
-      "proof_status": "DISCOVERY_ONLY"
-    },
-    {
-      "delta_avg_r_vs_baseline": 1.2758,
+      "discovery_avg_r_ci95": [
+        -1.0,
+        2.0
+      ],
       "filter": {
         "direction": "LONG",
         "structural_geometry_source": "ATR_EXTENSION_AFTER_CLEAR_STRUCTURE"
       },
+      "holdout": {
+        "avg_r": null,
+        "max_drawdown_r": null,
+        "n": 0,
+        "net_r": null,
+        "positive_pct": null,
+        "profit_factor": null
+      },
+      "holdout_avg_r_ci95": null,
+      "holdout_status": "INSUFFICIENT_N",
       "kind": "pair",
-      "metrics": {
+      "proof_status": "DISCOVERY_ONLY"
+    },
+    {
+      "delta_avg_r_vs_discovery_baseline": 0.8,
+      "discovery": {
         "avg_r": 1.0,
+        "max_drawdown_r": 1.0,
         "n": 3,
         "net_r": 3.0,
         "positive_pct": 66.67,
         "profit_factor": 4.0
       },
-      "proof_status": "DISCOVERY_ONLY"
-    },
-    {
-      "delta_avg_r_vs_baseline": 1.2758,
-      "filter": {
-        "futures_reason": "OPPOSED",
-        "structural_geometry_source": "ATR_EXTENSION_AFTER_CLEAR_STRUCTURE"
-      },
-      "kind": "pair",
-      "metrics": {
-        "avg_r": 1.0,
-        "n": 3,
-        "net_r": 3.0,
-        "positive_pct": 66.67,
-        "profit_factor": 4.0
-      },
-      "proof_status": "DISCOVERY_ONLY"
-    },
-    {
-      "delta_avg_r_vs_baseline": 1.2758,
+      "discovery_avg_r_ci95": [
+        -1.0,
+        2.0
+      ],
       "filter": {
         "playbook": "BREAKOUT_CONFIRMED_LONG",
         "relative_strength_reason": "ALIGNED_STRONG"
       },
+      "holdout": {
+        "avg_r": null,
+        "max_drawdown_r": null,
+        "n": 0,
+        "net_r": null,
+        "positive_pct": null,
+        "profit_factor": null
+      },
+      "holdout_avg_r_ci95": null,
+      "holdout_status": "INSUFFICIENT_N",
       "kind": "pair",
-      "metrics": {
+      "proof_status": "DISCOVERY_ONLY"
+    },
+    {
+      "delta_avg_r_vs_discovery_baseline": 0.8,
+      "discovery": {
         "avg_r": 1.0,
+        "max_drawdown_r": 1.0,
         "n": 3,
         "net_r": 3.0,
         "positive_pct": 66.67,
         "profit_factor": 4.0
       },
-      "proof_status": "DISCOVERY_ONLY"
-    },
-    {
-      "delta_avg_r_vs_baseline": 1.2758,
+      "discovery_avg_r_ci95": [
+        -1.0,
+        2.0
+      ],
       "filter": {
         "playbook": "BREAKOUT_CONFIRMED_LONG",
         "structural_geometry_source": "ATR_EXTENSION_AFTER_CLEAR_STRUCTURE"
       },
+      "holdout": {
+        "avg_r": null,
+        "max_drawdown_r": null,
+        "n": 0,
+        "net_r": null,
+        "positive_pct": null,
+        "profit_factor": null
+      },
+      "holdout_avg_r_ci95": null,
+      "holdout_status": "INSUFFICIENT_N",
       "kind": "pair",
-      "metrics": {
+      "proof_status": "DISCOVERY_ONLY"
+    },
+    {
+      "delta_avg_r_vs_discovery_baseline": 0.8,
+      "discovery": {
         "avg_r": 1.0,
+        "max_drawdown_r": 1.0,
         "n": 3,
         "net_r": 3.0,
         "positive_pct": 66.67,
         "profit_factor": 4.0
       },
+      "discovery_avg_r_ci95": [
+        -1.0,
+        2.0
+      ],
+      "filter": {
+        "regime": "BREAKOUT_UP",
+        "relative_strength_reason": "ALIGNED_STRONG"
+      },
+      "holdout": {
+        "avg_r": -1.0,
+        "max_drawdown_r": 1.0,
+        "n": 1,
+        "net_r": -1.0,
+        "positive_pct": 0.0,
+        "profit_factor": 0.0
+      },
+      "holdout_avg_r_ci95": null,
+      "holdout_status": "INSUFFICIENT_N",
+      "kind": "pair",
       "proof_status": "DISCOVERY_ONLY"
     },
     {
-      "delta_avg_r_vs_baseline": 1.2758,
+      "delta_avg_r_vs_discovery_baseline": 0.8,
+      "discovery": {
+        "avg_r": 1.0,
+        "max_drawdown_r": 1.0,
+        "n": 3,
+        "net_r": 3.0,
+        "positive_pct": 66.67,
+        "profit_factor": 4.0
+      },
+      "discovery_avg_r_ci95": [
+        -1.0,
+        2.0
+      ],
       "filter": {
         "regime": "BREAKOUT_UP",
         "structural_geometry_source": "ATR_EXTENSION_AFTER_CLEAR_STRUCTURE"
       },
+      "holdout": {
+        "avg_r": null,
+        "max_drawdown_r": null,
+        "n": 0,
+        "net_r": null,
+        "positive_pct": null,
+        "profit_factor": null
+      },
+      "holdout_avg_r_ci95": null,
+      "holdout_status": "INSUFFICIENT_N",
       "kind": "pair",
-      "metrics": {
+      "proof_status": "DISCOVERY_ONLY"
+    },
+    {
+      "delta_avg_r_vs_discovery_baseline": 0.8,
+      "discovery": {
         "avg_r": 1.0,
+        "max_drawdown_r": 1.0,
         "n": 3,
         "net_r": 3.0,
         "positive_pct": 66.67,
         "profit_factor": 4.0
       },
-      "proof_status": "DISCOVERY_ONLY"
-    },
-    {
-      "delta_avg_r_vs_baseline": 1.2758,
-      "filter": {
-        "breakout_confirmed": "True",
-        "futures_reason": "ALIGNED"
-      },
-      "kind": "pair",
-      "metrics": {
-        "avg_r": 1.0,
-        "n": 3,
-        "net_r": 3.0,
-        "positive_pct": 66.67,
-        "profit_factor": 4.0
-      },
-      "proof_status": "DISCOVERY_ONLY"
-    },
-    {
-      "delta_avg_r_vs_baseline": 1.2758,
-      "filter": {
-        "extension_guard_reason": "RSI_SANE",
-        "playbook": "BREAKOUT_CONFIRMED_LONG"
-      },
-      "kind": "pair",
-      "metrics": {
-        "avg_r": 1.0,
-        "n": 3,
-        "net_r": 3.0,
-        "positive_pct": 66.67,
-        "profit_factor": 4.0
-      },
-      "proof_status": "DISCOVERY_ONLY"
-    },
-    {
-      "delta_avg_r_vs_baseline": 1.2758,
-      "filter": {
-        "futures_reason": "ALIGNED",
-        "playbook": "BREAKOUT_CONFIRMED_LONG"
-      },
-      "kind": "pair",
-      "metrics": {
-        "avg_r": 1.0,
-        "n": 3,
-        "net_r": 3.0,
-        "positive_pct": 66.67,
-        "profit_factor": 4.0
-      },
-      "proof_status": "DISCOVERY_ONLY"
-    },
-    {
-      "delta_avg_r_vs_baseline": 1.2758,
-      "filter": {
-        "futures_reason": "ALIGNED",
-        "regime": "BREAKOUT_UP"
-      },
-      "kind": "pair",
-      "metrics": {
-        "avg_r": 1.0,
-        "n": 3,
-        "net_r": 3.0,
-        "positive_pct": 66.67,
-        "profit_factor": 4.0
-      },
-      "proof_status": "DISCOVERY_ONLY"
-    },
-    {
-      "delta_avg_r_vs_baseline": 1.2758,
-      "filter": {
-        "futures_reason": "ALIGNED",
-        "relative_strength_reason": "ALIGNED_STRONG"
-      },
-      "kind": "pair",
-      "metrics": {
-        "avg_r": 1.0,
-        "n": 3,
-        "net_r": 3.0,
-        "positive_pct": 66.67,
-        "profit_factor": 4.0
-      },
-      "proof_status": "DISCOVERY_ONLY"
-    },
-    {
-      "delta_avg_r_vs_baseline": 1.2758,
+      "discovery_avg_r_ci95": [
+        -1.0,
+        2.0
+      ],
       "filter": {
         "relative_strength_reason": "ALIGNED_STRONG",
-        "symbol": "ZECUSDT"
-      },
-      "kind": "pair",
-      "metrics": {
-        "avg_r": 1.0,
-        "n": 3,
-        "net_r": 3.0,
-        "positive_pct": 66.67,
-        "profit_factor": 4.0
-      },
-      "proof_status": "DISCOVERY_ONLY"
-    },
-    {
-      "delta_avg_r_vs_baseline": 1.2758,
-      "filter": {
-        "score_bucket": "80+",
-        "symbol": "ZECUSDT"
-      },
-      "kind": "pair",
-      "metrics": {
-        "avg_r": 1.0,
-        "n": 3,
-        "net_r": 3.0,
-        "positive_pct": 66.67,
-        "profit_factor": 4.0
-      },
-      "proof_status": "DISCOVERY_ONLY"
-    },
-    {
-      "delta_avg_r_vs_baseline": 1.2758,
-      "filter": {
-        "breakout_confirmed": "False",
         "score_bucket": "80+"
       },
-      "kind": "pair",
-      "metrics": {
+      "holdout": {
         "avg_r": 1.0,
+        "max_drawdown_r": 1.0,
         "n": 3,
         "net_r": 3.0,
         "positive_pct": 66.67,
         "profit_factor": 4.0
       },
-      "proof_status": "DISCOVERY_ONLY"
-    },
-    {
-      "delta_avg_r_vs_baseline": 1.0758,
-      "filter": {
-        "playbook": "BREAKOUT_CONFIRMED_LONG"
-      },
-      "kind": "single",
-      "metrics": {
-        "avg_r": 0.8,
-        "n": 5,
-        "net_r": 4.0,
-        "positive_pct": 60.0,
-        "profit_factor": 3.0
-      },
-      "proof_status": "DISCOVERY_ONLY"
-    },
-    {
-      "delta_avg_r_vs_baseline": 1.0758,
-      "filter": {
-        "breakout_confirmed": "True",
-        "playbook": "BREAKOUT_CONFIRMED_LONG"
-      },
+      "holdout_avg_r_ci95": [
+        -1.0,
+        2.0
+      ],
+      "holdout_status": "PASS_EARLY",
       "kind": "pair",
-      "metrics": {
-        "avg_r": 0.8,
-        "n": 5,
-        "net_r": 4.0,
-        "positive_pct": 60.0,
-        "profit_factor": 3.0
+      "proof_status": "PROSPECTIVE_CHALLENGER_ELIGIBLE"
+    },
+    {
+      "delta_avg_r_vs_discovery_baseline": 0.8,
+      "discovery": {
+        "avg_r": 1.0,
+        "max_drawdown_r": 1.0,
+        "n": 3,
+        "net_r": 3.0,
+        "positive_pct": 66.67,
+        "profit_factor": 4.0
       },
+      "discovery_avg_r_ci95": [
+        -1.0,
+        2.0
+      ],
+      "filter": {
+        "relative_strength_reason": "ALIGNED_STRONG",
+        "structural_geometry_source": "ATR_EXTENSION_AFTER_CLEAR_STRUCTURE"
+      },
+      "holdout": {
+        "avg_r": 2.0,
+        "max_drawdown_r": 0.0,
+        "n": 1,
+        "net_r": 2.0,
+        "positive_pct": 100.0,
+        "profit_factor": "INF"
+      },
+      "holdout_avg_r_ci95": null,
+      "holdout_status": "INSUFFICIENT_N",
+      "kind": "pair",
       "proof_status": "DISCOVERY_ONLY"
     },
     {
-      "delta_avg_r_vs_baseline": 1.0758,
+      "delta_avg_r_vs_discovery_baseline": 0.8,
+      "discovery": {
+        "avg_r": 1.0,
+        "max_drawdown_r": 1.0,
+        "n": 3,
+        "net_r": 3.0,
+        "positive_pct": 66.67,
+        "profit_factor": 4.0
+      },
+      "discovery_avg_r_ci95": [
+        -1.0,
+        2.0
+      ],
       "filter": {
-        "direction": "LONG",
-        "playbook": "BREAKOUT_CONFIRMED_LONG"
+        "score_bucket": "80+",
+        "structural_geometry_source": "ATR_EXTENSION_AFTER_CLEAR_STRUCTURE"
       },
+      "holdout": {
+        "avg_r": 2.0,
+        "max_drawdown_r": 0.0,
+        "n": 1,
+        "net_r": 2.0,
+        "positive_pct": 100.0,
+        "profit_factor": "INF"
+      },
+      "holdout_avg_r_ci95": null,
+      "holdout_status": "INSUFFICIENT_N",
       "kind": "pair",
-      "metrics": {
-        "avg_r": 0.8,
-        "n": 5,
-        "net_r": 4.0,
-        "positive_pct": 60.0,
-        "profit_factor": 3.0
-      },
       "proof_status": "DISCOVERY_ONLY"
     },
     {
-      "delta_avg_r_vs_baseline": 1.0758,
+      "delta_avg_r_vs_discovery_baseline": 0.8,
+      "discovery": {
+        "avg_r": 1.0,
+        "max_drawdown_r": 1.0,
+        "n": 3,
+        "net_r": 3.0,
+        "positive_pct": 66.67,
+        "profit_factor": 4.0
+      },
+      "discovery_avg_r_ci95": [
+        -1.0,
+        2.0
+      ],
       "filter": {
-        "playbook": "BREAKOUT_CONFIRMED_LONG",
-        "regime": "BREAKOUT_UP"
+        "extension_guard_reason": "RSI_SANE",
+        "score_bucket": "80+"
       },
+      "holdout": {
+        "avg_r": 0.5,
+        "max_drawdown_r": 1.0,
+        "n": 4,
+        "net_r": 2.0,
+        "positive_pct": 50.0,
+        "profit_factor": 2.0
+      },
+      "holdout_avg_r_ci95": [
+        -1.0,
+        2.0
+      ],
+      "holdout_status": "PASS_EARLY",
       "kind": "pair",
-      "metrics": {
-        "avg_r": 0.8,
-        "n": 5,
-        "net_r": 4.0,
-        "positive_pct": 60.0,
-        "profit_factor": 3.0
+      "proof_status": "PROSPECTIVE_CHALLENGER_ELIGIBLE"
+    },
+    {
+      "delta_avg_r_vs_discovery_baseline": 0.8,
+      "discovery": {
+        "avg_r": 1.0,
+        "max_drawdown_r": 1.0,
+        "n": 3,
+        "net_r": 3.0,
+        "positive_pct": 66.67,
+        "profit_factor": 4.0
       },
-      "proof_status": "DISCOVERY_ONLY"
+      "discovery_avg_r_ci95": [
+        -1.0,
+        2.0
+      ],
+      "filter": {
+        "futures_reason": "ALIGNED",
+        "score_bucket": "80+"
+      },
+      "holdout": {
+        "avg_r": 0.5,
+        "max_drawdown_r": 1.0,
+        "n": 2,
+        "net_r": 1.0,
+        "positive_pct": 50.0,
+        "profit_factor": 2.0
+      },
+      "holdout_avg_r_ci95": [
+        -1.0,
+        2.0
+      ],
+      "holdout_status": "PASS_EARLY",
+      "kind": "pair",
+      "proof_status": "PROSPECTIVE_CHALLENGER_ELIGIBLE"
     }
   ],
   "validation_contract": {
@@ -422,7 +947,9 @@
     "chronological_holdout_required": true,
     "costs_required_before_promotion": true,
     "discovery_min_n": 3,
-    "note": "Discovery performance is not proof. Candidate rules must be frozen before new prospective observations.",
+    "holdout_min_n": 2,
+    "multiple_testing_control_required": true,
+    "note": "PASS_EARLY only freezes a paper challenger. It is not proof of profitability and cannot alter Production.",
     "promotion_min_new_prospective_n": 10,
     "walk_forward_required": true
   }
