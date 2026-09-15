@@ -2,6 +2,88 @@
   "can_change_threshold": false,
   "can_override_production": false,
   "classification_is_research_only": true,
+  "cohorts": {
+    "legacy_baseline": {
+      "by_blocker_family": {
+        "BREAKOUT_NOT_CONFIRMED": {
+          "mean_12h_directional_return_pct": -2.5306,
+          "mean_4h_directional_return_pct": -1.4514,
+          "mean_8h_directional_return_pct": -2.0132,
+          "missed_n": 0,
+          "missed_rate_pct": 0.0,
+          "n": 6
+        },
+        "HTF_CONFLICT": {
+          "mean_12h_directional_return_pct": 0.1253,
+          "mean_4h_directional_return_pct": -0.1361,
+          "mean_8h_directional_return_pct": -0.1075,
+          "missed_n": 80,
+          "missed_rate_pct": 36.7,
+          "n": 218
+        },
+        "PRE_FINAL_DECISION_NOT_ACTIONABLE": {
+          "mean_12h_directional_return_pct": 2.5933,
+          "mean_4h_directional_return_pct": 1.5794,
+          "mean_8h_directional_return_pct": 1.7638,
+          "missed_n": 2,
+          "missed_rate_pct": 100.0,
+          "n": 2
+        },
+        "SCORE_BELOW_THRESHOLD": {
+          "mean_12h_directional_return_pct": -1.4981,
+          "mean_4h_directional_return_pct": -0.2572,
+          "mean_8h_directional_return_pct": -0.9215,
+          "missed_n": 5,
+          "missed_rate_pct": 20.83,
+          "n": 24
+        },
+        "SETUP_QUALITY": {
+          "mean_12h_directional_return_pct": -0.3386,
+          "mean_4h_directional_return_pct": -0.0801,
+          "mean_8h_directional_return_pct": -0.5127,
+          "missed_n": 0,
+          "missed_rate_pct": 0.0,
+          "n": 1
+        }
+      },
+      "matured_classified": 251,
+      "missed_n": 87,
+      "missed_rate_pct": 34.66,
+      "records": 251
+    },
+    "post_v2_forward": {
+      "by_blocker_family": {
+        "HTF_CONFLICT": {
+          "mean_12h_directional_return_pct": -0.9499,
+          "mean_4h_directional_return_pct": 0.1832,
+          "mean_8h_directional_return_pct": 0.0178,
+          "missed_n": 17,
+          "missed_rate_pct": 40.48,
+          "n": 42
+        }
+      },
+      "matured_classified": 42,
+      "missed_n": 17,
+      "missed_rate_pct": 40.48,
+      "records": 49
+    },
+    "post_v2_neutral_regime": {
+      "by_blocker_family": {
+        "HTF_CONFLICT": {
+          "mean_12h_directional_return_pct": -1.093,
+          "mean_4h_directional_return_pct": 0.2406,
+          "mean_8h_directional_return_pct": -0.0244,
+          "missed_n": 7,
+          "missed_rate_pct": 36.84,
+          "n": 19
+        }
+      },
+      "matured_classified": 19,
+      "missed_n": 7,
+      "missed_rate_pct": 36.84,
+      "records": 19
+    }
+  },
   "decision_source_of_truth": "FINAL_TRADE_GATE",
   "evaluation_horizons_h": [
     1,
@@ -10,439 +92,18 @@
     8,
     12
   ],
-  "generated_at": "2026-09-15T14:19:55.642218+00:00",
+  "generated_at": "2026-09-15T15:21:42.248032+00:00",
   "live_execution": false,
   "methodology": "Canonical WAIT capture; observed market price at decision time; public 5m candles; exact 1/2/4/8/12h close/MFE/MAE; invalidation-aware descriptive missed-opportunity classification.",
+  "performance_epoch": {
+    "id": "HTF_SR_V2_2026-09-14",
+    "policy": "legacy and post-V2 evidence must never be mixed for current-version claims",
+    "release_sha": "0e3db49b3511f845e4df52db49d41700d14a4eee",
+    "start_at": "2026-09-14T12:31:29+00:00"
+  },
   "product_horizon": "4-12H",
   "production_threshold_unchanged": 68,
   "records": [
-    {
-      "blocker_family": "HTF_CONFLICT",
-      "can_override_production": false,
-      "captured_at": "2026-09-10T00:07:26.669859+00:00",
-      "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
-      "decision_id": "cbe4ca70191ec1db6e2b2539",
-      "direction": "SHORT",
-      "horizons": {
-        "12h": {
-          "close": 100.95,
-          "directional_return_pct": 0.6593,
-          "invalidation_hit": false,
-          "mae_pct": 0.5609,
-          "mfe_pct": 1.1144
-        },
-        "1h": {
-          "close": 101.52,
-          "directional_return_pct": 0.0984,
-          "invalidation_hit": false,
-          "mae_pct": 0.1279,
-          "mfe_pct": 0.6637
-        },
-        "2h": {
-          "close": 101.11,
-          "directional_return_pct": 0.5019,
-          "invalidation_hit": false,
-          "mae_pct": 0.1279,
-          "mfe_pct": 1.1144
-        },
-        "4h": {
-          "close": 101.99,
-          "directional_return_pct": -0.3641,
-          "invalidation_hit": false,
-          "mae_pct": 0.4428,
-          "mfe_pct": 1.1144
-        },
-        "8h": {
-          "close": 101.21,
-          "directional_return_pct": 0.4035,
-          "invalidation_hit": false,
-          "mae_pct": 0.5609,
-          "mfe_pct": 1.1144
-        }
-      },
-      "id": "cbe4ca70191ec1db6e2b2539",
-      "invalidation": null,
-      "live_execution": false,
-      "market_source": "BINANCE_DATA_API_SPOT",
-      "missed_opportunity": true,
-      "playbook": "TREND_PULLBACK_SHORT",
-      "price": 101.62,
-      "raw_reason": "HTF_PRODUCT_DIRECTION_UNRESOLVED",
-      "reason": "HTF_CONFLICT",
-      "release": null,
-      "research_only": true,
-      "score": 67.0,
-      "status": "MATURED",
-      "symbol": "SOLUSDT",
-      "threshold": 68.0,
-      "v2_regime": null
-    },
-    {
-      "blocker_family": "HTF_CONFLICT",
-      "can_override_production": false,
-      "captured_at": "2026-09-10T00:07:26.669859+00:00",
-      "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
-      "decision_id": "f155f8336593a82a603dd148",
-      "direction": "SHORT",
-      "horizons": {
-        "12h": {
-          "close": 1.3743,
-          "directional_return_pct": 1.5121,
-          "invalidation_hit": false,
-          "mae_pct": 0.086,
-          "mfe_pct": 1.7871
-        },
-        "1h": {
-          "close": 1.3926,
-          "directional_return_pct": 0.2007,
-          "invalidation_hit": false,
-          "mae_pct": 0.086,
-          "mfe_pct": 0.6782
-        },
-        "2h": {
-          "close": 1.3832,
-          "directional_return_pct": 0.8743,
-          "invalidation_hit": false,
-          "mae_pct": 0.086,
-          "mfe_pct": 1.3362
-        },
-        "4h": {
-          "close": 1.3906,
-          "directional_return_pct": 0.344,
-          "invalidation_hit": false,
-          "mae_pct": 0.086,
-          "mfe_pct": 1.3362
-        },
-        "8h": {
-          "close": 1.3837,
-          "directional_return_pct": 0.8385,
-          "invalidation_hit": false,
-          "mae_pct": 0.086,
-          "mfe_pct": 1.3362
-        }
-      },
-      "id": "f155f8336593a82a603dd148",
-      "invalidation": null,
-      "live_execution": false,
-      "market_source": "BINANCE_DATA_API_SPOT",
-      "missed_opportunity": true,
-      "playbook": "TREND_PULLBACK_SHORT",
-      "price": 1.3954,
-      "raw_reason": "HTF_PRODUCT_DIRECTION_UNRESOLVED",
-      "reason": "HTF_CONFLICT",
-      "release": null,
-      "research_only": true,
-      "score": 68.0,
-      "status": "MATURED",
-      "symbol": "XRPUSDT",
-      "threshold": 68.0,
-      "v2_regime": null
-    },
-    {
-      "blocker_family": "HTF_CONFLICT",
-      "can_override_production": false,
-      "captured_at": "2026-09-10T00:07:26.669859+00:00",
-      "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
-      "decision_id": "cd4961d19b58951befad1675",
-      "direction": "SHORT",
-      "horizons": {
-        "12h": {
-          "close": 715.46,
-          "directional_return_pct": 1.1973,
-          "invalidation_hit": false,
-          "mae_pct": 0.308,
-          "mfe_pct": 1.2401
-        },
-        "1h": {
-          "close": 724.25,
-          "directional_return_pct": -0.0166,
-          "invalidation_hit": false,
-          "mae_pct": 0.0842,
-          "mfe_pct": 0.4885
-        },
-        "2h": {
-          "close": 721.43,
-          "directional_return_pct": 0.3729,
-          "invalidation_hit": false,
-          "mae_pct": 0.0842,
-          "mfe_pct": 1.1101
-        },
-        "4h": {
-          "close": 723.29,
-          "directional_return_pct": 0.116,
-          "invalidation_hit": false,
-          "mae_pct": 0.308,
-          "mfe_pct": 1.1101
-        },
-        "8h": {
-          "close": 719.49,
-          "directional_return_pct": 0.6408,
-          "invalidation_hit": false,
-          "mae_pct": 0.308,
-          "mfe_pct": 1.2132
-        }
-      },
-      "id": "cd4961d19b58951befad1675",
-      "invalidation": 730.542,
-      "live_execution": false,
-      "market_source": "BINANCE_DATA_API_SPOT",
-      "missed_opportunity": true,
-      "playbook": "MARKET_CONTINUATION_SHORT",
-      "price": 724.13,
-      "raw_reason": "HTF_PRODUCT_DIRECTION_UNRESOLVED",
-      "reason": "HTF_CONFLICT",
-      "release": null,
-      "research_only": true,
-      "score": 82.0,
-      "status": "MATURED",
-      "symbol": "BNBUSDT",
-      "threshold": 68.0,
-      "v2_regime": null
-    },
-    {
-      "blocker_family": "PRE_FINAL_DECISION_NOT_ACTIONABLE",
-      "can_override_production": false,
-      "captured_at": "2026-09-10T00:07:26.669859+00:00",
-      "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
-      "decision_id": "df41125862454ba42ce9cee5",
-      "direction": "SHORT",
-      "horizons": {
-        "12h": {
-          "close": 0.08508,
-          "directional_return_pct": 1.2649,
-          "invalidation_hit": false,
-          "mae_pct": 0.1277,
-          "mfe_pct": 1.6156
-        },
-        "1h": {
-          "close": 0.08608,
-          "directional_return_pct": 0.1044,
-          "invalidation_hit": false,
-          "mae_pct": 0.1277,
-          "mfe_pct": 0.7365
-        },
-        "2h": {
-          "close": 0.08549,
-          "directional_return_pct": 0.7891,
-          "invalidation_hit": false,
-          "mae_pct": 0.1277,
-          "mfe_pct": 1.2217
-        },
-        "4h": {
-          "close": 0.08607,
-          "directional_return_pct": 0.116,
-          "invalidation_hit": false,
-          "mae_pct": 0.1277,
-          "mfe_pct": 1.2217
-        },
-        "8h": {
-          "close": 0.08541,
-          "directional_return_pct": 0.882,
-          "invalidation_hit": false,
-          "mae_pct": 0.1277,
-          "mfe_pct": 1.6036
-        }
-      },
-      "id": "df41125862454ba42ce9cee5",
-      "invalidation": 0.0874351429,
-      "live_execution": false,
-      "market_source": "BINANCE_DATA_API_SPOT",
-      "missed_opportunity": true,
-      "playbook": "MARKET_CONTINUATION_SHORT",
-      "price": 0.08617,
-      "raw_reason": "PRE_FINAL_DECISION_NOT_ACTIONABLE",
-      "reason": "NOT_QUALIFIED",
-      "release": null,
-      "research_only": true,
-      "score": 76.0,
-      "status": "MATURED",
-      "symbol": "DOGEUSDT",
-      "threshold": 68.0,
-      "v2_regime": null
-    },
-    {
-      "blocker_family": "SETUP_QUALITY",
-      "can_override_production": false,
-      "captured_at": "2026-09-10T00:07:26.669859+00:00",
-      "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
-      "decision_id": "c4897bcb96b1040ad4f46472",
-      "direction": "LONG",
-      "horizons": {
-        "12h": {
-          "close": 1215.79,
-          "directional_return_pct": -2.4332,
-          "invalidation_hit": true,
-          "mae_pct": 3.4176,
-          "mfe_pct": 0.524
-        },
-        "1h": {
-          "close": 1241.27,
-          "directional_return_pct": -0.3884,
-          "invalidation_hit": false,
-          "mae_pct": 1.4335,
-          "mfe_pct": 0.1067
-        },
-        "2h": {
-          "close": 1214.77,
-          "directional_return_pct": -2.515,
-          "invalidation_hit": true,
-          "mae_pct": 3.4176,
-          "mfe_pct": 0.1067
-        },
-        "4h": {
-          "close": 1247.15,
-          "directional_return_pct": 0.0835,
-          "invalidation_hit": true,
-          "mae_pct": 3.4176,
-          "mfe_pct": 0.2062
-        },
-        "8h": {
-          "close": 1217.89,
-          "directional_return_pct": -2.2646,
-          "invalidation_hit": true,
-          "mae_pct": 3.4176,
-          "mfe_pct": 0.524
-        }
-      },
-      "id": "c4897bcb96b1040ad4f46472",
-      "invalidation": 1214.7423214286,
-      "live_execution": false,
-      "market_source": "BINANCE_DATA_API_SPOT",
-      "missed_opportunity": false,
-      "playbook": "TREND_PULLBACK_LONG",
-      "price": 1246.11,
-      "raw_reason": "PRE_FINAL_DECISION_NOT_ACTIONABLE",
-      "reason": "NOT_QUALIFIED",
-      "release": null,
-      "research_only": true,
-      "score": 68.0,
-      "status": "MATURED",
-      "symbol": "ZECUSDT",
-      "threshold": 68.0,
-      "v2_regime": null
-    },
-    {
-      "blocker_family": "HTF_CONFLICT",
-      "can_override_production": false,
-      "captured_at": "2026-09-10T04:33:16.667014+00:00",
-      "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
-      "decision_id": "a288534c38ee5f6bfca62307",
-      "direction": "SHORT",
-      "horizons": {
-        "12h": {
-          "close": 76841.16,
-          "directional_return_pct": 1.9728,
-          "invalidation_hit": false,
-          "mae_pct": 0.2255,
-          "mfe_pct": 2.2322
-        },
-        "1h": {
-          "close": 78476.56,
-          "directional_return_pct": -0.1135,
-          "invalidation_hit": false,
-          "mae_pct": 0.1689,
-          "mfe_pct": 0.1493
-        },
-        "2h": {
-          "close": 78154.79,
-          "directional_return_pct": 0.297,
-          "invalidation_hit": false,
-          "mae_pct": 0.2255,
-          "mfe_pct": 0.3063
-        },
-        "4h": {
-          "close": 78117.91,
-          "directional_return_pct": 0.3441,
-          "invalidation_hit": false,
-          "mae_pct": 0.2255,
-          "mfe_pct": 0.6176
-        },
-        "8h": {
-          "close": 77371.28,
-          "directional_return_pct": 1.2966,
-          "invalidation_hit": false,
-          "mae_pct": 0.2255,
-          "mfe_pct": 1.358
-        }
-      },
-      "id": "a288534c38ee5f6bfca62307",
-      "invalidation": null,
-      "live_execution": false,
-      "market_source": "BINANCE_DATA_API_SPOT",
-      "missed_opportunity": true,
-      "playbook": "TREND_PULLBACK_SHORT",
-      "price": 78387.62,
-      "raw_reason": "HTF_PRODUCT_DIRECTION_UNRESOLVED",
-      "reason": "HTF_CONFLICT",
-      "release": null,
-      "research_only": true,
-      "score": 63.0,
-      "status": "MATURED",
-      "symbol": "BTCUSDT",
-      "threshold": 68.0,
-      "v2_regime": null
-    },
-    {
-      "blocker_family": "HTF_CONFLICT",
-      "can_override_production": false,
-      "captured_at": "2026-09-10T04:33:16.667014+00:00",
-      "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
-      "decision_id": "4031894c07588dda09729308",
-      "direction": "SHORT",
-      "horizons": {
-        "12h": {
-          "close": 2434.38,
-          "directional_return_pct": 1.7662,
-          "invalidation_hit": false,
-          "mae_pct": 0.2667,
-          "mfe_pct": 3.0052
-        },
-        "1h": {
-          "close": 2480.28,
-          "directional_return_pct": -0.086,
-          "invalidation_hit": false,
-          "mae_pct": 0.1683,
-          "mfe_pct": 0.1698
-        },
-        "2h": {
-          "close": 2472.31,
-          "directional_return_pct": 0.2357,
-          "invalidation_hit": false,
-          "mae_pct": 0.2292,
-          "mfe_pct": 0.2488
-        },
-        "4h": {
-          "close": 2472.39,
-          "directional_return_pct": 0.2324,
-          "invalidation_hit": false,
-          "mae_pct": 0.2667,
-          "mfe_pct": 0.5698
-        },
-        "8h": {
-          "close": 2442.1,
-          "directional_return_pct": 1.4547,
-          "invalidation_hit": false,
-          "mae_pct": 0.2667,
-          "mfe_pct": 1.7044
-        }
-      },
-      "id": "4031894c07588dda09729308",
-      "invalidation": null,
-      "live_execution": false,
-      "market_source": "BINANCE_DATA_API_SPOT",
-      "missed_opportunity": true,
-      "playbook": "TREND_PULLBACK_SHORT",
-      "price": 2478.15,
-      "raw_reason": "HTF_4H_12H_NOT_ALIGNED",
-      "reason": "HTF_CONFLICT",
-      "release": null,
-      "research_only": true,
-      "score": 62.0,
-      "status": "MATURED",
-      "symbol": "ETHUSDT",
-      "threshold": 68.0,
-      "v2_regime": null
-    },
     {
       "blocker_family": "HTF_CONFLICT",
       "can_override_production": false,
@@ -450,6 +111,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "84d0bf6b7070afda8a4e9773",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 98.96,
@@ -511,6 +173,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "714ecd22df6ef6b4736ebf7a",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.344,
@@ -572,6 +235,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "630f04c72ee3aff6fd14bb97",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 705.24,
@@ -633,6 +297,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "be06b9209204dbf147e98f1c",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 0.08279,
@@ -694,6 +359,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "776392ac892ed4e5e5fcf3ad",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1121.02,
@@ -755,6 +421,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "caba00a5006d131e4a96c1b4",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 77306.04,
@@ -816,6 +483,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "0cd3cb32edb4489f3e2fccc5",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2460.21,
@@ -877,6 +545,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "c1d62e1b1d6c665945fbf32c",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 99.98,
@@ -938,6 +607,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "299020466581676af41ae7b6",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.359,
@@ -999,6 +669,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "9e991eb4e2895ed04a5c2fb3",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 711.28,
@@ -1060,6 +731,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "95810a2e83c92cbd94c75e79",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1146.04,
@@ -1121,6 +793,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "31d18c0444b9260fb88561ac",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 77200.89,
@@ -1182,6 +855,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "04e2b5506359debfe1ea9b7d",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2459.94,
@@ -1243,6 +917,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "9a22c862038debf67e1ea705",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 99.95,
@@ -1304,6 +979,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "89f324ab8b9666d9579b7be2",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.3539,
@@ -1365,6 +1041,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "c3994cb32b32ca4aba30a355",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 714.14,
@@ -1426,6 +1103,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "36b95ca1f1bebc8a0ce31e93",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 0.08407,
@@ -1487,6 +1165,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "d2dcc41f16b926f4dd7a7de2",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1131.52,
@@ -1548,6 +1227,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "ee21c1abbdd098c45156c9e6",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 76891.61,
@@ -1609,6 +1289,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "95d3018f78308b60c94d2a74",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2452.15,
@@ -1670,6 +1351,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "10fb9d1dc0d9ee66695d57b6",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 99.11,
@@ -1731,6 +1413,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "e5891010add44ba6fd89517c",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.3424,
@@ -1792,6 +1475,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "7b5972184874b41d3d298eb2",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 712.4,
@@ -1853,6 +1537,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "fc284ff3ae3c4e286d5db272",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1081.18,
@@ -1914,6 +1599,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "ca9d6f4d2eff9eb0df8e842a",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 77130.0,
@@ -1975,6 +1661,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "ef4e2ebb9add17320ec04624",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2459.88,
@@ -2036,6 +1723,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "d7b743523e86543a8ff7e635",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 99.72,
@@ -2097,6 +1785,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "8b6161b9a076a986627fa155",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.3488,
@@ -2158,6 +1847,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "3a423f0c882792347d094e8f",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 715.84,
@@ -2219,6 +1909,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "3a00537ef0985596d2a32569",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1087.07,
@@ -2280,6 +1971,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "61557b4082bbe44a13128a03",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 77215.33,
@@ -2341,6 +2033,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "488c7db7af01985b73f22e4b",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2466.64,
@@ -2402,6 +2095,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "8959204bb93c254f5a2141f0",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 99.73,
@@ -2463,6 +2157,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "e72b8d5493e902ef32cb8a05",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.3513,
@@ -2524,6 +2219,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "27fb3e76c042d00740c77142",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 713.56,
@@ -2585,6 +2281,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "7c655a596299215d51b1968b",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1110.63,
@@ -2646,6 +2343,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "c501bee2929e81ac31d8b50e",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 77040.92,
@@ -2707,6 +2405,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "8895fc0a02f165dcc23f85b0",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2465.31,
@@ -2768,6 +2467,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "da82554af76753ce9297e19e",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 99.44,
@@ -2829,6 +2529,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "7b42f9306bc85454faa76257",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.3394,
@@ -2890,6 +2591,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "b48b38fcecaeac126041aa53",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 713.58,
@@ -2951,6 +2653,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "779f1d9ca7ad478af36cbea3",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1105.37,
@@ -3012,6 +2715,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "8bdde647103af26e011ba733",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 76962.56,
@@ -3073,6 +2777,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "5ba738dae848b699496553f5",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2455.58,
@@ -3134,6 +2839,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "cdf7fcc0a67116257842c938",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 99.13,
@@ -3195,6 +2901,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "7959c87f6f22c4c79bffd957",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.3245,
@@ -3256,6 +2963,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "302213713b56576cf464cae9",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 712.03,
@@ -3317,6 +3025,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "0fd466a5eb24e9fd47d10359",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1097.53,
@@ -3378,6 +3087,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "0ca269ff046c222498e5428d",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 102.33,
@@ -3439,6 +3149,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "3752f32b22ae4a276374d809",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.3766,
@@ -3500,6 +3211,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "dcd7f1ba3a66beffc96a2bac",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1186.98,
@@ -3561,6 +3273,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "c89aac3de703c1c94a4d828f",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 77288.39,
@@ -3622,6 +3335,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "f840b27316abfd01b3bccf8b",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2515.2,
@@ -3683,6 +3397,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "84a5309ed1f876b6431ef0ea",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 102.12,
@@ -3744,6 +3459,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "3b4f4c0aef627551fe913b1e",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.3618,
@@ -3805,6 +3521,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "1a48d32d808966765352ce92",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 730.6,
@@ -3866,6 +3583,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "13b1a1821061a0d420525231",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 0.08443,
@@ -3927,6 +3645,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "6ea3b75e150aaa3eccaa2465",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2512.26,
@@ -3988,6 +3707,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "1f2aed04aeabce683afefeee",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 101.65,
@@ -4049,6 +3769,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "bb725c971a257cdc9a457016",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.365,
@@ -4110,6 +3831,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "b1f4770dde9e95fcd56cea44",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 733.46,
@@ -4171,6 +3893,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "ade3dd8e75a33e868e4b7c95",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 0.08446,
@@ -4232,6 +3955,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "7fb8a9c72ed485b2a4509e20",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1129.9,
@@ -4293,6 +4017,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "e9003ca2b3a945a8045bfc05",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2526.72,
@@ -4354,6 +4079,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "4a807a1d13239b29eafaf683",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 101.8,
@@ -4415,6 +4141,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "376499bd5c91358c1ae58d3d",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.3696,
@@ -4476,6 +4203,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "81bb23bdc3b9caf244571c02",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 734.28,
@@ -4537,6 +4265,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "63e6bb081772ccafbe5d9d55",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1149.39,
@@ -4598,6 +4327,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "6d9497d54e70dc1c556d6bd8",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 77361.19,
@@ -4659,6 +4389,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "50717f82174496a09665444c",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2531.25,
@@ -4720,6 +4451,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "ed9831dc01702238a18f0f30",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 101.97,
@@ -4781,6 +4513,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "3aff37ec92d8b459a12c8cd6",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.3708,
@@ -4842,6 +4575,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "6a2db5db6fe636dcfbf74276",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 737.44,
@@ -4903,6 +4637,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "bb4645c4e150a7252838a05c",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 0.08494,
@@ -4964,6 +4699,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "746a856bf5784d334a058689",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1154.04,
@@ -5025,6 +4761,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "3b9dacb63891cff1e712414c",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2534.51,
@@ -5086,6 +4823,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "0c7309b5a2a2f57a9c53e8dd",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 102.24,
@@ -5147,6 +4885,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "e263fc98aedd0fa2a85a583a",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 736.5,
@@ -5208,6 +4947,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "a9363cced34bdd7471ca1a2e",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1157.94,
@@ -5269,6 +5009,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "6abc841376be6469a9581ebd",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 77394.01,
@@ -5330,6 +5071,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "d73236912ae2747fa762ae00",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 102.11,
@@ -5391,6 +5133,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "3735f9c0023777c413c7aa93",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 732.16,
@@ -5452,6 +5195,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "7db191ae79ce47c01ee5bf8d",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 0.08506,
@@ -5513,6 +5257,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "aa2a32e32f240c2e1af6387f",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1142.1,
@@ -5574,6 +5319,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "22d9f9f7d57bac5b41bf72c8",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 77171.01,
@@ -5635,6 +5381,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "40a64cd152a0d12c793b5fe8",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2523.94,
@@ -5696,6 +5443,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "31413b796eeb549a00ece7a0",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 101.43,
@@ -5757,6 +5505,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "04711428f8ca105520e55ace",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.3646,
@@ -5818,6 +5567,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "c48302d711ea9ebc1ddf3598",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 726.64,
@@ -5879,6 +5629,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "38378123c6b43533975ae8f0",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 0.0848,
@@ -5940,6 +5691,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "036af4f01f78119cabaf0b20",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 77193.07,
@@ -6001,6 +5753,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "07113694aac7675ad812f91b",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2521.67,
@@ -6062,6 +5815,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "afaf24a30e7d78e7376925cd",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 101.62,
@@ -6123,6 +5877,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "99efab92f3f87db4885d7af9",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.3625,
@@ -6184,6 +5939,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "5cee0cf0ed05f903e76d2cde",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 725.85,
@@ -6245,6 +6001,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "9f89dcd9db6922c495e3d424",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 0.08462,
@@ -6306,6 +6063,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "78ee2acbfc1afe508d8d178c",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 77276.02,
@@ -6367,6 +6125,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "82046e2c077b3ec2acf11a1d",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2525.23,
@@ -6428,6 +6187,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "0ae5a470705323720ce762de",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 101.74,
@@ -6489,6 +6249,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "7808827a87a7c4e9c0f378ac",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.3675,
@@ -6550,6 +6311,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "9f1fd21875c9068c698a0203",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 728.02,
@@ -6611,6 +6373,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "305a4ac82a83ab995c470dfd",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1126.68,
@@ -6672,6 +6435,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "10f951d28a782368269b8fd6",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2523.17,
@@ -6733,6 +6497,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "ea11edb8f31d4e49fa44a19c",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 101.8,
@@ -6794,6 +6559,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "2c45285a697f4c6af0d72934",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.3649,
@@ -6855,6 +6621,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "d4bb989870b3276d18e99701",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 726.74,
@@ -6916,6 +6683,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "938ce7ae4d0a671d83cb32a9",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1140.2,
@@ -6977,6 +6745,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "db4718662a4a9c4eee91bb1b",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 77296.43,
@@ -7038,6 +6807,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "0e78ff2926d7c5b27e7d8495",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2521.37,
@@ -7099,6 +6869,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "ae53918ab451db069b01f65f",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 101.36,
@@ -7160,6 +6931,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "36fab610af3bd2f3a74eb3fe",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.3655,
@@ -7221,6 +6993,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "68d158c9b8c877eec09c8dc9",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1138.5,
@@ -7282,6 +7055,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "ad31c37ab510983f3953cc43",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 76848.0,
@@ -7343,6 +7117,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "e16a52fedb4a96ca30572320",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2496.37,
@@ -7404,6 +7179,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "1fec2f0e711b2fdfd307bc90",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 100.17,
@@ -7465,6 +7241,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "df0c2d50d9dab63647cfefa2",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.3501,
@@ -7526,6 +7303,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "0429a8009dbffe4b64ec11fd",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1112.53,
@@ -7587,6 +7365,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "5a70550bc5abdb31ace65661",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 76694.0,
@@ -7648,6 +7427,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "6a6c76d450eabf29955956c3",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2477.5,
@@ -7709,6 +7489,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "abc68af94e7f639ea165087b",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 99.72,
@@ -7770,6 +7551,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "6345f7892d24896f89682bd3",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.3429,
@@ -7831,6 +7613,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "de2a46ebdfd91907451b434a",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 0.08348,
@@ -7892,6 +7675,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "432ed6e9534fc48493c475b9",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1097.7,
@@ -7953,6 +7737,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "048929a89ba7c8449725b3bb",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 76746.0,
@@ -8014,6 +7799,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "92b68d78c37eb616786ae2a1",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2477.35,
@@ -8075,6 +7861,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "52fadb419e60a0046eec52b3",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 99.65,
@@ -8136,6 +7923,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "53af98159d4a7b1efe7af0fc",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.3396,
@@ -8197,6 +7985,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "18d72c4b11f388c6e1d05209",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1092.68,
@@ -8258,6 +8047,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "cb92bc9cf59317786eeb177b",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2505.11,
@@ -8319,6 +8109,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "fb40d7a9ddba522366c34130",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 101.02,
@@ -8380,6 +8171,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "a8e2f6aab07a85bff562ac41",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.355,
@@ -8441,6 +8233,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "5094b87319cc6d24eb2c8083",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 720.9,
@@ -8502,6 +8295,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "9f612ecdd617e54b639cbe43",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1104.28,
@@ -8563,6 +8357,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "e84a22492d8353a3a26b2856",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2508.08,
@@ -8624,6 +8419,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "93ac1cc9f6891d6289fdbc86",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.3577,
@@ -8685,6 +8481,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "3545197496179e1a2580aa97",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 721.09,
@@ -8746,6 +8543,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "79eead35d6d38f15d2e5b436",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 0.08455,
@@ -8807,6 +8605,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "7c23dd3336c763edd748d075",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1106.26,
@@ -8868,6 +8667,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "20751b802f28f3dc97d9827e",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 77236.28,
@@ -8929,6 +8729,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "dc18f7313f95c9ee1a6c3524",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2504.51,
@@ -8990,6 +8791,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "d955dcfe630dd3e535f08712",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 100.92,
@@ -9051,6 +8853,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "f8dce4b6d638c720f7424841",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.354,
@@ -9112,6 +8915,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "d7176c3cdc3ca6216f4d4f08",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 721.2,
@@ -9173,6 +8977,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "44e71810ec7e305aa3e21b22",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 0.08417,
@@ -9234,6 +9039,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "86b8b05c3152a1cd95b60ab8",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1090.65,
@@ -9295,6 +9101,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "e326345e198e8c7fc788ee7e",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 76691.6,
@@ -9356,6 +9163,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "984b652e7cb782e3cdcc3ea5",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2476.8,
@@ -9417,6 +9225,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "07bb3852d92d086d56696ba6",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 99.63,
@@ -9478,6 +9287,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "6af2edca433da80dd1e62445",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.3399,
@@ -9539,6 +9349,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "3e44432c76231957db6111d4",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 716.55,
@@ -9600,6 +9411,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "b25b0b63b66a719729e78d8e",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 0.08239,
@@ -9661,6 +9473,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "93743552f7da24d9095eb8a7",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1068.8,
@@ -9722,6 +9535,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "ba39817936d0efa4e0321637",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 76837.04,
@@ -9783,6 +9597,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "fa7439c8dcc48d1ed1b10e3c",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2479.7,
@@ -9844,6 +9659,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "5f36f697433a2410a16f50ab",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 99.74,
@@ -9905,6 +9721,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "5adc73b8f5a33bc1758c1cfc",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.3435,
@@ -9966,6 +9783,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "5939cd3d5e3d4b1961160566",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 716.61,
@@ -10027,6 +9845,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "c5310be55d5d8812ed58a118",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 0.08267,
@@ -10088,6 +9907,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "1196bd2cb0c88712f4b0b70a",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1066.19,
@@ -10149,6 +9969,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "1b2dea9fa8b8acdd5d20c9c7",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 76828.57,
@@ -10210,6 +10031,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "cc424853df4f3b07e53dedd9",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2476.62,
@@ -10271,6 +10093,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "64eaad6a91ae3c2c4f6f4823",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 99.63,
@@ -10332,6 +10155,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "22a13501e3956c4998c57b64",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.3431,
@@ -10393,6 +10217,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "d12f426f46d38474663cc56e",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 716.65,
@@ -10454,6 +10279,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "3deeec9a30b364e1ba7d75b4",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 0.08257,
@@ -10515,6 +10341,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "ea724fb0269f5efa19428ad4",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1064.39,
@@ -10576,6 +10403,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "80f339f1734120e89963aaf5",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 76835.34,
@@ -10637,6 +10465,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "8a55862202a1ecb3bda0aa40",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2483.01,
@@ -10698,6 +10527,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "8899e1bb72c6e24fb3ecbcf0",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 99.57,
@@ -10759,6 +10589,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "70f822118f15b6b7966879cf",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 717.34,
@@ -10820,6 +10651,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "b209e892b0edbe92bf0bff4a",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 0.08268,
@@ -10881,6 +10713,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "e024369c0d4f399b8796dad4",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1063.4,
@@ -10942,6 +10775,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "9b98743c14b8b53e5a3e5a5f",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 716.89,
@@ -11003,6 +10837,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "c33d148f7c2609b5f4e6c7bc",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 76822.0,
@@ -11064,6 +10899,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "1c0f107ef70cfa3657538bc3",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 0.08259,
@@ -11125,6 +10961,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "9e9f4b198b375b8365828dae",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2481.2,
@@ -11186,6 +11023,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "01ef6974fa907da74055984d",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 99.42,
@@ -11247,6 +11085,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "6f5a3b5d44374b082c4a0c6d",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1063.29,
@@ -11308,6 +11147,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "29add2b281697d32100550d7",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 725.06,
@@ -11369,6 +11209,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "bd97585f3f6504c74df19c30",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 77821.43,
@@ -11430,6 +11271,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "36021183b6c7ebb1979930cd",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 0.08429,
@@ -11491,6 +11333,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "7ed437c75380d35b80c68224",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2519.09,
@@ -11552,6 +11395,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "4cd9d4a791c169303bf9ae70",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 101.22,
@@ -11613,6 +11457,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "438bc3b7bd3092e315468282",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.3734,
@@ -11674,6 +11519,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "f464bc5ee265e6de07be16fd",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1114.51,
@@ -11735,6 +11581,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "dc57442c655bc9f6b6da5e54",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 725.38,
@@ -11796,6 +11643,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "fb20b7e3000ac390eecfa5da",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 77764.27,
@@ -11857,6 +11705,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "974293fb0554303084247054",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 0.08443,
@@ -11918,6 +11767,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "c60e33e92f0bf96c3574ba22",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2522.99,
@@ -11979,6 +11829,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "8b438283c0a4a486d771162c",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 101.69,
@@ -12040,6 +11891,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "644b2990ab8c27bf0e3b952b",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.3841,
@@ -12101,6 +11953,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "13ecd80b0585911cf2b15e27",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1136.82,
@@ -12162,6 +12015,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "61434a3b09a8bdf534e54b76",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 723.87,
@@ -12223,6 +12077,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "3aacdb89915f719dfe44c426",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 77663.46,
@@ -12284,6 +12139,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "6399f0a1fa39e082dd8a3157",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 0.08441,
@@ -12345,6 +12201,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "5c6ebeadbb11fb245868d530",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2518.72,
@@ -12406,6 +12263,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "418764f1a555a03f90a815b2",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 101.56,
@@ -12467,6 +12325,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "557a45561daa244f9a7ef509",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.3834,
@@ -12528,6 +12387,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "f1ee4fa19ce09320391c00e3",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1133.84,
@@ -12589,6 +12449,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "26bcee67c3210b1da6aba8de",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 723.81,
@@ -12650,6 +12511,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "04510462c80b297a9a3d3b08",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 77669.99,
@@ -12711,6 +12573,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "73e30e2613b307ef5822a37c",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 0.08413,
@@ -12772,6 +12635,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "8d9c9175a15e2a50c372eea7",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2517.78,
@@ -12833,6 +12697,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "2813184a20231c442aabc445",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.3849,
@@ -12894,6 +12759,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "fad8c47847270ea452490b82",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1136.34,
@@ -12955,6 +12821,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "d3565139c46c8f20ceedca5a",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 723.81,
@@ -13016,6 +12883,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "d7accf53ad245d5386fbdec4",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 77954.32,
@@ -13077,6 +12945,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "07f66bcbb4dc51b11da4599a",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 0.08445,
@@ -13138,6 +13007,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "7d6395164641c922a8aa1b8c",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2517.14,
@@ -13199,6 +13069,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "a671a316df7ea67b221cbf39",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 101.93,
@@ -13260,6 +13131,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "74ed25adf7d26e80a6569ba0",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.3998,
@@ -13321,6 +13193,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "a815dea52a657fde407bdfe7",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1140.25,
@@ -13382,6 +13255,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "4ca5b6fe54ed54cf374e4165",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 722.87,
@@ -13443,6 +13317,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "bebcfc4b94daf7581d04cc4c",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 78027.06,
@@ -13504,6 +13379,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "27649f0fbee1afe12d1a7785",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 0.08433,
@@ -13565,6 +13441,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "9459b2722779148d0c490310",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2516.4,
@@ -13626,6 +13503,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "3febe15af24e1adfd8ad1494",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 101.88,
@@ -13687,6 +13565,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "8bda7486e6cb5831934a8018",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.4013,
@@ -13748,6 +13627,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "f839dd50efbaecd1df9ea79d",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1140.36,
@@ -13809,6 +13689,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "654ed08b6141c17867294eaf",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 721.37,
@@ -13870,6 +13751,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "b1f7bdd51155159cbdda0c23",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 77800.0,
@@ -13931,6 +13813,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "abf3b1353421379b2b0d569b",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 0.08391,
@@ -13992,6 +13875,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "03f17b7ccb8b672304055907",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2509.06,
@@ -14053,6 +13937,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "a5b7a7cf56436d1ee7c5d88f",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 101.52,
@@ -14114,6 +13999,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "c2f20c15f7343a1a06b15563",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.399,
@@ -14175,6 +14061,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "d7c16fad10d4ec56c54d1ded",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1132.2,
@@ -14236,6 +14123,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "4d1b1c4fb02369f2269e1cd0",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 721.58,
@@ -14297,6 +14185,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "c42eaece059092d72b87463a",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 78521.06,
@@ -14358,6 +14247,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "823512b5aeb46b6f886e131c",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.3999,
@@ -14419,6 +14309,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "df254abc18e770433158582d",
       "direction": "SHORT",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 724.09,
@@ -14480,6 +14371,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "94506d53465e7543699eff5c",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 78730.99,
@@ -14541,6 +14433,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "ce224ee47b491966e013b2a7",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.422,
@@ -14602,6 +14495,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "8d1935b8ae1bbd92df99da28",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 728.74,
@@ -14663,6 +14557,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "e57fd7f0b99567c0303d7dd0",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 79245.49,
@@ -14724,6 +14619,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "aa8fb70051aeabf06eb132b6",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2582.7,
@@ -14785,6 +14681,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "3e91b5f4723901d02c1562b7",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 104.45,
@@ -14846,6 +14743,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "385b1e258ce07bf91ea8ab05",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.4723,
@@ -14907,6 +14805,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "8b8a6296b910f88358f83a83",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1210.91,
@@ -14968,6 +14867,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "3acadd1354d33d8007dc8860",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 724.85,
@@ -15029,6 +14929,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "a4f3c9ab7b9c1833f5430321",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 78975.98,
@@ -15090,6 +14991,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "4ec5c736a46019d9efe6f54f",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2558.73,
@@ -15151,6 +15053,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "f01fc34b7fe92fa7890f5695",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 103.78,
@@ -15212,6 +15115,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "9f25e3ef6a6b1f4df0b398b5",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.454,
@@ -15273,6 +15177,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "69a66eae708a601c6dd3002b",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1182.3,
@@ -15334,6 +15239,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "65eba0b507359452135dfc1b",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 720.31,
@@ -15395,6 +15301,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "b95ee2260e7d57db47dfa7c3",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 78450.45,
@@ -15456,6 +15363,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "33bebd30e2fe64f69bb54b46",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 0.0839,
@@ -15517,6 +15425,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "d20054e0ea5bb289b24b78bb",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 2528.37,
@@ -15578,6 +15487,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "73a9ad88fc3d69a18689e9f1",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 102.77,
@@ -15639,6 +15549,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "58485678814aed5c70d7b0fe",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1.4307,
@@ -15700,6 +15611,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "e108b2c02741a3ca85fd0f21",
       "direction": "LONG",
+      "epoch_id": "LEGACY_BASELINE",
       "horizons": {
         "12h": {
           "close": 1165.53,
@@ -15761,6 +15673,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "d18b38516f4b777368d98b1c",
       "direction": "SHORT",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "12h": {
           "close": 719.28,
@@ -15822,6 +15735,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "d049153a2d132edc573e5241",
       "direction": "LONG",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "12h": {
           "close": 77991.37,
@@ -15883,6 +15797,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "9784fed7faccc8ddf2f82d50",
       "direction": "LONG",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "12h": {
           "close": 2515.02,
@@ -15944,6 +15859,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "1039e6621fcc2145c73dbe2f",
       "direction": "LONG",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "12h": {
           "close": 102.57,
@@ -16005,6 +15921,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "b1242116a2997a46086efad5",
       "direction": "LONG",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "12h": {
           "close": 1.4179,
@@ -16066,6 +15983,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "7577e5bc43f0e0aa8bae91be",
       "direction": "LONG",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "12h": {
           "close": 1162.84,
@@ -16127,6 +16045,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "482fecd573e2250583909cc0",
       "direction": "SHORT",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "12h": {
           "close": 719.2,
@@ -16188,6 +16107,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "5145f2c2f71994998e61e195",
       "direction": "LONG",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "12h": {
           "close": 77831.22,
@@ -16249,6 +16169,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "d5d6e76373bdb7b69ffbfe67",
       "direction": "LONG",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "12h": {
           "close": 2512.64,
@@ -16310,6 +16231,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "58186bd884bb58a317c05184",
       "direction": "LONG",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "12h": {
           "close": 102.4,
@@ -16371,6 +16293,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "f629a11437471ebbd4ca4669",
       "direction": "LONG",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "12h": {
           "close": 1.419,
@@ -16432,6 +16355,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "ec6536de301993617311abca",
       "direction": "LONG",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "12h": {
           "close": 720.59,
@@ -16493,6 +16417,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "0adc4e0057affa67845a1b7d",
       "direction": "LONG",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "12h": {
           "close": 77567.12,
@@ -16554,6 +16479,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "d8547cd86997779fca88da80",
       "direction": "LONG",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "12h": {
           "close": 0.08318,
@@ -16615,6 +16541,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "0cecf63d7f278c1845712d35",
       "direction": "LONG",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "12h": {
           "close": 2490.72,
@@ -16676,6 +16603,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "ffc2fa265c3353f39130f173",
       "direction": "LONG",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "12h": {
           "close": 101.28,
@@ -16737,6 +16665,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "358e9977a81f27f4c576a7a7",
       "direction": "LONG",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "12h": {
           "close": 1.4135,
@@ -16798,6 +16727,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "4f2c3bec687057ca894f4d57",
       "direction": "LONG",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "12h": {
           "close": 1144.73,
@@ -16859,6 +16789,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "643955ad9d808ee459c06831",
       "direction": "LONG",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "12h": {
           "close": 717.61,
@@ -16920,6 +16851,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "59586bf2632428ffba8de560",
       "direction": "LONG",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "12h": {
           "close": 77000.01,
@@ -16981,6 +16913,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "0b4218015bf647eb63b10a69",
       "direction": "LONG",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "12h": {
           "close": 0.08266,
@@ -17042,6 +16975,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "2d604e97dccd6986ccfb0a64",
       "direction": "LONG",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "12h": {
           "close": 100.65,
@@ -17103,6 +17037,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "4399e2339545c924209f1d95",
       "direction": "LONG",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "12h": {
           "close": 1.398,
@@ -17164,6 +17099,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "b92d12844a4d817690666dca",
       "direction": "LONG",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "12h": {
           "close": 1145.95,
@@ -17225,6 +17161,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "e25964fffb584c860366d894",
       "direction": "LONG",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "12h": {
           "close": 76900.0,
@@ -17286,6 +17223,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "0f5fea89f25c163f306e7c4c",
       "direction": "LONG",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "12h": {
           "close": 2475.33,
@@ -17347,6 +17285,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "5da7e5976b4654e465a6cc8d",
       "direction": "LONG",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "12h": {
           "close": 100.75,
@@ -17408,6 +17347,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "f20039a2e7449818efa623d4",
       "direction": "LONG",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "12h": {
           "close": 1.3977,
@@ -17469,6 +17409,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "5f722ca05aaf7e1ae560510c",
       "direction": "LONG",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "12h": {
           "close": 1128.09,
@@ -17530,6 +17471,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "8e5276a658f363631d1576d4",
       "direction": "SHORT",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "1h": {
           "close": 720.85,
@@ -17584,6 +17526,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "c91c3145d3ccbdb67b70b258",
       "direction": "SHORT",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "1h": {
           "close": 77506.0,
@@ -17638,6 +17581,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "6d4eb3d3b96cec2433584855",
       "direction": "SHORT",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "1h": {
           "close": 0.08308,
@@ -17692,6 +17636,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "80f4fa95bc8834fe87c48290",
       "direction": "SHORT",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "1h": {
           "close": 2492.59,
@@ -17746,6 +17691,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "5d084c4261168c0120ab6994",
       "direction": "LONG",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "1h": {
           "close": 1.406,
@@ -17800,6 +17746,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "1b29112078c3a6c6a3851825",
       "direction": "LONG",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "1h": {
           "close": 1145.35,
@@ -17854,6 +17801,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "52637ca660c709e136c48f50",
       "direction": "SHORT",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "1h": {
           "close": 719.5,
@@ -17901,6 +17849,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "d3007338a91b7a83694c016e",
       "direction": "SHORT",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "1h": {
           "close": 77052.01,
@@ -17948,6 +17897,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "f3461d38a5f814c4b6c4f05f",
       "direction": "SHORT",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "1h": {
           "close": 0.08279,
@@ -17995,6 +17945,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "3c7f495dcc02b4cac0e927d6",
       "direction": "SHORT",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "1h": {
           "close": 2479.21,
@@ -18042,6 +17993,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "4fc2f9e92af4d27fa8a96848",
       "direction": "SHORT",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "1h": {
           "close": 100.95,
@@ -18089,6 +18041,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "c4511acc584bea3e2274b41d",
       "direction": "SHORT",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "1h": {
           "close": 1.4009,
@@ -18136,6 +18089,7 @@
       "classification_rule": "RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION",
       "decision_id": "58c4b2d315c689dd3e7b110a",
       "direction": "SHORT",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
       "horizons": {
         "1h": {
           "close": 1143.96,
@@ -18175,6 +18129,167 @@
       "symbol": "ZECUSDT",
       "threshold": 68.0,
       "v2_regime": "NOT_CONDITIONAL_NEUTRAL_REGIME"
+    },
+    {
+      "blocker_family": "HTF_CONFLICT",
+      "can_override_production": false,
+      "captured_at": "2026-09-15T14:32:33.900673+00:00",
+      "decision_id": "b8ee136e8954aa6f6d65a31b",
+      "direction": "SHORT",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
+      "horizons": {},
+      "id": "b8ee136e8954aa6f6d65a31b",
+      "invalidation": null,
+      "live_execution": false,
+      "playbook": "BREAKDOWN_CONTINUATION_SHORT",
+      "price": 717.8,
+      "raw_reason": "HTF_PRODUCT_DIRECTION_UNRESOLVED",
+      "reason": "HTF_CONFLICT",
+      "release": null,
+      "research_only": true,
+      "score": 68.0,
+      "status": "OPEN",
+      "symbol": "BNBUSDT",
+      "threshold": 68.0,
+      "v2_regime": "NOT_CONDITIONAL_NEUTRAL_REGIME"
+    },
+    {
+      "blocker_family": "HTF_CONFLICT",
+      "can_override_production": false,
+      "captured_at": "2026-09-15T14:32:33.900673+00:00",
+      "decision_id": "3e533ab84acb2e2c17fd3082",
+      "direction": "SHORT",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
+      "horizons": {},
+      "id": "3e533ab84acb2e2c17fd3082",
+      "invalidation": 76401.5133614286,
+      "live_execution": false,
+      "playbook": "BREAKDOWN_CONTINUATION_SHORT",
+      "price": 76325.09,
+      "raw_reason": "HTF_PRODUCT_DIRECTION_UNRESOLVED",
+      "reason": "HTF_CONFLICT",
+      "release": null,
+      "research_only": true,
+      "score": 63.0,
+      "status": "OPEN",
+      "symbol": "BTCUSDT",
+      "threshold": 68.0,
+      "v2_regime": "NOT_CONDITIONAL_NEUTRAL_REGIME"
+    },
+    {
+      "blocker_family": "HTF_CONFLICT",
+      "can_override_production": false,
+      "captured_at": "2026-09-15T14:32:33.900673+00:00",
+      "decision_id": "20739c97974ad0cc826c4e98",
+      "direction": "SHORT",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
+      "horizons": {},
+      "id": "20739c97974ad0cc826c4e98",
+      "invalidation": null,
+      "live_execution": false,
+      "playbook": "TREND_PULLBACK_SHORT",
+      "price": 0.08247,
+      "raw_reason": "HTF_PRODUCT_DIRECTION_UNRESOLVED",
+      "reason": "HTF_CONFLICT",
+      "release": null,
+      "research_only": true,
+      "score": 68.0,
+      "status": "OPEN",
+      "symbol": "DOGEUSDT",
+      "threshold": 68.0,
+      "v2_regime": "NOT_CONDITIONAL_NEUTRAL_REGIME"
+    },
+    {
+      "blocker_family": "HTF_CONFLICT",
+      "can_override_production": false,
+      "captured_at": "2026-09-15T14:32:33.900673+00:00",
+      "decision_id": "958bbd2aec8709976e571317",
+      "direction": "SHORT",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
+      "horizons": {},
+      "id": "958bbd2aec8709976e571317",
+      "invalidation": 2445.765,
+      "live_execution": false,
+      "playbook": "BREAKDOWN_CONTINUATION_SHORT",
+      "price": 2436.23,
+      "raw_reason": "HTF_4H_12H_NOT_ALIGNED",
+      "reason": "HTF_CONFLICT",
+      "release": null,
+      "research_only": true,
+      "score": 65.0,
+      "status": "OPEN",
+      "symbol": "ETHUSDT",
+      "threshold": 68.0,
+      "v2_regime": "NOT_CONDITIONAL_NEUTRAL_REGIME"
+    },
+    {
+      "blocker_family": "HTF_CONFLICT",
+      "can_override_production": false,
+      "captured_at": "2026-09-15T14:32:33.900673+00:00",
+      "decision_id": "33b632f3eef8b7aa23a35e03",
+      "direction": "SHORT",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
+      "horizons": {},
+      "id": "33b632f3eef8b7aa23a35e03",
+      "invalidation": 99.9555357143,
+      "live_execution": false,
+      "playbook": "TREND_PULLBACK_SHORT",
+      "price": 99.86,
+      "raw_reason": "HTF_PRODUCT_DIRECTION_UNRESOLVED",
+      "reason": "HTF_CONFLICT",
+      "release": null,
+      "research_only": true,
+      "score": 62.0,
+      "status": "OPEN",
+      "symbol": "SOLUSDT",
+      "threshold": 68.0,
+      "v2_regime": "NOT_CONDITIONAL_NEUTRAL_REGIME"
+    },
+    {
+      "blocker_family": "HTF_CONFLICT",
+      "can_override_production": false,
+      "captured_at": "2026-09-15T14:32:33.900673+00:00",
+      "decision_id": "dfc3cd00fbd331bf2888fa00",
+      "direction": "LONG",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
+      "horizons": {},
+      "id": "dfc3cd00fbd331bf2888fa00",
+      "invalidation": null,
+      "live_execution": false,
+      "playbook": null,
+      "price": 1.3987,
+      "raw_reason": "HTF_4H_12H_NOT_ALIGNED",
+      "reason": "HTF_CONFLICT",
+      "release": null,
+      "research_only": true,
+      "score": null,
+      "status": "OPEN",
+      "symbol": "XRPUSDT",
+      "threshold": 68.0,
+      "v2_regime": "NOT_CONDITIONAL_NEUTRAL_REGIME"
+    },
+    {
+      "blocker_family": "HTF_CONFLICT",
+      "can_override_production": false,
+      "captured_at": "2026-09-15T14:32:33.900673+00:00",
+      "decision_id": "8ab32fc2b96e701f581d82dd",
+      "direction": "SHORT",
+      "epoch_id": "HTF_SR_V2_2026-09-14",
+      "horizons": {},
+      "id": "8ab32fc2b96e701f581d82dd",
+      "invalidation": 1131.4103571429,
+      "live_execution": false,
+      "playbook": "TREND_PULLBACK_SHORT",
+      "price": 1126.2,
+      "raw_reason": "HTF_PRODUCT_DIRECTION_UNRESOLVED",
+      "reason": "HTF_CONFLICT",
+      "release": null,
+      "research_only": true,
+      "score": 62.0,
+      "status": "OPEN",
+      "symbol": "ZECUSDT",
+      "threshold": 68.0,
+      "v2_regime": "NOT_CONDITIONAL_NEUTRAL_REGIME"
     }
   ],
   "schema": "ATLAS_WAIT_MISSED_OPPORTUNITY_V2_CANDLE_SETTLED",
@@ -18189,20 +18304,20 @@
         "n": 6
       },
       "HTF_CONFLICT": {
-        "mean_12h_directional_return_pct": 0.0273,
-        "mean_4h_directional_return_pct": -0.0804,
-        "mean_8h_directional_return_pct": -0.0704,
-        "missed_n": 102,
-        "missed_rate_pct": 38.49,
-        "n": 265
+        "mean_12h_directional_return_pct": -0.001,
+        "mean_4h_directional_return_pct": -0.0846,
+        "mean_8h_directional_return_pct": -0.0901,
+        "missed_n": 97,
+        "missed_rate_pct": 37.31,
+        "n": 260
       },
       "PRE_FINAL_DECISION_NOT_ACTIONABLE": {
-        "mean_12h_directional_return_pct": 2.1505,
-        "mean_4h_directional_return_pct": 1.0916,
-        "mean_8h_directional_return_pct": 1.4699,
-        "missed_n": 3,
+        "mean_12h_directional_return_pct": 2.5933,
+        "mean_4h_directional_return_pct": 1.5794,
+        "mean_8h_directional_return_pct": 1.7638,
+        "missed_n": 2,
         "missed_rate_pct": 100.0,
-        "n": 3
+        "n": 2
       },
       "SCORE_BELOW_THRESHOLD": {
         "mean_12h_directional_return_pct": -1.4981,
@@ -18213,17 +18328,17 @@
         "n": 24
       },
       "SETUP_QUALITY": {
-        "mean_12h_directional_return_pct": -1.3859,
-        "mean_4h_directional_return_pct": 0.0017,
-        "mean_8h_directional_return_pct": -1.3887,
+        "mean_12h_directional_return_pct": -0.3386,
+        "mean_4h_directional_return_pct": -0.0801,
+        "mean_8h_directional_return_pct": -0.5127,
         "missed_n": 0,
         "missed_rate_pct": 0.0,
-        "n": 2
+        "n": 1
       }
     },
-    "matured_classified": 300,
-    "missed_n": 110,
-    "missed_rate_pct": 36.67,
+    "matured_classified": 293,
+    "missed_n": 104,
+    "missed_rate_pct": 35.49,
     "records": 300
   }
 }
