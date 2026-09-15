@@ -1,0 +1,41 @@
+name: ATLAS Post-V2 Challenger Gate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'post_v2_challenger_gate.py'
+      - 'tests/test_post_v2_challenger_gate.py'
+      - 'status/wait-missed-opportunity-latest.json'
+      - 'status/learning-engine-latest.json'
+      - '.github/workflows/atlas-post-v2-challenger-gate.yml'
+  schedule:
+    - cron: '37 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+concurrency:
+  group: atlas-post-v2-challenger-gate-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Safety regression
+        run: PYTHONPATH=. python3 tests/test_post_v2_challenger_gate.py
+      - name: Build post-V2 gate evidence
+        run: python3 post_v2_challenger_gate.py
+      - name: Verify no automatic production mutation
+        run: jq -e '.automatic_promotion == false and .production_mutation_authorized == false and .live_execution == false and .research_only == true' status/post-v2-challenger-gate-latest.json >/dev/null
+      - name: Commit gate evidence
+        run: |
+          git config user.name "atlas-post-v2-gate"
+          git config user.email "atlas-post-v2-gate@users.noreply.github.com"
+          git add status/post-v2-challenger-gate-latest.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "research: update post-V2 challenger gate [skip ci] [skip render]"
+          git pull --rebase origin main
+          git push
