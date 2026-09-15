@@ -32,13 +32,13 @@ jobs:
         run: python3 profitability_research_engine.py
       - name: Verify research-only boundary
         run: |
-          jq -e '.schema == "ATLAS_PROFITABILITY_RESEARCH_V1" and .product_horizon == "4-12H" and .validation_contract.chronological_holdout_required == true and .validation_contract.walk_forward_required == true and .validation_contract.costs_required_before_promotion == true and .validation_contract.automatic_promotion == false and .safety.research_only == true and .safety.paper_only == true and .safety.live_execution == false and .safety.can_override_production == false' status/profitability-research-latest.json >/dev/null
+          jq -e '.schema == "ATLAS_PROFITABILITY_RESEARCH_V2" and .product_horizon == "4-12H" and .chronological_split.holdout_used_for_candidate_selection == false and .validation_contract.chronological_holdout_required == true and .validation_contract.walk_forward_required == true and .validation_contract.costs_required_before_promotion == true and .validation_contract.multiple_testing_control_required == true and .validation_contract.automatic_promotion == false and .stage_status["7_production_promotion"] == "BLOCKED_PENDING_PROSPECTIVE_VALIDATION" and .safety.research_only == true and .safety.paper_only == true and .safety.live_execution == false and .safety.can_override_production == false' status/profitability-research-latest.json >/dev/null
       - name: Commit evidence report
         run: |
           git config user.name "atlas-profitability-research"
           git config user.email "atlas-profitability-research@users.noreply.github.com"
           git add status/profitability-research-latest.json
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m "research: update profitability edge candidates [skip ci] [skip render]"
+          git commit -m "research: update profitability V2 evidence [skip ci] [skip render]"
           git pull --rebase origin main
           git push
