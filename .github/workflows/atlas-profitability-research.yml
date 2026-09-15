@@ -27,7 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Safety regression
-        run: python3 tests/test_profitability_research_engine.py
+        run: PYTHONPATH=. python3 tests/test_profitability_research_engine.py
       - name: Build profitability research evidence
         run: python3 profitability_research_engine.py
       - name: Verify research-only boundary
@@ -42,4 +42,3 @@ jobs:
           git commit -m "research: update profitability edge candidates [skip ci] [skip render]"
           git pull --rebase origin main
           git push
-# activated after initial workflow registration
