@@ -13,6 +13,13 @@ on:
       - 'tests/test_analyst_forward_attribution.py'
       - 'tests/test_profitability_research_engine.py'
       - '.github/workflows/atlas-profitability-research.yml'
+  pull_request:
+    paths:
+      - 'profitability_research_engine.py'
+      - 'analyst_forward_attribution.py'
+      - 'tests/test_analyst_forward_attribution.py'
+      - 'tests/test_profitability_research_engine.py'
+      - '.github/workflows/atlas-profitability-research.yml'
   schedule:
     - cron: '47 * * * *'
   workflow_dispatch:
@@ -64,6 +71,7 @@ jobs:
           print({'fresh_matured_n':a['matured_12h_metrics']['n'],'candidate_count':p['candidate_count'],'holdout_eligible_count':p['holdout_eligible_count']})
           PY
       - name: Commit synchronized evidence reports
+        if: github.event_name != 'pull_request'
         run: |
           git config user.name "atlas-profitability-research"
           git config user.email "atlas-profitability-research@users.noreply.github.com"
