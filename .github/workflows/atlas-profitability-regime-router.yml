@@ -21,18 +21,18 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Safety regression
+      - name: Native regime safety regression
         run: PYTHONPATH=. python3 tests/test_profitability_regime_router_research.py
-      - name: Build regime and path-quality evidence
+      - name: Build native regime walk-forward evidence
         run: python3 profitability_regime_router_research.py
       - name: Enforce research-only boundary
-        run: jq -e '.decision == "RESEARCH_ONLY_NO_ROUTING_CHANGE" and .production_mutation_authorized == false and .automatic_promotion == false and .causal_claim == false' status/profitability-regime-router-latest.json >/dev/null
+        run: jq -e '.schema == "ATLAS_PROFITABILITY_NATIVE_REGIME_ROUTER_V2" and .decision == "RESEARCH_ONLY_NO_ROUTING_CHANGE" and .production_mutation_authorized == false and .automatic_promotion == false and .causal_claim == false' status/profitability-regime-router-latest.json >/dev/null
       - name: Commit evidence
         run: |
           git config user.name "atlas-regime-router-research"
           git config user.email "atlas-regime-router-research@users.noreply.github.com"
           git add status/profitability-regime-router-latest.json
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m "research: update regime-router evidence [skip ci] [skip render]"
+          git commit -m "research: update native regime-router evidence [skip ci] [skip render]"
           git pull --rebase origin main
           git push
