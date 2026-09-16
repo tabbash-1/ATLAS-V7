@@ -1,0 +1,39 @@
+name: ATLAS Profitability Edge Intersection Shadow
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'profitability_edge_intersection_shadow.py'
+      - 'tests/test_profitability_edge_intersection_shadow.py'
+      - 'status/analyst-forward-attribution-latest.json'
+      - 'status/profitability-feature-attribution-latest.json'
+      - '.github/workflows/atlas-profitability-edge-intersection-shadow.yml'
+  schedule:
+    - cron: '57 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: atlas-profitability-edge-intersection-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  shadow:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Safety regression
+        run: PYTHONPATH=. python3 tests/test_profitability_edge_intersection_shadow.py
+      - name: Build frozen intersection evidence
+        run: python3 profitability_edge_intersection_shadow.py
+      - name: Enforce no-production boundary
+        run: jq -e '.promotion_ready == false and .automatic_promotion == false and .production_mutation_authorized == false and .prospective_new_n == 0' status/profitability-edge-intersection-shadow-latest.json >/dev/null
+      - name: Commit evidence
+        run: |
+          git config user.name atlas-edge-intersection-shadow
+          git config user.email atlas-edge-intersection-shadow@users.noreply.github.com
+          git add status/profitability-edge-intersection-shadow-latest.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "research: update edge intersection shadow [skip ci] [skip render]"
+          git pull --rebase origin main
+          git push
