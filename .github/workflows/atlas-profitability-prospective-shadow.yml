@@ -8,6 +8,7 @@ on:
       - 'status/analyst-forward-attribution-latest.json'
       - 'status/paper-portfolio-10k-analyst-latest.json'
       - 'status/profitability-research-latest.json'
+      - 'status/profitability-challenger-registry.json'
       - '.github/workflows/atlas-profitability-prospective-shadow.yml'
   schedule:
     - cron: '47 * * * *'
@@ -25,16 +26,16 @@ jobs:
       - uses: actions/checkout@v4
       - name: Safety regression
         run: PYTHONPATH=. python3 tests/test_profitability_challenger_ledger.py
-      - name: Build cost-aware immutable prospective ledger
+      - name: Build integrity cost-aware prospective ledger
         run: python3 profitability_challenger_ledger.py
       - name: Enforce shadow boundary
-        run: jq -e '.schema == "ATLAS_PROFITABILITY_PROSPECTIVE_SHADOW_V2_COST_AWARE" and .stage == "PROSPECTIVE_SHADOW" and .production_mutation_authorized == false and .promotion_policy.automatic_promotion == false and .promotion_policy.requires_funding_when_nonspot == true' status/profitability-prospective-shadow-latest.json >/dev/null
+        run: jq -e '.schema == "ATLAS_PROFITABILITY_PROSPECTIVE_SHADOW_V3_INTEGRITY_COST_AWARE" and .stage == "PROSPECTIVE_SHADOW" and .production_mutation_authorized == false and .promotion_policy.automatic_promotion == false and .promotion_policy.requires_funding_when_nonspot == true and (.registry_integrity_sha256|length) == 64' status/profitability-prospective-shadow-latest.json >/dev/null
       - name: Commit frozen registry and evidence
         run: |
           git config user.name "atlas-profitability-shadow"
           git config user.email "atlas-profitability-shadow@users.noreply.github.com"
           git add status/profitability-challenger-registry.json status/profitability-prospective-shadow-latest.json
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m "research: update cost-aware prospective challenger shadow [skip ci] [skip render]"
+          git commit -m "research: update integrity cost-aware prospective challenger shadow [skip ci] [skip render]"
           git pull --rebase origin main
           git push
