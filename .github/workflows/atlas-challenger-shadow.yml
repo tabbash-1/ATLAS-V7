@@ -7,10 +7,21 @@ on:
       - 'atlas_challenger_shadow.py'
       - 'test_atlas_challenger_shadow.py'
       - '.github/workflows/atlas-challenger-shadow.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'status/wait-missed-opportunity-latest.json'
+      - 'atlas_challenger_shadow.py'
+      - '.github/workflows/atlas-challenger-shadow.yml'
+  schedule:
+    - cron: '17 */4 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  validate:
+  validate-and-measure:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -38,3 +49,25 @@ jobs:
           grep -q "can_change_threshold':False" atlas_challenger_shadow.py
           grep -q "live_execution':False" atlas_challenger_shadow.py
           grep -q "promotion_decision':'NOT_AUTHORIZED" atlas_challenger_shadow.py
+      - name: Build current forward-evidence report
+        run: python atlas_challenger_shadow.py
+      - name: Verify report contract
+        run: |
+          python - <<'PY'
+          import json
+          p='status/challenger-shadow-latest.json'
+          d=json.load(open(p))
+          assert d['schema']=='ATLAS_CHALLENGER_SHADOW_V1'
+          assert d['research_only'] is True
+          assert d['can_override_production'] is False
+          assert d['can_change_threshold'] is False
+          assert d['live_execution'] is False
+          assert d['promotion_decision']=='NOT_AUTHORIZED'
+          print(json.dumps(d['summary'], indent=2))
+          PY
+      - name: Upload Challenger evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-challenger-shadow-${{ github.run_id }}
+          path: status/challenger-shadow-latest.json
+          retention-days: 30
