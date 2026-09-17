@@ -3,6 +3,9 @@ on:
   pull_request:
     branches: [main]
     paths: ['atlas_walk_forward_costs.py','test_atlas_walk_forward_costs.py','.github/workflows/atlas-walk-forward-costs.yml']
+  push:
+    branches: [main]
+    paths: ['atlas_walk_forward_costs.py','test_atlas_walk_forward_costs.py','.github/workflows/atlas-walk-forward-costs.yml','atlas_challenger_shadow.py']
   schedule:
     - cron: '37 */4 * * *'
   workflow_dispatch:
@@ -25,16 +28,16 @@ jobs:
           for fn in tests: fn()
           print(f'{len(tests)} Phase 4 tests ok')
           PY
-      - name: Build Phase 3 source then cost evidence
+      - name: Build Phase 3 source then complete Phase 4 evidence
         run: |
           python atlas_challenger_shadow.py
           python atlas_walk_forward_costs.py
-      - name: Verify isolation contract
+      - name: Verify isolation and robustness contract
         run: |
           python - <<'PY'
           import json
           d=json.load(open('status/walk-forward-costs-latest.json'))
-          assert d['schema']=='ATLAS_WALK_FORWARD_COSTS_V1'
+          assert d['schema']=='ATLAS_WALK_FORWARD_COSTS_V2_COMPLETE'
           assert d['production_impact']=='NONE'
           assert d['research_only'] is True
           assert d['can_override_production'] is False
@@ -42,8 +45,11 @@ jobs:
           assert d['production_threshold']==68
           assert d['live_execution'] is False
           assert d['promotion_decision']=='NOT_AUTHORIZED'
-          assert d['cost_assumptions']['round_trip_cost_pct']>0
-          print(json.dumps(d['summary'],indent=2))
+          assert set(d['horizon_metrics'])=={'4h','8h','12h'}
+          assert d['cost_assumptions']['cost_12h_pct']>0
+          assert set(d['cost_stress'])=={'zero_cost_12h','base_cost_12h','double_cost_12h'}
+          assert 'passed' in d['robustness_gate']
+          print(json.dumps({'horizons':d['horizon_metrics'],'stress':d['cost_stress'],'robustness':d['robustness_gate']},indent=2))
           PY
       - uses: actions/upload-artifact@v4
         with:
