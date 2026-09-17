@@ -1,0 +1,56 @@
+name: ATLAS Promotion Gate
+on:
+  pull_request:
+    branches: [main]
+    paths: ['atlas_promotion_gate.py','test_atlas_promotion_gate.py','.github/workflows/atlas-promotion-gate.yml','atlas_walk_forward_costs.py']
+  push:
+    branches: [main]
+    paths: ['atlas_promotion_gate.py','test_atlas_promotion_gate.py','.github/workflows/atlas-promotion-gate.yml','atlas_walk_forward_costs.py']
+  schedule:
+    - cron: '57 */4 * * *'
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Regression
+        run: |
+          python -m py_compile atlas_promotion_gate.py test_atlas_promotion_gate.py
+          PYTHONPATH=. python - <<'PY'
+          import test_atlas_promotion_gate as t
+          tests=[getattr(t,n) for n in dir(t) if n.startswith('test_')]
+          for fn in tests: fn()
+          print(f'{len(tests)} Phase 5 tests ok')
+          PY
+      - name: Rebuild evidence chain
+        run: |
+          python atlas_challenger_shadow.py
+          python atlas_walk_forward_costs.py
+          python atlas_promotion_gate.py
+      - name: Verify no-production-impact contract
+        run: |
+          python - <<'PY'
+          import json
+          d=json.load(open('status/promotion-gate-latest.json'))
+          assert d['schema']=='ATLAS_PROMOTION_GATE_V1'
+          assert d['phase']=='5_OF_6'
+          assert d['production_impact']=='NONE'
+          assert d['research_only'] is True
+          assert d['can_override_production'] is False
+          assert d['can_change_threshold'] is False
+          assert d['production_threshold']==68
+          assert d['live_execution'] is False
+          assert d['promotion_decision']=='NOT_AUTHORIZED'
+          assert all(x['production_authorization']=='NOT_AUTHORIZED' for x in d['candidates'])
+          print(json.dumps({'passed':d['evidence_passed_candidates'],'decision':d['promotion_decision']},indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atlas-promotion-gate-${{ github.run_id }}
+          path: status/promotion-gate-latest.json
+          retention-days: 30
