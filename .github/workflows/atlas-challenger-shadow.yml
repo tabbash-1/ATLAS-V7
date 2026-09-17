@@ -1,0 +1,40 @@
+name: ATLAS Challenger Shadow
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'atlas_challenger_shadow.py'
+      - 'test_atlas_challenger_shadow.py'
+      - '.github/workflows/atlas-challenger-shadow.yml'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax
+        run: python -m py_compile atlas_challenger_shadow.py test_atlas_challenger_shadow.py
+      - name: Shadow regression
+        run: |
+          PYTHONPATH=. python - <<'PY'
+          import test_atlas_challenger_shadow as t
+          tests=[getattr(t,n) for n in dir(t) if n.startswith('test_') and callable(getattr(t,n))]
+          if not tests:
+              raise SystemExit('no Challenger Shadow tests discovered')
+          for fn in tests:
+              fn()
+          print(f'Challenger Shadow tests: {len(tests)} ok')
+          PY
+      - name: Production isolation guard
+        run: |
+          grep -q "production_impact':'NONE" atlas_challenger_shadow.py
+          grep -q "can_override_production':False" atlas_challenger_shadow.py
+          grep -q "can_change_threshold':False" atlas_challenger_shadow.py
+          grep -q "live_execution':False" atlas_challenger_shadow.py
+          grep -q "promotion_decision':'NOT_AUTHORIZED" atlas_challenger_shadow.py
