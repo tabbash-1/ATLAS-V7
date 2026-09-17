@@ -1,0 +1,38 @@
+name: ATLAS Profitability Entry Path Research
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'profitability_entry_path_research.py'
+      - 'tests/test_profitability_entry_path_research.py'
+      - 'status/analyst-forward-attribution-latest.json'
+      - '.github/workflows/atlas-profitability-entry-path.yml'
+  schedule:
+    - cron: '58 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: atlas-profitability-entry-path-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Entry research safety regression
+        run: PYTHONPATH=. python3 tests/test_profitability_entry_path_research.py
+      - name: Build MFE MAE entry diagnostics
+        run: python3 profitability_entry_path_research.py
+      - name: Enforce diagnostics-only boundary
+        run: jq -e '.schema == "ATLAS_PROFITABILITY_ENTRY_PATH_RESEARCH_V1" and .counterfactual_entry_claim_authorized == false and .stop_target_change_authorized == false and .production_mutation_authorized == false and .automatic_promotion == false' status/profitability-entry-path-latest.json >/dev/null
+      - name: Commit evidence
+        run: |
+          git config user.name atlas-entry-path-research
+          git config user.email atlas-entry-path-research@users.noreply.github.com
+          git add status/profitability-entry-path-latest.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "research: update entry path evidence [skip ci] [skip render]"
+          git pull --rebase origin main
+          git push
