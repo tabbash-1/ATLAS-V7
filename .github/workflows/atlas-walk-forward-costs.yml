@@ -1,0 +1,52 @@
+name: ATLAS Walk Forward Costs
+on:
+  pull_request:
+    branches: [main]
+    paths: ['atlas_walk_forward_costs.py','test_atlas_walk_forward_costs.py','.github/workflows/atlas-walk-forward-costs.yml']
+  schedule:
+    - cron: '37 */4 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Syntax and regression
+        run: |
+          python -m py_compile atlas_walk_forward_costs.py test_atlas_walk_forward_costs.py
+          PYTHONPATH=. python - <<'PY'
+          import test_atlas_walk_forward_costs as t
+          tests=[getattr(t,n) for n in dir(t) if n.startswith('test_')]
+          for fn in tests: fn()
+          print(f'{len(tests)} Phase 4 tests ok')
+          PY
+      - name: Build Phase 3 source then cost evidence
+        run: |
+          python atlas_challenger_shadow.py
+          python atlas_walk_forward_costs.py
+      - name: Verify isolation contract
+        run: |
+          python - <<'PY'
+          import json
+          d=json.load(open('status/walk-forward-costs-latest.json'))
+          assert d['schema']=='ATLAS_WALK_FORWARD_COSTS_V1'
+          assert d['production_impact']=='NONE'
+          assert d['research_only'] is True
+          assert d['can_override_production'] is False
+          assert d['can_change_threshold'] is False
+          assert d['production_threshold']==68
+          assert d['live_execution'] is False
+          assert d['promotion_decision']=='NOT_AUTHORIZED'
+          assert d['cost_assumptions']['round_trip_cost_pct']>0
+          print(json.dumps(d['summary'],indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atlas-walk-forward-costs-${{ github.run_id }}
+          path: status/walk-forward-costs-latest.json
+          retention-days: 30
