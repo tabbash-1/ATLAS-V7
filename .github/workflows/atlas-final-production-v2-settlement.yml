@@ -1,0 +1,58 @@
+name: ATLAS Final Production V2 Settlement
+on:
+  pull_request:
+    branches: [main]
+    paths: ['atlas_final_production_v2_settlement.py','test_atlas_final_production_v2_settlement.py','.github/workflows/atlas-final-production-v2-settlement.yml','atlas_promotion_gate.py']
+  push:
+    branches: [main]
+    paths: ['atlas_final_production_v2_settlement.py','test_atlas_final_production_v2_settlement.py','.github/workflows/atlas-final-production-v2-settlement.yml','atlas_promotion_gate.py']
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Regression
+        run: |
+          python -m py_compile atlas_final_production_v2_settlement.py test_atlas_final_production_v2_settlement.py
+          PYTHONPATH=. python - <<'PY'
+          import test_atlas_final_production_v2_settlement as t
+          tests=[getattr(t,n) for n in dir(t) if n.startswith('test_')]
+          for fn in tests: fn()
+          print(f'{len(tests)} Phase 6 tests ok')
+          PY
+      - name: Build full evidence chain
+        run: |
+          python atlas_challenger_shadow.py
+          python atlas_walk_forward_costs.py
+          python atlas_promotion_gate.py
+          python atlas_final_production_v2_settlement.py
+      - name: Verify current release settlement
+        run: |
+          python - <<'PY'
+          import json
+          d=json.load(open('status/final-production-v2-latest.json'))
+          assert d['schema']=='ATLAS_FINAL_PRODUCTION_V2_SETTLEMENT_V1'
+          assert d['phase']=='6_OF_6'
+          assert d['production_changed'] is False
+          assert d['automatic_promotion'] is False
+          assert d['threshold_before']==68 and d['threshold_after']==68
+          assert d['live_execution_change'] is False
+          assert d['score_logic_changed'] is False
+          assert d['risk_logic_changed'] is False
+          assert d['sl_tp_logic_changed'] is False
+          assert d['final_trade_gate_changed'] is False
+          if d['source_promotion_decision']=='NO_PROMOTION':
+              assert d['final_release_action']=='PRESERVE_CURRENT_PRODUCTION'
+              assert d['new_performance_epoch_required'] is False
+          print(json.dumps(d,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atlas-final-production-v2-${{ github.run_id }}
+          path: status/final-production-v2-latest.json
+          retention-days: 30
