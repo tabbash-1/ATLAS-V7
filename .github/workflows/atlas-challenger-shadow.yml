@@ -51,18 +51,23 @@ jobs:
           grep -q "promotion_decision':'NOT_AUTHORIZED" atlas_challenger_shadow.py
       - name: Build current forward-evidence report
         run: python atlas_challenger_shadow.py
-      - name: Verify report contract
+      - name: Verify paired-evidence report contract
         run: |
           python - <<'PY'
           import json
           p='status/challenger-shadow-latest.json'
           d=json.load(open(p))
-          assert d['schema']=='ATLAS_CHALLENGER_SHADOW_V1'
+          assert d['schema']=='ATLAS_CHALLENGER_SHADOW_V2_PAIRED_EVIDENCE'
           assert d['research_only'] is True
           assert d['can_override_production'] is False
           assert d['can_change_threshold'] is False
           assert d['live_execution'] is False
           assert d['promotion_decision']=='NOT_AUTHORIZED'
+          assert d['production_impact']=='NONE'
+          pairs=d.get('paired_evidence', d.get('records', []))
+          for row in pairs:
+              assert row.get('canonical_action') == 'WAIT'
+              assert row.get('shadow_action') in ('LONG','SHORT')
           print(json.dumps(d['summary'], indent=2))
           PY
       - name: Upload Challenger evidence
