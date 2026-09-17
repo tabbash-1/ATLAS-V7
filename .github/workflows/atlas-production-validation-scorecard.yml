@@ -1,0 +1,79 @@
+name: ATLAS Production Validation Scorecard
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'production_validation_scorecard.py'
+      - 'tests/test_production_validation_scorecard.py'
+      - '.github/workflows/atlas-production-validation-scorecard.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'production_validation_scorecard.py'
+      - 'status/canonical-outcomes-latest.json'
+      - '.github/workflows/atlas-production-validation-scorecard.yml'
+  schedule:
+    - cron: '12 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atlas-production-validation-scorecard
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Regression
+        run: |
+          python -m py_compile production_validation_scorecard.py
+          PYTHONPATH=. python - <<'PY'
+          import tests.test_production_validation_scorecard as t
+          for name in sorted(x for x in dir(t) if x.startswith('test_')):
+              getattr(t,name)()
+              print('PASS', name)
+          PY
+      - name: Build post-V2 scorecard
+        run: python production_validation_scorecard.py
+      - name: Verify isolation and truth contract
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path('status/production-validation-latest.json').read_text())
+          assert p['schema']=='ATLAS_PRODUCTION_VALIDATION_SCORECARD_V1'
+          assert p['decision_source_of_truth']=='FINAL_TRADE_GATE'
+          assert p['epoch']['id']=='HTF_SR_V2_2026-09-14'
+          assert p['sample_readiness']['formal_min_terminal']==30
+          assert p['interpretation']['profitability_claim_allowed'] is False
+          assert p['safety']['production_threshold']==68
+          assert p['safety']['can_override_production'] is False
+          assert p['safety']['live_execution'] is False
+          print('PRODUCTION_VALIDATION_OK', p['post_v2'])
+          PY
+      - name: Upload scorecard artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-production-validation-${{ github.run_id }}
+          path: status/production-validation-latest.json
+          retention-days: 30
+      - name: Commit scorecard snapshot
+        if: github.event_name != 'pull_request'
+        run: |
+          git add status/production-validation-latest.json
+          if git diff --cached --quiet; then echo 'scorecard unchanged'; exit 0; fi
+          git config user.name 'atlas-production-validation'
+          git config user.email 'atlas-validation@users.noreply.github.com'
+          git commit -m 'validation: update post-V2 production scorecard [skip ci] [skip render]'
+          git push origin HEAD:main
