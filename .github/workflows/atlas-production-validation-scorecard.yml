@@ -57,6 +57,12 @@ jobs:
           assert p['epoch']['id']=='HTF_SR_V2_2026-09-14'
           assert p['sample_readiness']['formal_min_terminal']==30
           assert p['interpretation']['profitability_claim_allowed'] is False
+          assert p['interpretation']['cost_adjusted_profitability_claim_allowed'] is False
+          assert p['cost_model']['schema']=='ATLAS_VALIDATION_COST_MODEL_V1'
+          assert p['cost_model']['fee_bps_per_side']==5.0
+          assert p['cost_model']['slippage_bps_per_side']==3.0
+          assert p['cost_model']['funding_bps_per_12h']==1.0
+          assert p['cost_model']['production_impact']=='NONE'
           assert p['safety']['production_threshold']==68
           assert p['safety']['can_override_production'] is False
           assert p['safety']['live_execution'] is False
@@ -76,4 +82,5 @@ jobs:
           git config user.name 'atlas-production-validation'
           git config user.email 'atlas-validation@users.noreply.github.com'
           git commit -m 'validation: update post-V2 production scorecard [skip ci] [skip render]'
+          git pull --rebase origin main
           git push origin HEAD:main
