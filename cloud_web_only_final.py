@@ -34,6 +34,7 @@ from whale_intelligence import filter_feed as filter_whale_feed
 from whale_intelligence import load_snapshot as load_whale_snapshot
 from canonical_outcome_snapshot import VERSION as CANONICAL_OUTCOME_VERSION
 from canonical_outcome_snapshot import load_snapshot as load_canonical_outcomes
+from evidence_control_center import build as build_evidence_control_center
 
 
 def _whale_snapshot():
@@ -57,6 +58,12 @@ class FinalWebOnlyHandler(ns["WebOnlyHandler"]):
     """Web-only handler with explicit final-decision, outcome and whale contracts."""
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
+        if parsed.path == "/api/evidence/control-center":
+            try:
+                payload = build_evidence_control_center(BASE)
+                return self._json(payload)
+            except Exception as exc:
+                return self._json({"error":"evidence control center unavailable","detail":str(exc),"research_only":True,"live_execution":False,"can_override_production":False}, 503)
         if parsed.path == "/api/runtime/status":
             whale = _whale_snapshot()
             outcomes = _outcome_snapshot()
