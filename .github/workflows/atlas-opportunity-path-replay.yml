@@ -1,0 +1,79 @@
+name: ATLAS Opportunity Path Replay
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'opportunity_path_replay.py'
+      - 'tests/test_opportunity_path_replay.py'
+      - '.github/workflows/atlas-opportunity-path-replay.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'opportunity_path_replay.py'
+      - 'status/production-validation-latest.json'
+      - '.github/workflows/atlas-opportunity-path-replay.yml'
+  schedule:
+    - cron: '37 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atlas-opportunity-path-replay
+  cancel-in-progress: false
+
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Regression
+        run: |
+          python -m py_compile opportunity_path_replay.py
+          PYTHONPATH=. python - <<'PY'
+          import tests.test_opportunity_path_replay as t
+          for name in sorted(x for x in dir(t) if x.startswith('test_')):
+              getattr(t,name)(); print('PASS',name)
+          PY
+      - name: Build prospective candle-path replay
+        run: python opportunity_path_replay.py
+      - name: Verify replay firewall
+        run: |
+          python - <<'PY'
+          import json
+          p=json.load(open('status/opportunity-path-replay-latest.json'))
+          assert p['schema']=='ATLAS_OPPORTUNITY_PATH_REPLAY_V1'
+          assert p['activation_at']=='2026-09-18T07:10:00+00:00'
+          assert p['criteria_locked_before_evaluation'] is True
+          assert p['path_rules']['failfast_adverse_r']==-0.25
+          assert p['path_rules']['failfast_window_h']==4
+          assert p['interpretation']['best_variant_selection_allowed'] is False
+          assert p['interpretation']['automatic_strategy_change'] is False
+          assert p['safety']['production_impact']=='NONE'
+          assert p['safety']['production_threshold']==68
+          assert p['safety']['can_override_production'] is False
+          assert all(x['promotion_allowed'] is False for x in p['hypotheses'])
+          print('PATH_REPLAY_OK',p['eligible_prospective_rows'],len(p['market_data_errors']))
+          PY
+      - name: Upload replay artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-opportunity-path-replay-${{ github.run_id }}
+          path: status/opportunity-path-replay-latest.json
+          retention-days: 30
+      - name: Commit replay snapshot
+        if: github.event_name != 'pull_request'
+        run: |
+          git add status/opportunity-path-replay-latest.json
+          if git diff --cached --quiet; then echo 'path replay unchanged'; exit 0; fi
+          git config user.name 'atlas-path-replay'
+          git config user.email 'atlas-path-replay@users.noreply.github.com'
+          git commit -m 'validation: update opportunity path replay [skip render]'
+          git pull --rebase origin main
+          git push origin HEAD:main
