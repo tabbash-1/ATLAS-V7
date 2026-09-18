@@ -6,6 +6,7 @@ on:
     paths:
       - 'evidence_control_center.py'
       - 'opportunity_replay_shadow.py'
+      - 'opportunity_path_replay.py'
       - 'evidence-control-center.html'
       - 'cloud_web_only_final.py'
       - 'tests/test_evidence_control_center.py'
@@ -40,7 +41,7 @@ jobs:
         with: {python-version: '3.12'}
       - name: Regression
         run: |
-          python -m py_compile evidence_control_center.py opportunity_replay_shadow.py cloud_web_only_final.py
+          python -m py_compile evidence_control_center.py opportunity_replay_shadow.py opportunity_path_replay.py cloud_web_only_final.py
           PYTHONPATH=. python - <<'PY'
           import tests.test_evidence_control_center as t
           for name in sorted(x for x in dir(t) if x.startswith('test_')):
