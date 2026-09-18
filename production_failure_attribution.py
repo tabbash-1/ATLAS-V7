@@ -50,6 +50,7 @@ def diagnose(row: dict[str, Any]) -> dict[str, Any]:
     margin = None if score is None else round(score-threshold, 4)
     tp1 = bool(s.get("tp1_reached")); status = str(s.get("status") or "UNKNOWN")
     tte = _hours_to_exit(row)
+    t_mfe=_f(s.get("time_to_mfe_peak_h")); t_mae=_f(s.get("time_to_mae_peak_h")); t_tp1=_f(s.get("time_to_tp1_h"))
     provenance = row.get("decision_provenance") if isinstance(row.get("decision_provenance"), dict) else None
     quality = "PATH_PLUS_FROZEN_DECISION_PROVENANCE" if provenance and provenance.get("frozen_before_outcome") is True else "PATH_ONLY"
     tags=[]
@@ -71,6 +72,8 @@ def diagnose(row: dict[str, Any]) -> dict[str, Any]:
             elif tte < 4: tags.append("STOP_WITHIN_4H")
             elif tte >= 8: tags.append("LATE_HORIZON_REVERSAL")
         if mae is not None and mae >= 1: tags.append("FULL_RISK_INVALIDATION")
+        if mfe is not None and mfe >= .5 and t_mfe is not None and t_mfe <= 1: tags.append("EARLY_FAVORABLE_EXCURSION_THEN_REVERSAL")
+        elif mfe is not None and mfe >= .5 and t_mfe is not None and t_mfe >= 4: tags.append("LATE_FAVORABLE_PEAK_THEN_REVERSAL")
     elif r is not None and r > 0:
         if status == "WIN_TP2":
             primary="POSITIVE_CONTROL_TP2"
@@ -94,7 +97,8 @@ def diagnose(row: dict[str, Any]) -> dict[str, Any]:
         "captured_at": row.get("captured_at"), "score": score, "threshold": threshold,
         "score_margin": margin, "terminal_status": status, "r_multiple": r,
         "mfe_r": mfe, "mae_r": mae, "tp1_reached": tp1,
-        "hours_to_terminal": tte, "checkpoint_r": cps,
+        "hours_to_terminal": tte, "time_to_mfe_peak_h":t_mfe,"time_to_mae_peak_h":t_mae,"time_to_tp1_h":t_tp1,
+        "checkpoint_r": cps,
         "primary_attribution": primary, "secondary_tags": tags,
         "evidence_quality": quality,
         "decision_provenance": provenance,
