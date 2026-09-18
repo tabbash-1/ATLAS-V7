@@ -40,9 +40,11 @@ jobs:
           python -m py_compile production_validation_scorecard.py
           PYTHONPATH=. python - <<'PY'
           import tests.test_production_validation_scorecard as t
-          for name in sorted(x for x in dir(t) if x.startswith('test_')):
-              getattr(t,name)()
-              print('PASS', name)
+          import tests.test_evidence_pipeline_event_chain as e
+          for module in (t,e):
+              for name in sorted(x for x in dir(module) if x.startswith('test_')):
+                  getattr(module,name)()
+                  print('PASS', module.__name__, name)
           PY
       - name: Build post-V2 scorecard
         run: python production_validation_scorecard.py
@@ -81,6 +83,6 @@ jobs:
           if git diff --cached --quiet; then echo 'scorecard unchanged'; exit 0; fi
           git config user.name 'atlas-production-validation'
           git config user.email 'atlas-validation@users.noreply.github.com'
-          git commit -m 'validation: update post-V2 production scorecard [skip ci] [skip render]'
+          git commit -m 'validation: update post-V2 production scorecard [skip render]'
           git pull --rebase origin main
           git push origin HEAD:main
