@@ -106,6 +106,63 @@ def trade_ready(decision: dict[str, Any]) -> bool:
     return bool(truth.get("trade_ready") is True and truth.get("source_of_truth") == "FINAL_TRADE_GATE" and geometry(decision))
 
 
+def _path(obj: dict[str, Any], *paths: str):
+    for path in paths:
+        cur: Any = obj
+        ok = True
+        for part in path.split("."):
+            if not isinstance(cur, dict) or part not in cur:
+                ok = False; break
+            cur = cur.get(part)
+        if ok and cur is not None:
+            return cur
+    return None
+
+
+def freeze_decision_provenance(decision: dict[str, Any]) -> dict[str, Any]:
+    """Freeze compact pre-outcome decision context for causal failure attribution.
+
+    Evidence-only: this snapshot is written at enrollment time and never feeds
+    back into scoring, qualification, risk, geometry, or execution.
+    """
+    v2 = _path(decision, "htf_sr_decision_v2") or {}
+    quality = _path(decision, "setup_quality_gate") or {}
+    futures = _path(decision, "futures", "futures_context", "validated_futures") or {}
+    attribution = _path(decision, "score_attribution") or {}
+    if isinstance(attribution, dict):
+        attribution = {str(k): v for k, v in attribution.items() if isinstance(v, (int, float, str, bool)) or v is None}
+    else:
+        attribution = {}
+    blockers = v2.get("blockers") if isinstance(v2, dict) else None
+    if not isinstance(blockers, list): blockers = []
+    return {
+        "schema": "ATLAS_ENTRY_DECISION_PROVENANCE_V1",
+        "frozen_before_outcome": True,
+        "source_of_truth": "FINAL_TRADE_GATE",
+        "candidate_direction": _path(decision, "candidate_direction", "direction"),
+        "score": fnum(decision.get("score")),
+        "threshold": fnum(_path(decision, "signal_threshold", "threshold")),
+        "production_signal_qualified": _path(decision, "production_signal_qualified", "production_qualified"),
+        "htf_alignment_class": _path(decision, "htf_alignment_class"),
+        "htf_regime": v2.get("regime") if isinstance(v2, dict) else None,
+        "htf_v2_eligible": v2.get("eligible") if isinstance(v2, dict) else None,
+        "htf_v2_blockers": [str(x) for x in blockers[:12]],
+        "final_trade_ready_reason": _path(decision, "trade_plan.final_trade_ready_reason", "final_trade_ready_reason"),
+        "scenario_reason": _path(decision, "trade_plan.scenario_reason", "scenario_reason"),
+        "scenario_readiness": _path(decision, "trade_plan.scenario_readiness", "scenario_readiness"),
+        "entry_mode": _path(decision, "trade_plan.entry_mode"),
+        "breakout_confirmed": _path(decision, "trade_plan.breakout_confirmed", "breakout_confirmed"),
+        "continuation_strong": _path(decision, "trade_plan.continuation_strong", "continuation_strong"),
+        "playbook": _path(decision, "playbook", "setup_family", "trade_plan.playbook"),
+        "market_regime": _path(decision, "market_regime", "regime"),
+        "relative_volume": fnum(_path(decision, "relative_volume", "relative_volume_ratio")),
+        "futures_score": fnum(futures.get("score") if isinstance(futures, dict) else futures),
+        "futures_alignment": futures.get("alignment") if isinstance(futures, dict) else None,
+        "setup_quality_status": quality.get("status") if isinstance(quality, dict) else None,
+        "score_attribution": attribution,
+    }
+
+
 def event_id(symbol: str, captured_at: str, g: dict[str, Any], decision: dict[str, Any] | None = None) -> str:
     truth = from_decision(decision or {}, symbol=symbol, captured_at=captured_at)
     if truth.get("decision_id"):
@@ -170,6 +227,7 @@ def enroll_new(manifest, cohort, snapshots, observed_through, sizing_equity):
                 "product_horizon":g.get("product_horizon") or PRODUCT_HORIZON,"canonical_lane":g.get("canonical_lane") or "CORE_4_12H",
                 "evaluation_horizons":["4h","8h","12h"],
                 "score":fnum(d.get("score")),"threshold":fnum(d.get("signal_threshold")),
+                "decision_provenance":freeze_decision_provenance(d),
                 "geometry":g,"sizing_equity_usd":round(sizing_equity,2),"risk_pct":float(manifest["risk_per_trade_pct"]),
                 "risk_usd":risk_usd,"paper_quantity":round(qty,12),"paper_notional_usd":round(abs(qty*g["entry"]),2),
                 "outcome_known_at_entry":False,"paper_only":True,"live_execution":False,"can_override_production":False,
