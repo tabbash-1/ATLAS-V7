@@ -1,0 +1,75 @@
+{
+  "activation_at": "2026-09-18T07:10:00+00:00",
+  "cost_model": {
+    "fee_bps_per_side": 5.0,
+    "funding_bps_per_12h": 1.0,
+    "production_impact": "NONE",
+    "slippage_bps_per_side": 3.0
+  },
+  "criteria_locked_before_evaluation": true,
+  "eligible_prospective_rows": 0,
+  "epoch_id": "HTF_SR_V2_2026-09-14",
+  "generated_at": "2026-09-18T08:15:49.624074+00:00",
+  "hypotheses": [
+    {
+      "champion_net_r": null,
+      "delta_net_r": null,
+      "eligible": 0,
+      "formal_ready": false,
+      "id": "DELAY_ENTRY_1H_CONFIRM",
+      "min_n": 30,
+      "paired_n": 0,
+      "production_impact": "NONE",
+      "promotion_allowed": false,
+      "rows": [],
+      "rule": "first fully post-decision clock-aligned 1H candle must close in trade direction; enter at its close using original quantity and absolute SL/TP",
+      "settled": 0,
+      "shadow_action": "REPRICE_ENTRY",
+      "shadow_net_r": null,
+      "state": "COLLECTING_PATH_REPLAY"
+    },
+    {
+      "champion_net_r": null,
+      "delta_net_r": null,
+      "eligible": 0,
+      "formal_ready": false,
+      "id": "EARLY_MOMENTUM_FAILFAST_EXIT",
+      "min_n": 30,
+      "paired_n": 0,
+      "production_impact": "NONE",
+      "promotion_allowed": false,
+      "rows": [],
+      "rule": "before TP1/SL, exit at first fully post-decision 1H close within first 4H at <= -0.25 original R",
+      "settled": 0,
+      "shadow_action": "REPRICE_EXIT",
+      "shadow_net_r": null,
+      "state": "COLLECTING_PATH_REPLAY"
+    }
+  ],
+  "interpretation": {
+    "automatic_promotion": false,
+    "automatic_strategy_change": false,
+    "best_variant_selection_allowed": false,
+    "causal_claim_allowed": false,
+    "formal_comparison_requires_paired_n": 30
+  },
+  "market_data_errors": [],
+  "path_rules": {
+    "delay_entry_confirmation": "FIRST_FULL_POST_DECISION_CLOCK_ALIGNED_1H_DIRECTIONAL_CLOSE",
+    "delayed_entry_position_size": "ORIGINAL_CHAMPION_QUANTITY",
+    "failfast_adverse_r": -0.25,
+    "failfast_window_h": 4,
+    "intrabar_ambiguity": "FAIL_CLOSED"
+  },
+  "product_horizon": "4-12H",
+  "safety": {
+    "can_change_threshold": false,
+    "can_override_production": false,
+    "live_execution": false,
+    "paper_only": true,
+    "production_impact": "NONE",
+    "production_threshold": 68,
+    "research_only": true
+  },
+  "schema": "ATLAS_OPPORTUNITY_PATH_REPLAY_V1"
+}
