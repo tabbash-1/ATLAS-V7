@@ -58,16 +58,17 @@ def test_workflow_run_consumers_checkout_fresh_main_not_stale_upstream_sha():
         assert "if: github.event_name != 'workflow_run'" in y
 
 
-def test_canonical_evidence_writers_share_serialization_and_retry_helper():
-    names=(
-        "atlas-paper-portfolio-10k.yml",
-        "atlas-production-validation-scorecard.yml",
-        "atlas-production-failure-attribution.yml",
-        "atlas-entry-provenance-cohort.yml",
-    )
-    for name in names:
+def test_canonical_evidence_writers_keep_per_workflow_concurrency_and_retry_helper():
+    expected={
+        "atlas-paper-portfolio-10k.yml":"atlas-paper-portfolio-10k",
+        "atlas-production-validation-scorecard.yml":"atlas-production-validation-scorecard",
+        "atlas-production-failure-attribution.yml":"atlas-production-failure-attribution",
+        "atlas-entry-provenance-cohort.yml":"atlas-entry-provenance-cohort",
+    }
+    for name,group in expected.items():
         y=text(name)
-        assert "group: atlas-evidence-canonical-writer" in y
+        assert f"group: {group}" in y
+        assert "group: atlas-evidence-canonical-writer" not in y
         assert "scripts/commit_status_with_retry.sh" in y
 
 
