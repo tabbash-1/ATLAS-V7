@@ -68,6 +68,13 @@
       "exit_at_ms": 1789584608179,
       "pnl_usd": 43.22,
       "trade_id": "8548e713cb18ed5d0147fe35"
+    },
+    {
+      "drawdown_pct": 0.6054,
+      "equity_usd": 10091.89,
+      "exit_at_ms": 1789698600000,
+      "pnl_usd": 197.88,
+      "trade_id": "816243ba5e84109f0399e12b"
     }
   ],
   "evaluation_horizons": [
@@ -75,38 +82,38 @@
     "8h",
     "12h"
   ],
-  "generated_at": "2026-09-18T06:16:28.156640+00:00",
+  "generated_at": "2026-09-18T06:22:52.198578+00:00",
   "live_execution": false,
   "manifest_hash": "d6ccdae80214e3d664acbf03f155bd0bd699e1439896f7880270d1f7610e5abb",
-  "methodology": "Prospective canonical Final Trade Guard TRADE READY entries only; frozen Entry/SL/TP2; 4h/8h/12h product-window checkpoints; 5m first-touch with 1m ambiguity refinement; 12h terminal mark-to-market expiry; gross paper P&L before fees/slippage.",
+  "methodology": "Prospective canonical Final Trade Guard TRADE READY entries only; frozen Entry/SL/TP2; SL/TP2 settle immediately on first observed touch using 5m candles with 1m ambiguity refinement; 4h/8h/12h product-window checkpoints; 12h mark-to-market expiry only when no terminal barrier was hit; gross paper P&L before fees/slippage.",
   "observed_through_at": "2026-09-18T06:06:47.745829+00:00",
   "paper_only": true,
   "portfolio": {
-    "avg_r": -0.1444,
-    "closed": 7,
+    "avg_r": 0.1237,
+    "closed": 8,
     "entries": 8,
-    "equity_usd": 9894.01,
+    "equity_usd": 10091.89,
     "long": {
-      "closed": 2,
-      "pnl_usd": -201.53,
-      "win_rate_pct": 0.0
+      "closed": 3,
+      "pnl_usd": -3.65,
+      "win_rate_pct": 33.33
     },
     "losses": 4,
     "max_drawdown_pct": 2.98,
-    "net_pnl_usd": -105.99,
-    "net_r": -1.0108,
-    "open_or_unresolved": 1,
+    "net_pnl_usd": 91.89,
+    "net_r": 0.9892,
+    "open_or_unresolved": 0,
     "peak_equity_usd": 10153.36,
-    "profit_factor": 0.7367,
-    "return_pct": -1.0599,
+    "profit_factor": 1.2283,
+    "return_pct": 0.9189,
     "short": {
       "closed": 5,
       "pnl_usd": 95.54,
       "win_rate_pct": 60.0
     },
     "starting_equity_usd": 10000.0,
-    "win_rate_pct": 42.86,
-    "wins": 3
+    "win_rate_pct": 50.0,
+    "wins": 4
   },
   "product_horizon": "4-12H",
   "production_threshold_unchanged": 68,
@@ -476,7 +483,7 @@
         "id": "a6e058bc0727915c9bc4ad10",
         "mae_r": 1.5579,
         "market_source": "BINANCE_DATA_API_SPOT",
-        "mfe_r": -0.3258,
+        "mfe_r": 0.0,
         "r_multiple": -1.0,
         "status": "LOSS",
         "terminal": true,
@@ -837,8 +844,8 @@
       },
       "decision_source": "FINAL_TRADE_GATE",
       "direction": "LONG",
-      "drawdown_after_pct": null,
-      "equity_after_usd": null,
+      "drawdown_after_pct": 0.6054,
+      "equity_after_usd": 10091.89,
       "evaluation_horizons": [
         "4h",
         "8h",
@@ -864,7 +871,7 @@
       "paper_notional_usd": 14562.45,
       "paper_only": true,
       "paper_quantity": 19.647659574524,
-      "pnl_usd": null,
+      "pnl_usd": 197.88,
       "portfolio_id": "ATLAS_10K_PAPER_V1",
       "product_horizon": "4-12H",
       "product_window_checkpoints": [
@@ -897,11 +904,22 @@
       "schema": "ATLAS_PAPER_PORTFOLIO_10K_ENTRY_V3_CANONICAL_TRUTH",
       "score": 84.0,
       "settlement": {
-        "exit_at_ms": null,
+        "excursion_scope": "THROUGH_TERMINAL_EVENT",
+        "exit_at_ms": 1789698600000,
         "id": "816243ba5e84109f0399e12b",
-        "r_multiple": null,
-        "status": "OPEN",
-        "terminal": false
+        "mae_r": 0.2125,
+        "market_source": "BINANCE_DATA_API_SPOT",
+        "mfe_r": 2.0414,
+        "r_multiple": 2.0,
+        "status": "WIN_TP2",
+        "terminal": true,
+        "terminal_refined_to_1m": false,
+        "time_to_mae_peak_h": 0.0543,
+        "time_to_mfe_peak_h": 1.2209,
+        "time_to_tp1_h": 0.8876,
+        "timing_semantics": "BAR_OPEN_TIME_APPROX_NO_INTRABAR_ORDER_INFERENCE",
+        "tp1_first_hit_at_ms": 1789697400000,
+        "tp1_reached": true
       },
       "sizing_equity_usd": 9894.01,
       "symbol": "BNBUSDT",
