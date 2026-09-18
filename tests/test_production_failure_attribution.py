@@ -83,3 +83,26 @@ def test_path_timing_can_tag_early_favorable_reversal_without_causal_claim():
     d=m.diagnose(x)
     assert "EARLY_FAVORABLE_EXCURSION_THEN_REVERSAL" in d["secondary_tags"]
     assert d["time_to_mfe_peak_h"]==.5
+
+
+def test_provenance_freezer_uses_frozen_score_attribution_when_futures_context_missing():
+    decision={"score":84,"signal_threshold":68,"candidate_direction":"LONG",
+              "production_signal_qualified":True,
+              "htf_alignment_class":"CONDITIONAL_ALIGNED_12H_NEUTRAL",
+              "htf_sr_decision_v2":{"regime":"4H_DIRECTIONAL_12H_NEUTRAL","eligible":True,"blockers":[]},
+              "trade_plan":{"entry_mode":"NOW","breakout_confirmed":True,"continuation_strong":False},
+              "score_attribution":{"trend_base":68,"futures_adjustment":-2.7,"futures_reason":"OPPOSED"}}
+    z=p.freeze_decision_provenance(decision)
+    assert z["futures_alignment"]=="OPPOSED"
+    assert z["futures_alignment_source"]=="FROZEN_SCORE_ATTRIBUTION"
+    assert z["futures_adjustment"]==-2.7
+    assert z["futures_score"] is None
+
+
+def test_provenance_freezer_prefers_explicit_futures_context_over_attribution_reason():
+    decision={"score":80,"signal_threshold":68,
+              "futures_context":{"score":45,"alignment":"ALIGNED"},
+              "score_attribution":{"futures_adjustment":4.5,"futures_reason":"OPPOSED"}}
+    z=p.freeze_decision_provenance(decision)
+    assert z["futures_alignment"]=="ALIGNED"
+    assert z["futures_alignment_source"]=="FUTURES_CONTEXT"

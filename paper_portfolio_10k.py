@@ -135,6 +135,12 @@ def freeze_decision_provenance(decision: dict[str, Any]) -> dict[str, Any]:
         attribution = {}
     blockers = v2.get("blockers") if isinstance(v2, dict) else None
     if not isinstance(blockers, list): blockers = []
+    futures_alignment = futures.get("alignment") if isinstance(futures, dict) else None
+    futures_alignment_source = "FUTURES_CONTEXT" if futures_alignment is not None else None
+    frozen_futures_reason = attribution.get("futures_reason") if isinstance(attribution, dict) else None
+    if futures_alignment is None and str(frozen_futures_reason or "").upper() in {"ALIGNED","OPPOSED","NEUTRAL","MIXED","UNAVAILABLE"}:
+        futures_alignment = str(frozen_futures_reason).upper()
+        futures_alignment_source = "FROZEN_SCORE_ATTRIBUTION"
     return {
         "schema": "ATLAS_ENTRY_DECISION_PROVENANCE_V1",
         "frozen_before_outcome": True,
@@ -160,7 +166,9 @@ def freeze_decision_provenance(decision: dict[str, Any]) -> dict[str, Any]:
         "market_regime": _path(decision, "market_regime", "regime"),
         "relative_volume": fnum(_path(decision, "relative_volume", "relative_volume_ratio")),
         "futures_score": fnum(futures.get("score") if isinstance(futures, dict) else futures),
-        "futures_alignment": futures.get("alignment") if isinstance(futures, dict) else None,
+        "futures_alignment": futures_alignment,
+        "futures_alignment_source": futures_alignment_source,
+        "futures_adjustment": fnum(attribution.get("futures_adjustment") if isinstance(attribution, dict) else None),
         "setup_quality_status": quality.get("status") if isinstance(quality, dict) else None,
         "score_attribution": attribution,
     }
