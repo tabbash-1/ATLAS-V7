@@ -70,3 +70,14 @@ def test_control_center_exposes_manual_strategy_review_gate_only():
     assert "strategy-change-review-gate-latest.json" in source
     assert "Strategy Change Review Gate" in page
     assert "automatic_promotion" in source
+
+
+def test_evidence_status_writers_retry_if_main_moves():
+    from pathlib import Path
+    root=Path(__file__).resolve().parents[1]/".github/workflows"
+    for name in ("atlas-evidence-control-center.yml","atlas-opportunity-path-replay.yml","atlas-strategy-change-review-gate.yml"):
+        y=(root/name).read_text(encoding="utf-8")
+        assert "for attempt in 1 2 3 4 5" in y
+        assert "git fetch origin main" in y
+        assert "git rebase origin/main" in y
+        assert "main moved during evidence push" in y
