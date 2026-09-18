@@ -29,3 +29,20 @@ def test_attribution_and_provenance_listen_to_scorecard_status():
     c=text("atlas-entry-provenance-cohort.yml")
     assert "status/production-validation-latest.json" in a
     assert "status/production-validation-latest.json" in c
+
+
+def test_scorecard_chains_from_paper_workflow_run_not_token_push_only():
+    y=text("atlas-production-validation-scorecard.yml")
+    assert "workflow_run:" in y
+    assert "ATLAS $10K Paper Portfolio" in y
+    assert "github.event.workflow_run.conclusion == 'success'" in y
+    assert "github.event.workflow_run.head_branch == 'main'" in y
+
+
+def test_diagnostics_chain_from_scorecard_workflow_run():
+    for name in ("atlas-production-failure-attribution.yml","atlas-entry-provenance-cohort.yml"):
+        y=text(name)
+        assert "workflow_run:" in y
+        assert "ATLAS Production Validation Scorecard" in y
+        assert "github.event.workflow_run.conclusion == 'success'" in y
+        assert "github.event.workflow_run.head_branch == 'main'" in y
