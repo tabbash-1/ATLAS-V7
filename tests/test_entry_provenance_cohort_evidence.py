@@ -89,3 +89,12 @@ def test_valid_provenance_requires_epoch_horizon_and_locked_threshold():
 
 def test_horizon_end_is_12h_after_capture():
     assert m._horizon_end("2026-09-18T01:16:44+00:00")=="2026-09-18T13:16:44+00:00"
+
+
+def test_feature_completeness_exposes_unknown_dimensions():
+    raw=base_row()
+    z=m._feature_row(raw,cost_map([raw]))
+    z["futures_alignment"]="UNKNOWN"
+    q=m._feature_completeness([z])
+    assert q["direction"]["known_pct"]==100.0
+    assert q["futures_alignment"]["known_pct"]==0.0
