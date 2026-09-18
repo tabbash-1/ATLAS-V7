@@ -1,5 +1,6 @@
 import opportunity_replay_shadow as m
 import evidence_control_center as c
+import opportunity_path_replay as p
 
 
 def test_replay_hypotheses_are_prelocked_and_shadow_only():
@@ -42,3 +43,20 @@ def test_terminal_links_and_renders_evidence_center():
     assert "/evidence-control-center.html" in index
     assert "/api/evidence/control-center" in page
     assert "Opportunity Replay Shadow" in page
+
+
+def test_path_replay_is_prelocked_shadow_only():
+    assert p.ACTIVATION_AT=="2026-09-18T07:10:00+00:00"
+    assert p.MIN_N==30 and p.THRESHOLD==68
+    assert p.FAILFAST_ADVERSE_R==-0.25 and p.FAILFAST_WINDOW_H==4
+    assert {x["id"] for x in p.PATH_HYPOTHESES}=={"DELAY_ENTRY_1H_CONFIRM","EARLY_MOMENTUM_FAILFAST_EXIT"}
+
+
+def test_control_center_renders_candle_path_replay():
+    from pathlib import Path
+    root=Path(__file__).resolve().parents[1]
+    page=(root/"evidence-control-center.html").read_text(encoding="utf-8")
+    source=(root/"evidence_control_center.py").read_text(encoding="utf-8")
+    assert "Candle-Path Replay" in page
+    assert "path_replay" in source
+    assert "opportunity-path-replay-latest.json" in source
