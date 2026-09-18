@@ -1,0 +1,86 @@
+name: ATLAS Entry Provenance Cohort Evidence
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'entry_provenance_cohort_evidence.py'
+      - 'paper_portfolio_10k.py'
+      - 'production_validation_scorecard.py'
+      - 'tests/test_entry_provenance_cohort_evidence.py'
+      - '.github/workflows/atlas-entry-provenance-cohort.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'entry_provenance_cohort_evidence.py'
+      - 'paper_portfolio_10k.py'
+      - 'production_validation_scorecard.py'
+      - 'status/production-validation-latest.json'
+      - '.github/workflows/atlas-entry-provenance-cohort.yml'
+  schedule:
+    - cron: '27 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atlas-entry-provenance-cohort
+  cancel-in-progress: false
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Regression
+        run: |
+          python -m py_compile entry_provenance_cohort_evidence.py
+          PYTHONPATH=. python - <<'PY'
+          import tests.test_entry_provenance_cohort_evidence as t
+          for name in sorted(x for x in dir(t) if x.startswith('test_')):
+              getattr(t,name)()
+              print('PASS',name)
+          PY
+      - name: Build prospective provenance cohorts
+        run: python entry_provenance_cohort_evidence.py
+      - name: Verify evidence firewall
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path('status/entry-provenance-cohort-latest.json').read_text())
+          assert p['schema']=='ATLAS_ENTRY_PROVENANCE_COHORT_EVIDENCE_V1'
+          assert p['criteria_locked_before_evaluation'] is True
+          assert p['decision_source_of_truth']=='FINAL_TRADE_GATE'
+          assert p['criteria']['min_total_provenance']==30
+          assert p['criteria']['min_bucket_n']==10
+          assert p['criteria']['min_complement_n']==10
+          assert p['interpretation']['root_cause_claim_allowed'] is False
+          assert p['interpretation']['automatic_strategy_change'] is False
+          assert p['interpretation']['automatic_shadow_deploy'] is False
+          assert p['safety']['production_impact']=='NONE'
+          assert p['safety']['production_threshold']==68
+          assert p['safety']['can_override_production'] is False
+          print('PROVENANCE_COHORT_OK',p['coverage'],len(p['shadow_test_hypotheses']))
+          PY
+      - name: Upload evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-entry-provenance-cohort-${{ github.run_id }}
+          path: status/entry-provenance-cohort-latest.json
+          retention-days: 30
+      - name: Commit evidence snapshot
+        if: github.event_name != 'pull_request'
+        run: |
+          git add status/entry-provenance-cohort-latest.json
+          if git diff --cached --quiet; then echo 'evidence unchanged'; exit 0; fi
+          git config user.name 'atlas-provenance-evidence'
+          git config user.email 'atlas-provenance@users.noreply.github.com'
+          git commit -m 'validation: update frozen entry provenance cohorts [skip ci] [skip render]'
+          git pull --rebase origin main
+          git push origin HEAD:main
