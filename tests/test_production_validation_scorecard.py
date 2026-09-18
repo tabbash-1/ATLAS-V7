@@ -27,3 +27,40 @@ def test_formal_sample_constant_is_locked():
 
 def test_no_profitability_claim_contract():
     assert m.SOURCE=="FINAL_TRADE_GATE"
+
+
+def test_cost_model_matches_phase4_assumptions():
+    x=row("2026-09-16T00:00:00Z",-1,"SHORT",9900,-100,"LOSS",False)
+    x["captured_at_ms"]=1000000
+    x["settlement"]["exit_at_ms"]=1000000+12*3600000
+    x["paper_notional_usd"]=10000
+    x["risk_usd"]=100
+    z=m._cost_adjusted_row(x)
+    assert z["estimated_cost_bps"]==17.0
+    assert z["estimated_cost_usd"]==17.0
+    assert z["estimated_cost_r"]==0.17
+    assert z["net_r"]==-1.17
+
+
+def test_early_exit_reduces_funding_component_not_roundtrip_cost():
+    x=row("2026-09-16T00:00:00Z",-1,"LONG",9900,-100,"LOSS",False)
+    x["captured_at_ms"]=1000000
+    x["settlement"]["exit_at_ms"]=1000000+4*3600000
+    x["paper_notional_usd"]=10000
+    x["risk_usd"]=100
+    z=m._cost_adjusted_row(x)
+    assert z["estimated_cost_bps"]==16.3333
+    assert z["net_r"]==-1.1633
+
+
+def test_cost_summary_never_improves_gross_r_under_cost_assumption():
+    a=row("2026-09-16T00:00:00Z",.5,"SHORT",10050,50,"EXPIRED_TP1",True)
+    b=row("2026-09-17T00:00:00Z",-1,"LONG",9950,-100,"LOSS",False)
+    for i,x in enumerate((a,b)):
+        x["captured_at_ms"]=1000000+i*100000000
+        x["settlement"]["exit_at_ms"]=x["captured_at_ms"]+12*3600000
+        x["paper_notional_usd"]=5000
+        x["risk_usd"]=100
+    s=m._cost_summary([a,b])
+    assert s["net_r"] < -.5
+    assert s["estimated_total_cost_usd"] > 0
