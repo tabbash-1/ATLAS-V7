@@ -1,0 +1,96 @@
+{
+  "activation_at": "2026-09-18T07:10:00+00:00",
+  "criteria_locked_before_evaluation": true,
+  "eligible_prospective_rows": 0,
+  "epoch_id": "HTF_SR_V2_2026-09-14",
+  "hypotheses": [
+    {
+      "champion_net_r": 0,
+      "delta_net_r": 0,
+      "formal_ready": false,
+      "id": "FUTURES_OPPOSITION_VETO",
+      "kept": 0,
+      "kind": "FILTER",
+      "min_n": 30,
+      "n": 0,
+      "production_impact": "NONE",
+      "promotion_allowed": false,
+      "rule": "futures_alignment == OPPOSED",
+      "shadow_action": "SKIP",
+      "shadow_filter_net_r": 0,
+      "skipped": 0,
+      "state": "COLLECTING"
+    },
+    {
+      "champion_net_r": 0,
+      "delta_net_r": 0,
+      "formal_ready": false,
+      "id": "BREAKOUT_CONFIRMATION_REQUIRED",
+      "kept": 0,
+      "kind": "FILTER",
+      "min_n": 30,
+      "n": 0,
+      "production_impact": "NONE",
+      "promotion_allowed": false,
+      "rule": "breakout_confirmed == False",
+      "shadow_action": "SKIP",
+      "shadow_filter_net_r": 0,
+      "skipped": 0,
+      "state": "COLLECTING"
+    },
+    {
+      "champion_net_r": 0,
+      "delta_net_r": 0,
+      "formal_ready": false,
+      "id": "MARGINAL_THRESHOLD_VETO",
+      "kept": 0,
+      "kind": "FILTER",
+      "min_n": 30,
+      "n": 0,
+      "production_impact": "NONE",
+      "promotion_allowed": false,
+      "rule": "score_margin <= 0",
+      "shadow_action": "SKIP",
+      "shadow_filter_net_r": 0,
+      "skipped": 0,
+      "state": "COLLECTING"
+    },
+    {
+      "id": "DELAY_ENTRY_1H_CONFIRM",
+      "kind": "PATH_CHANGE",
+      "n": 0,
+      "production_impact": "NONE",
+      "promotion_allowed": false,
+      "rule": "delay entry until next closed 1H confirmation",
+      "shadow_action": "REPRICE_ENTRY",
+      "state": "NOT_EVALUABLE_PATH_REPLAY_REQUIRED"
+    },
+    {
+      "id": "EARLY_MOMENTUM_FAILFAST_EXIT",
+      "kind": "PATH_CHANGE",
+      "n": 0,
+      "production_impact": "NONE",
+      "promotion_allowed": false,
+      "rule": "exit early after predefined momentum failure",
+      "shadow_action": "REPRICE_EXIT",
+      "state": "NOT_EVALUABLE_PATH_REPLAY_REQUIRED"
+    }
+  ],
+  "interpretation": {
+    "automatic_promotion": false,
+    "automatic_strategy_change": false,
+    "best_variant_selection_allowed": false,
+    "causal_claim_allowed": false,
+    "path_change_variants_require_candle_replay": true
+  },
+  "safety": {
+    "can_change_threshold": false,
+    "can_override_production": false,
+    "live_execution": false,
+    "paper_only": true,
+    "production_impact": "NONE",
+    "production_threshold": 68,
+    "research_only": true
+  },
+  "schema": "ATLAS_OPPORTUNITY_REPLAY_SHADOW_V1"
+}
