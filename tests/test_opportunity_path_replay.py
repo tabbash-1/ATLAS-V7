@@ -47,7 +47,7 @@ def test_delay_entry_uses_original_quantity_not_resized_risk():
 
 
 def test_failfast_exits_on_prelocked_adverse_one_hour_close():
-    cs=candles(4,step=-.03)
+    cs=candles(4,step=-.15)
     r=row("LONG");r["geometry"]["stop_loss"]=95;r["geometry"]["risk_abs"]=5;r["geometry"]["tp1"]=105;r["geometry"]["tp2"]=110
     z=m.replay_failfast(r,cs)
     assert z["state"]=="SETTLED"
