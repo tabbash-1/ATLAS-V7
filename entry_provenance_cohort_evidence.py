@@ -121,6 +121,16 @@ def _cohorts(rows):
     return out
 
 
+def _feature_completeness(rows):
+    out={}
+    missing={"","NONE","NULL","UNKNOWN"}
+    for dim in DIMENSIONS:
+        known=sum(str(r.get(dim,"UNKNOWN")).upper() not in missing for r in rows)
+        out[dim]={"known":known,"missing":len(rows)-known,
+                  "known_pct":round(100*known/len(rows),2) if rows else None}
+    return out
+
+
 def _hypotheses(rows, cohorts):
     if len(rows) < MIN_TOTAL_PROVENANCE: return []
     out=[]
@@ -180,7 +190,8 @@ def build(root: Path):
                     "remaining_to_formal_total":max(0,MIN_TOTAL_PROVENANCE-len(rows))},
         "pending_frozen_entries":pending,
         "state":"FORMAL_PROVENANCE_COHORT_SAMPLE_READY" if len(rows)>=MIN_TOTAL_PROVENANCE else "COLLECTING_FROZEN_ENTRY_PROVENANCE",
-        "overall":_stats(rows),"cohorts":cohorts,"shadow_test_hypotheses":hypotheses,
+        "overall":_stats(rows),"feature_completeness":_feature_completeness(rows),
+        "cohorts":cohorts,"shadow_test_hypotheses":hypotheses,
         "rows":rows,
         "interpretation":{"root_cause_claim_allowed":False,"automatic_strategy_change":False,
                           "automatic_shadow_deploy":False,"multiple_testing_warning":True,
