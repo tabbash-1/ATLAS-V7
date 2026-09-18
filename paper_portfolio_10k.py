@@ -309,10 +309,11 @@ def path_timing(rows, g: dict[str, Any], start_ms: int):
 
 def settle_entry(row: dict[str, Any], horizon_h: float, now_ms: int):
     start = int(row["captured_at_ms"]); maturity = start + int(horizon_h*3600_000); g=row["geometry"]
-    if now_ms < maturity:
+    if now_ms <= start:
         return {"id":row["id"],"status":"OPEN","terminal":False,"r_multiple":None,"exit_at_ms":None}
+    observation_end = min(int(now_ms), maturity)
     try:
-        candles, provider = market_klines(row["symbol"], "5", start, maturity)
+        candles, provider = market_klines(row["symbol"], "5", start, observation_end)
         if not candles: raise RuntimeError("no_5m_candles")
         ev, candle, tp1_seen = event_from(candles, g)
         parent_5m_open = None
@@ -334,18 +335,23 @@ def settle_entry(row: dict[str, Any], horizon_h: float, now_ms: int):
             refinement_rows=refinement_rows,
         )
         mfe, mae = excursions(excursion_rows, g)
+        if mfe is not None: mfe=max(0.0,float(mfe))
+        if mae is not None: mae=max(0.0,float(mae))
         timing = path_timing(excursion_rows, g, start)
         if ev == "SL": status,r,terminal,exit_ms="LOSS",-1.0,True,int(candle["open_time"] if candle else maturity)
         elif ev == "TP2": status,r,terminal,exit_ms="WIN_TP2",float(g["rr_tp2"]),True,int(candle["open_time"] if candle else maturity)
         elif ev == "AMBIGUOUS": status,r,terminal,exit_ms="AMBIGUOUS",None,False,None
         else:
-            last=candles[-1]["close"]
-            directional=(last-g["entry"]) if g["direction"]=="LONG" else (g["entry"]-last)
-            r=directional/g["risk_abs"]; status="EXPIRED_TP1" if tp1_seen else "EXPIRED"; terminal=True; exit_ms=maturity
+            if now_ms < maturity:
+                status,r,terminal,exit_ms="OPEN",None,False,None
+            else:
+                last=candles[-1]["close"]
+                directional=(last-g["entry"]) if g["direction"]=="LONG" else (g["entry"]-last)
+                r=directional/g["risk_abs"]; status="EXPIRED_TP1" if tp1_seen else "EXPIRED"; terminal=True; exit_ms=maturity
         return {"id":row["id"],"status":status,"terminal":terminal,"r_multiple":None if r is None else round(float(r),4),
                 "exit_at_ms":exit_ms,"tp1_reached":bool(tp1_seen),"mfe_r":mfe,"mae_r":mae,
                 **timing,"terminal_refined_to_1m":bool(refinement_rows is not None),
-                "excursion_scope":"THROUGH_TERMINAL_EVENT" if ev in {"SL","TP2"} else "FULL_HORIZON",
+                "excursion_scope":"THROUGH_TERMINAL_EVENT" if ev in {"SL","TP2"} else ("OBSERVED_TO_NOW" if now_ms < maturity else "FULL_HORIZON"),
                 "market_source":provider}
     except Exception as e:
         return {"id":row["id"],"status":"MARKET_DATA_ERROR","terminal":False,"r_multiple":None,"exit_at_ms":None,"error":str(e)[:700]}
