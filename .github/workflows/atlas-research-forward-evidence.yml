@@ -1,0 +1,46 @@
+name: ATLAS Research Forward Evidence
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "22 * * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atlas-research-forward-evidence
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ATLAS_DATA_DIR: ${{ github.workspace }}/.atlas-research-data
+      ATLAS_CLOUD_FORWARD_ENABLED: "0"
+      ATLAS_CLOUD_FORWARD_MIN_SCORE: "68"
+      ATLAS_RESEARCH_SAMPLE_MIN_SCORE: "50"
+      ATLAS_RESEARCH_SAMPLE_MAX_PER_CYCLE: "8"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install runtime dependencies
+        run: pip install -r requirements.txt
+      - name: Run isolated research cycle
+        run: PYTHONPATH=. python research_forward_cycle_action.py
+      - name: Verify HYPE was actually scored
+        run: |
+          jq -e '.research_only == true and .live_execution == false and .can_override_production == false and .changes_production_universe == false and .changes_threshold == false and .product_horizon == "4-12H" and (.research_assets | index("HYPEUSDT")) != null and (.research_lane.last_scored_symbols | index("HYPEUSDT")) != null' status/research-forward-cycle-latest.json >/dev/null
+      - name: Commit research evidence
+        run: |
+          git config user.name "atlas-research-forward"
+          git config user.email "atlas-research-forward@users.noreply.github.com"
+          git add status/research-forward-cycle-latest.json
+          git add -f .atlas-research-data 2>/dev/null || true
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "research: collect forward evidence [skip render]"
+          git pull --rebase origin main
+          git push
