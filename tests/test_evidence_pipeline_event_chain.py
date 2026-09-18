@@ -56,3 +56,26 @@ def test_workflow_run_consumers_checkout_fresh_main_not_stale_upstream_sha():
         assert "ref: main" in y
         assert "Checkout triggering ref" in y
         assert "if: github.event_name != 'workflow_run'" in y
+
+
+def test_canonical_evidence_writers_keep_per_workflow_concurrency_and_retry_helper():
+    expected={
+        "atlas-paper-portfolio-10k.yml":"atlas-paper-portfolio-10k",
+        "atlas-production-validation-scorecard.yml":"atlas-production-validation-scorecard",
+        "atlas-production-failure-attribution.yml":"atlas-production-failure-attribution",
+        "atlas-entry-provenance-cohort.yml":"atlas-entry-provenance-cohort",
+    }
+    for name,group in expected.items():
+        y=text(name)
+        assert f"group: {group}" in y
+        assert "group: atlas-evidence-canonical-writer" not in y
+        assert "scripts/commit_status_with_retry.sh" in y
+
+
+def test_retry_helper_is_fail_closed_and_never_force_pushes():
+    s=(ROOT/"scripts/commit_status_with_retry.sh").read_text(encoding="utf-8")
+    assert "git fetch origin main" in s
+    assert "git rebase origin/main" in s
+    assert "git rebase --abort" in s
+    assert "git push origin HEAD:main" in s
+    assert "--force" not in s and "force-with-lease" not in s

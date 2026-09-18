@@ -91,10 +91,8 @@ jobs:
       - name: Commit scorecard snapshot
         if: github.event_name != 'pull_request'
         run: |
-          git add status/production-validation-latest.json
-          if git diff --cached --quiet; then echo 'scorecard unchanged'; exit 0; fi
-          git config user.name 'atlas-production-validation'
-          git config user.email 'atlas-validation@users.noreply.github.com'
-          git commit -m 'validation: update post-V2 production scorecard [skip render]'
-          git pull --rebase origin main
-          git push origin HEAD:main
+          bash scripts/commit_status_with_retry.sh \
+            'atlas-production-validation' \
+            'atlas-validation@users.noreply.github.com' \
+            'validation: update post-V2 production scorecard [skip render]' \
+            'status/production-validation-latest.json'

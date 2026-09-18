@@ -76,3 +76,16 @@ def test_wrong_epoch_provenance_is_excluded():
     r=base_row()
     r["decision_provenance"]["strategy_epoch_id"]="WRONG_EPOCH"
     assert m._feature_row(r,cost_map([r])) is None
+
+
+def test_valid_provenance_requires_epoch_horizon_and_locked_threshold():
+    r=base_row()
+    assert m._valid_provenance(r) is True
+    for key,value in (("strategy_epoch_id","OTHER"),("product_horizon","1-3H"),("production_threshold_locked",67)):
+        z=base_row()
+        z["decision_provenance"][key]=value
+        assert m._valid_provenance(z) is False
+
+
+def test_horizon_end_is_12h_after_capture():
+    assert m._horizon_end("2026-09-18T01:16:44+00:00")=="2026-09-18T13:16:44+00:00"
