@@ -49,7 +49,7 @@ jobs:
           node --check atlas-unified-terminal.js
 
           # Production autoload publishes the canonical decision contract explicitly.
-          grep -Fq "ATLAS_PRODUCTION_WEB_AUTOLOAD_V6_STRICT_FINAL_TRUTH" production-web-autoload.js
+          grep -Fq "ATLAS_PRODUCTION_WEB_AUTOLOAD_V7_HIERARCHICAL_WAIT_TRUTH" production-web-autoload.js
           grep -Fq "contract:'canonical_decision'" production-web-autoload.js
           grep -Fq "sourceOfTruth:'FINAL_TRADE_GATE'" production-web-autoload.js
           ! grep -Fq "contract:'analyst_output'" production-web-autoload.js
@@ -137,7 +137,7 @@ jobs:
           for f in production-web-autoload.js atlas-unified-terminal.js atlas-product-shell.js; do
             curl -L --retry 6 --retry-delay 5 --retry-all-errors --connect-timeout 20 --max-time 120 -fsS "$BASE_URL/$f?t=$(date +%s%N)" -o "/tmp/$f"
           done
-          grep -Fq 'ATLAS_PRODUCTION_WEB_AUTOLOAD_V6_STRICT_FINAL_TRUTH' /tmp/production-web-autoload.js
+          grep -Fq 'ATLAS_PRODUCTION_WEB_AUTOLOAD_V7_HIERARCHICAL_WAIT_TRUTH' /tmp/production-web-autoload.js
           grep -Fq "contract:'canonical_decision'" /tmp/production-web-autoload.js
           grep -Fq "sourceOfTruth:'FINAL_TRADE_GATE'" /tmp/production-web-autoload.js
           grep -Fq 'ATLAS_PRODUCT_SHELL_V7_BOUND_ANALYST_GEOMETRY' /tmp/atlas-product-shell.js
