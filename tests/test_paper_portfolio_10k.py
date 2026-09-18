@@ -160,12 +160,6 @@ def test_portfolio_report_computes_dollars_equity_drawdown_profit_factor_and_che
     assert pf['long']['pnl_usd']==200.0 and pf['short']['pnl_usd']==-100.0
 
 
-if __name__=='__main__':
-    tests=[globals()[n] for n in sorted(globals()) if n.startswith('test_') and callable(globals()[n])]
-    for fn in tests: fn()
-    print(f'paper portfolio tests: {len(tests)} ok')
-
-
 def test_path_timing_records_mfe_mae_and_tp1_without_intrabar_claim():
     rows=[
         {'open_time':0,'high':100.2,'low':99.8},
@@ -266,3 +260,9 @@ def test_excursion_evidence_is_nonnegative_by_definition():
         assert out['mae_r']>=0.0
     finally:
         p.market_klines=old_market
+
+
+if __name__=='__main__':
+    tests=[globals()[n] for n in sorted(globals()) if n.startswith('test_') and callable(globals()[n])]
+    for fn in tests: fn()
+    print(f'paper portfolio tests: {len(tests)} ok')
