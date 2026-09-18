@@ -55,6 +55,8 @@ def _feature_row(row: dict[str,Any], cost_map: dict[str,dict[str,Any]]) -> dict[
     did=str(row.get("decision_id") or row.get("id") or "")
     if not isinstance(p,dict) or p.get("schema") != PROVENANCE_SCHEMA or p.get("frozen_before_outcome") is not True:
         return None
+    if p.get("strategy_epoch_id") != EPOCH_ID or p.get("product_horizon") != "4-12H" or p.get("production_threshold_locked") != 68:
+        return None
     if s.get("terminal") is not True or not did: return None
     cost=cost_map.get(did) or {}
     gross=_f(s.get("r_multiple")); net=_f(cost.get("net_r"))
