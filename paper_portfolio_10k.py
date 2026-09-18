@@ -395,7 +395,7 @@ def portfolio_report(manifest, cohort, settlements, generated_at, observed_throu
         "schema":SCHEMA,"generated_at":generated_at,"observed_through_at":observed_through.isoformat(),"manifest_hash":manifest["manifest_hash"],
         "product_horizon":PRODUCT_HORIZON,"evaluation_horizons":["4h","8h","12h"],"decision_source_of_truth":"FINAL_TRADE_GATE",
         "paper_only":True,"live_execution":False,"can_override_production":False,"production_threshold_unchanged":manifest["production_threshold"],
-        "methodology":"Prospective canonical Final Trade Guard TRADE READY entries only; frozen Entry/SL/TP2; 4h/8h/12h product-window checkpoints; 5m first-touch with 1m ambiguity refinement; 12h terminal mark-to-market expiry; gross paper P&L before fees/slippage.",
+        "methodology":"Prospective canonical Final Trade Guard TRADE READY entries only; frozen Entry/SL/TP2; SL/TP2 settle immediately on first observed touch using 5m candles with 1m ambiguity refinement; 4h/8h/12h product-window checkpoints; 12h mark-to-market expiry only when no terminal barrier was hit; gross paper P&L before fees/slippage.",
         "cost_note":"Gross paper performance. Exchange fees, funding and slippage are not deducted and results must not be described as live-account P&L.",
         "checkpoint_summary":checkpoint_summary,
         "portfolio":{"starting_equity_usd":start,"equity_usd":round(equity,2),"net_pnl_usd":round(equity-start,2),"return_pct":round((equity/start-1)*100,4),
