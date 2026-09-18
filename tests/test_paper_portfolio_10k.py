@@ -164,3 +164,38 @@ if __name__=='__main__':
     tests=[globals()[n] for n in sorted(globals()) if n.startswith('test_') and callable(globals()[n])]
     for fn in tests: fn()
     print(f'paper portfolio tests: {len(tests)} ok')
+
+
+def test_path_timing_records_mfe_mae_and_tp1_without_intrabar_claim():
+    rows=[
+        {'open_time':0,'high':100.2,'low':99.8},
+        {'open_time':3600_000,'high':101.2,'low':99.7},
+        {'open_time':2*3600_000,'high':100.8,'low':99.1},
+    ]
+    g={'direction':'LONG','entry':100.0,'stop_loss':99.0,'tp1':101.0,'tp2':102.0,'risk_abs':1.0}
+    z=p.path_timing(rows,g,0)
+    assert z['time_to_mfe_peak_h']==1.0
+    assert z['time_to_mae_peak_h']==2.0
+    assert z['time_to_tp1_h']==1.0
+    assert z['tp1_first_hit_at_ms']==3600_000
+    assert 'NO_INTRABAR_ORDER_INFERENCE' in z['timing_semantics']
+
+
+def test_settlement_exposes_path_timing_metadata():
+    old_market=p.market_klines
+    try:
+        candles=[
+            {'open_time':0,'open':100.0,'high':100.4,'low':99.7,'close':100.2},
+            {'open_time':300_000,'open':100.2,'high':101.2,'low':100.0,'close':101.0},
+            {'open_time':600_000,'open':101.0,'high':102.1,'low':100.9,'close':102.0},
+        ]
+        p.market_klines=lambda symbol, interval, start, end: (candles,'TEST')
+        row={'id':'timing','captured_at_ms':0,'symbol':'BTCUSDT','geometry':{
+            'direction':'LONG','entry':100.0,'stop_loss':99.0,'tp1':101.0,'tp2':102.0,'rr_tp2':2.0,'risk_abs':1.0}}
+        out=p.settle_entry(row,12,12*3600_000)
+        assert out['status']=='WIN_TP2'
+        assert out['time_to_tp1_h']==round(300_000/3_600_000,4)
+        assert out['time_to_mfe_peak_h']==round(600_000/3_600_000,4)
+        assert out['terminal_refined_to_1m'] is False
+    finally:
+        p.market_klines=old_market
