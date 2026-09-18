@@ -24,3 +24,21 @@ def test_control_center_contract_is_read_only():
     assert c.THRESHOLD==68
     assert c.FORMAL_SAMPLE==30
     assert c.EPOCH_ID=="HTF_SR_V2_2026-09-14"
+
+
+def test_production_web_exposes_read_only_control_center_route():
+    from pathlib import Path
+    root=Path(__file__).resolve().parents[1]
+    src=(root/"cloud_web_only_final.py").read_text(encoding="utf-8")
+    assert 'parsed.path == "/api/evidence/control-center"' in src
+    assert "build_evidence_control_center(BASE)" in src
+
+
+def test_terminal_links_and_renders_evidence_center():
+    from pathlib import Path
+    root=Path(__file__).resolve().parents[1]
+    index=(root/"index.html").read_text(encoding="utf-8")
+    page=(root/"evidence-control-center.html").read_text(encoding="utf-8")
+    assert "/evidence-control-center.html" in index
+    assert "/api/evidence/control-center" in page
+    assert "Opportunity Replay Shadow" in page
