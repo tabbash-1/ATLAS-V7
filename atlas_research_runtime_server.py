@@ -3,6 +3,7 @@ import os, threading, time
 
 import atlas_runtime_server as runtime
 import research_coverage
+import research_asset_universe
 
 atlas = runtime.atlas
 
@@ -33,7 +34,7 @@ runtime.CLOUD_RUNTIME_STATE['research_lane'] = RESEARCH_LANE_STATE
 
 def refresh_research_coverage():
     coverage = research_coverage.build_coverage(
-        atlas.read_forward(), atlas.ON_DEMAND_SYMBOLS, int(time.time() * 1000), RESEARCH_COVERAGE_STALE_HOURS
+        atlas.read_forward(), research_asset_universe.symbols(), int(time.time() * 1000), RESEARCH_COVERAGE_STALE_HOURS
     )
     RESEARCH_LANE_STATE['coverage_by_asset'] = coverage
     RESEARCH_LANE_STATE['coverage_summary'] = research_coverage.coverage_summary(coverage)
@@ -154,7 +155,7 @@ def research_cloud_forward_cycle():
         btc = atlas._spot_klines('BTCUSDT')
 
         state['last_failed_stage'] = 'score_universe'
-        for symbol in atlas.ON_DEMAND_SYMBOLS:
+        for symbol in research_asset_universe.symbols():
             try:
                 row = atlas.cloud_score_symbol(symbol, btc)
                 if row is None:
