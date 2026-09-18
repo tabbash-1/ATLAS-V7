@@ -2,7 +2,8 @@ import entry_provenance_cohort_evidence as m
 
 
 def base_row(i=1, net=.5, direction="LONG", score=75, feature=None):
-    p={"schema":m.PROVENANCE_SCHEMA,"frozen_before_outcome":True,"score":score,"threshold":68,
+    p={"schema":m.PROVENANCE_SCHEMA,"frozen_before_outcome":True,"strategy_epoch_id":m.EPOCH_ID,
+       "product_horizon":"4-12H","production_threshold_locked":68,"score":score,"threshold":68,
        "htf_alignment_class":"ALIGNED","htf_regime":"4H_DIRECTIONAL_12H_NEUTRAL",
        "breakout_confirmed":True,"continuation_strong":True,"futures_alignment":"ALIGNED",
        "entry_mode":"NOW","scenario_readiness":"READY","setup_quality_status":"PASS",
@@ -69,3 +70,9 @@ def test_safety_constants_are_locked():
     assert m.MIN_BUCKET_N==10
     assert m.MIN_COMPLEMENT_N==10
     assert m.MIN_ABS_DELTA_R==.25
+
+
+def test_wrong_epoch_provenance_is_excluded():
+    r=base_row()
+    r["decision_provenance"]["strategy_epoch_id"]="WRONG_EPOCH"
+    assert m._feature_row(r,cost_map([r])) is None
