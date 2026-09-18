@@ -83,6 +83,9 @@ jobs:
       - name: Commit review snapshot
         if: github.event_name != 'pull_request'
         run: |
+          # Refreshed shadow inputs are ephemeral here; their owner workflows commit them.
+          # Keep this writer single-purpose so rebase/push cannot fail on unstaged evidence files.
+          git restore status/opportunity-replay-shadow-latest.json status/opportunity-path-replay-latest.json || true
           git add status/strategy-change-review-gate-latest.json
           if git diff --cached --quiet; then echo 'review gate unchanged'; exit 0; fi
           git config user.name 'atlas-strategy-review'
