@@ -37,6 +37,7 @@ def build(root: Path) -> dict[str,Any]:
     o=_load(root,"canonical-outcomes-latest.json")
     r=_load(root,"opportunity-replay-shadow-latest.json")
     pr=_load(root,"opportunity-path-replay-latest.json")
+    sg=_load(root,"strategy-change-review-gate-latest.json")
     if (v.get("epoch") or {}).get("id") not in (None,EPOCH_ID):
         raise RuntimeError("control center refuses mixed strategy epoch")
     if (v.get("safety") or {}).get("production_threshold") not in (None,THRESHOLD):
@@ -102,6 +103,10 @@ def build(root: Path) -> dict[str,Any]:
                        "market_data_errors":len(pr.get("market_data_errors") or []),
                        "hypotheses":pr.get("hypotheses") or [],
                        "automatic_strategy_change":False,"best_variant_selection_allowed":False},
+        "strategy_review_gate":{"schema":sg.get("schema"),"overall_decision":sg.get("overall_decision") or "PRESERVE_CURRENT_PRODUCTION",
+                                "eligible_for_manual_review":sg.get("eligible_for_manual_review") or [],
+                                "criteria":sg.get("criteria") or {},"hypotheses":sg.get("hypotheses") or [],
+                                "automatic_promotion":False,"production_impact":"NONE"},
         "provenance":{
             "state":c.get("state"),"coverage":coverage,"overall":c.get("overall") or {},
             "shadow_test_hypotheses":c.get("shadow_test_hypotheses") or [],
