@@ -26,7 +26,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: atlas-production-failure-attribution
+  group: atlas-evidence-canonical-writer
   cancel-in-progress: false
 
 jobs:
@@ -88,10 +88,8 @@ jobs:
       - name: Commit attribution snapshot
         if: github.event_name != 'pull_request'
         run: |
-          git add status/production-failure-attribution-latest.json
-          if git diff --cached --quiet; then echo 'attribution unchanged'; exit 0; fi
-          git config user.name 'atlas-failure-attribution'
-          git config user.email 'atlas-attribution@users.noreply.github.com'
-          git commit -m 'validation: update post-V2 failure attribution [skip ci] [skip render]'
-          git pull --rebase origin main
-          git push origin HEAD:main
+          bash scripts/commit_status_with_retry.sh \
+            'atlas-failure-attribution' \
+            'atlas-attribution@users.noreply.github.com' \
+            'validation: update post-V2 failure attribution [skip ci] [skip render]' \
+            'status/production-failure-attribution-latest.json'
