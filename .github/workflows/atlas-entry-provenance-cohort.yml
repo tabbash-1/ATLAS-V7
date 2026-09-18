@@ -28,7 +28,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: atlas-entry-provenance-cohort
+  group: atlas-evidence-canonical-writer
   cancel-in-progress: false
 
 jobs:
@@ -94,10 +94,8 @@ jobs:
       - name: Commit evidence snapshot
         if: github.event_name != 'pull_request'
         run: |
-          git add status/entry-provenance-cohort-latest.json
-          if git diff --cached --quiet; then echo 'evidence unchanged'; exit 0; fi
-          git config user.name 'atlas-provenance-evidence'
-          git config user.email 'atlas-provenance@users.noreply.github.com'
-          git commit -m 'validation: update frozen entry provenance cohorts [skip ci] [skip render]'
-          git pull --rebase origin main
-          git push origin HEAD:main
+          bash scripts/commit_status_with_retry.sh \
+            'atlas-provenance-evidence' \
+            'atlas-provenance@users.noreply.github.com' \
+            'validation: update frozen entry provenance cohorts [skip ci] [skip render]' \
+            'status/entry-provenance-cohort-latest.json'
