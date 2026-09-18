@@ -60,3 +60,13 @@ def test_control_center_renders_candle_path_replay():
     assert "Candle-Path Replay" in page
     assert "path_replay" in source
     assert "opportunity-path-replay-latest.json" in source
+
+
+def test_control_center_exposes_manual_strategy_review_gate_only():
+    from pathlib import Path
+    root=Path(__file__).resolve().parents[1]
+    source=(root/"evidence_control_center.py").read_text(encoding="utf-8")
+    page=(root/"evidence-control-center.html").read_text(encoding="utf-8")
+    assert "strategy-change-review-gate-latest.json" in source
+    assert "Strategy Change Review Gate" in page
+    assert "automatic_promotion" in source
