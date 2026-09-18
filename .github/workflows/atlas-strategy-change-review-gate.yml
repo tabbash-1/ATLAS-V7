@@ -91,5 +91,12 @@ jobs:
           git config user.name 'atlas-strategy-review'
           git config user.email 'atlas-strategy-review@users.noreply.github.com'
           git commit -m 'validation: update strategy change review gate [skip render]'
-          git pull --rebase origin main
-          git push origin HEAD:main
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main
+            git rebase origin/main
+            if git push origin HEAD:main; then exit 0; fi
+            echo "main moved during evidence push; retry $attempt/5"
+            sleep $((attempt * 2))
+          done
+          echo "evidence push retries exhausted" >&2
+          exit 1
