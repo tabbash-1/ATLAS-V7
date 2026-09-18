@@ -199,3 +199,70 @@ def test_settlement_exposes_path_timing_metadata():
         assert out['terminal_refined_to_1m'] is False
     finally:
         p.market_klines=old_market
+
+
+def test_tp2_settles_immediately_before_12h_maturity():
+    old_market=p.market_klines
+    try:
+        candles=[
+            {'open_time':0,'open':100.0,'high':100.5,'low':99.8,'close':100.2},
+            {'open_time':300_000,'open':100.2,'high':102.1,'low':100.1,'close':102.0},
+        ]
+        p.market_klines=lambda symbol, interval, start, end: (candles,'TEST')
+        row={'id':'early-tp2','captured_at_ms':0,'symbol':'BTCUSDT','geometry':{
+            'direction':'LONG','entry':100.0,'stop_loss':99.0,'tp1':101.0,'tp2':102.0,'rr_tp2':2.0,'risk_abs':1.0}}
+        out=p.settle_entry(row,12,4*3600_000)
+        assert out['status']=='WIN_TP2'
+        assert out['terminal'] is True
+        assert out['r_multiple']==2.0
+        assert out['exit_at_ms']==300_000
+        assert out['excursion_scope']=='THROUGH_TERMINAL_EVENT'
+    finally:
+        p.market_klines=old_market
+
+
+def test_stop_settles_immediately_before_12h_maturity():
+    old_market=p.market_klines
+    try:
+        candles=[{'open_time':0,'open':100.0,'high':100.2,'low':98.8,'close':99.0}]
+        p.market_klines=lambda symbol, interval, start, end: (candles,'TEST')
+        row={'id':'early-sl','captured_at_ms':0,'symbol':'BTCUSDT','geometry':{
+            'direction':'LONG','entry':100.0,'stop_loss':99.0,'tp1':101.0,'tp2':102.0,'rr_tp2':2.0,'risk_abs':1.0}}
+        out=p.settle_entry(row,12,2*3600_000)
+        assert out['status']=='LOSS'
+        assert out['terminal'] is True
+        assert out['r_multiple']==-1.0
+        assert out['exit_at_ms']==0
+    finally:
+        p.market_klines=old_market
+
+
+def test_no_terminal_hit_stays_open_before_maturity_with_observed_path_only():
+    old_market=p.market_klines
+    try:
+        candles=[{'open_time':0,'open':100.0,'high':100.4,'low':99.6,'close':100.2}]
+        p.market_klines=lambda symbol, interval, start, end: (candles,'TEST')
+        row={'id':'open','captured_at_ms':0,'symbol':'BTCUSDT','geometry':{
+            'direction':'LONG','entry':100.0,'stop_loss':99.0,'tp1':101.0,'tp2':102.0,'rr_tp2':2.0,'risk_abs':1.0}}
+        out=p.settle_entry(row,12,2*3600_000)
+        assert out['status']=='OPEN'
+        assert out['terminal'] is False
+        assert out['r_multiple'] is None
+        assert out['excursion_scope']=='OBSERVED_TO_NOW'
+    finally:
+        p.market_klines=old_market
+
+
+def test_excursion_evidence_is_nonnegative_by_definition():
+    old_market=p.market_klines
+    try:
+        candles=[{'open_time':0,'open':99.5,'high':99.7,'low':98.8,'close':99.0}]
+        p.market_klines=lambda symbol, interval, start, end: (candles,'TEST')
+        row={'id':'floor','captured_at_ms':0,'symbol':'BTCUSDT','geometry':{
+            'direction':'LONG','entry':100.0,'stop_loss':99.0,'tp1':101.0,'tp2':102.0,'rr_tp2':2.0,'risk_abs':1.0}}
+        out=p.settle_entry(row,12,2*3600_000)
+        assert out['status']=='LOSS'
+        assert out['mfe_r']==0.0
+        assert out['mae_r']>=0.0
+    finally:
+        p.market_klines=old_market
