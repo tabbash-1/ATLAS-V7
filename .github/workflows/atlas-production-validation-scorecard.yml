@@ -1,6 +1,9 @@
 name: ATLAS Production Validation Scorecard
 
 on:
+  workflow_run:
+    workflows: ['ATLAS $10K Paper Portfolio']
+    types: [completed]
   pull_request:
     branches: [main]
     paths:
@@ -26,6 +29,7 @@ concurrency:
 
 jobs:
   validate:
+    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
