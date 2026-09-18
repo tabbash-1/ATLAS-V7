@@ -46,3 +46,13 @@ def test_diagnostics_chain_from_scorecard_workflow_run():
         assert "ATLAS Production Validation Scorecard" in y
         assert "github.event.workflow_run.conclusion == 'success'" in y
         assert "github.event.workflow_run.head_branch == 'main'" in y
+
+
+def test_workflow_run_consumers_checkout_fresh_main_not_stale_upstream_sha():
+    for name in ("atlas-production-validation-scorecard.yml","atlas-production-failure-attribution.yml","atlas-entry-provenance-cohort.yml"):
+        y=text(name)
+        assert "Checkout latest main after upstream workflow" in y
+        assert "if: github.event_name == 'workflow_run'" in y
+        assert "ref: main" in y
+        assert "Checkout triggering ref" in y
+        assert "if: github.event_name != 'workflow_run'" in y
