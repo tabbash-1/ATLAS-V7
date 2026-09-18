@@ -64,6 +64,8 @@ def test_entry_provenance_freezer_is_compact_and_preoutcome():
     assert z["schema"]=="ATLAS_ENTRY_DECISION_PROVENANCE_V1"
     assert z["frozen_before_outcome"] is True
     assert z["source_of_truth"]=="FINAL_TRADE_GATE"
+    assert z["strategy_epoch_id"]=="HTF_SR_V2_2026-09-14"
+    assert z["product_horizon"]=="4-12H" and z["production_threshold_locked"]==68
     assert z["score"]==74 and z["threshold"]==68
     assert z["futures_alignment"]=="ALIGNED"
     assert "settlement" not in z and "pnl_usd" not in z
