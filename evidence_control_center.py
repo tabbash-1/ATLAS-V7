@@ -35,6 +35,7 @@ def build(root: Path) -> dict[str,Any]:
     w=_load(root,"wait-missed-opportunity-latest.json")
     p=_load(root,"paper-portfolio-10k-latest.json")
     o=_load(root,"canonical-outcomes-latest.json")
+    r=_load(root,"opportunity-replay-shadow-latest.json")
     if (v.get("epoch") or {}).get("id") not in (None,EPOCH_ID):
         raise RuntimeError("control center refuses mixed strategy epoch")
     if (v.get("safety") or {}).get("production_threshold") not in (None,THRESHOLD):
@@ -91,6 +92,10 @@ def build(root: Path) -> dict[str,Any]:
         },
         "direction":net.get("by_direction") or {},
         "failure_attribution":a.get("summary") or {},
+        "opportunity_replay":{"schema":r.get("schema"),"activation_at":r.get("activation_at"),
+                              "eligible_prospective_rows":r.get("eligible_prospective_rows",0),
+                              "hypotheses":r.get("hypotheses") or [],
+                              "automatic_strategy_change":False},
         "provenance":{
             "state":c.get("state"),"coverage":coverage,"overall":c.get("overall") or {},
             "shadow_test_hypotheses":c.get("shadow_test_hypotheses") or [],
