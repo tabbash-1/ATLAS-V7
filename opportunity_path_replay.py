@@ -186,21 +186,31 @@ def build(root:Path):
         except Exception as exc:
             data_errors.append({"decision_id":row.get("decision_id"),"symbol":row.get("symbol"),"error":f"{type(exc).__name__}: {exc}"})
             continue
+        champion=(cost.get(str(row.get("decision_id"))) or {}).get("net_r")
         for h in PATH_HYPOTHESES:
             out=replay_delay(row,candles) if h["id"]=="DELAY_ENTRY_1H_CONFIRM" else replay_failfast(row,candles)
+            # Pair every evaluable policy decision, not only trades whose path changed.
+            # SKIP => 0R shadow contribution; NO_TRIGGER => Champion unchanged.
+            shadow_net_r=out.get("net_r")
+            policy_effect="REPRICED_PATH" if shadow_net_r is not None else None
+            if h["id"]=="DELAY_ENTRY_1H_CONFIRM" and str(out.get("state") or "").startswith("SHADOW_SKIP_"):
+                shadow_net_r=0.0; policy_effect="SKIPPED_BY_SHADOW_POLICY"
+            elif h["id"]=="EARLY_MOMENTUM_FAILFAST_EXIT" and out.get("state")=="NO_FAILFAST_TRIGGER" and champion is not None:
+                shadow_net_r=float(champion); policy_effect="UNCHANGED_CHAMPION_PATH"
             results[h["id"]].append({"decision_id":row.get("decision_id"),"symbol":row.get("symbol"),"direction":row.get("direction"),
                                      "captured_at":row.get("captured_at"),"provider":provider,
-                                     "champion_net_r":(cost.get(str(row.get("decision_id"))) or {}).get("net_r"),**out})
+                                     "champion_net_r":champion,"shadow_net_r":shadow_net_r,"policy_effect":policy_effect,**out})
     reports=[]
     for h in PATH_HYPOTHESES:
-        rr=results[h["id"]]; settled=[x for x in rr if x.get("net_r") is not None]
-        paired=[x for x in settled if x.get("champion_net_r") is not None]
-        delta=sum(float(x["net_r"])-float(x["champion_net_r"]) for x in paired)
+        rr=results[h["id"]]
+        paired=[x for x in rr if x.get("shadow_net_r") is not None and x.get("champion_net_r") is not None]
+        changed=[x for x in paired if x.get("policy_effect") in {"REPRICED_PATH","SKIPPED_BY_SHADOW_POLICY"}]
+        delta=sum(float(x["shadow_net_r"])-float(x["champion_net_r"]) for x in paired)
         reports.append({**h,"state":"FORMAL_SHADOW_SAMPLE_READY" if len(paired)>=MIN_N else "COLLECTING_PATH_REPLAY",
-                        "eligible":len(eligible),"settled":len(settled),"paired_n":len(paired),"min_n":MIN_N,
+                        "eligible":len(eligible),"evaluable":len(paired),"changed":len(changed),"paired_n":len(paired),"min_n":MIN_N,
                         "formal_ready":len(paired)>=MIN_N,
                         "champion_net_r":round(sum(float(x["champion_net_r"]) for x in paired),4) if paired else None,
-                        "shadow_net_r":round(sum(float(x["net_r"]) for x in paired),4) if paired else None,
+                        "shadow_net_r":round(sum(float(x["shadow_net_r"]) for x in paired),4) if paired else None,
                         "delta_net_r":round(delta,4) if paired else None,
                         "promotion_allowed":False,"production_impact":"NONE","rows":rr})
     return {"schema":VERSION,"generated_at":dt.datetime.now(dt.timezone.utc).isoformat(),"activation_at":ACTIVATION_AT,
