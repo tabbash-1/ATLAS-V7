@@ -169,6 +169,18 @@ def replay_failfast(row,candles):
             "champion_terminal":champion.get("terminal")}
 
 
+def shadow_pair_value(hypothesis_id:str,out:dict[str,Any],champion_net_r):
+    """Return evaluable shadow contribution for the pre-registered policy."""
+    if out.get("net_r") is not None:
+        return float(out["net_r"]),"REPRICED_PATH"
+    state=str(out.get("state") or "")
+    if hypothesis_id=="DELAY_ENTRY_1H_CONFIRM" and state.startswith("SHADOW_SKIP_"):
+        return 0.0,"SKIPPED_BY_SHADOW_POLICY"
+    if hypothesis_id=="EARLY_MOMENTUM_FAILFAST_EXIT" and state=="NO_FAILFAST_TRIGGER" and champion_net_r is not None:
+        return float(champion_net_r),"UNCHANGED_CHAMPION_PATH"
+    return None,None
+
+
 def build(root:Path):
     v=_read(root,"production-validation-latest.json")
     if v.get("schema")!=SOURCE_SCHEMA:raise RuntimeError("unexpected scorecard schema")
@@ -191,12 +203,7 @@ def build(root:Path):
             out=replay_delay(row,candles) if h["id"]=="DELAY_ENTRY_1H_CONFIRM" else replay_failfast(row,candles)
             # Pair every evaluable policy decision, not only trades whose path changed.
             # SKIP => 0R shadow contribution; NO_TRIGGER => Champion unchanged.
-            shadow_net_r=out.get("net_r")
-            policy_effect="REPRICED_PATH" if shadow_net_r is not None else None
-            if h["id"]=="DELAY_ENTRY_1H_CONFIRM" and str(out.get("state") or "").startswith("SHADOW_SKIP_"):
-                shadow_net_r=0.0; policy_effect="SKIPPED_BY_SHADOW_POLICY"
-            elif h["id"]=="EARLY_MOMENTUM_FAILFAST_EXIT" and out.get("state")=="NO_FAILFAST_TRIGGER" and champion is not None:
-                shadow_net_r=float(champion); policy_effect="UNCHANGED_CHAMPION_PATH"
+            shadow_net_r,policy_effect=shadow_pair_value(h["id"],out,champion)
             results[h["id"]].append({"decision_id":row.get("decision_id"),"symbol":row.get("symbol"),"direction":row.get("direction"),
                                      "captured_at":row.get("captured_at"),"provider":provider,
                                      "champion_net_r":champion,"shadow_net_r":shadow_net_r,"policy_effect":policy_effect,**out})
