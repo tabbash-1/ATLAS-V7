@@ -70,13 +70,21 @@ def build(root:Path)->dict[str,Any]:
             continue
         kept=[x for x in eligible if not _trigger(h["id"],x["provenance"])]
         skipped=[x for x in eligible if _trigger(h["id"],x["provenance"])]
-        champion=sum(x["net_r"] for x in eligible); shadow=sum(x["net_r"] for x in kept)
+        paired_rows=[]
+        for x in eligible:
+            triggered=_trigger(h["id"],x["provenance"])
+            shadow_r=0.0 if triggered else float(x["net_r"])
+            paired_rows.append({"decision_id":x["decision_id"],"symbol":x["symbol"],"direction":x["direction"],
+                                "captured_at":x["captured_at"],"champion_net_r":float(x["net_r"]),
+                                "shadow_net_r":shadow_r,"delta_net_r":round(shadow_r-float(x["net_r"]),4),
+                                "policy_effect":"SKIPPED_BY_SHADOW_POLICY" if triggered else "UNCHANGED_CHAMPION_PATH"})
+        champion=sum(x["net_r"] for x in eligible); shadow=sum(x["shadow_net_r"] for x in paired_rows)
         results.append({**h,"state":"COLLECTING" if len(eligible)<MIN_N else "FORMAL_SHADOW_SAMPLE_READY",
                         "n":len(eligible),"kept":len(kept),"skipped":len(skipped),
                         "champion_net_r":round(champion,4),"shadow_filter_net_r":round(shadow,4),
                         "delta_net_r":round(shadow-champion,4),"min_n":MIN_N,
                         "formal_ready":len(eligible)>=MIN_N,"promotion_allowed":False,
-                        "production_impact":"NONE"})
+                        "production_impact":"NONE","paired_rows":paired_rows})
     return {"schema":VERSION,"activation_at":ACTIVATION_AT,"epoch_id":EPOCH_ID,
             "criteria_locked_before_evaluation":True,"eligible_prospective_rows":len(eligible),
             "hypotheses":results,

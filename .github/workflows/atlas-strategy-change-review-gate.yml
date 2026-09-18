@@ -1,0 +1,92 @@
+name: ATLAS Strategy Change Review Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'strategy_change_review_gate.py'
+      - 'opportunity_replay_shadow.py'
+      - 'opportunity_path_replay.py'
+      - 'tests/test_strategy_change_review_gate.py'
+      - 'tests/test_opportunity_path_replay.py'
+      - '.github/workflows/atlas-strategy-change-review-gate.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'status/opportunity-replay-shadow-latest.json'
+      - 'status/opportunity-path-replay-latest.json'
+      - 'strategy_change_review_gate.py'
+      - '.github/workflows/atlas-strategy-change-review-gate.yml'
+  schedule:
+    - cron: '44 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atlas-strategy-change-review-gate
+  cancel-in-progress: false
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Regression
+        run: |
+          python -m py_compile strategy_change_review_gate.py opportunity_replay_shadow.py opportunity_path_replay.py
+          PYTHONPATH=. python - <<'PY'
+          import tests.test_strategy_change_review_gate as g
+          import tests.test_opportunity_path_replay as p
+          for module in (g,p):
+              for name in sorted(x for x in dir(module) if x.startswith('test_')):
+                  getattr(module,name)(); print('PASS',module.__name__,name)
+          PY
+      - name: Refresh shadow inputs
+        run: |
+          python opportunity_replay_shadow.py
+          python opportunity_path_replay.py
+      - name: Build strategy review gate
+        run: python strategy_change_review_gate.py
+      - name: Verify production firewall
+        run: |
+          python - <<'PY'
+          import json
+          p=json.load(open('status/strategy-change-review-gate-latest.json'))
+          assert p['schema']=='ATLAS_STRATEGY_CHANGE_REVIEW_GATE_V1'
+          assert p['criteria_locked_before_formal_sample'] is True
+          assert p['criteria']['paired_n']==30
+          assert p['criteria']['affected_n']==10
+          assert p['criteria']['delta_avg_net_r_gte']==0.10
+          assert p['criteria']['shadow_profit_factor_gte']==1.10
+          assert p['interpretation']['automatic_strategy_change'] is False
+          assert p['interpretation']['automatic_promotion'] is False
+          assert p['safety']['production_threshold']==68
+          assert p['safety']['production_impact']=='NONE'
+          assert p['safety']['can_override_production'] is False
+          print('STRATEGY_REVIEW_GATE_OK',p['overall_decision'],p['eligible_for_manual_review'])
+          PY
+      - name: Upload evidence packet
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-strategy-review-${{ github.run_id }}
+          path: |
+            status/opportunity-replay-shadow-latest.json
+            status/opportunity-path-replay-latest.json
+            status/strategy-change-review-gate-latest.json
+          retention-days: 30
+      - name: Commit review snapshot
+        if: github.event_name != 'pull_request'
+        run: |
+          git add status/strategy-change-review-gate-latest.json
+          if git diff --cached --quiet; then echo 'review gate unchanged'; exit 0; fi
+          git config user.name 'atlas-strategy-review'
+          git config user.email 'atlas-strategy-review@users.noreply.github.com'
+          git commit -m 'validation: update strategy change review gate [skip render]'
+          git pull --rebase origin main
+          git push origin HEAD:main

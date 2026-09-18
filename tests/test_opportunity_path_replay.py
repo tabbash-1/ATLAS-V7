@@ -71,3 +71,18 @@ def test_safety_constants_are_locked():
     assert m.THRESHOLD==68 and m.MIN_N==30
     assert m.FAILFAST_ADVERSE_R==-.25 and m.FAILFAST_WINDOW_H==4
     assert {x["id"] for x in m.PATH_HYPOTHESES}=={"DELAY_ENTRY_1H_CONFIRM","EARLY_MOMENTUM_FAILFAST_EXIT"}
+
+
+def test_delay_skip_is_paired_as_zero_r_not_dropped():
+    v,e=m.shadow_pair_value("DELAY_ENTRY_1H_CONFIRM",{"state":"SHADOW_SKIP_NO_1H_CONFIRM"},-1.2)
+    assert v==0.0 and e=="SKIPPED_BY_SHADOW_POLICY"
+
+
+def test_failfast_no_trigger_is_paired_as_unchanged_champion():
+    v,e=m.shadow_pair_value("EARLY_MOMENTUM_FAILFAST_EXIT",{"state":"NO_FAILFAST_TRIGGER"},0.7)
+    assert v==0.7 and e=="UNCHANGED_CHAMPION_PATH"
+
+
+def test_unavailable_path_remains_unpaired_fail_closed():
+    v,e=m.shadow_pair_value("DELAY_ENTRY_1H_CONFIRM",{"state":"MARKET_DATA_INCOMPLETE"},-1)
+    assert v is None and e is None
