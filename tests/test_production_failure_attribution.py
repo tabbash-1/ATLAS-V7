@@ -74,3 +74,12 @@ def test_entry_provenance_freezer_is_compact_and_preoutcome():
 def test_safety_contract_constants():
     assert m.THRESHOLD==68.0
     assert m.EPOCH_ID=="HTF_SR_V2_2026-09-14"
+
+
+def test_path_timing_can_tag_early_favorable_reversal_without_causal_claim():
+    x=row(r=-1,mfe=.7,mae=1.1,exit_h=5)
+    x["settlement"]["time_to_mfe_peak_h"]=.5
+    x["settlement"]["time_to_mae_peak_h"]=4.8
+    d=m.diagnose(x)
+    assert "EARLY_FAVORABLE_EXCURSION_THEN_REVERSAL" in d["secondary_tags"]
+    assert d["time_to_mfe_peak_h"]==.5
