@@ -1,6 +1,9 @@
 name: ATLAS Entry Provenance Cohort Evidence
 
 on:
+  workflow_run:
+    workflows: ['ATLAS Production Validation Scorecard']
+    types: [completed]
   pull_request:
     branches: [main]
     paths:
@@ -30,6 +33,7 @@ concurrency:
 
 jobs:
   evidence:
+    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
