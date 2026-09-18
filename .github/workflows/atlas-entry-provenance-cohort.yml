@@ -41,10 +41,13 @@ jobs:
         run: |
           python -m py_compile entry_provenance_cohort_evidence.py
           PYTHONPATH=. python - <<'PY'
-          import tests.test_entry_provenance_cohort_evidence as t
-          for name in sorted(x for x in dir(t) if x.startswith('test_')):
-              getattr(t,name)()
-              print('PASS',name)
+          import tests.test_entry_provenance_cohort_evidence as c
+          import tests.test_production_failure_attribution as a
+          import tests.test_paper_portfolio_10k as p
+          for module in (c,a,p):
+              for name in sorted(x for x in dir(module) if x.startswith('test_')):
+                  getattr(module,name)()
+                  print('PASS',module.__name__,name)
           PY
       - name: Build prospective provenance cohorts
         run: python entry_provenance_cohort_evidence.py
