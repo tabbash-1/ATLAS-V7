@@ -1,0 +1,84 @@
+name: ATLAS Production Failure Attribution
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'production_failure_attribution.py'
+      - 'paper_portfolio_10k.py'
+      - 'tests/test_production_failure_attribution.py'
+      - '.github/workflows/atlas-production-failure-attribution.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'production_failure_attribution.py'
+      - 'paper_portfolio_10k.py'
+      - 'status/production-validation-latest.json'
+      - '.github/workflows/atlas-production-failure-attribution.yml'
+  schedule:
+    - cron: '22 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atlas-production-failure-attribution
+  cancel-in-progress: false
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Regression
+        run: |
+          python -m py_compile production_failure_attribution.py paper_portfolio_10k.py
+          PYTHONPATH=. python - <<'PY'
+          import tests.test_production_failure_attribution as t
+          for name in sorted(x for x in dir(t) if x.startswith('test_')):
+              getattr(t,name)()
+              print('PASS',name)
+          PY
+      - name: Build failure attribution
+        run: python production_failure_attribution.py
+      - name: Verify evidence-only contract
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path('status/production-failure-attribution-latest.json').read_text())
+          assert p['schema']=='ATLAS_PRODUCTION_FAILURE_ATTRIBUTION_V1'
+          assert p['decision_source_of_truth']=='FINAL_TRADE_GATE'
+          assert p['epoch']['id']=='HTF_SR_V2_2026-09-14'
+          assert p['evidence_quality']['retroactive_provenance_inference_allowed'] is False
+          assert p['interpretation']['automatic_strategy_change'] is False
+          assert p['safety']['production_impact']=='NONE'
+          assert p['safety']['production_threshold']==68
+          assert p['safety']['score_logic_changed'] is False
+          assert p['safety']['risk_logic_changed'] is False
+          assert p['safety']['sl_tp_logic_changed'] is False
+          assert p['safety']['final_trade_gate_changed'] is False
+          print('FAILURE_ATTRIBUTION_OK',p['summary'])
+          PY
+      - name: Upload attribution artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-production-failure-attribution-${{ github.run_id }}
+          path: status/production-failure-attribution-latest.json
+          retention-days: 30
+      - name: Commit attribution snapshot
+        if: github.event_name != 'pull_request'
+        run: |
+          git add status/production-failure-attribution-latest.json
+          if git diff --cached --quiet; then echo 'attribution unchanged'; exit 0; fi
+          git config user.name 'atlas-failure-attribution'
+          git config user.email 'atlas-attribution@users.noreply.github.com'
+          git commit -m 'validation: update post-V2 failure attribution [skip ci] [skip render]'
+          git push origin HEAD:main
