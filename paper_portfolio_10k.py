@@ -139,6 +139,9 @@ def freeze_decision_provenance(decision: dict[str, Any]) -> dict[str, Any]:
         "schema": "ATLAS_ENTRY_DECISION_PROVENANCE_V1",
         "frozen_before_outcome": True,
         "source_of_truth": "FINAL_TRADE_GATE",
+        "strategy_epoch_id": "HTF_SR_V2_2026-09-14",
+        "product_horizon": "4-12H",
+        "production_threshold_locked": 68,
         "candidate_direction": _path(decision, "candidate_direction", "direction"),
         "score": fnum(decision.get("score")),
         "threshold": fnum(_path(decision, "signal_threshold", "threshold")),
@@ -283,6 +286,27 @@ def _excursion_rows_through_terminal(candles, terminal_candle, parent_5m_open=No
     return [c for c in candles if int(c["open_time"]) <= terminal_open]
 
 
+def path_timing(rows, g: dict[str, Any], start_ms: int):
+    """Descriptive timing of observed excursions using bar open timestamps.
+
+    This does not infer intrabar ordering. It is evidence metadata only.
+    """
+    if not rows: return {"time_to_mfe_peak_h":None,"time_to_mae_peak_h":None,"time_to_tp1_h":None,"tp1_first_hit_at_ms":None}
+    risk=float(g["risk_abs"]); direction=g["direction"]; entry=float(g["entry"]); tp1=float(g["tp1"])
+    best_f=None; best_a=None; best_ft=None; best_at=None; tp1_at=None
+    for bar in rows:
+        t=int(bar["open_time"]); hi=float(bar["high"]); lo=float(bar["low"])
+        fav=(hi-entry)/risk if direction=="LONG" else (entry-lo)/risk
+        adv=(entry-lo)/risk if direction=="LONG" else (hi-entry)/risk
+        if best_f is None or fav>best_f: best_f,best_ft=fav,t
+        if best_a is None or adv>best_a: best_a,best_at=adv,t
+        if tp1_at is None and ((direction=="LONG" and hi>=tp1) or (direction=="SHORT" and lo<=tp1)): tp1_at=t
+    def hours(t): return None if t is None else round(max(0.0,(t-start_ms)/3_600_000.0),4)
+    return {"time_to_mfe_peak_h":hours(best_ft),"time_to_mae_peak_h":hours(best_at),
+            "time_to_tp1_h":hours(tp1_at),"tp1_first_hit_at_ms":tp1_at,
+            "timing_semantics":"BAR_OPEN_TIME_APPROX_NO_INTRABAR_ORDER_INFERENCE"}
+
+
 def settle_entry(row: dict[str, Any], horizon_h: float, now_ms: int):
     start = int(row["captured_at_ms"]); maturity = start + int(horizon_h*3600_000); g=row["geometry"]
     if now_ms < maturity:
@@ -310,6 +334,7 @@ def settle_entry(row: dict[str, Any], horizon_h: float, now_ms: int):
             refinement_rows=refinement_rows,
         )
         mfe, mae = excursions(excursion_rows, g)
+        timing = path_timing(excursion_rows, g, start)
         if ev == "SL": status,r,terminal,exit_ms="LOSS",-1.0,True,int(candle["open_time"] if candle else maturity)
         elif ev == "TP2": status,r,terminal,exit_ms="WIN_TP2",float(g["rr_tp2"]),True,int(candle["open_time"] if candle else maturity)
         elif ev == "AMBIGUOUS": status,r,terminal,exit_ms="AMBIGUOUS",None,False,None
@@ -319,6 +344,7 @@ def settle_entry(row: dict[str, Any], horizon_h: float, now_ms: int):
             r=directional/g["risk_abs"]; status="EXPIRED_TP1" if tp1_seen else "EXPIRED"; terminal=True; exit_ms=maturity
         return {"id":row["id"],"status":status,"terminal":terminal,"r_multiple":None if r is None else round(float(r),4),
                 "exit_at_ms":exit_ms,"tp1_reached":bool(tp1_seen),"mfe_r":mfe,"mae_r":mae,
+                **timing,"terminal_refined_to_1m":bool(refinement_rows is not None),
                 "excursion_scope":"THROUGH_TERMINAL_EVENT" if ev in {"SL","TP2"} else "FULL_HORIZON",
                 "market_source":provider}
     except Exception as e:
