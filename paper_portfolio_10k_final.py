@@ -31,7 +31,14 @@ def strict_trade_ready(decision):
     return bool(g and g.get("direction") == action)
 
 
-portfolio.trade_ready = strict_trade_ready
+def install_strict_guard():
+    """Install the strict predicate only for the executable wrapper.
+
+    Importing this module for tests or diagnostics must not mutate the shared
+    legacy accounting module for the rest of the Python process.
+    """
+    portfolio.trade_ready = strict_trade_ready
 
 if __name__ == "__main__":
+    install_strict_guard()
     portfolio.main()

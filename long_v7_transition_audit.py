@@ -66,9 +66,10 @@ def dt(v):
 
 
 def nearest_prior(history, now, min_h, max_h):
-    """Return closest prior row whose age is inside the pre-registered window."""
+    """Return the row closest to the named lag inside its frozen window."""
     best = None
     best_age = None
+    target_h = (float(min_h) + float(max_h)) / 2.0
     for r in reversed(history):
         t = dt(r.get('captured_at'))
         if t is None or t >= now:
@@ -78,7 +79,7 @@ def nearest_prior(history, now, min_h, max_h):
             continue
         if age > max_h:
             break
-        if best is None or age < best_age:
+        if best is None or abs(age-target_h) < abs(best_age-target_h):
             best, best_age = r, age
     return best, best_age
 

@@ -22,7 +22,7 @@ import scenario_outcome_recorder as recorder
 VERSION = 'SCENARIO_EVIDENCE_PIPELINE_V1'
 BASE_URL = os.environ.get('ATLAS_BASE_URL', 'https://atlas-v7.onrender.com').rstrip('/')
 SYMBOLS = tuple(x.strip().upper() for x in os.environ.get(
-    'ATLAS_SCENARIO_SYMBOLS', 'BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,BNBUSDT,DOGEUSDT,ZECUSDT'
+    'ATLAS_SCENARIO_SYMBOLS', 'BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,BNBUSDT,DOGEUSDT,ZECUSDT,ADAUSDT,LINKUSDT,AVAXUSDT,LTCUSDT'
 ).split(',') if x.strip())
 STATUS_DIR = Path(os.environ.get('ATLAS_SCENARIO_STATUS_DIR', 'status'))
 OUTCOMES_PATH = STATUS_DIR / 'scenario-outcomes.json'

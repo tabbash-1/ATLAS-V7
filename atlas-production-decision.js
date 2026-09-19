@@ -1,6 +1,6 @@
 (()=>{
 const VERSION='ATLAS_PRODUCTION_DECISION_UI_V13_EXTENDED_TARGET_EVIDENCE';
-const SUPPORTED=new Set(['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT','HYPEUSDT']);
+const SUPPORTED=new Set(['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT','ADAUSDT','LINKUSDT','AVAXUSDT','LTCUSDT','HYPEUSDT']);
 let verifyEpoch=0;
 const $=id=>document.getElementById(id),finite=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v)),fmt=(v,d=4)=>finite(v)?Number(v).toLocaleString(undefined,{maximumFractionDigits:d}):'—',norm=v=>String(v||'').toUpperCase().replace('BINANCE:','').replace(/[^A-Z0-9]/g,'');
 function currentSymbol(){const s=window.ATLAS_APP_STATE,a=s?.assets?.[s.active];return norm(a?.symbol)}

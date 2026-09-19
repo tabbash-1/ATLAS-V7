@@ -61,7 +61,7 @@ def test_unified_terminal_market_map_uses_only_canonical_production_frames():
 def test_unified_terminal_core_asset_authority_is_asset_agnostic():
     terminal = text('atlas-unified-terminal.js')
     production = text('atlas-production-decision.js')
-    for symbol in ['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT']:
+    for symbol in ['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT','ADAUSDT','LINKUSDT','AVAXUSDT','LTCUSDT']:
         assert symbol in production
     assert "marketMapSource:'production.htf_thesis.frames'" in terminal
     assert "sourceOfTruth:'FINAL_TRADE_GATE'" in terminal

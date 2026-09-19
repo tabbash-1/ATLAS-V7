@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 import datetime as dt, json, os, pathlib, time, urllib.parse, urllib.request
+from production_asset_universe import ASSET_UNIVERSE_EPOCH, cohort_for
 ROOT=pathlib.Path(__file__).resolve().parent
 BASE=os.environ.get('ATLAS_ANALYST_CAPTURE_BASE','https://atlas-v7.onrender.com').rstrip('/')
-SYMBOLS=tuple(x.strip().upper() for x in os.environ.get('ATLAS_ANALYST_CAPTURE_SYMBOLS','BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,BNBUSDT,DOGEUSDT,ZECUSDT,HYPEUSDT').split(',') if x.strip())
+SYMBOLS=tuple(x.strip().upper() for x in os.environ.get('ATLAS_ANALYST_CAPTURE_SYMBOLS','BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,BNBUSDT,DOGEUSDT,ZECUSDT,ADAUSDT,LINKUSDT,AVAXUSDT,LTCUSDT,HYPEUSDT').split(',') if x.strip())
 OUT=pathlib.Path(os.environ.get('ATLAS_ANALYST_CAPTURE_OUT',str(ROOT/'status/history/analyst-output-snapshots.jsonl')))
 CAPTURE_SCHEMA=os.environ.get('ATLAS_ANALYST_CAPTURE_SCHEMA','ATLAS_ANALYST_OUTPUT_FORWARD_CAPTURE_V1')
 COHORT_LABEL=os.environ.get('ATLAS_ANALYST_CAPTURE_COHORT_LABEL','')
@@ -37,6 +38,7 @@ def main():
             try:
                 d=get(f"{BASE}/api/decision/current?symbol={urllib.parse.quote(s)}&t={time.time_ns()}")
                 if not valid(d,s):raise RuntimeError('CANONICAL_CONTRACT_VALIDATION_FAILED')
+                d['asset_cohort']=cohort_for(s); d['asset_universe_epoch']=ASSET_UNIVERSE_EPOCH
                 freeze_candidate_cost(d,s)
                 decisions[s]=d; ok=True; break
             except Exception as e:

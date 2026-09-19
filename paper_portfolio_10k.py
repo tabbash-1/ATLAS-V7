@@ -18,6 +18,7 @@ from typing import Any
 
 from canonical_decision_contract import from_decision
 from offline_production_path_settlement import market_klines, event_from, excursions
+from production_asset_universe import ASSET_UNIVERSE_EPOCH, cohort_for
 
 ROOT = pathlib.Path(__file__).resolve().parent
 MANIFEST = ROOT / "status/paper-portfolio-10k-manifest.json"
@@ -234,6 +235,7 @@ def enroll_new(manifest, cohort, snapshots, observed_through, sizing_equity):
             row = {
                 "schema":"ATLAS_PAPER_PORTFOLIO_10K_ENTRY_V3_CANONICAL_TRUTH","id":eid,"decision_id":truth["decision_id"],"portfolio_id":manifest["portfolio_id"],
                 "captured_at":captured,"captured_at_ms":int(t.timestamp()*1000),"symbol":symbol,"direction":direction,
+                "asset_cohort":cohort_for(symbol),"asset_universe_epoch":ASSET_UNIVERSE_EPOCH,
                 "decision_source":"FINAL_TRADE_GATE","decision_action":"TRADE_READY","canonical_truth_schema":truth["schema"],
                 "product_horizon":g.get("product_horizon") or PRODUCT_HORIZON,"canonical_lane":g.get("canonical_lane") or "CORE_4_12H",
                 "evaluation_horizons":["4h","8h","12h"],
@@ -384,6 +386,15 @@ def portfolio_report(manifest, cohort, settlements, generated_at, observed_throu
     def direction_stats(direction):
         z=[x for x in closed if x["row"]["direction"]==direction]; p=sum(x["pnl_usd"] for x in z)
         return {"closed":len(z),"pnl_usd":round(p,2),"win_rate_pct":round(100*sum(x["pnl_usd"]>0 for x in z)/len(z),2) if z else None}
+    def cohort_stats(cohort_name):
+        enrolled=[row for row in cohort if (row.get("asset_cohort") or cohort_for(row.get("symbol")))==cohort_name]
+        z=[x for x in closed if (x["row"].get("asset_cohort") or cohort_for(x["row"].get("symbol")))==cohort_name]
+        cohort_rs=[float(x["settlement"]["r_multiple"]) for x in z]
+        pnl=sum(x["pnl_usd"] for x in z)
+        return {"entries":len(enrolled),"closed":len(z),"open_or_unresolved":len(enrolled)-len(z),
+                "pnl_usd":round(pnl,2),"net_r":round(sum(cohort_rs),4),
+                "avg_r":round(sum(cohort_rs)/len(cohort_rs),4) if cohort_rs else None,
+                "win_rate_pct":round(100*sum(x["pnl_usd"]>0 for x in z)/len(z),2) if z else None}
     checkpoint_summary={}
     for h in PRODUCT_CHECKPOINT_HOURS:
         vals=[]
@@ -406,6 +417,8 @@ def portfolio_report(manifest, cohort, settlements, generated_at, observed_throu
         "methodology":"Prospective canonical Final Trade Guard TRADE READY entries only; frozen Entry/SL/TP2; SL/TP2 settle immediately on first observed touch using 5m candles with 1m ambiguity refinement; 4h/8h/12h product-window checkpoints; 12h mark-to-market expiry only when no terminal barrier was hit; gross paper P&L before fees/slippage.",
         "cost_note":"Gross paper performance. Exchange fees, funding and slippage are not deducted and results must not be described as live-account P&L.",
         "checkpoint_summary":checkpoint_summary,
+        "asset_universe":{"epoch":ASSET_UNIVERSE_EPOCH,"cohorts_separate":True,
+                          "base":cohort_stats("BASE_V1"),"expansion":cohort_stats("ASSET_EXPANSION_V1")},
         "portfolio":{"starting_equity_usd":start,"equity_usd":round(equity,2),"net_pnl_usd":round(equity-start,2),"return_pct":round((equity/start-1)*100,4),
                      "peak_equity_usd":round(peak,2),"max_drawdown_pct":round(max_dd,4),"entries":len(cohort),"closed":len(closed),
                      "open_or_unresolved":len(cohort)-len(closed),"wins":len(wins),"losses":len(losses),

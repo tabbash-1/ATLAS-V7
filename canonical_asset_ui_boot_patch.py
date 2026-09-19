@@ -1,17 +1,18 @@
-"""Production UI patch for the canonical seven-asset ATLAS universe.
+"""Production UI patch for the canonical ATLAS asset universe.
 
-The browser historically exposed HYPE as an eighth selectable symbol. Earlier
+The browser historically exposed HYPE as an extra selectable symbol. Earlier
 Render boot patches can rewrite its provider from BINANCE to BYBIT before this
 patch runs, so removal must be provider-agnostic. The Production decision API is
-contractually limited to seven assets; research-only symbols must not be shown or
-resurrected from localStorage. This guard is intentionally strategy-neutral.
+contractually limited to the frozen base-plus-expansion universe; research-only
+symbols must not be shown or resurrected from localStorage. This guard is
+intentionally strategy-neutral.
 """
 from __future__ import annotations
 
 import re
 from pathlib import Path
 
-VERSION = "ATLAS_CANONICAL_ASSET_UI_PATCH_V3_EXPOSURE_DIAGNOSTIC"
+VERSION = "ATLAS_CANONICAL_ASSET_UI_PATCH_V4_EXPANSION_COHORT"
 CANONICAL_UI_SYMBOLS = (
     "BINANCE:BTCUSDT",
     "BINANCE:ETHUSDT",
@@ -20,6 +21,10 @@ CANONICAL_UI_SYMBOLS = (
     "BINANCE:BNBUSDT",
     "BINANCE:DOGEUSDT",
     "BINANCE:ZECUSDT",
+    "BINANCE:ADAUSDT",
+    "BINANCE:LINKUSDT",
+    "BINANCE:AVAXUSDT",
+    "BINANCE:LTCUSDT",
 )
 _FILTER_OLD = "? savedAssets.filter(a => a && a.cls === 'Crypto' && String(a.symbol || '').toUpperCase().endsWith('USDT'))"
 

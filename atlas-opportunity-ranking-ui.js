@@ -1,6 +1,6 @@
 (() => {
   const VERSION='ATLAS_OPPORTUNITY_RANKING_UI_V1';
-  const CORE=['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','XRPUSDT','DOGEUSDT','ZECUSDT'];
+  const CORE=['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','XRPUSDT','DOGEUSDT','ZECUSDT','ADAUSDT','LINKUSDT','AVAXUSDT','LTCUSDT'];
   const $=id=>document.getElementById(id);
   const human=v=>String(v||'').replace(/_/g,' ').replace(/\s+/g,' ').trim();
   const shell=$('atlasProductShell');

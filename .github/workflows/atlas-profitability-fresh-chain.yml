@@ -30,8 +30,13 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test runner
+        run: python -m pip install --disable-pip-version-check pytest
       - name: Verify attribution safety
-        run: PYTHONPATH=. pytest -q tests/test_analyst_forward_attribution.py
+        run: PYTHONPATH=. python -m pytest -q tests/test_analyst_forward_attribution.py
       - name: Rebuild attribution from canonical frozen histories
         run: python3 analyst_forward_attribution.py
       - name: Verify profitability safety

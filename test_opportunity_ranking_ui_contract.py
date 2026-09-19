@@ -15,6 +15,6 @@ def test_ranking_ui_is_manual_refresh_and_diagnostic_only():
 def test_render_boot_applies_ranking_ui_patch_before_runtime():
     text = Path('cloud_start.py').read_text(encoding='utf-8')
     patch = text.index('from opportunity_ranking_ui_boot_patch import apply as _apply_opportunity_ranking_ui_patch')
-    run = text.index('runpy.run_path(str(BASE / "cloud_web_only_final.py"), run_name="__main__")')
+    run = text.index('runpy.run_path(str(BASE / "cloud_production_canonical.py"), run_name="__main__")')
     assert patch < run
     assert 'ATLAS_CLOUD_FORWARD_MIN_SCORE", "68"' in text

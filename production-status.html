@@ -20,7 +20,7 @@
 <div class="card full"><div class="label">Live diagnostics</div><pre id="diag">Loading…</pre></div>
 </section><div class="footer">Auto-refresh every 30 seconds · <span id="last">—</span></div></main>
 <script>
-const $=x=>document.getElementById(x),ASSETS=['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT','HYPEUSDT'];async function j(p){const r=await fetch(p,{cache:'no-store'});if(!r.ok)throw Error(p+' '+r.status);return r.json()}
+const $=x=>document.getElementById(x),ASSETS=['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT','ADAUSDT','LINKUSDT','AVAXUSDT','LTCUSDT','HYPEUSDT'];async function j(p){const r=await fetch(p,{cache:'no-store'});if(!r.ok)throw Error(p+' '+r.status);return r.json()}
 async function refresh(){let health={},dq={},rt={},ready={},stats={};const errors=[];try{health=await j('/health')}catch(e){errors.push(String(e))}try{dq=await j('/api/data-quality')}catch(e){errors.push(String(e))}try{rt=await j('/api/runtime/status')}catch(e){errors.push(String(e))}try{ready=await j('/api/production/readiness')}catch(e){errors.push(String(e))}
 for(const h of [1,4,12,24]){try{stats[h]=await j('/api/forward/stats?horizon='+h)}catch(e){stats[h]={};errors.push(String(e))}}
 const memories=ready.pattern_memory?.by_asset||{};if(!Object.keys(memories).length){await Promise.all(ASSETS.map(async s=>{try{memories[s]=await j('/api/confluence/memory-stats?symbol='+encodeURIComponent(s))}catch(e){memories[s]={};errors.push(String(e))}}))}

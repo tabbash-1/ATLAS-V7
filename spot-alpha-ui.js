@@ -3,7 +3,8 @@
 const $=id=>document.getElementById(id);
 const universe=[
  {name:'Bitcoin',symbol:'BTCUSDT'},{name:'Ethereum',symbol:'ETHUSDT'},{name:'Solana',symbol:'SOLUSDT'},
- {name:'XRP',symbol:'XRPUSDT'},{name:'BNB',symbol:'BNBUSDT'},{name:'Dogecoin',symbol:'DOGEUSDT'},{name:'Zcash',symbol:'ZECUSDT'}
+ {name:'XRP',symbol:'XRPUSDT'},{name:'BNB',symbol:'BNBUSDT'},{name:'Dogecoin',symbol:'DOGEUSDT'},{name:'Zcash',symbol:'ZECUSDT'},
+ {name:'Cardano',symbol:'ADAUSDT'},{name:'Chainlink',symbol:'LINKUSDT'},{name:'Avalanche',symbol:'AVAXUSDT'},{name:'Litecoin',symbol:'LTCUSDT'}
 ];
 async function candles(sym,limit=220){
  const u=`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=1d&limit=${limit}`;

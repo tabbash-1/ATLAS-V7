@@ -13,7 +13,14 @@ def _assert_producer_sync(path: Path) -> None:
     assert BUILDER in text, f"{path.name} must rebuild canonical outcomes in-process"
     assert CANONICAL in text, f"{path.name} must commit the rebuilt canonical outcome snapshot"
     build_pos = text.index(BUILDER)
-    commit_pos = text.index("git commit")
+    markers = [
+        x for x in (
+            text.find("git commit", build_pos),
+            text.find("commit_status_with_retry.sh", build_pos),
+        ) if x >= 0
+    ]
+    assert markers, f"{path.name} must publish the rebuilt canonical outcome snapshot"
+    commit_pos = min(markers)
     assert build_pos < commit_pos, f"{path.name} must rebuild canonical outcomes before committing"
 
 
