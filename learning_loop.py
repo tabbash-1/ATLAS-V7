@@ -11,6 +11,7 @@ import loss_challenger_replay as replay
 
 VERSION="ATLAS_LEARNING_LOOP_V1"
 MIN_N=30
+PROSPECTIVE_ALIAS={"ENTRY_CONFIRMATION_DELAY":"DELAY_ENTRY_1H_CONFIRM","EARLY_THESIS_FAILURE":"EARLY_MOMENTUM_FAILFAST_EXIT","PROFIT_PROTECTION_TIME_DECAY":"PROFIT_PROTECTION_TIME_DECAY"}
 
 def build(root:Path):
  f=failures.build(root); failures.validate(f)
@@ -36,7 +37,7 @@ def build(root:Path):
   candidates[name]={"evaluated_n":x["evaluated_n"],"triggered_n":x["triggered_n"],
    "diagnostic_delta_r":x["observed_delta_r"],"state":"COLLECT_FORWARD_EVIDENCE",
    "promotion_allowed":False,"minimum_prospective_paired_n":MIN_N,
-   "prospective_evidence":prospective.get(name)}
+   "prospective_candidate_id":PROSPECTIVE_ALIAS.get(name,name),"prospective_evidence":prospective.get(PROSPECTIVE_ALIAS.get(name,name))}
  return {"schema":VERSION,"generated_at":dt.datetime.now(dt.timezone.utc).isoformat(),
   "pipeline":["OUTCOME","FAILURE_ATTRIBUTION","CHALLENGER_REPLAY","FORWARD_EVIDENCE","HUMAN_REVIEW"],
   "product_horizon":"4-12H","decision_source_of_truth":"FINAL_TRADE_GATE",
