@@ -18,12 +18,13 @@ def build(root:Path):
  costs={x["decision_id"]:x for x in (pv.get("post_v2_cost_adjusted") or {}).get("rows") or []}
  settled=[]
  for e in ledger.get("entries") or []:
+  if e.get("evidence_class") != "FORMAL_PROSPECTIVE":continue
   c=costs.get(e.get("decision_id"))
   if c and c.get("net_r") is not None:settled.append({"decision_id":e["decision_id"],"group":e["fingerprint_group"],"net_r":c["net_r"],"symbol":e.get("symbol"),"direction":e.get("direction")})
  m=_stats([x for x in settled if x["group"]=="MATCHED"]);c=_stats([x for x in settled if x["group"]=="CONTROL"])
  ready=m["n"]>=MIN_N and c["n"]>=MIN_N
  delta=None if not ready else round(m["avg_net_r"]-c["avg_net_r"],4)
- return {"schema":VERSION,"generated_at":dt.datetime.now(dt.timezone.utc).isoformat(),"settled_rows":settled,"groups":{"matched":m,"control":c},"formal_sample_ready":ready,"matched_minus_control_avg_net_r":delta,"edge_claim_allowed":False,"state":"FORMAL_REVIEW_READY" if ready else "COLLECTING_PROSPECTIVE_COST_ADJUSTED_OUTCOMES","interpretation":"NO_EDGE_CLAIM_BEFORE_FORMAL_REVIEW_AND_MINIMUM_SAMPLE","safety":{"research_only":True,"paper_only":True,"can_override_production":False,"can_create_trade":False,"can_veto_trade":False,"automatic_strategy_change":False}}
+ return {"schema":VERSION,"generated_at":dt.datetime.now(dt.timezone.utc).isoformat(),"settled_rows":settled,"groups":{"matched":m,"control":c},"formal_sample_ready":ready,"matched_minus_control_avg_net_r":delta,"edge_claim_allowed":False,"state":"FORMAL_REVIEW_READY" if ready else "COLLECTING_PROSPECTIVE_COST_ADJUSTED_OUTCOMES","interpretation":"FORMAL_EVALUATION_USES_ONLY_FIRST_SEEN_UNRESOLVED_ASSIGNMENTS","safety":{"research_only":True,"paper_only":True,"can_override_production":False,"can_create_trade":False,"can_veto_trade":False,"automatic_strategy_change":False}}
 def validate(x):
  assert x["edge_claim_allowed"] is False and not x["safety"]["can_override_production"] and not x["safety"]["automatic_strategy_change"]
 if __name__=="__main__":

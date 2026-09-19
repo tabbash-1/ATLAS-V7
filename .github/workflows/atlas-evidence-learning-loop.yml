@@ -45,7 +45,9 @@ jobs:
           import tests.test_learning_loop as a
           import tests.test_loss_challenger_replay as b
           import tests.test_loss_shadow_challengers as c
-          for mod in (a,b,c):
+          import tests.test_fingerprint_prospective_ledger as d
+          import tests.test_fingerprint_prospective_evaluator as e
+          for mod in (a,b,c,d,e):
               for name in sorted(x for x in dir(mod) if x.startswith('test_')):
                   getattr(mod,name)()
                   print('PASS',mod.__name__,name)
@@ -69,6 +71,7 @@ jobs:
           assert p['safety']['can_override_production'] is False
           assert p['safety']['automatic_promotion'] is False
           assert p['safety']['automatic_strategy_change'] is False
+          assert p['evidence']['winning_fingerprint']['edge_claim_allowed'] is False
           assert all(x['promotion_allowed'] is False for x in p['evidence']['candidates'].values())
           print('LEARNING_LOOP_OK',p['learning_state'],p['evidence']['terminal'],p['evidence']['losses'])
           PY
