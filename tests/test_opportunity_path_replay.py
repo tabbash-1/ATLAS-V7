@@ -70,7 +70,7 @@ def test_safety_constants_are_locked():
     assert m.ACTIVATION_AT=="2026-09-18T07:10:00+00:00"
     assert m.THRESHOLD==68 and m.MIN_N==30
     assert m.FAILFAST_ADVERSE_R==-.25 and m.FAILFAST_WINDOW_H==4
-    assert {x["id"] for x in m.PATH_HYPOTHESES}=={"DELAY_ENTRY_1H_CONFIRM","EARLY_MOMENTUM_FAILFAST_EXIT"}
+    assert {x["id"] for x in m.PATH_HYPOTHESES}=={"DELAY_ENTRY_1H_CONFIRM","EARLY_MOMENTUM_FAILFAST_EXIT","PROFIT_PROTECTION_TIME_DECAY"}
 
 
 def test_delay_skip_is_paired_as_zero_r_not_dropped():
@@ -86,3 +86,14 @@ def test_failfast_no_trigger_is_paired_as_unchanged_champion():
 def test_unavailable_path_remains_unpaired_fail_closed():
     v,e=m.shadow_pair_value("DELAY_ENTRY_1H_CONFIRM",{"state":"MARKET_DATA_INCOMPLETE"},-1)
     assert v is None and e is None
+
+
+def test_profit_protection_constants_are_locked():
+    assert m.PROTECT_CHECKPOINT_H==8
+    assert m.PROTECT_MIN_FAVORABLE_R==0.15
+    assert "PROFIT_PROTECTION_TIME_DECAY" in {x["id"] for x in m.PATH_HYPOTHESES}
+
+
+def test_profit_protection_no_trigger_pairs_as_unchanged():
+    v,e=m.shadow_pair_value("PROFIT_PROTECTION_TIME_DECAY",{"state":"NO_PROTECTION_TRIGGER"},0.4)
+    assert v==0.4 and e=="UNCHANGED_CHAMPION_PATH"
