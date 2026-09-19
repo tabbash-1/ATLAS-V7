@@ -26,3 +26,9 @@ def test_learning_loop_surfaces_prospective_path_replay(tmp_path, monkeypatch):
     assert p["paired_n"]==4 and p["delta_net_r"]==0.2 and p["promotion_allowed"] is False
     assert x["evidence"]["prospective_path_replay"]["EARLY_THESIS_FAILURE"]["formal_ready"] is False
     loop.validate(x)
+
+
+def test_prospective_aliases_match_registered_path_replay_ids():
+    assert loop.PROSPECTIVE_ALIAS["ENTRY_CONFIRMATION_DELAY"]=="DELAY_ENTRY_1H_CONFIRM"
+    assert loop.PROSPECTIVE_ALIAS["EARLY_THESIS_FAILURE"]=="EARLY_MOMENTUM_FAILFAST_EXIT"
+    assert loop.PROSPECTIVE_ALIAS["PROFIT_PROTECTION_TIME_DECAY"]=="PROFIT_PROTECTION_TIME_DECAY"
