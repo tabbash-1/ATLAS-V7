@@ -39,3 +39,22 @@ def test_snapshot_readiness_path_matches_boot_patch_contract():
 
     assert 'fetch_json readiness /api/production/readiness' in workflow
     assert '"/api/production/readiness"' in patch
+
+
+def test_readiness_counts_quality_and_data_health_as_required_final_conditions():
+    import opportunity_readiness as readiness
+    d={
+        "symbol":"BTCUSDT","score":90,"signal_threshold":68,"production_signal_qualified":True,
+        "product_direction":"LONG","direction_alignment":"ALIGNED","candidate_direction":"LONG",
+        "actionable_decision":"WAIT","htf_thesis":{"status":"PASS","reason":"HTF_ALIGNED"},
+        "final_trade_gate":{"trade_ready":False,"blockers":["SETUP_QUALITY_GATE_BLOCKED"]},
+    }
+    x=readiness.assess(d)
+    assert x["checks"]["setup_quality_passed"] is False
+    assert "setup_quality_passed" in x["missing_conditions"]
+    assert x["readiness_score"] < 100
+
+    d["final_trade_gate"]={"trade_ready":False,"blockers":["DATA_DEGRADED"]}
+    x=readiness.assess(d)
+    assert x["checks"]["data_health_passed"] is False
+    assert "data_health_passed" in x["missing_conditions"]
