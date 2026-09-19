@@ -26,10 +26,13 @@ SLIPPAGE_BPS_PER_SIDE=3.0
 FUNDING_BPS_PER_12H=1.0
 FAILFAST_ADVERSE_R=-0.25
 FAILFAST_WINDOW_H=4
+PROTECT_CHECKPOINT_H=8
+PROTECT_MIN_FAVORABLE_R=0.15
 
 PATH_HYPOTHESES=(
  {"id":"DELAY_ENTRY_1H_CONFIRM","rule":"first fully post-decision clock-aligned 1H candle must close in trade direction; enter at its close using original quantity and absolute SL/TP","shadow_action":"REPRICE_ENTRY"},
  {"id":"EARLY_MOMENTUM_FAILFAST_EXIT","rule":"before TP1/SL, exit at first fully post-decision 1H close within first 4H at <= -0.25 original R","shadow_action":"REPRICE_EXIT"},
+ {"id":"PROFIT_PROTECTION_TIME_DECAY","rule":"at the locked 8H checkpoint, if TP1 has not been reached and mark-to-market is >= +0.15 original R, exit shadow at that fully observed 8H price","shadow_action":"REPRICE_EXIT"},
 )
 
 
@@ -169,6 +172,32 @@ def replay_failfast(row,candles):
             "champion_terminal":champion.get("terminal")}
 
 
+
+def replay_profit_protection(row,candles):
+    """Pre-registered forward policy: protect a modest favorable move at 8H if TP1 is still untouched."""
+    g=row["geometry"]; start=int(row["captured_at_ms"]); checkpoint=start+PROTECT_CHECKPOINT_H*3_600_000
+    risk_abs=float(g["risk_abs"]); entry=float(g["entry"]); direction=row["direction"]
+    before=[x for x in candles if int(x["open_time"])+300_000<=checkpoint]
+    if not before:return {"state":"MARKET_DATA_INCOMPLETE"}
+    ev,t,tp1=_first_terminal(before,g)
+    if ev in {"SL","TP2","AMBIGUOUS"} or tp1:
+        return {"state":"NO_PROTECTION_TRIGGER","reason":"TERMINAL_OR_TP1_BEFORE_8H"}
+    last=before[-1]
+    if int(last["open_time"])+300_000 < checkpoint:
+        return {"state":"MARKET_DATA_INCOMPLETE"}
+    px=float(last["close"])
+    r8=((px-entry)/risk_abs) if direction=="LONG" else ((entry-px)/risk_abs)
+    if r8 < PROTECT_MIN_FAVORABLE_R:
+        return {"state":"NO_PROTECTION_TRIGGER","checkpoint_r":round(r8,4)}
+    qty=float(row.get("paper_quantity") or 0); risk=float(row.get("risk_usd") or 0)
+    if qty<=0 or risk<=0:return {"state":"SIZING_UNAVAILABLE"}
+    gross=_directional_pnl(direction,qty,entry,px); notional=abs(qty*entry)
+    cost=_cost_usd(notional,PROTECT_CHECKPOINT_H); net=gross-cost
+    return {"state":"SETTLED","terminal":"PROFIT_PROTECTION_8H_EXIT","exit_price":round(px,12),
+            "exit_at_ms":checkpoint,"holding_h":PROTECT_CHECKPOINT_H,"checkpoint_r":round(r8,4),
+            "gross_pnl_usd":round(gross,4),"estimated_cost_usd":round(cost,4),
+            "net_pnl_usd":round(net,4),"net_r":round(net/risk,4)}
+
 def shadow_pair_value(hypothesis_id:str,out:dict[str,Any],champion_net_r):
     """Return evaluable shadow contribution for the pre-registered policy."""
     if out.get("net_r") is not None:
@@ -177,6 +206,8 @@ def shadow_pair_value(hypothesis_id:str,out:dict[str,Any],champion_net_r):
     if hypothesis_id=="DELAY_ENTRY_1H_CONFIRM" and state.startswith("SHADOW_SKIP_"):
         return 0.0,"SKIPPED_BY_SHADOW_POLICY"
     if hypothesis_id=="EARLY_MOMENTUM_FAILFAST_EXIT" and state=="NO_FAILFAST_TRIGGER" and champion_net_r is not None:
+        return float(champion_net_r),"UNCHANGED_CHAMPION_PATH"
+    if hypothesis_id=="PROFIT_PROTECTION_TIME_DECAY" and state=="NO_PROTECTION_TRIGGER" and champion_net_r is not None:
         return float(champion_net_r),"UNCHANGED_CHAMPION_PATH"
     return None,None
 
@@ -200,7 +231,7 @@ def build(root:Path):
             continue
         champion=(cost.get(str(row.get("decision_id"))) or {}).get("net_r")
         for h in PATH_HYPOTHESES:
-            out=replay_delay(row,candles) if h["id"]=="DELAY_ENTRY_1H_CONFIRM" else replay_failfast(row,candles)
+            out=(replay_delay(row,candles) if h["id"]=="DELAY_ENTRY_1H_CONFIRM" else replay_failfast(row,candles) if h["id"]=="EARLY_MOMENTUM_FAILFAST_EXIT" else replay_profit_protection(row,candles))
             # Pair every evaluable policy decision, not only trades whose path changed.
             # SKIP => 0R shadow contribution; NO_TRIGGER => Champion unchanged.
             shadow_net_r,policy_effect=shadow_pair_value(h["id"],out,champion)
@@ -224,6 +255,7 @@ def build(root:Path):
             "epoch_id":EPOCH_ID,"product_horizon":"4-12H","criteria_locked_before_evaluation":True,
             "path_rules":{"delay_entry_confirmation":"FIRST_FULL_POST_DECISION_CLOCK_ALIGNED_1H_DIRECTIONAL_CLOSE",
                           "failfast_adverse_r":FAILFAST_ADVERSE_R,"failfast_window_h":FAILFAST_WINDOW_H,
+                          "profit_protection_checkpoint_h":PROTECT_CHECKPOINT_H,"profit_protection_min_favorable_r":PROTECT_MIN_FAVORABLE_R,
                           "intrabar_ambiguity":"FAIL_CLOSED","delayed_entry_position_size":"ORIGINAL_CHAMPION_QUANTITY"},
             "cost_model":{"fee_bps_per_side":FEE_BPS_PER_SIDE,"slippage_bps_per_side":SLIPPAGE_BPS_PER_SIDE,
                           "funding_bps_per_12h":FUNDING_BPS_PER_12H,"production_impact":"NONE"},
