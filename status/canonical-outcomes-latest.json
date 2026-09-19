@@ -5,26 +5,26 @@
     8,
     12
   ],
-  "generated_at": "2026-09-19T18:41:49.688578+00:00",
+  "generated_at": "2026-09-19T18:59:54.326825+00:00",
   "geometry_status": {
-    "canonical_trade_rows": 14,
+    "canonical_trade_rows": 15,
     "coverage_pct": 100.0,
-    "rows_with_frozen_geometry": 14,
+    "rows_with_frozen_geometry": 15,
     "source": "FINAL_TRADE_GATE"
   },
   "legacy_backfill_allowed": false,
   "legacy_score_path_research_included": false,
   "official_trade_authority": "PAPER_PORTFOLIO_CANONICAL_FINAL_GATE_ENTRIES",
   "path_summary": {
-    "avg_r": 0.1844,
-    "closed": 14,
-    "entries": 14,
-    "losses": 7,
+    "avg_r": 0.1054,
+    "closed": 15,
+    "entries": 15,
+    "losses": 8,
     "max_drawdown_pct": 2.98,
-    "net_r": 2.5809,
+    "net_r": 1.5809,
     "open_or_unresolved": 0,
-    "profit_factor": 1.3529,
-    "win_rate_pct": 50.0,
+    "profit_factor": 1.1816,
+    "win_rate_pct": 46.67,
     "wins": 7
   },
   "product_horizon": "4-12H",
@@ -38,13 +38,13 @@
   "schema": "ATLAS_CANONICAL_OUTCOME_SNAPSHOT_V1",
   "settlement_status": {
     "forward_generated_at": "2026-09-19T18:30:47.448983+00:00",
-    "observed_through_at": "2026-09-19T14:24:18.855360+00:00",
+    "observed_through_at": "2026-09-19T17:25:40.876755+00:00",
     "outcome_read_triggered_by_request": false,
-    "paper_generated_at": "2026-09-19T16:41:41.362711+00:00",
+    "paper_generated_at": "2026-09-19T18:59:54.143590+00:00",
     "web_process_background_worker": false
   },
   "signals": {
-    "count": 14,
+    "count": 15,
     "rows": [
       {
         "can_override_production": false,
@@ -1645,9 +1645,11 @@
           {
             "checkpoint_h": 8,
             "id": "a49f79ab2c455f85d70d622a",
-            "matured": false,
-            "r_multiple": null,
-            "status": "NOT_MATURED"
+            "market_source": "BINANCE_DATA_API_SPOT",
+            "matured": true,
+            "r_multiple": 2.0,
+            "status": "TP2_BY_CHECKPOINT",
+            "tp1_reached": true
           },
           {
             "checkpoint_h": 12,
@@ -1791,9 +1793,11 @@
           {
             "checkpoint_h": 4,
             "id": "ddc5a761c24162d6aa8791f8",
-            "matured": false,
-            "r_multiple": null,
-            "status": "NOT_MATURED"
+            "market_source": "BINANCE_DATA_API_SPOT",
+            "matured": true,
+            "r_multiple": -1.0,
+            "status": "LOSS_BY_CHECKPOINT",
+            "tp1_reached": false
           },
           {
             "checkpoint_h": 8,
@@ -1835,6 +1839,156 @@
         "sizing_equity_usd": 10148.0,
         "symbol": "XRPUSDT",
         "threshold": 68.0
+      },
+      {
+        "asset_cohort": "BASE_V1",
+        "asset_universe_epoch": "ASSET_EXPANSION_V1_2026-09-18",
+        "can_override_production": false,
+        "canonical_lane": "CORE_4_12H",
+        "canonical_truth_schema": "ATLAS_CANONICAL_DECISION_TRUTH_V1",
+        "captured_at": "2026-09-19T17:25:40.876755+00:00",
+        "captured_at_ms": 1789838740876,
+        "decision_action": "TRADE_READY",
+        "decision_id": "f7e0bd36a5e3d68798dac307",
+        "decision_provenance": {
+          "breakout_confirmed": true,
+          "candidate_direction": "LONG",
+          "continuation_strong": true,
+          "entry_mode": "NOW",
+          "final_trade_ready_reason": null,
+          "frozen_before_outcome": true,
+          "futures_adjustment": -1.2,
+          "futures_alignment": "OPPOSED",
+          "futures_alignment_source": "FROZEN_SCORE_ATTRIBUTION",
+          "futures_score": null,
+          "htf_alignment_class": "CONDITIONAL_ALIGNED_12H_NEUTRAL",
+          "htf_regime": "4H_DIRECTIONAL_12H_NEUTRAL",
+          "htf_v2_blockers": [],
+          "htf_v2_eligible": true,
+          "market_regime": "BREAKOUT_UP",
+          "playbook": "BREAKOUT_CONFIRMED_LONG",
+          "product_horizon": "4-12H",
+          "production_signal_qualified": true,
+          "production_threshold_locked": 68,
+          "relative_volume": 4.0,
+          "scenario_readiness": "WAIT_FOR_HTF_ALIGNMENT",
+          "scenario_reason": "4H_12H_NOT_ALIGNED",
+          "schema": "ATLAS_ENTRY_DECISION_PROVENANCE_V1",
+          "score": 93.0,
+          "score_attribution": {
+            "continuation_obstacle_reason": "NO_RELIEF_NEEDED",
+            "continuation_obstacle_relief": 0,
+            "extension_guard_adjustment": 0,
+            "extension_guard_reason": "RSI_SANE",
+            "final_score": 93,
+            "formula": "trend_base + paced_volume_bonus + relative_strength_adjustment + futures_adjustment + continuation_aware_obstacle_adjustment + momentum_adjustment + market_breadth_adjustment + extension_guard_adjustment",
+            "futures_adjustment": -1.2,
+            "futures_reason": "OPPOSED",
+            "market_breadth_adjustment": 3,
+            "momentum_adjustment": 4,
+            "obstacle_adjustment": 3.0,
+            "obstacle_adjustment_before_continuation": 3.0,
+            "obstacle_distance_pct": null,
+            "obstacle_reason": "CONFIRMED_BREAKOUT_CLEAR_SPACE",
+            "obstacle_source": "NO_PRIOR_RESISTANCE_AHEAD",
+            "raw_score": 92.8,
+            "relative_strength_adjustment": 6,
+            "relative_strength_reason": "ALIGNED_STRONG",
+            "trend_base": 68,
+            "volume_bonus": 10
+          },
+          "setup_quality_status": "PASS",
+          "source_of_truth": "FINAL_TRADE_GATE",
+          "strategy_epoch_id": "HTF_SR_V2_2026-09-14",
+          "threshold": 68.0
+        },
+        "decision_source": "FINAL_TRADE_GATE",
+        "decision_source_of_truth": "FINAL_TRADE_GATE",
+        "direction": "LONG",
+        "drawdown_after_pct": 1.0041,
+        "equity_after_usd": 10146.99,
+        "evaluation_horizons": [
+          "4h",
+          "8h",
+          "12h"
+        ],
+        "evaluation_horizons_h": [
+          4,
+          8,
+          12
+        ],
+        "geometry": {
+          "canonical_lane": "CORE_4_12H",
+          "direction": "LONG",
+          "entry": 0.09065,
+          "entry_mode": "NOW",
+          "plan_version": "PRODUCTION_TRADE_PLAN_V5_ANALYSIS_GEOMETRY_PROVENANCE",
+          "product_horizon": "4-12H",
+          "risk_abs": 0.001228285699999998,
+          "rr_tp2": 2.0,
+          "stop_loss": 0.0894217143,
+          "tp1": 0.0918782857,
+          "tp2": 0.0931065714
+        },
+        "id": "f7e0bd36a5e3d68798dac307",
+        "legacy_backfill_allowed": false,
+        "live_execution": false,
+        "manifest_hash": "d6ccdae80214e3d664acbf03f155bd0bd699e1439896f7880270d1f7610e5abb",
+        "outcome_known_at_entry": false,
+        "paper_notional_usd": 7563.97,
+        "paper_only": true,
+        "paper_quantity": 83441.4989932718,
+        "pnl_usd": -102.49,
+        "portfolio_id": "ATLAS_10K_PAPER_V1",
+        "product_horizon": "4-12H",
+        "product_window_checkpoints": [
+          {
+            "checkpoint_h": 4,
+            "id": "f7e0bd36a5e3d68798dac307",
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          },
+          {
+            "checkpoint_h": 8,
+            "id": "f7e0bd36a5e3d68798dac307",
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          },
+          {
+            "checkpoint_h": 12,
+            "id": "f7e0bd36a5e3d68798dac307",
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          }
+        ],
+        "risk_pct": 1.0,
+        "risk_usd": 102.49,
+        "schema": "ATLAS_PAPER_PORTFOLIO_10K_ENTRY_V3_CANONICAL_TRUTH",
+        "score": 93.0,
+        "settlement": {
+          "excursion_scope": "THROUGH_TERMINAL_EVENT",
+          "exit_at_ms": 1789842600000,
+          "id": "f7e0bd36a5e3d68798dac307",
+          "mae_r": 1.2701,
+          "market_source": "BINANCE_DATA_API_SPOT",
+          "mfe_r": 0.0,
+          "r_multiple": -1.0,
+          "status": "LOSS",
+          "terminal": true,
+          "terminal_refined_to_1m": false,
+          "time_to_mae_peak_h": 1.072,
+          "time_to_mfe_peak_h": 0.072,
+          "time_to_tp1_h": null,
+          "timing_semantics": "BAR_OPEN_TIME_APPROX_NO_INTRABAR_ORDER_INFERENCE",
+          "tp1_first_hit_at_ms": null,
+          "tp1_reached": false
+        },
+        "sizing_equity_usd": 10249.48,
+        "symbol": "DOGEUSDT",
+        "threshold": 68.0
       }
     ]
   },
@@ -1846,43 +2000,43 @@
         "positive_pct": 50.0
       },
       "4h": {
-        "avg_r": 0.1018,
-        "matured": 13,
-        "positive_pct": 53.85
+        "avg_r": 0.0231,
+        "matured": 14,
+        "positive_pct": 50.0
       },
       "8h": {
-        "avg_r": 0.2242,
-        "matured": 12,
-        "positive_pct": 50.0
+        "avg_r": 0.3608,
+        "matured": 13,
+        "positive_pct": 53.85
       }
     },
     "forward_trade_ready_count": 27,
     "forward_wait_directional_count": 593,
     "portfolio": {
-      "avg_r": 0.1844,
-      "closed": 14,
-      "entries": 14,
-      "equity_usd": 10249.48,
+      "avg_r": 0.1054,
+      "closed": 15,
+      "entries": 15,
+      "equity_usd": 10146.99,
       "long": {
-        "closed": 9,
-        "pnl_usd": 153.94,
-        "win_rate_pct": 44.44
+        "closed": 10,
+        "pnl_usd": 51.45,
+        "win_rate_pct": 40.0
       },
-      "losses": 7,
+      "losses": 8,
       "max_drawdown_pct": 2.98,
-      "net_pnl_usd": 249.48,
-      "net_r": 2.5809,
+      "net_pnl_usd": 146.99,
+      "net_r": 1.5809,
       "open_or_unresolved": 0,
       "peak_equity_usd": 10249.91,
-      "profit_factor": 1.3529,
-      "return_pct": 2.4948,
+      "profit_factor": 1.1816,
+      "return_pct": 1.4699,
       "short": {
         "closed": 5,
         "pnl_usd": 95.54,
         "win_rate_pct": 60.0
       },
       "starting_equity_usd": 10000.0,
-      "win_rate_pct": 50.0,
+      "win_rate_pct": 46.67,
       "wins": 7
     }
   }
