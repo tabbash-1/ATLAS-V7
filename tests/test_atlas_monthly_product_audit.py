@@ -1,5 +1,5 @@
 import datetime as dt
-from atlas_monthly_product_audit import build
+from atlas_monthly_product_audit import build, joint_setup_breakdown
 
 
 def snap(t, px, qualified=True, wait_reason=None):
@@ -30,6 +30,6 @@ def test_wait_missed_opportunity_is_attributed_not_promoted():
 
 def test_joint_setup_breakdown_keeps_quarantine_dimensions_together():
     items=[{"direction":"LONG","regime":"TREND_UP","playbook":"TREND_PULLBACK_LONG","horizons":{"4":{"directional_return_pct":1},"8":{"directional_return_pct":2},"12":{"directional_return_pct":3}}}]
-    out=audit.joint_setup_breakdown(items)
+    out=joint_setup_breakdown(items)
     assert out["LONG|TREND_UP|TREND_PULLBACK_LONG"]["12"]["n"]==1
     assert out["LONG|TREND_UP|TREND_PULLBACK_LONG"]["12"]["mean_pct"]==3.0
