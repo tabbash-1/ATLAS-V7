@@ -8,6 +8,7 @@ import datetime as dt,json
 from pathlib import Path
 import production_failure_attribution as failures
 import loss_challenger_replay as replay
+import fingerprint_prospective_evaluator as fingerprint
 
 VERSION="ATLAS_LEARNING_LOOP_V1"
 MIN_N=30
@@ -16,6 +17,7 @@ PROSPECTIVE_ALIAS={"ENTRY_CONFIRMATION_DELAY":"DELAY_ENTRY_1H_CONFIRM","EARLY_TH
 def build(root:Path):
  f=failures.build(root); failures.validate(f)
  r=replay.build(root); replay.validate(r)
+ fp=fingerprint.build(root); fingerprint.validate(fp)
  terminal=f["summary"]["terminal"]; losses=f["summary"]["losses"]
  prospective={}
  p=root/"status/opportunity-path-replay-latest.json"
@@ -42,7 +44,7 @@ def build(root:Path):
   "pipeline":["OUTCOME","FAILURE_ATTRIBUTION","CHALLENGER_REPLAY","FORWARD_EVIDENCE","HUMAN_REVIEW"],
   "product_horizon":"4-12H","decision_source_of_truth":"FINAL_TRADE_GATE",
   "evidence":{"terminal":terminal,"losses":losses,"attributions":f["summary"]["primary_attributions"],
-              "candidates":candidates,"prospective_path_replay":prospective},
+              "candidates":candidates,"prospective_path_replay":prospective,"winning_fingerprint":{"state":fp["state"],"formal_sample_ready":fp["formal_sample_ready"],"groups":fp["groups"],"matched_minus_control_avg_net_r":fp["matched_minus_control_avg_net_r"],"edge_claim_allowed":False,"source":"status/fingerprint-prospective-ledger.json"}},
   "next_action":"COLLECT_PROSPECTIVE_PAIRED_EVIDENCE",
   "learning_state":"EVIDENCE_COLLECTION",
   "safety":{"research_only":True,"paper_only":True,"live_execution":False,
@@ -56,6 +58,7 @@ def validate(x):
  assert x["pipeline"][-1]=="HUMAN_REVIEW"
  assert all(not z["promotion_allowed"] for z in x["evidence"]["candidates"].values())
  assert all(not z["promotion_allowed"] for z in x["evidence"].get("prospective_path_replay",{}).values())
+ assert x["evidence"]["winning_fingerprint"]["edge_claim_allowed"] is False
 
 if __name__=="__main__":
  root=Path(__file__).resolve().parent;x=build(root);validate(x)
