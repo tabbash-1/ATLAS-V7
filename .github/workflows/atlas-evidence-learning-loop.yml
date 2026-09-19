@@ -1,0 +1,73 @@
+name: ATLAS Evidence Learning Loop
+
+on:
+  workflow_run:
+    workflows: ['ATLAS Production Failure Attribution']
+    types: [completed]
+  push:
+    branches: [main]
+    paths:
+      - 'learning_loop.py'
+      - 'loss_challenger_replay.py'
+      - 'loss_shadow_challengers.py'
+      - 'tests/test_learning_loop.py'
+      - '.github/workflows/atlas-evidence-learning-loop.yml'
+  schedule:
+    - cron: '29 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atlas-evidence-learning-loop
+  cancel-in-progress: false
+
+jobs:
+  learn:
+    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Regression
+        run: |
+          python -m py_compile learning_loop.py loss_challenger_replay.py loss_shadow_challengers.py
+          PYTHONPATH=. pytest -q tests/test_learning_loop.py tests/test_loss_challenger_replay.py tests/test_loss_shadow_challengers.py
+      - name: Build learning loop evidence
+        run: python learning_loop.py
+      - name: Verify Production firewall
+        run: |
+          python - <<'PY'
+          import json
+          p=json.load(open('status/learning-loop-latest.json'))
+          assert p['schema']=='ATLAS_LEARNING_LOOP_V1'
+          assert p['next_action']=='COLLECT_PROSPECTIVE_PAIRED_EVIDENCE'
+          assert p['pipeline'][-1]=='HUMAN_REVIEW'
+          assert p['safety']['production_impact']=='NONE'
+          assert p['safety']['production_threshold']==68
+          assert p['safety']['can_override_production'] is False
+          assert p['safety']['automatic_promotion'] is False
+          assert p['safety']['automatic_strategy_change'] is False
+          assert all(x['promotion_allowed'] is False for x in p['evidence']['candidates'].values())
+          print('LEARNING_LOOP_OK',p['learning_state'],p['evidence']['terminal'],p['evidence']['losses'])
+          PY
+      - name: Upload evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-learning-loop-${{ github.run_id }}
+          path: status/learning-loop-latest.json
+          retention-days: 30
+      - name: Commit evidence snapshot
+        if: github.event_name != 'pull_request'
+        run: |
+          bash scripts/commit_status_with_retry.sh \
+            'atlas-learning-loop' \
+            'atlas-learning-loop@users.noreply.github.com' \
+            'validation: update evidence learning loop [skip ci] [skip render]' \
+            'status/learning-loop-latest.json'
