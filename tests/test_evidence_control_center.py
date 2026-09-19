@@ -18,7 +18,7 @@ def test_filter_triggers_are_deterministic():
 
 def test_path_change_hypotheses_are_not_fake_settled():
     path=[x for x in m.HYPOTHESES if x["kind"]=="PATH_CHANGE"]
-    assert {x["id"] for x in path}=={"DELAY_ENTRY_1H_CONFIRM","EARLY_MOMENTUM_FAILFAST_EXIT"}
+    assert {x["id"] for x in path}=={"DELAY_ENTRY_1H_CONFIRM","EARLY_MOMENTUM_FAILFAST_EXIT","PROFIT_PROTECTION_TIME_DECAY"}
 
 
 def test_control_center_contract_is_read_only():
