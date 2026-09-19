@@ -86,3 +86,14 @@ def test_failfast_no_trigger_is_paired_as_unchanged_champion():
 def test_unavailable_path_remains_unpaired_fail_closed():
     v,e=m.shadow_pair_value("DELAY_ENTRY_1H_CONFIRM",{"state":"MARKET_DATA_INCOMPLETE"},-1)
     assert v is None and e is None
+
+
+def test_profit_protection_constants_are_locked():
+    assert m.PROTECT_CHECKPOINT_H==8
+    assert m.PROTECT_MIN_FAVORABLE_R==0.15
+    assert "PROFIT_PROTECTION_TIME_DECAY" in {x["id"] for x in m.PATH_HYPOTHESES}
+
+
+def test_profit_protection_no_trigger_pairs_as_unchanged():
+    v,e=m.shadow_pair_value("PROFIT_PROTECTION_TIME_DECAY",{"state":"NO_PROTECTION_TRIGGER"},0.4)
+    assert v==0.4 and e=="UNCHANGED_CHAMPION_PATH"
