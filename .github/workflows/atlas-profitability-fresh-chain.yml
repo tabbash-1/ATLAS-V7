@@ -13,6 +13,13 @@ on:
       - 'tests/test_analyst_forward_attribution.py'
       - 'tests/test_profitability_research_engine.py'
       - '.github/workflows/atlas-profitability-fresh-chain.yml'
+  pull_request:
+    paths:
+      - 'analyst_forward_attribution.py'
+      - 'profitability_research_engine.py'
+      - 'tests/test_analyst_forward_attribution.py'
+      - 'tests/test_profitability_research_engine.py'
+      - '.github/workflows/atlas-profitability-fresh-chain.yml'
   schedule:
     - cron: '31 * * * *'
   workflow_dispatch:
@@ -30,8 +37,10 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
+      - name: Install test dependency
+        run: python3 -m pip install pytest
       - name: Verify attribution safety
-        run: PYTHONPATH=. pytest -q tests/test_analyst_forward_attribution.py
+        run: PYTHONPATH=. python3 -m pytest -q tests/test_analyst_forward_attribution.py
       - name: Rebuild attribution from canonical frozen histories
         run: python3 analyst_forward_attribution.py
       - name: Verify profitability safety
@@ -56,6 +65,7 @@ jobs:
           print({'fresh_matured_n':a['matured_12h_metrics']['n'],'candidate_count':p['candidate_count'],'holdout_eligible_count':p['holdout_eligible_count']})
           PY
       - name: Commit synchronized evidence
+        if: github.event_name != 'pull_request'
         run: |
           git config user.name "atlas-profitability-fresh-chain"
           git config user.email "atlas-profitability-fresh-chain@users.noreply.github.com"
