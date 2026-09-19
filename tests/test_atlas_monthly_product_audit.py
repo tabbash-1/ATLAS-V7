@@ -1,5 +1,5 @@
 import datetime as dt
-from atlas_monthly_product_audit import build, joint_setup_breakdown
+from atlas_monthly_product_audit import build, joint_setup_breakdown, nonoverlap
 
 
 def snap(t, px, qualified=True, wait_reason=None):
@@ -33,3 +33,12 @@ def test_joint_setup_breakdown_keeps_quarantine_dimensions_together():
     out=joint_setup_breakdown(items)
     assert out["LONG|TREND_UP|TREND_PULLBACK_LONG"]["12"]["n"]==1
     assert out["LONG|TREND_UP|TREND_PULLBACK_LONG"]["12"]["mean_pct"]==3.0
+
+
+def test_nonoverlap_reduces_same_setup_12h_dependence():
+    base=dt.datetime(2026,9,1,tzinfo=dt.timezone.utc)
+    items=[]
+    for h in (0,1,13):
+        items.append({"captured_at":(base+dt.timedelta(hours=h)).isoformat(),"symbol":"BTCUSDT","direction":"LONG","regime":"TREND_UP","playbook":"TREND_PULLBACK_LONG","horizons":{}})
+    out=nonoverlap(items,12)
+    assert len(out)==2
