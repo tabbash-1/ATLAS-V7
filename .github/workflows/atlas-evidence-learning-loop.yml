@@ -38,7 +38,15 @@ jobs:
       - name: Regression
         run: |
           python -m py_compile learning_loop.py loss_challenger_replay.py loss_shadow_challengers.py
-          PYTHONPATH=. pytest -q tests/test_learning_loop.py tests/test_loss_challenger_replay.py tests/test_loss_shadow_challengers.py
+          PYTHONPATH=. python - <<'PY'
+          import tests.test_learning_loop as a
+          import tests.test_loss_challenger_replay as b
+          import tests.test_loss_shadow_challengers as c
+          for mod in (a,b,c):
+              for name in sorted(x for x in dir(mod) if x.startswith('test_')):
+                  getattr(mod,name)()
+                  print('PASS',mod.__name__,name)
+          PY
       - name: Build learning loop evidence
         run: python learning_loop.py
       - name: Verify Production firewall
