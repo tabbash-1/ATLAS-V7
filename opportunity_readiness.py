@@ -36,15 +36,19 @@ def assess(decision):
             and not _has(blockers, "SCORE_DIRECTION_NOT_HTF_DIRECTION"),
         "pre_final_actionable": not _has(blockers, "PRE_FINAL_DECISION_NOT_ACTIONABLE"),
         "breakout_structure_confirmed": not _has(blockers, "BREAKOUT_STRUCTURE_NOT_CONFIRMED"),
+        "setup_quality_passed": not _has(blockers, "SETUP_QUALITY_GATE_BLOCKED"),
+        "data_health_passed": not _has(blockers, "DATA_DEGRADED"),
     }
     weights = {
         "htf_direction_resolved": 20,
         "htf_4h_12h_aligned": 20,
         "entry_confirmation_aligned": 15,
         "production_score_qualified": 15,
-        "score_direction_matches_htf": 10,
+        "score_direction_matches_htf": 5,
         "pre_final_actionable": 10,
-        "breakout_structure_confirmed": 10,
+        "breakout_structure_confirmed": 5,
+        "setup_quality_passed": 5,
+        "data_health_passed": 5,
     }
     readiness = 100 if trade_ready else sum(weights[k] for k, ok in checks.items() if ok)
     missing = [k for k, ok in checks.items() if not ok]
