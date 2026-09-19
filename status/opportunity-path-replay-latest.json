@@ -9,7 +9,7 @@
   "criteria_locked_before_evaluation": true,
   "eligible_prospective_rows": 4,
   "epoch_id": "HTF_SR_V2_2026-09-14",
-  "generated_at": "2026-09-19T06:33:48.230363+00:00",
+  "generated_at": "2026-09-19T07:10:32.321805+00:00",
   "hypotheses": [
     {
       "champion_net_r": -0.0069,
@@ -199,6 +199,72 @@
       "shadow_action": "REPRICE_EXIT",
       "shadow_net_r": -0.2002,
       "state": "COLLECTING_PATH_REPLAY"
+    },
+    {
+      "champion_net_r": -0.3964,
+      "changed": 0,
+      "delta_net_r": 0.0,
+      "eligible": 4,
+      "evaluable": 3,
+      "formal_ready": false,
+      "id": "PROFIT_PROTECTION_TIME_DECAY",
+      "min_n": 30,
+      "paired_n": 3,
+      "production_impact": "NONE",
+      "promotion_allowed": false,
+      "rows": [
+        {
+          "captured_at": "2026-09-18T07:23:19.999153+00:00",
+          "champion_net_r": -1.2207,
+          "decision_id": "e233593ba2525aa3a8f61791",
+          "direction": "LONG",
+          "policy_effect": "UNCHANGED_CHAMPION_PATH",
+          "provider": "BINANCE_DATA_API_SPOT",
+          "reason": "TERMINAL_OR_TP1_BEFORE_8H",
+          "shadow_net_r": -1.2207,
+          "state": "NO_PROTECTION_TRIGGER",
+          "symbol": "BNBUSDT"
+        },
+        {
+          "captured_at": "2026-09-18T14:59:01.747262+00:00",
+          "champion_net_r": 0.3895,
+          "decision_id": "8127f71b2c31273ae0c956f4",
+          "direction": "LONG",
+          "policy_effect": null,
+          "provider": "BINANCE_DATA_API_SPOT",
+          "shadow_net_r": null,
+          "state": "MARKET_DATA_INCOMPLETE",
+          "symbol": "BTCUSDT"
+        },
+        {
+          "captured_at": "2026-09-18T14:59:01.747262+00:00",
+          "champion_net_r": 1.8865,
+          "decision_id": "5b8f0eab21c42fe03a679d43",
+          "direction": "LONG",
+          "policy_effect": "UNCHANGED_CHAMPION_PATH",
+          "provider": "BINANCE_DATA_API_SPOT",
+          "reason": "TERMINAL_OR_TP1_BEFORE_8H",
+          "shadow_net_r": 1.8865,
+          "state": "NO_PROTECTION_TRIGGER",
+          "symbol": "SOLUSDT"
+        },
+        {
+          "captured_at": "2026-09-18T23:15:43.105641+00:00",
+          "champion_net_r": -1.0622,
+          "decision_id": "8b7db6193a60f8c198c00428",
+          "direction": "LONG",
+          "policy_effect": "UNCHANGED_CHAMPION_PATH",
+          "provider": "BINANCE_DATA_API_SPOT",
+          "reason": "TERMINAL_OR_TP1_BEFORE_8H",
+          "shadow_net_r": -1.0622,
+          "state": "NO_PROTECTION_TRIGGER",
+          "symbol": "ZECUSDT"
+        }
+      ],
+      "rule": "at the locked 8H checkpoint, if TP1 has not been reached and mark-to-market is >= +0.15 original R, exit shadow at that fully observed 8H price",
+      "shadow_action": "REPRICE_EXIT",
+      "shadow_net_r": -0.3964,
+      "state": "COLLECTING_PATH_REPLAY"
     }
   ],
   "interpretation": {
@@ -214,7 +280,9 @@
     "delayed_entry_position_size": "ORIGINAL_CHAMPION_QUANTITY",
     "failfast_adverse_r": -0.25,
     "failfast_window_h": 4,
-    "intrabar_ambiguity": "FAIL_CLOSED"
+    "intrabar_ambiguity": "FAIL_CLOSED",
+    "profit_protection_checkpoint_h": 8,
+    "profit_protection_min_favorable_r": 0.15
   },
   "product_horizon": "4-12H",
   "safety": {
