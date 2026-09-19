@@ -41,17 +41,13 @@ jobs:
       - name: Regression
         run: |
           python -m py_compile learning_loop.py loss_challenger_replay.py loss_shadow_challengers.py winning_setup_fingerprint.py fingerprint_prospective_ledger.py fingerprint_prospective_evaluator.py
-          PYTHONPATH=. python - <<'PY'
-          import tests.test_learning_loop as a
-          import tests.test_loss_challenger_replay as b
-          import tests.test_loss_shadow_challengers as c
-          import tests.test_fingerprint_prospective_ledger as d
-          import tests.test_fingerprint_prospective_evaluator as e
-          for mod in (a,b,c,d,e):
-              for name in sorted(x for x in dir(mod) if x.startswith('test_')):
-                  getattr(mod,name)()
-                  print('PASS',mod.__name__,name)
-          PY
+          python -m pip install --disable-pip-version-check -q pytest
+          PYTHONPATH=. python -m pytest -q \
+            tests/test_learning_loop.py \
+            tests/test_loss_challenger_replay.py \
+            tests/test_loss_shadow_challengers.py \
+            tests/test_fingerprint_prospective_ledger.py \
+            tests/test_fingerprint_prospective_evaluator.py
       - name: Freeze prospective fingerprint assignments
         run: python fingerprint_prospective_ledger.py
       - name: Evaluate prospective fingerprint outcomes
