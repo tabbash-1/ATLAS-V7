@@ -70,7 +70,7 @@ def test_safety_constants_are_locked():
     assert m.ACTIVATION_AT=="2026-09-18T07:10:00+00:00"
     assert m.THRESHOLD==68 and m.MIN_N==30
     assert m.FAILFAST_ADVERSE_R==-.25 and m.FAILFAST_WINDOW_H==4
-    assert {x["id"] for x in m.PATH_HYPOTHESES}=={"DELAY_ENTRY_1H_CONFIRM","EARLY_MOMENTUM_FAILFAST_EXIT"}
+    assert {x["id"] for x in m.PATH_HYPOTHESES}=={"DELAY_ENTRY_1H_CONFIRM","EARLY_MOMENTUM_FAILFAST_EXIT","PROFIT_PROTECTION_TIME_DECAY"}
 
 
 def test_delay_skip_is_paired_as_zero_r_not_dropped():
