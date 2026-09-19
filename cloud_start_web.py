@@ -144,6 +144,10 @@ _install_htf_scenario_engine(_collector)
 # Canonical geometry is promoted only after HTF direction + 1H confirmation align.
 from htf_core_geometry_overlay import install as _install_htf_core_geometry
 _install_htf_core_geometry(_collector)
+# Restore only an already-actionable qualified decision when 4H is directional and 12H is neutral.
+# This overlay fails closed on any V2 blocker and must run before quality/final gates.
+from htf_sr_decision_v2 import install as _install_htf_sr_decision_v2
+_install_htf_sr_decision_v2(_collector)
 from product_quality_gate_overlay import install as _install_product_quality_gate
 _install_product_quality_gate(_collector)
 
