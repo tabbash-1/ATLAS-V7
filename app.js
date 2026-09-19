@@ -6,6 +6,10 @@ const DEFAULT_ASSETS = [
   { name: 'BNB / USDT', symbol: 'BINANCE:BNBUSDT', cls: 'Crypto' },
   { name: 'Dogecoin / USDT', symbol: 'BINANCE:DOGEUSDT', cls: 'Crypto' },
   { name: 'Zcash / USDT', symbol: 'BINANCE:ZECUSDT', cls: 'Crypto' },
+  { name: 'Cardano / USDT', symbol: 'BINANCE:ADAUSDT', cls: 'Crypto' },
+  { name: 'Chainlink / USDT', symbol: 'BINANCE:LINKUSDT', cls: 'Crypto' },
+  { name: 'Avalanche / USDT', symbol: 'BINANCE:AVAXUSDT', cls: 'Crypto' },
+  { name: 'Litecoin / USDT', symbol: 'BINANCE:LTCUSDT', cls: 'Crypto' },
   { name: 'Hyperliquid / USDT', symbol: 'BINANCE:HYPEUSDT', cls: 'Crypto' }
 ];
 

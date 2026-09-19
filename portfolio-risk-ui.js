@@ -1,6 +1,6 @@
 (() => {
 const $=id=>document.getElementById(id);
-const universe=['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT'];
+const universe=['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT','ADAUSDT','LINKUSDT','AVAXUSDT','LTCUSDT'];
 function fmt(v,d=2){return v==null?'—':Number(v).toFixed(d);}
 function parseOpen(){
  try{return JSON.parse(localStorage.getItem('atlas.openPositions')||'[]')}catch{return []}

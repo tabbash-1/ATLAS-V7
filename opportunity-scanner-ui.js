@@ -1,7 +1,7 @@
 (() => {
 const $=id=>document.getElementById(id);
-const SYMBOLS=['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT','HYPEUSDT'];
-const names={BTCUSDT:'Bitcoin',ETHUSDT:'Ethereum',SOLUSDT:'Solana',XRPUSDT:'XRP',BNBUSDT:'BNB',DOGEUSDT:'Dogecoin',ZECUSDT:'Zcash',HYPEUSDT:'Hyperliquid'};
+const SYMBOLS=['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT','ADAUSDT','LINKUSDT','AVAXUSDT','LTCUSDT','HYPEUSDT'];
+const names={BTCUSDT:'Bitcoin',ETHUSDT:'Ethereum',SOLUSDT:'Solana',XRPUSDT:'XRP',BNBUSDT:'BNB',DOGEUSDT:'Dogecoin',ZECUSDT:'Zcash',ADAUSDT:'Cardano',LINKUSDT:'Chainlink',AVAXUSDT:'Avalanche',LTCUSDT:'Litecoin',HYPEUSDT:'Hyperliquid'};
 function fmt(v,d=2){return v==null?'—':Number(v).toFixed(d);}
 function cleanSymbol(value){return String(value||'').toUpperCase().split(':').pop();}
 function activeSymbol(){return cleanSymbol(window.ATLAS_STATE?.selectedAsset?.symbol||$('tvSymbolLabel')?.textContent);}

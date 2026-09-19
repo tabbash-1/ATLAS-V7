@@ -4,8 +4,12 @@ from types import SimpleNamespace
 from canonical_asset_ui_boot_patch import apply as apply_canonical_asset_ui_patch
 from canonical_asset_ui_boot_patch import transform_app_js
 from production_asset_universe import (
+    ASSET_UNIVERSE_EPOCH,
+    BASE_PRODUCTION_ASSETS,
     CANONICAL_PRODUCTION_ASSETS,
+    EXPANSION_PRODUCTION_ASSETS,
     VERSION,
+    cohort_for,
     enforce,
 )
 
@@ -17,6 +21,10 @@ EXPECTED = (
     "BNBUSDT",
     "DOGEUSDT",
     "ZECUSDT",
+    "ADAUSDT",
+    "LINKUSDT",
+    "AVAXUSDT",
+    "LTCUSDT",
 )
 
 
@@ -34,7 +42,13 @@ def test_enforce_replaces_research_symbol_leak_with_exact_canonical_universe():
     assert atlas.SYMBOLS == EXPECTED
     assert "HYPEUSDT" not in atlas.ON_DEMAND_SYMBOLS
     assert state["version"] == VERSION
-    assert state["count"] == 7
+    assert state["count"] == 11
+    assert state["base_assets"] == list(BASE_PRODUCTION_ASSETS)
+    assert state["expansion_assets"] == list(EXPANSION_PRODUCTION_ASSETS)
+    assert state["asset_universe_epoch"] == ASSET_UNIVERSE_EPOCH
+    assert state["expansion_rules"] == "IDENTICAL_TO_BASE_PRODUCTION_RULES"
+    assert cohort_for("ADAUSDT") == "ASSET_EXPANSION_V1"
+    assert cohort_for("BTCUSDT") == "BASE_V1"
     assert state["score_changed"] is False
     assert state["threshold_changed"] is False
     assert state["research_symbols_can_override"] is False
@@ -94,7 +108,7 @@ function openAsset(asset) {
 
     assert "HYPEUSDT" in patched.upper()  # compatibility token may remain
     assert state["hype_exposed"] is False
-    assert state["count"] == 7
+    assert state["count"] == 11
     assert state["saved_assets_filtered"] is True
     assert state["score_changed"] is False
     assert state["threshold_changed"] is False
@@ -111,10 +125,10 @@ def test_render_entrypoint_routes_through_canonical_universe_launcher():
     assert 'cloud_web_only_final.py' in launcher
 
 
-def test_consensus_shadow_workflow_uses_canonical_seven_asset_universe():
+def test_consensus_shadow_workflow_uses_canonical_expanded_asset_universe():
     root = Path(__file__).resolve().parents[1]
     source = (root / ".github/workflows/consensus-tiebreak-shadow-prospective.yml").read_text(encoding="utf-8")
-    expected = "BTCUSDT ETHUSDT SOLUSDT XRPUSDT BNBUSDT DOGEUSDT ZECUSDT"
+    expected = "BTCUSDT ETHUSDT SOLUSDT XRPUSDT BNBUSDT DOGEUSDT ZECUSDT ADAUSDT LINKUSDT AVAXUSDT LTCUSDT"
 
     assert f"symbols='{expected}'" in source
     assert "for s in $symbols; do" in source

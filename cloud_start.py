@@ -4,7 +4,7 @@
 Render historically used ``python3 cloud_start.py`` from a manually configured
 service. Keep this path permanently safe: on Render it delegates to the minimal
 web-only runtime plus the final fail-closed TRADE READY guard and canonical
-seven-asset Production universe so dashboard settings cannot accidentally boot
+base-plus-expansion Production universe so dashboard settings cannot accidentally boot
 the heavy research process, bypass final 4-12H direction authority, or expose a
 research-only symbol on the Production decision surface.
 

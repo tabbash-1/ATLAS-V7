@@ -1,6 +1,6 @@
 (function(){
   const VERSION='ATLAS_RC10_1_DEEP_UI_V2_PRIMARY_4_12H';
-  const SUPPORTED=new Set(['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT','HYPEUSDT']);
+  const SUPPORTED=new Set(['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT','ADAUSDT','LINKUSDT','AVAXUSDT','LTCUSDT','HYPEUSDT']);
   let requestEpoch=0;
   const $=id=>document.getElementById(id);
   function symbol(){const s=window.ATLAS_APP_STATE,a=s?.assets?.[s.active];return String(a?.symbol||'').toUpperCase().replace('BINANCE:','').replace(/[^A-Z0-9]/g,'');}

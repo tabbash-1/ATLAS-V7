@@ -1,7 +1,7 @@
 
 (() => {
 const $=id=>document.getElementById(id);
-const universe=['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT'];
+const universe=['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT','ADAUSDT','LINKUSDT','AVAXUSDT','LTCUSDT'];
 async function fetchHistory(sym,limit=1000){
  const r=await fetch(`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=1d&limit=${limit}`);
  if(!r.ok) throw new Error(`${sym}: HTTP ${r.status}`);

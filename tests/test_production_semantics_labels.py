@@ -16,8 +16,10 @@ def test_regime_label_explains_bias_and_pullback_without_changing_engine():
     assert 'SHORT BIAS · PULLBACK' in js
 
 
-def test_semantics_layer_is_loaded_after_product_shell():
+def test_semantics_are_owned_by_canonical_product_writer():
     loader = Path('theme-toggle.js').read_text(encoding='utf-8')
-    product = loader.index("'atlas-product-shell.js'")
-    semantics = loader.index("'production-semantics-labels.js'")
-    assert semantics > product
+    autoload = Path('production-web-autoload.js').read_text(encoding='utf-8')
+    assert "const scripts=['atlas-product-shell.js']" in loader
+    assert "'production-semantics-labels.js'" not in loader
+    assert "Final Trade Gate" in autoload
+    assert "No user-facing trade geometry while canonical decision is WAIT" in autoload

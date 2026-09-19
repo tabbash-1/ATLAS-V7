@@ -6,7 +6,7 @@ def test_cloud_start_remains_untouched_by_staged_shadow_wiring():
     assert 'staged_shadow_api' not in text
     assert 'staged_decision_shadow' not in text
     assert 'ATLAS_CLOUD_FORWARD_MIN_SCORE", "68"' in text
-    assert 'runpy.run_path(str(BASE / "cloud_web_only_final.py")' in text
+    assert 'runpy.run_path(str(BASE / "cloud_production_canonical.py")' in text
 
 
 def test_shadow_is_wired_through_existing_research_bootstrap():

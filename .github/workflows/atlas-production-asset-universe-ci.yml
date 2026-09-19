@@ -23,7 +23,7 @@ on:
       - '.github/workflows/atlas-production-asset-universe-ci.yml'
 
 jobs:
-  canonical-seven-assets:
+  canonical-production-assets:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -41,9 +41,9 @@ jobs:
         run: |
           python - <<'PY'
           from production_asset_universe import CANONICAL_PRODUCTION_ASSETS
-          expected = ('BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT')
+          expected = ('BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT','ADAUSDT','LINKUSDT','AVAXUSDT','LTCUSDT')
           assert CANONICAL_PRODUCTION_ASSETS == expected
-          assert len(CANONICAL_PRODUCTION_ASSETS) == 7
+          assert len(CANONICAL_PRODUCTION_ASSETS) == 11
           assert 'HYPEUSDT' not in CANONICAL_PRODUCTION_ASSETS
           PY
           grep -q 'score_changed.*False' production_asset_universe.py

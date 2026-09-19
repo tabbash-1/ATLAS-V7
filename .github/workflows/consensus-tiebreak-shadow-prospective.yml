@@ -33,12 +33,12 @@ jobs:
         run: |
           PYTHONPATH=. python tests/test_consensus_tiebreak_shadow.py
           PYTHONPATH=. python tests/test_consensus_tiebreak_shadow_tracker.py
-      - name: Fetch live research shadow for canonical seven-asset universe
+      - name: Fetch live research shadow for canonical Production universe
         shell: bash
         run: |
           set -euo pipefail
           base='https://atlas-v7.onrender.com'
-          symbols='BTCUSDT ETHUSDT SOLUSDT XRPUSDT BNBUSDT DOGEUSDT ZECUSDT'
+          symbols='BTCUSDT ETHUSDT SOLUSDT XRPUSDT BNBUSDT DOGEUSDT ZECUSDT ADAUSDT LINKUSDT AVAXUSDT LTCUSDT'
           mkdir -p /tmp/atlas-shadow
           for s in $symbols; do
             curl -fsSL --retry 8 --retry-delay 8 --retry-all-errors --connect-timeout 10 --max-time 60 \

@@ -22,7 +22,7 @@ LATEST = ROOT / "status/wait-missed-opportunity-latest.json"
 LEDGER = ROOT / "status/history/wait-missed-opportunity.jsonl"
 SCHEMA = "ATLAS_WAIT_MISSED_OPPORTUNITY_V2_CANDLE_SETTLED"
 HORIZONS = (1, 2, 4, 8, 12)
-CORE = {"BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","BNBUSDT","DOGEUSDT","ZECUSDT"}
+CORE = {"BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","BNBUSDT","DOGEUSDT","ZECUSDT","ADAUSDT","LINKUSDT","AVAXUSDT","LTCUSDT"}
 # Strategy-semantic boundary: HTF neutral-regime V2 merged to main.
 POST_V2_EPOCH_ID = "HTF_SR_V2_2026-09-14"
 POST_V2_START = dt.datetime(2026, 9, 14, 12, 31, 29, tzinfo=dt.timezone.utc)

@@ -2,7 +2,7 @@ from pathlib import Path
 
 
 WORKFLOW = Path('.github/workflows/atlas-production-snapshot.yml')
-CANONICAL = "['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT']"
+CANONICAL = "['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT','ADAUSDT','LINKUSDT','AVAXUSDT','LTCUSDT']"
 
 
 def test_snapshot_reports_only_canonical_assets_as_supported():

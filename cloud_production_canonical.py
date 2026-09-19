@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Final Render launcher with the canonical seven-asset Production boundary.
+"""Final Render launcher with the canonical Production asset boundary.
 
 Loads the existing final web stack without starting its server, constrains the
 interactive Production universe and browser asset list, then starts the same

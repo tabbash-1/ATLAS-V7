@@ -33,7 +33,7 @@ def patch_production_ui():
         '  <script src="production-web-autoload.js?v=production-autoload-v6-strict-final-truth"></script>',
         '  <script src="atlas-deep-analysis-ui.js?v=rc10-1-deep-v2-primary-4-12h"></script>',
         '  <script src="atlas-unified-terminal.js?v=unified-terminal-v6-single-snapshot-htf"></script>',
-        '  <script src="atlas-unified-terminal-polish.js?v=unified-terminal-polish-v2-execution-semantics"></script>',
+        '  <script src="atlas-unified-terminal-polish.js?v=unified-terminal-polish-v4-wait-cause"></script>',
         '  <script src="atlas-paper-portfolio-ui.js?v=paper-portfolio-v3-final-gate-only"></script>',
         '  <script src="atlas-research-validation-ui.js?v=research-shadow-v3-target-status"></script>',
     ])

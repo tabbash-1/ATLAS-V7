@@ -73,7 +73,7 @@ jobs:
           fetch_json outcomes /api/outcomes/summary || true; sleep 3
           fetch_json geometry /api/outcomes/geometry-status || true; sleep 3
           fetch_json ai_status /api/ai/council/status || true
-          for s in BTCUSDT ETHUSDT SOLUSDT XRPUSDT BNBUSDT DOGEUSDT ZECUSDT HYPEUSDT; do
+          for s in BTCUSDT ETHUSDT SOLUSDT XRPUSDT BNBUSDT DOGEUSDT ZECUSDT ADAUSDT LINKUSDT AVAXUSDT LTCUSDT HYPEUSDT; do
             sleep 4; fetch_json "decision_${s}" "/api/decision/current?symbol=${s}" || true
             sleep 2; fetch_json "ai_${s}" "/api/ai/council?symbol=${s}" || true
           done
@@ -81,7 +81,7 @@ jobs:
           # Second-pass recovery for failed canonical decisions. A transient Render
           # 5xx/non-JSON response must not silently become a successful-looking cycle.
           sleep 10
-          for s in BTCUSDT ETHUSDT SOLUSDT XRPUSDT BNBUSDT DOGEUSDT ZECUSDT; do
+          for s in BTCUSDT ETHUSDT SOLUSDT XRPUSDT BNBUSDT DOGEUSDT ZECUSDT ADAUSDT LINKUSDT AVAXUSDT LTCUSDT; do
             f="status/raw/decision_${s}.json"
             if ! jq -e '.ok == true and .canonical_decision.schema == "ATLAS_CANONICAL_DECISION_TRUTH_V1" and .canonical_decision.canonical_source_present == true and .canonical_decision.source_of_truth == "FINAL_TRADE_GATE"' "$f" >/dev/null 2>&1; then
               echo "RECOVER_CANONICAL_DECISION ${s}"
@@ -103,7 +103,7 @@ jobs:
               if not p.exists(): return {'ok':False,'error':'missing_committed_report','path':str(p)}
               try:return json.loads(p.read_text())
               except Exception as e:return {'ok':False,'error':f'invalid_committed_report:{e}','path':str(p)}
-          core_symbols=['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT']
+          core_symbols=['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ZECUSDT','ADAUSDT','LINKUSDT','AVAXUSDT','LTCUSDT']
           symbols=core_symbols+['HYPEUSDT']
           decisions={s:load('decision_'+s) for s in symbols}
           raw_councils={s:load('ai_'+s) for s in symbols}
