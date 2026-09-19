@@ -64,6 +64,14 @@ def breakdown(items,field):
     for value in sorted({str(x[field]) for x in items}):out[value]=aggregate([x for x in items if str(x[field])==value])
     return out
 
+def joint_setup_breakdown(items):
+    out={}
+    keys=sorted({(str(x["direction"]),str(x["regime"]),str(x["playbook"])) for x in items})
+    for direction,regime,playbook in keys:
+        k=f"{direction}|{regime}|{playbook}"
+        out[k]=aggregate([x for x in items if str(x["direction"])==direction and str(x["regime"])==regime and str(x["playbook"])==playbook])
+    return out
+
 def diagnosis(groups):
     out=[]
     for field in ('playbook','regime','symbol','direction'):
@@ -108,7 +116,7 @@ def build(rows,days=31):
         v=((x['horizons'].get('12') or {}).get('directional_return_pct'))
         if v is not None and v>=1:missed[x['wait_reason']]+=1
     diag=diagnosis(groups)
-    return {'schema':SCHEMA,'ok':True,'generated_at':dt.datetime.now(dt.timezone.utc).isoformat(),'window':{'requested_days':days,'start_at':start.isoformat(),'end_at':end.isoformat(),'snapshot_rows_in_window':len(scoped)},'product_contract':{'canonical_horizon':'4-12H','analyst_only':True,'live_execution':False},'research_only':True,'can_override_production':False,'production_threshold_changed':False,'sampling':'max one observation per symbol/class/direction per hour','counts':{'observations':len(obs),'qualified':len(q),'wait_directional':len(w),'qualified_execution_ready':sum(x['execution_ready'] for x in q)},'qualified':aggregate(q),'wait_directional':aggregate(w),'qualified_breakdown':groups,'diagnosis_12h_worst_first':diag,'wait_reason_counts':dict(Counter(x['wait_reason'] for x in w).most_common()),'failure_attribution_12h':dict(failure.most_common()),'missed_wait_opportunities_12h_ge_1pct_by_reason':dict(missed.most_common()),'latest_observations':obs[-100:]}
+    return {'schema':SCHEMA,'ok':True,'generated_at':dt.datetime.now(dt.timezone.utc).isoformat(),'window':{'requested_days':days,'start_at':start.isoformat(),'end_at':end.isoformat(),'snapshot_rows_in_window':len(scoped)},'product_contract':{'canonical_horizon':'4-12H','analyst_only':True,'live_execution':False},'research_only':True,'can_override_production':False,'production_threshold_changed':False,'sampling':'max one observation per symbol/class/direction per hour','counts':{'observations':len(obs),'qualified':len(q),'wait_directional':len(w),'qualified_execution_ready':sum(x['execution_ready'] for x in q)},'qualified':aggregate(q),'wait_directional':aggregate(w),'qualified_breakdown':groups,'qualified_joint_setup_breakdown':joint_setup_breakdown(q),'diagnosis_12h_worst_first':diag,'wait_reason_counts':dict(Counter(x['wait_reason'] for x in w).most_common()),'failure_attribution_12h':dict(failure.most_common()),'missed_wait_opportunities_12h_ge_1pct_by_reason':dict(missed.most_common()),'latest_observations':obs[-100:]}
 
 def main():
     ap=argparse.ArgumentParser(); ap.add_argument('--history',default='status/history/production-snapshots.jsonl'); ap.add_argument('--output',default='status/monthly-product-audit-latest.json'); ap.add_argument('--days',type=int,default=31); a=ap.parse_args()
