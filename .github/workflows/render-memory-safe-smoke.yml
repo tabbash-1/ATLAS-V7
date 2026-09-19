@@ -20,7 +20,7 @@ jobs:
     steps:
       - name: Wait for Render deploy
         run: sleep 100
-      - name: Verify health, workers and Cloud Forward
+      - name: Verify memory-safe web runtime
         shell: bash
         run: |
           set -euo pipefail
@@ -34,28 +34,29 @@ jobs:
           r=json.load(open('/tmp/runtime.json'))
           c=json.load(open('/tmp/cloud.json'))
           assert h.get('status') == 'ok', h
+          # Render intentionally runs the memory-safe web-only process. Heavy
+          # research workers are isolated to scheduled GitHub workflows and must
+          # not be required by this smoke test.
           workers=r.get('workers') or {}
-          for name in ('smart_money','news','cloud_forward'):
-              assert name in workers, (name, workers)
-              assert int((workers[name] or {}).get('starts') or 0) >= 1, workers[name]
-          assert c.get('enabled') is True, c
-          assert c.get('research_only') is True, c
+          assert isinstance(workers, dict), workers
+          assert r.get('web_only') is True or r.get('memory_safe') is True or workers == {}, r
           assert c.get('live_execution') is False, c
           print('BOOT', r.get('boot_id'))
           print('UPTIME', r.get('uptime_seconds'))
           print('WORKERS', json.dumps(workers, sort_keys=True))
-          print('CLOUD', json.dumps({k:c.get(k) for k in ('enabled','running','cycles','stored','errors','last_success_at','last_error')}, sort_keys=True))
+          print('CLOUD', json.dumps({k:c.get(k) for k in ('enabled','running','cycles','stored','errors','last_success_at','last_error','research_only','live_execution')}, sort_keys=True))
           PY
-      - name: Verify live HYPE Production endpoint
+      - name: Verify research-only HYPE is excluded from Production
         shell: bash
         run: |
           set -euo pipefail
           base='https://atlas-v7.onrender.com'
-          curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --connect-timeout 10 --max-time 45 "$base/api/decision/current?symbol=HYPEUSDT" -o /tmp/hype.json
-          python3 - <<'PY'
-          import json
+          code=$(curl -sS -o /tmp/hype.json -w '%{http_code}' --retry 5 --retry-delay 10 --retry-all-errors --connect-timeout 10 --max-time 45 "$base/api/decision/current?symbol=HYPEUSDT")
+          python3 - "$code" <<'PY'
+          import json,sys
           x=json.load(open('/tmp/hype.json'))
-          assert x.get('ok') is True, x
-          assert x.get('research_only') is True, x
-          print('HYPE', json.dumps({k:x.get(k) for k in ('score','signal_threshold','candidate_direction','opportunity_state','wait_reason','actionable_reason')}, sort_keys=True))
+          assert sys.argv[1] == '400', (sys.argv[1],x)
+          assert x.get('ok') is False, x
+          assert x.get('error') == 'unsupported symbol', x
+          print('HYPE correctly excluded from Production')
           PY
