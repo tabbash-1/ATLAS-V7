@@ -50,6 +50,10 @@ jobs:
                   getattr(mod,name)()
                   print('PASS',mod.__name__,name)
           PY
+      - name: Freeze prospective fingerprint assignments
+        run: python fingerprint_prospective_ledger.py
+      - name: Evaluate prospective fingerprint outcomes
+        run: python fingerprint_prospective_evaluator.py
       - name: Build learning loop evidence
         run: python learning_loop.py
       - name: Verify Production firewall
@@ -72,7 +76,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: atlas-learning-loop-${{ github.run_id }}
-          path: status/learning-loop-latest.json
+          path: |
+            status/learning-loop-latest.json
+            status/fingerprint-prospective-ledger.json
+            status/fingerprint-prospective-evaluation-latest.json
           retention-days: 30
       - name: Commit evidence snapshot
         if: github.event_name != 'pull_request'
@@ -81,4 +88,6 @@ jobs:
             'atlas-learning-loop' \
             'atlas-learning-loop@users.noreply.github.com' \
             'validation: update evidence learning loop [skip ci] [skip render]' \
-            'status/learning-loop-latest.json'
+            'status/learning-loop-latest.json' \
+            'status/fingerprint-prospective-ledger.json' \
+            'status/fingerprint-prospective-evaluation-latest.json'
