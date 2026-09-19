@@ -11,14 +11,14 @@ def build(root:Path):
  groups={"ALIGNED":[],"CONTROL":[],"UNKNOWN":[]}
  observations=[]
  for r in rows:
-  relation=str(r.get("microstructure_relation_at_entry") or r.get("frozen_entry_context",{}).get("microstructure_relation_at_entry") or "UNKNOWN")
+  prov=r.get("decision_provenance") or {}; relation=str(r.get("microstructure_relation_at_entry") or (r.get("frozen_entry_context") or {}).get("microstructure_relation_at_entry") or prov.get("microstructure_relation_at_entry") or "UNKNOWN")
   group="ALIGNED" if relation=="ALIGNED" else "CONTROL" if relation in ("OPPOSED_OR_CROWDED","MIXED_OR_INSUFFICIENT") else "UNKNOWN"
-  terminal=r.get("terminal") or {}; rv=terminal.get("r_multiple")
+  terminal=r.get("settlement") or r.get("terminal") or {}; rv=terminal.get("r_multiple")
   if rv is None:continue
   rv=float(rv);groups[group].append(rv);observations.append({"decision_id":r.get("decision_id"),"symbol":r.get("symbol"),"direction":r.get("direction"),"relation":relation,"group":group,"terminal_r":rv})
  a=_stats(groups["ALIGNED"]);c=_stats(groups["CONTROL"])
  delta=round(a["avg_r"]-c["avg_r"],4) if a["avg_r"] is not None and c["avg_r"] is not None else None
- return {"schema":VERSION,"generated_at":dt.datetime.now(dt.timezone.utc).isoformat(),"research_only":True,"live_execution":False,"can_override_production":False,"automatic_strategy_change":False,"interpretation":"DESCRIPTIVE_CANONICAL_R_BRIDGE_NOT_FORWARD_EDGE_PROOF","groups":{"aligned":a,"control":c,"unknown":_stats(groups["UNKNOWN"])},"aligned_minus_control_avg_r":delta,"observations":observations}
+ return {"schema":VERSION,"generated_at":dt.datetime.now(dt.timezone.utc).isoformat(),"research_only":True,"live_execution":False,"can_override_production":False,"automatic_strategy_change":False,"interpretation":"DESCRIPTIVE_CANONICAL_R_BRIDGE_NOT_FORWARD_EDGE_PROOF","groups":{"aligned":a,"control":c,"unknown":_stats(groups["UNKNOWN"])},"aligned_minus_control_avg_r":delta,"observations":observations,"provenance_coverage":{"known_relation_n":sum(1 for x in observations if x["group"]!="UNKNOWN"),"unknown_relation_n":sum(1 for x in observations if x["group"]=="UNKNOWN"),"warning":"MICROSTRUCTURE_RELATION_NOT_FROZEN_IN_CANONICAL_ENTRY" if observations and all(x["group"]=="UNKNOWN" for x in observations) else None}}
 def validate(x):
  assert x["research_only"] and not x["live_execution"] and not x["can_override_production"] and not x["automatic_strategy_change"]
 if __name__=="__main__":
