@@ -18,7 +18,7 @@ def test_filter_triggers_are_deterministic():
 
 def test_path_change_hypotheses_are_not_fake_settled():
     path=[x for x in m.HYPOTHESES if x["kind"]=="PATH_CHANGE"]
-    assert {x["id"] for x in path}=={"DELAY_ENTRY_1H_CONFIRM","EARLY_MOMENTUM_FAILFAST_EXIT","PROFIT_PROTECTION_TIME_DECAY"}
+    assert {x["id"] for x in path}=={"DELAY_ENTRY_1H_CONFIRM","EARLY_MOMENTUM_FAILFAST_EXIT"}
 
 
 def test_control_center_contract_is_read_only():
@@ -49,7 +49,7 @@ def test_path_replay_is_prelocked_shadow_only():
     assert p.ACTIVATION_AT=="2026-09-18T07:10:00+00:00"
     assert p.MIN_N==30 and p.THRESHOLD==68
     assert p.FAILFAST_ADVERSE_R==-0.25 and p.FAILFAST_WINDOW_H==4
-    assert {x["id"] for x in p.PATH_HYPOTHESES}=={"DELAY_ENTRY_1H_CONFIRM","EARLY_MOMENTUM_FAILFAST_EXIT"}
+    assert {x["id"] for x in p.PATH_HYPOTHESES}=={"DELAY_ENTRY_1H_CONFIRM","EARLY_MOMENTUM_FAILFAST_EXIT","PROFIT_PROTECTION_TIME_DECAY"}
 
 
 def test_control_center_renders_candle_path_replay():
