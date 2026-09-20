@@ -43,7 +43,7 @@ def run(now=None):
  rows=[json.loads(x) for x in LEDGER.read_text().splitlines() if x.strip()] if LEDGER.exists() else []
  rows,errors=settlement.settle_due(rows,now=now,price_at=_price_at)
  settlement.rewrite(rows,LEDGER)
- ev=evaluator.build(LEDGER)
+ ev=evaluator.build(LEDGER, settlement.ledger.SETTLEMENT_OUT)
  evaluator.OUT.write_text(json.dumps(ev,indent=2,sort_keys=True))
  st=status.build();status.OUT.write_text(json.dumps(st,indent=2,sort_keys=True))
  return {"capture":cap,"settled_n":len(events),"settlement_errors":errors,"evaluation":ev,"research_only":True,"production_effect":"NONE"}
