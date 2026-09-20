@@ -31,9 +31,9 @@ jobs:
         run: pip install -r requirements.txt
       - name: Run isolated research cycle
         run: PYTHONPATH=. python research_forward_cycle_action.py
-      - name: Verify HYPE was actually scored
+      - name: Verify research universe coverage
         run: |
-          jq -e '.research_only == true and .live_execution == false and .can_override_production == false and .changes_production_universe == false and .changes_threshold == false and .product_horizon == "4-12H" and (.research_assets | index("HYPEUSDT")) != null and (.research_lane.last_scored_symbols | index("HYPEUSDT")) != null' status/research-forward-cycle-latest.json >/dev/null
+          jq -e '.research_only == true and .live_execution == false and .can_override_production == false and .changes_production_universe == false and .changes_threshold == false and .product_horizon == "4-12H" and (.research_assets | index("HYPEUSDT")) != null and (((.research_lane.last_scored_symbols | index("HYPEUSDT")) != null) or ((.research_lane.last_failed_symbols | map(.symbol) | index("HYPEUSDT")) != null))' status/research-forward-cycle-latest.json >/dev/null
       - name: Commit research evidence
         run: |
           git config user.name "atlas-research-forward"

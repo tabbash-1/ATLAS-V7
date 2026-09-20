@@ -7,6 +7,8 @@ on:
     paths:
       - 'market_context_reasoning.py'
       - 'tests/test_market_context_reasoning.py'
+      - 'market_context_adapter.py'
+      - 'tests/test_market_context_adapter.py'
       - '.github/workflows/atlas-market-context-reasoning.yml'
 
 permissions:
@@ -20,7 +22,7 @@ jobs:
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
       - run: python -m pip install --disable-pip-version-check -q pytest
-      - run: PYTHONPATH=. python -m pytest -q tests/test_market_context_reasoning.py
+      - run: PYTHONPATH=. python -m pytest -q tests/test_market_context_reasoning.py tests/test_market_context_adapter.py
       - name: Verify Production firewall
         run: |
           python - <<'PY'
