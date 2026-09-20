@@ -6,7 +6,9 @@ Uses existing ATLAS market-data functions. Research-only; never calls an executi
 from __future__ import annotations
 import json,pathlib
 from datetime import datetime,timezone
-import atlas_v7 as atlas
+import atlas_runtime_server as runtime
+atlas=runtime.atlas
+import market_context_klines as context_klines
 import market_context_cycle as cycle
 import market_context_settlement as settlement
 import market_context_forward_evaluator as evaluator
@@ -21,7 +23,7 @@ def _load_snapshot():
  if not x.get("decisions"): raise RuntimeError("CANONICAL_SNAPSHOT_EMPTY")
  return x
 
-def _klines(symbol): return atlas._spot_klines(symbol)
+def _klines(symbol): return context_klines.load(symbol, interval="4h")
 
 def _price_at(symbol,due):
  # Existing spot kline provider; choose first candle at/after due from returned history.
