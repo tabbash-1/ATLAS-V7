@@ -10,7 +10,7 @@ def test_runner_is_research_only(tmp_path,monkeypatch):
  monkeypatch.setattr(r,"_price_at",lambda s,d:101)
  monkeypatch.setattr(r.evaluator,"OUT",tmp_path/"eval.json")
  monkeypatch.setattr(r.status,"OUT",tmp_path/"status.json")
- monkeypatch.setattr(r.status.evaluator,"LEDGER",r.LEDGER)
+ monkeypatch.setattr(r.status.evaluator,"LEDGER",r.LEDGER)\n monkeypatch.setattr(r.settlement.ledger,"SETTLEMENT_OUT",tmp_path/"settlements.jsonl")\n monkeypatch.setattr(r.evaluator,"SETTLEMENTS",tmp_path/"settlements.jsonl")\n monkeypatch.setattr(r.status.evaluator,"SETTLEMENTS",tmp_path/"settlements.jsonl")
  x=r.run(__import__("datetime").datetime(2026,9,20,tzinfo=__import__("datetime").timezone.utc))
  assert x["research_only"] is True and x["production_effect"]=="NONE"
  assert x["capture"]["captured_n"]==1
