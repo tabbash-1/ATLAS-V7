@@ -46,7 +46,7 @@ def run(now=None):
  ev=evaluator.build(LEDGER)
  evaluator.OUT.write_text(json.dumps(ev,indent=2,sort_keys=True))
  st=status.build();status.OUT.write_text(json.dumps(st,indent=2,sort_keys=True))
- return {"capture":cap,"settlement_errors":errors,"evaluation":ev,"research_only":True,"production_effect":"NONE"}
+ return {"capture":cap,"settled_n":len(events),"settlement_errors":errors,"evaluation":ev,"research_only":True,"production_effect":"NONE"}
 
 if __name__=="__main__":
  print(json.dumps(run(),sort_keys=True))
