@@ -21,7 +21,9 @@ def build(context):
     rsi=_n(c.get("rsi")); dist=_n(c.get("distance_from_recent_high_pct"))
     news=_u(c.get("event_risk")); catalyst=_u(c.get("catalyst_bias"))
     htf=_u(c.get("htf_alignment"))
-    evidence=[]; pressures=[]
+    liquidity=_u(c.get("liquidity_bias")); whale=_u(c.get("whale10_consensus"))
+    extra_e=list(c.get("enrichment_evidence") or []); extra_p=list(c.get("enrichment_pressures") or [])
+    evidence=list(extra_e); pressures=list(extra_p)
 
     bullish=direction=="LONG"
     bearish=direction=="SHORT"
@@ -38,9 +40,11 @@ def build(context):
         overextended=True; pressures.append("BEARISH_OVEREXTENSION")
     if dist is not None and abs(dist)<=3: evidence.append("NEAR_RECENT_EXTREME")
 
+    opposition=(bullish and (liquidity=="ASK" or whale=="DISTRIBUTION")) or (bearish and (liquidity=="BID" or whale=="ACCUMULATION"))
     if htf=="CONFLICT": decision="WAIT"; reason="HTF_CONFLICT"
     elif news in ("HIGH","CRITICAL"): decision="WAIT"; reason="EVENT_RISK"
     elif overextended: decision="WAIT"; reason="AVOID_CHASING_EXTENDED_MOVE"
+    elif opposition: decision="WAIT"; reason="CONTEXT_OPPOSES_TREND"
     elif bullish: decision="LONG"; reason="TREND_WITHOUT_CONTEXT_BLOCKER"
     elif bearish: decision="SHORT"; reason="TREND_WITHOUT_CONTEXT_BLOCKER"
     else: decision="WAIT"; reason="NO_DIRECTIONAL_EDGE"
