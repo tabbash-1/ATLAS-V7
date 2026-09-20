@@ -20,11 +20,11 @@ def test_learning_loop_surfaces_prospective_path_replay(tmp_path, monkeypatch):
     monkeypatch.setattr(m.replay, "build", lambda root: {"challengers":{"EARLY_THESIS_FAILURE":{"evaluated_n":1,"triggered_n":1,"observed_delta_r":0.2}}})
     monkeypatch.setattr(m.replay, "validate", lambda x: None)
     (tmp_path/"status").mkdir()
-    (tmp_path/"status/opportunity-path-replay-latest.json").write_text(json.dumps({"hypotheses":[{"id":"EARLY_THESIS_FAILURE","paired_n":4,"evaluable":4,"changed":2,"champion_net_r":-0.1,"shadow_net_r":0.1,"delta_net_r":0.2,"formal_ready":False,"promotion_allowed":False}]}))
+    (tmp_path/"status/opportunity-path-replay-latest.json").write_text(json.dumps({"hypotheses":[{"id":"EARLY_MOMENTUM_FAILFAST_EXIT","paired_n":4,"evaluable":4,"changed":2,"champion_net_r":-0.1,"shadow_net_r":0.1,"delta_net_r":0.2,"formal_ready":False,"promotion_allowed":False}]}))
     x=m.build(tmp_path)
     p=x["evidence"]["candidates"]["EARLY_THESIS_FAILURE"]["prospective_evidence"]
     assert p["paired_n"]==4 and p["delta_net_r"]==0.2 and p["promotion_allowed"] is False
-    assert x["evidence"]["prospective_path_replay"]["EARLY_THESIS_FAILURE"]["formal_ready"] is False
+    assert x["evidence"]["prospective_path_replay"]["EARLY_MOMENTUM_FAILFAST_EXIT"]["formal_ready"] is False
     m.validate(x)
 
 

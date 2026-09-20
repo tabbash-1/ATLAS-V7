@@ -1,0 +1,50 @@
+name: ATLAS Reasoning Prospective Evidence
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'market_context_hourly_runner.py'
+      - 'market_context_cycle.py'
+      - 'market_context_settlement.py'
+      - 'market_context_forward_evaluator.py'
+      - 'market_context_status.py'
+      - 'tests/test_market_context_hourly_runner.py'
+      - '.github/workflows/atlas-reasoning-prospective-evidence.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atlas-reasoning-prospective-evidence
+  cancel-in-progress: false
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: main, fetch-depth: 0}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: |
+          python -m pip install --disable-pip-version-check -q pytest
+          PYTHONPATH=. python -m pytest -q tests/test_market_context_reasoning.py tests/test_market_context_adapter.py tests/test_market_context_forward_evidence.py tests/test_market_context_cycle.py tests/test_market_context_settlement_cost.py tests/test_market_context_status.py tests/test_market_context_hourly_runner.py
+      - name: Run prospective reasoning cycle
+        run: PYTHONPATH=. python market_context_hourly_runner.py
+      - name: Verify firewall
+        run: |
+          python - <<'PY'
+          import json
+          p=json.load(open('status/market-context-reasoning-status-latest.json'))
+          assert p['production_effect']=='NONE'
+          assert p['automatic_promotion'] is False
+          assert p['research_only'] is True and p['live_execution'] is False
+          PY
+      - name: Commit prospective evidence
+        run: |
+          bash scripts/commit_status_with_retry.sh             'atlas-reasoning-evidence'             'atlas-reasoning-evidence@users.noreply.github.com'             'research: update reasoning prospective evidence [skip ci] [skip render]'             'status/market-context-reasoning-ledger.jsonl'             'status/market-context-reasoning-evaluation-latest.json'             'status/market-context-reasoning-status-latest.json'
