@@ -49,7 +49,7 @@ jobs:
           ! grep -q "CANONICAL_ANALYST_OUTPUT" atlas-production-decision.js
           ! grep -q "candidate_direction" atlas-production-decision.js
 
-          grep -q "ATLAS_UNIFIED_TERMINAL_V6_SINGLE_SNAPSHOT_HTF" atlas-unified-terminal.js
+          grep -q "ATLAS_UNIFIED_TERMINAL_V7_MOBILE_DECISION_FIRST" atlas-unified-terminal.js
           grep -q "const PRODUCT_FRAMES=\['1d','12h','4h','1h'\]" atlas-unified-terminal.js
           ! grep -q "\['1d','12h','6h','4h','1h'\]" atlas-unified-terminal.js
           ! grep -q "p.product_direction||p.candidate_direction" atlas-unified-terminal.js
@@ -74,7 +74,7 @@ jobs:
           grep -q "geometrySource:'bound_analyst_output'" production-web-autoload.js
 
           grep -q "production-decision-v13-extended-target-evidence" render_boot_patch.py
-          grep -q "unified-terminal-v6-single-snapshot-htf" render_boot_patch.py
+          grep -q "unified-terminal-v7-mobile-decision-first" render_boot_patch.py
           grep -q "paper-portfolio-v3-final-gate-only" render_boot_patch.py
           grep -q "research-shadow-v3-target-status" render_boot_patch.py
           echo 'STRICT_PRODUCT_TRUTH_REGRESSION_OK'
@@ -97,11 +97,11 @@ jobs:
               && curl -fsSL --connect-timeout 10 --max-time 50 "$base/atlas-research-validation-ui.js" -o /tmp/research.js \
               && curl -fsSL --connect-timeout 10 --max-time 50 "$base/production-web-autoload.js" -o /tmp/autoload.js; then
               if grep -q 'production-decision-v13-extended-target-evidence' /tmp/index.html \
-                && grep -q 'unified-terminal-v6-single-snapshot-htf' /tmp/index.html \
+                && grep -q 'unified-terminal-v7-mobile-decision-first' /tmp/index.html \
                 && grep -q 'paper-portfolio-v3-final-gate-only' /tmp/index.html \
                 && grep -q 'research-shadow-v3-target-status' /tmp/index.html \
                 && grep -q 'ATLAS_PRODUCTION_DECISION_UI_V13_EXTENDED_TARGET_EVIDENCE' /tmp/prod.js \
-                && grep -q 'ATLAS_UNIFIED_TERMINAL_V6_SINGLE_SNAPSHOT_HTF' /tmp/unified.js \
+                && grep -q 'ATLAS_UNIFIED_TERMINAL_V7_MOBILE_DECISION_FIRST' /tmp/unified.js \
                 && grep -q 'ATLAS_CANONICAL_PAPER_UI_V3_FINAL_GATE_ONLY' /tmp/paper.js \
                 && grep -q 'ATLAS_RESEARCH_SHADOW_UI_V3_TARGET_STATUS' /tmp/research.js \
                 && grep -q 'ATLAS_PRODUCTION_WEB_AUTOLOAD_V6_STRICT_FINAL_TRUTH' /tmp/autoload.js; then
