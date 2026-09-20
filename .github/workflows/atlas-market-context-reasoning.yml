@@ -1,0 +1,36 @@
+name: ATLAS Market Context Reasoning Shadow
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'market_context_reasoning.py'
+      - 'tests/test_market_context_reasoning.py'
+      - '.github/workflows/atlas-market-context-reasoning.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: python -m pip install --disable-pip-version-check -q pytest
+      - run: PYTHONPATH=. python -m pytest -q tests/test_market_context_reasoning.py
+      - name: Verify Production firewall
+        run: |
+          python - <<'PY'
+          from market_context_reasoning import build
+          x=build({})
+          assert x['mode']=='SHADOW_CHALLENGER'
+          assert x['can_override_canonical_decision'] is False
+          assert x['can_change_score'] is False
+          assert x['can_change_threshold'] is False
+          assert x['can_change_geometry'] is False
+          assert x['analysis_only'] is True and x['live_execution'] is False
+          assert x['comparison_horizons_h']==[4,8,12]
+          PY
