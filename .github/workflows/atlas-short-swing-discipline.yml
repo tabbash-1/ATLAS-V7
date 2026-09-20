@@ -1,0 +1,25 @@
+name: ATLAS Short Swing Discipline Shadow
+on:
+  push:
+    branches: [main]
+    paths: ['short_swing_discipline.py','tests/test_short_swing_discipline.py','.github/workflows/atlas-short-swing-discipline.yml']
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  shadow:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: |
+          python -m pip install --disable-pip-version-check -q pytest
+          PYTHONPATH=. python -m pytest -q tests/test_short_swing_discipline.py
+      - name: Verify Production firewall
+        run: |
+          python - <<'PY'
+          import short_swing_discipline as m
+          x=m.evaluate({})
+          assert x['research_only'] and x['production_effect']=='NONE'
+          assert x['can_override_final_trade_gate'] is False and x['automatic_promotion'] is False
+          PY
