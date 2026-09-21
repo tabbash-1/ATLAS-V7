@@ -52,7 +52,8 @@ def _derivatives(d,candidate):
 def freeze(snapshot):
     captured=snapshot.get("captured_at")
     decisions=snapshot.get("decisions") or {}
-    btc_decision=decisions.get("BTCUSDT") or {}\n    btc=btc_decision.get("independent_btc_regime") or _regime_from_decision(btc_decision)
+    btc_decision=decisions.get("BTCUSDT") or {}
+    btc=btc_decision.get("independent_btc_regime") or _regime_from_decision(btc_decision)
     out=[]
     for symbol,d in decisions.items():
         if not isinstance(d,dict) or not d.get("ok"):continue
