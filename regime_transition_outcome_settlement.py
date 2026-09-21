@@ -9,7 +9,11 @@ from pathlib import Path
 from offline_production_path_settlement import market_klines
 
 SCHEMA="ATLAS_REGIME_TRANSITION_OUTCOMES_V1"
-COST_BPS=10
+# Locked research cost model. Keep aligned with opportunity-path replay:
+# 5 bps fee/side + 3 bps slippage/side = 16 bps round trip.
+# Funding is modeled separately by elapsed holding horizon (1 bp per 12h).
+ROUND_TRIP_FEE_SLIPPAGE_BPS=16
+FUNDING_BPS_PER_12H=1
 HORIZONS=(4,8,12)
 
 def _f(v):
@@ -42,7 +46,7 @@ def settle_one(obs,now=None):
          "symbol":obs.get("symbol"),"captured_at":obs.get("captured_at"),
          "candidate_direction":obs.get("candidate_direction"),"challenger_decision":(obs.get("challenger") or {}).get("decision"),
          "research_only":True,"live_execution":False,"can_override_production":False,
-         "modeled_round_trip_cost_bps":COST_BPS,"horizons":{}}
+         "modeled_round_trip_cost_bps":ROUND_TRIP_FEE_SLIPPAGE_BPS,"funding_bps_per_12h":FUNDING_BPS_PER_12H,"horizons":{}}
     if not (obs.get("challenger") or {}).get("eligible"):
         out["status"]="INELIGIBLE"; return out
     g=_geometry(obs)
@@ -58,7 +62,7 @@ def settle_one(obs,now=None):
     if not candles:
         out.update({"status":"MARKET_DATA_ERROR","error":"no_candles"}); return out
     side=obs["candidate_direction"]; risk=abs(g["entry"]-g["stop"])
-    cost_r=(g["entry"]*(COST_BPS/10000.0))/risk if risk else None
+    base_cost_r=(g["entry"]*(ROUND_TRIP_FEE_SLIPPAGE_BPS/10000.0))/risk if risk else None
     terminal=None
     for h in HORIZONS:
         hend=start+h*3600_000
@@ -74,12 +78,15 @@ def settle_one(obs,now=None):
             if ht: gross_r=abs(g["tp2"]-g["entry"])/risk; event="TP2"; hit_tp=True; break
         if gross_r is None:
             close=cs[-1]["close"]; gross_r=((close-g["entry"])/risk if side=="LONG" else (g["entry"]-close)/risk)
-        net_r=gross_r-(cost_r or 0)
+        funding_bps=FUNDING_BPS_PER_12H*(h/12.0)
+        funding_cost_r=(g["entry"]*(funding_bps/10000.0))/risk if risk else None
+        net_r=gross_r-(base_cost_r or 0)-(funding_cost_r or 0)
         highs=[c["high"] for c in cs]; lows=[c["low"] for c in cs]
         mfe=((max(highs)-g["entry"])/risk if side=="LONG" else (g["entry"]-min(lows))/risk)
         mae=((g["entry"]-min(lows))/risk if side=="LONG" else (max(highs)-g["entry"])/risk)
         out["horizons"][f"{h}h"]={"gross_r":round(gross_r,4),"net_r_after_cost":round(net_r,4),
-          "mfe_r":round(mfe,4),"mae_r":round(mae,4),"event":event,"stop_hit":hit_stop,"tp2_hit":hit_tp}
+          "mfe_r":round(mfe,4),"mae_r":round(mae,4),"event":event,"stop_hit":hit_stop,"tp2_hit":hit_tp,
+          "modeled_funding_bps":round(funding_bps,4),"modeled_total_cost_bps":round(ROUND_TRIP_FEE_SLIPPAGE_BPS+funding_bps,4)}
         terminal=out["horizons"][f"{h}h"]
     out["market_source"]=provider
     out["status"]="MATURED" if "12h" in out["horizons"] else "PARTIAL"
@@ -107,7 +114,7 @@ def settle(history="status/history/regime-transition-frozen-evidence.jsonl"):
             except Exception:pass
     rows=[settle_one(x) for x in obs]
     report={"schema":SCHEMA,"generated_at":dt.datetime.now(dt.timezone.utc).isoformat(),"product_horizon":"4-12H",
-      "cost_bps":COST_BPS,"intrabar_both_hit_rule":"STOP_FIRST_CONSERVATIVE","summary":summarize(rows),"records":rows,
+      "round_trip_fee_slippage_bps":ROUND_TRIP_FEE_SLIPPAGE_BPS,"funding_bps_per_12h":FUNDING_BPS_PER_12H,"intrabar_both_hit_rule":"STOP_FIRST_CONSERVATIVE","summary":summarize(rows),"records":rows,
       "research_only":True,"live_execution":False,"can_override_production":False,"production_threshold_unchanged":68}
     Path("status/regime-transition-outcomes-latest.json").write_text(json.dumps(report,indent=2,sort_keys=True))
     return report
