@@ -60,5 +60,26 @@ def test_cohort_summary_never_mixes_legacy_and_post_v2():
 
 
 def test_research_only_contract():
-    assert m.SCHEMA == 'ATLAS_WAIT_MISSED_OPPORTUNITY_V2_CANDLE_SETTLED'
+    assert m.SCHEMA == 'ATLAS_WAIT_MISSED_OPPORTUNITY_V3_EXECUTABILITY_AWARE'
     assert m.HORIZONS == (1,2,4,8,12)
+
+
+def test_v3_missed_tradeable_requires_frozen_independent_evidence_and_net_rr(monkeypatch):
+    start=dt.datetime(2026,1,1,tzinfo=dt.timezone.utc)
+    candles=[{'open_time':int(start.timestamp()*1000)+i*5*60_000,'open':100+i/143*3,'high':100+i/143*3+0.05,'low':100+i/143*3-0.05,'close':100+i/143*3} for i in range(144)]
+    monkeypatch.setattr(m,'market_klines',lambda *a,**k:(candles,'TEST'))
+    row={'id':'v3','decision_id':'v3','symbol':'BTCUSDT','captured_at':start,'captured_at_ms':int(start.timestamp()*1000),'direction':'LONG','price':100.0,'invalidation':98.0,'geometry':{'entry':100.0,'stop':98.0,'tp2':104.2,'gross_rr':2.1},'transition_evidence':{'asset_regime_aligned':True,'btc_regime_aligned':True,'h1_aligned':True,'h4_aligned':True,'h12_explicit_opposition':False,'d1_explicit_opposition':False},'score':80.0,'threshold':68.0,'reason':'HTF_CONFLICT','raw_reason':'HTF_CONFLICT','blocker_family':'HTF_CONFLICT','playbook':'X','release':None,'v2_regime':'4H_DIRECTIONAL_12H_NEUTRAL','epoch_id':m.POST_V2_EPOCH_ID}
+    out=m.settle(row,start+dt.timedelta(hours=13))
+    assert out['executability_classification']=='MISSED_TRADEABLE_OPPORTUNITY'
+    assert out['net_rr_after_locked_cost'] >= 2.0
+    assert out['locked_cost_bps_12h']==17
+
+
+def test_v3_move_without_t0_evidence_is_correct_no_chase(monkeypatch):
+    start=dt.datetime(2026,1,1,tzinfo=dt.timezone.utc)
+    candles=[{'open_time':int(start.timestamp()*1000)+i*5*60_000,'open':100+i/143*3,'high':100+i/143*3+0.05,'low':100+i/143*3-0.05,'close':100+i/143*3} for i in range(144)]
+    monkeypatch.setattr(m,'market_klines',lambda *a,**k:(candles,'TEST'))
+    row={'id':'v3b','decision_id':'v3b','symbol':'BTCUSDT','captured_at':start,'captured_at_ms':int(start.timestamp()*1000),'direction':'LONG','price':100.0,'invalidation':98.0,'geometry':{'entry':100.0,'stop':98.0,'tp2':104.2,'gross_rr':2.1},'transition_evidence':{'asset_regime_aligned':False,'btc_regime_aligned':True,'h1_aligned':True,'h4_aligned':True,'h12_explicit_opposition':False,'d1_explicit_opposition':False},'score':80.0,'threshold':68.0,'reason':'HTF_CONFLICT','raw_reason':'HTF_CONFLICT','blocker_family':'HTF_CONFLICT','playbook':'X','release':None,'v2_regime':'4H_DIRECTIONAL_12H_NEUTRAL','epoch_id':m.POST_V2_EPOCH_ID}
+    out=m.settle(row,start+dt.timedelta(hours=13))
+    assert out['missed_opportunity'] is True
+    assert out['executability_classification']=='CORRECT_NO_CHASE'
