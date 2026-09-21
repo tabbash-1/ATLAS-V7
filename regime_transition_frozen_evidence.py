@@ -76,7 +76,7 @@ def freeze(snapshot):
           "canonical_decision":"WAIT","candidate_direction":candidate,
           "frozen_evidence":{"asset_regime":asset,"btc_regime":btc,"breadth":breadth,"derivatives":derivatives,
                              "frames":_frames(d),"geometry_ready":row["htf_core_geometry"]["ready"],
-                             "rr_tp2":row["analyst_output"]["risk_reward"]},
+                             "rr_tp2":row["analyst_output"]["risk_reward"],"entry":_f((d.get("trade_plan") or {}).get("entry") or d.get("entry")),"stop_loss":_f((d.get("trade_plan") or {}).get("stop_loss") or d.get("stop_loss")),"tp2":_f((d.get("trade_plan") or {}).get("tp2") or d.get("take_profit"))},
           "challenger":verdict,"research_only":True,"paper_only":True,"live_execution":False,
           "can_override_production":False,"production_threshold_unchanged":68})
     return out
