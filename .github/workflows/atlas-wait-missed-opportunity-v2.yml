@@ -42,13 +42,12 @@ jobs:
           pytest -q test_wait_missed_opportunity_settlement.py
           python -m py_compile wait_missed_opportunity_settlement.py
       - name: Settle canonical WAIT outcomes
-        if: github.event_name != 'pull_request'
         run: |
           python wait_missed_opportunity_settlement.py
           python - <<'PY'
           import json
           p=json.load(open('status/wait-missed-opportunity-latest.json'))
-          assert p['schema']=='ATLAS_WAIT_MISSED_OPPORTUNITY_V2_CANDLE_SETTLED'
+          assert p['schema']=='ATLAS_WAIT_MISSED_OPPORTUNITY_V3_EXECUTABILITY_AWARE'
           assert p['decision_source_of_truth']=='FINAL_TRADE_GATE'
           assert p['evaluation_horizons_h']==[1,2,4,8,12]
           assert p['classification_is_research_only'] is True
