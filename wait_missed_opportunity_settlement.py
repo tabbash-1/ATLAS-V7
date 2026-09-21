@@ -78,10 +78,16 @@ def independent_transition_evidence(d, direction):
     asset=(d or {}).get("independent_market_regime") or {}
     btc=(d or {}).get("independent_btc_regime") or {}
     matrix=(d or {}).get("timeframe_matrix") or {}
-    h1=str(matrix.get("1h") or matrix.get("1H") or (d or {}).get("bias_1h") or "").upper()
-    h4=str(matrix.get("4h") or matrix.get("4H") or (d or {}).get("bias_4h") or "").upper()
-    h12=str(matrix.get("12h") or matrix.get("12H") or (d or {}).get("bias_12h") or "").upper()
-    d1=str(matrix.get("1d") or matrix.get("1D") or (d or {}).get("bias_1d") or "").upper()
+    # Production timeframe_matrix is lane-oriented, not direct {"1h": ...}.
+    # Freeze only explicit T0 directional evidence; never reconstruct it later.
+    htf=(d or {}).get("htf_sr_decision_v2") or {}
+    core=matrix.get("core_4_12h") or {}
+    quick=matrix.get("quick_1_3h") or matrix.get("tactical_1_3h") or {}
+    pa=((matrix.get("htf_price_action") or {}).get("frames") or {})
+    h1=str((d or {}).get("entry_confirmation_direction") or quick.get("direction") or (d or {}).get("bias_1h") or "").upper()
+    h4=str(htf.get("direction") or (d or {}).get("bias_4h") or "").upper()
+    h12=str((d or {}).get("bias_12h") or (pa.get("12h") or {}).get("scenario") or "").upper()
+    d1=str((d or {}).get("bias_1d") or "").upper()
     opposite="SHORT" if direction=="LONG" else "LONG"
     return {"asset_regime_aligned":aligned(asset),"btc_regime_aligned":aligned(btc),"h1_aligned":direction in h1,"h4_aligned":direction in h4,"h12_explicit_opposition":opposite in h12,"d1_explicit_opposition":opposite in d1}
 
