@@ -78,12 +78,15 @@ def settle_one(obs,now=None):
             if ht: gross_r=abs(g["tp2"]-g["entry"])/risk; event="TP2"; hit_tp=True; break
         if gross_r is None:
             close=cs[-1]["close"]; gross_r=((close-g["entry"])/risk if side=="LONG" else (g["entry"]-close)/risk)
-        funding_bps=FUNDING_BPS_PER_12H*(h/12.0)\n        funding_cost_r=(g["entry"]*(funding_bps/10000.0))/risk if risk else None\n        net_r=gross_r-(base_cost_r or 0)-(funding_cost_r or 0)
+        funding_bps=FUNDING_BPS_PER_12H*(h/12.0)
+        funding_cost_r=(g["entry"]*(funding_bps/10000.0))/risk if risk else None
+        net_r=gross_r-(base_cost_r or 0)-(funding_cost_r or 0)
         highs=[c["high"] for c in cs]; lows=[c["low"] for c in cs]
         mfe=((max(highs)-g["entry"])/risk if side=="LONG" else (g["entry"]-min(lows))/risk)
         mae=((g["entry"]-min(lows))/risk if side=="LONG" else (max(highs)-g["entry"])/risk)
         out["horizons"][f"{h}h"]={"gross_r":round(gross_r,4),"net_r_after_cost":round(net_r,4),
-          "mfe_r":round(mfe,4),"mae_r":round(mae,4),"event":event,"stop_hit":hit_stop,"tp2_hit":hit_tp,\n          "modeled_funding_bps":round(funding_bps,4),"modeled_total_cost_bps":round(ROUND_TRIP_FEE_SLIPPAGE_BPS+funding_bps,4)}
+          "mfe_r":round(mfe,4),"mae_r":round(mae,4),"event":event,"stop_hit":hit_stop,"tp2_hit":hit_tp,
+          "modeled_funding_bps":round(funding_bps,4),"modeled_total_cost_bps":round(ROUND_TRIP_FEE_SLIPPAGE_BPS+funding_bps,4)}
         terminal=out["horizons"][f"{h}h"]
     out["market_source"]=provider
     out["status"]="MATURED" if "12h" in out["horizons"] else "PARTIAL"
