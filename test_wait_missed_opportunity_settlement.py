@@ -83,3 +83,22 @@ def test_v3_move_without_t0_evidence_is_correct_no_chase(monkeypatch):
     out=m.settle(row,start+dt.timedelta(hours=13))
     assert out['missed_opportunity'] is True
     assert out['executability_classification']=='CORRECT_NO_CHASE'
+
+
+def test_v3_reads_lane_oriented_production_timeframe_matrix():
+    d={
+      'independent_market_regime':{'regime':'VOLATILITY_EXPANSION_UP'},
+      'independent_btc_regime':{'regime':'BREAKOUT_UP'},
+      'entry_confirmation_direction':'LONG',
+      'htf_sr_decision_v2':{'direction':'LONG'},
+      'timeframe_matrix':{
+        'core_4_12h':{'candidate_direction':'LONG'},
+        'htf_price_action':{'frames':{'12h':{'scenario':'RANGE_OR_TRANSITION'}}}
+      }
+    }
+    e=m.independent_transition_evidence(d,'LONG')
+    assert e['asset_regime_aligned'] is True
+    assert e['btc_regime_aligned'] is True
+    assert e['h1_aligned'] is True
+    assert e['h4_aligned'] is True
+    assert e['h12_explicit_opposition'] is False
