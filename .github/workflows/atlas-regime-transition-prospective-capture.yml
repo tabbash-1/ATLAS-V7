@@ -59,4 +59,8 @@ jobs:
           git add status/regime-transition-frozen-latest.json status/history/regime-transition-frozen-evidence.jsonl status/regime-transition-outcomes-latest.json
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "research: capture frozen regime transition evidence [skip render]"
+          # Scheduled evidence writers can race with other status publishers on main.
+          # Rebase the evidence-only commit onto the latest main before publishing.
+          git fetch origin main
+          git rebase origin/main
           git push origin HEAD:main
