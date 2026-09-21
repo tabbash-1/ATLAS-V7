@@ -41,8 +41,8 @@ def run(now=None):
  snapshot=_load_snapshot()
  cap=cycle.run(snapshot=snapshot,kline_loader=_klines,now=now.isoformat(),output=LEDGER)
  rows=[json.loads(x) for x in LEDGER.read_text().splitlines() if x.strip()] if LEDGER.exists() else []
- rows,errors=settlement.settle_due(rows,now=now,price_at=_price_at)
- settlement.rewrite(rows,LEDGER)
+ events,errors=settlement.settle_due(rows,now=now,price_at=_price_at)
+
  ev=evaluator.build(LEDGER, settlement.ledger.SETTLEMENT_OUT)
  evaluator.OUT.write_text(json.dumps(ev,indent=2,sort_keys=True))
  st=status.build();status.OUT.write_text(json.dumps(st,indent=2,sort_keys=True))
