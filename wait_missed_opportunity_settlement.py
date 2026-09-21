@@ -20,8 +20,10 @@ ROOT = pathlib.Path(__file__).resolve().parent
 HISTORY = ROOT / "status/history/production-snapshots.jsonl"
 LATEST = ROOT / "status/wait-missed-opportunity-latest.json"
 LEDGER = ROOT / "status/history/wait-missed-opportunity.jsonl"
-SCHEMA = "ATLAS_WAIT_MISSED_OPPORTUNITY_V2_CANDLE_SETTLED"
+SCHEMA = "ATLAS_WAIT_MISSED_OPPORTUNITY_V3_EXECUTABILITY_AWARE"
 HORIZONS = (1, 2, 4, 8, 12)
+ROUND_TRIP_FEE_SLIPPAGE_BPS = 16
+FUNDING_BPS_PER_12H = 1
 CORE = {"BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","BNBUSDT","DOGEUSDT","ZECUSDT","ADAUSDT","LINKUSDT","AVAXUSDT","LTCUSDT"}
 # Strategy-semantic boundary: HTF neutral-regime V2 merged to main.
 POST_V2_EPOCH_ID = "HTF_SR_V2_2026-09-14"
@@ -55,6 +57,33 @@ def observed_price(d):
         x=fnum(((pa.get("frames") or {}).get(frame) or {}).get("price"))
         if x and x>0:return x
     return None
+
+
+def frozen_trade_geometry(d, direction):
+    plan=(d or {}).get("trade_plan") or {}
+    entry=fnum(plan.get("entry") or observed_price(d))
+    stop=fnum(plan.get("stop_loss") or (d or {}).get("stop_loss"))
+    tp=fnum(plan.get("tp2") or (d or {}).get("tp2"))
+    if not entry or not stop or not tp:return None
+    valid=(direction=="LONG" and stop<entry<tp) or (direction=="SHORT" and tp<entry<stop)
+    if not valid:return None
+    risk=abs(entry-stop)
+    return {"entry":entry,"stop":stop,"tp2":tp,"gross_rr":abs(tp-entry)/risk if risk else None}
+
+
+def independent_transition_evidence(d, direction):
+    def aligned(reg):
+        name=str((reg or {}).get("regime") or "").upper()
+        return (any(x in name for x in ("UP","BULL")) and "DOWN" not in name) if direction=="LONG" else (any(x in name for x in ("DOWN","BEAR")) and "UP" not in name)
+    asset=(d or {}).get("independent_market_regime") or {}
+    btc=(d or {}).get("independent_btc_regime") or {}
+    matrix=(d or {}).get("timeframe_matrix") or {}
+    h1=str(matrix.get("1h") or matrix.get("1H") or (d or {}).get("bias_1h") or "").upper()
+    h4=str(matrix.get("4h") or matrix.get("4H") or (d or {}).get("bias_4h") or "").upper()
+    h12=str(matrix.get("12h") or matrix.get("12H") or (d or {}).get("bias_12h") or "").upper()
+    d1=str(matrix.get("1d") or matrix.get("1D") or (d or {}).get("bias_1d") or "").upper()
+    opposite="SHORT" if direction=="LONG" else "LONG"
+    return {"asset_regime_aligned":aligned(asset),"btc_regime_aligned":aligned(btc),"h1_aligned":direction in h1,"h4_aligned":direction in h4,"h12_explicit_opposition":opposite in h12,"d1_explicit_opposition":opposite in d1}
 
 
 def invalidation_price(d, direction):
@@ -106,7 +135,7 @@ def load_waits():
             key=did or hashlib.sha256(f"{symbol}|{at.isoformat()}|{direction}|{price}".encode()).hexdigest()[:24]
             if key in seen:continue
             seen.add(key)
-            rows.append({"id":key,"decision_id":did or None,"symbol":symbol,"captured_at":at,"captured_at_ms":int(at.timestamp()*1000),"direction":direction,"price":price,"invalidation":invalidation_price(d,direction),"score":fnum(t.get("score")),"threshold":fnum(t.get("threshold")),"reason":t.get("wait_reason"),"raw_reason":t.get("raw_wait_reason"),"blocker_family":blocker_family(d,t),"playbook":d.get("playbook"),"release":((r.get("runtime") or {}).get("release") or (r.get("runtime") or {}).get("commit_sha")),"v2_regime":((d.get("htf_sr_decision_v2") or {}).get("regime")),"epoch_id":POST_V2_EPOCH_ID if at >= POST_V2_START else "LEGACY_BASELINE"})
+            rows.append({"id":key,"decision_id":did or None,"symbol":symbol,"captured_at":at,"captured_at_ms":int(at.timestamp()*1000),"direction":direction,"price":price,"invalidation":invalidation_price(d,direction),"geometry":frozen_trade_geometry(d,direction),"transition_evidence":independent_transition_evidence(d,direction),"score":fnum(t.get("score")),"threshold":fnum(t.get("threshold")),"reason":t.get("wait_reason"),"raw_reason":t.get("raw_wait_reason"),"blocker_family":blocker_family(d,t),"playbook":d.get("playbook"),"release":((r.get("runtime") or {}).get("release") or (r.get("runtime") or {}).get("commit_sha")),"v2_regime":((d.get("htf_sr_decision_v2") or {}).get("regime")),"epoch_id":POST_V2_EPOCH_ID if at >= POST_V2_START else "LEGACY_BASELINE"})
     return rows
 
 
@@ -141,8 +170,24 @@ def settle(row, now):
     mature=h12 or h8 or h4
     if mature:
         out["missed_opportunity"] = bool(mature["mfe_pct"] >= 1.0 and not mature["invalidation_hit"])
-        out["classification_rule"]="RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION"
-    else:out["missed_opportunity"]=None
+        out["classification_rule"]="LEGACY_RESEARCH_ONLY_MFE_GE_1PCT_WITHOUT_INVALIDATION"
+        g=row.get("geometry"); ev=row.get("transition_evidence") or {}
+        if not g:
+            out["executability_classification"]="GOOD_WAIT"; out["executability_reason"]="NO_FROZEN_VALID_GEOMETRY"
+        else:
+            risk=abs(g["entry"]-g["stop"]); total_cost_bps=ROUND_TRIP_FEE_SLIPPAGE_BPS+FUNDING_BPS_PER_12H
+            cost_r=(g["entry"]*(total_cost_bps/10000.0))/risk if risk else None
+            net_rr=(g["gross_rr"]-(cost_r or 0)) if g.get("gross_rr") is not None else None
+            independent_ok=ev.get("asset_regime_aligned") and ev.get("btc_regime_aligned") and ev.get("h1_aligned") and ev.get("h4_aligned") and not ev.get("h12_explicit_opposition") and not ev.get("d1_explicit_opposition")
+            out["net_rr_after_locked_cost"]=round(net_rr,4) if net_rr is not None else None; out["locked_cost_bps_12h"]=total_cost_bps
+            if out["missed_opportunity"] and independent_ok and net_rr is not None and net_rr>=2.0:
+                out["executability_classification"]="MISSED_TRADEABLE_OPPORTUNITY"; out["executability_reason"]="T0_INDEPENDENT_TRANSITION_ALIGNED_NET_RR_GE_2"
+            elif out["missed_opportunity"]:
+                out["executability_classification"]="CORRECT_NO_CHASE"; out["executability_reason"]="MOVE_OCCURRED_BUT_T0_LOCKED_EXECUTABILITY_NOT_PROVEN"
+            else:
+                out["executability_classification"]="GOOD_WAIT"; out["executability_reason"]="NO_QUALIFYING_FORWARD_OPPORTUNITY"
+    else:
+        out["missed_opportunity"]=None; out["executability_classification"]=None
     out["status"]="MATURED" if h12 else "PARTIAL"
     return out
 
