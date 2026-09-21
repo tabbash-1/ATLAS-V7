@@ -294,6 +294,21 @@ jobs:
           if not exists:
               with history.open('a') as f:
                   f.write(json.dumps(obj, separators=(',', ':')) + '\n')
+          # Keep the tracked rolling history safely below GitHub's 100 MB hard limit.
+          # Preserve the newest complete JSONL rows only; research evidence remains chronological.
+          max_bytes = 80 * 1024 * 1024
+          if history.exists() and history.stat().st_size > max_bytes:
+              lines = history.read_text().splitlines()
+              kept = []
+              size = 0
+              for line in reversed(lines):
+                  row = line + '\n'
+                  n = len(row.encode('utf-8'))
+                  if kept and size + n > max_bytes:
+                      break
+                  kept.append(row)
+                  size += n
+              history.write_text(''.join(reversed(kept)))
           PY
             git add status/atlas-production-latest.json status/raw/*.json status/history/production-snapshots.jsonl status/wait-outcomes.json
             if git diff --cached --quiet; then
