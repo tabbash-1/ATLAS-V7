@@ -49,6 +49,8 @@ jobs:
           assert p['automatic_promotion'] is False
           assert p['research_only'] is True and p['live_execution'] is False
           PY
+      - name: Ensure immutable settlement stream exists
+        run: mkdir -p status && touch status/market-context-reasoning-settlements.jsonl
       - name: Commit prospective evidence
         run: |
           bash scripts/commit_status_with_retry.sh             'atlas-reasoning-evidence'             'atlas-reasoning-evidence@users.noreply.github.com'             'research: update reasoning prospective evidence [skip ci] [skip render]'             'status/market-context-reasoning-ledger.jsonl'             'status/market-context-reasoning-settlements.jsonl'             'status/market-context-reasoning-evaluation-latest.json'             'status/market-context-reasoning-status-latest.json'
