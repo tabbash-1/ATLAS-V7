@@ -17,6 +17,9 @@ def existing(path=ledger.SETTLEMENT_OUT):
 def settle_due(rows,*,now,price_at,output=ledger.SETTLEMENT_OUT):
  now=ts(now) if not isinstance(now,datetime) else now; done=existing(output);events=[];errors=[]
  for x in rows:
+  if not x.get("observation_id"):
+   errors.append({"symbol":x.get("symbol"),"horizon_h":None,"reason":"LEGACY_NO_OBSERVATION_ID"})
+   continue
   captured=ts(x["captured_at"])
   for h in (4,8,12):
    key=(x.get("observation_id"),h)
