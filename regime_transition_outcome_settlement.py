@@ -46,9 +46,12 @@ def settle_one(obs,now=None):
          "symbol":obs.get("symbol"),"captured_at":obs.get("captured_at"),
          "candidate_direction":obs.get("candidate_direction"),"challenger_decision":(obs.get("challenger") or {}).get("decision"),
          "research_only":True,"live_execution":False,"can_override_production":False,
-         "modeled_round_trip_cost_bps":ROUND_TRIP_FEE_SLIPPAGE_BPS,"funding_bps_per_12h":FUNDING_BPS_PER_12H,"horizons":{}}
-    if not (obs.get("challenger") or {}).get("eligible"):
-        out["status"]="INELIGIBLE"; return out
+         "modeled_round_trip_cost_bps":ROUND_TRIP_FEE_SLIPPAGE_BPS,"funding_bps_per_12h":FUNDING_BPS_PER_12H,"horizons":{},
+         "challenger_eligible":bool((obs.get("challenger") or {}).get("eligible")),
+         "challenger_blockers":list((obs.get("challenger") or {}).get("blockers") or [])}
+    # Settle every prospectively frozen candidate with valid T0 geometry. Eligibility
+    # remains metadata only: this lets research measure near-miss blockers (for example
+    # 4H neutral) without changing the challenger or Production decision.
     g=_geometry(obs)
     if not g:
         out["status"]="NO_FROZEN_GEOMETRY"; return out
@@ -104,7 +107,9 @@ def summarize(rows):
     return {"matured_n":len(vals),"net_r_after_cost":round(sum(vals),4),"avg_net_r_after_cost":round(sum(vals)/len(vals),4) if vals else None,
       "win_rate_pct":round(100*len(wins)/len(vals),2) if vals else None,
       "profit_factor_after_cost":round(gp/gl,4) if gl else ("INF" if gp else None),
-      "max_drawdown_r":round(dd,4)}
+      "max_drawdown_r":round(dd,4),
+      "challenger_eligible_matured_n":sum(bool(r.get("challenger_eligible")) for r in xs),
+      "near_miss_matured_n":sum(not bool(r.get("challenger_eligible")) for r in xs)}
 
 def settle(history="status/history/regime-transition-frozen-evidence.jsonl"):
     p=Path(history); obs=[]
