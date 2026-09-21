@@ -1,0 +1,56 @@
+name: ATLAS Regime Transition Prospective Capture
+on:
+  schedule:
+    - cron: '17,37,57 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: atlas-regime-transition-prospective-capture
+  cancel-in-progress: true
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Capture frozen point-in-time challenger evidence
+        run: |
+          set -euo pipefail
+          test -s status/atlas-production-latest.json
+          python regime_transition_frozen_evidence.py
+          python regime_transition_outcome_settlement.py
+          python - <<'PY'
+          import json, pathlib
+          p=pathlib.Path("status/regime-transition-frozen-latest.json")
+          x=json.loads(p.read_text())
+          assert x["research_only"] is True
+          assert x["live_execution"] is False
+          assert x["can_override_production"] is False
+          assert x["production_threshold_unchanged"] == 68
+          for r in x["observations"]:
+              assert r["research_only"] is True
+              assert r["can_override_production"] is False
+          y=json.loads(pathlib.Path("status/regime-transition-outcomes-latest.json").read_text())
+          assert y["research_only"] is True
+          assert y["live_execution"] is False
+          assert y["can_override_production"] is False
+          assert y["production_threshold_unchanged"] == 68
+          assert y["intrabar_both_hit_rule"] == "STOP_FIRST_CONSERVATIVE"
+          print("REGIME_TRANSITION_FROZEN_EVIDENCE_OK", len(x["observations"]), "MATURED", y["summary"]["matured_n"])
+          PY
+      - name: Publish research evidence only
+        run: |
+          set -euo pipefail
+          git config user.name "atlas-research-monitor"
+          git config user.email "atlas-research@users.noreply.github.com"
+          git add status/regime-transition-frozen-latest.json status/history/regime-transition-frozen-evidence.jsonl status/regime-transition-outcomes-latest.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "research: capture frozen regime transition evidence [skip render]"
+          git push origin HEAD:main
