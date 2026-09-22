@@ -7,6 +7,7 @@ from __future__ import annotations
 import datetime as dt, hashlib, json
 from pathlib import Path
 from regime_transition_challenger import assess
+from transition_quality_research import assess as assess_transition_quality
 
 SCHEMA="ATLAS_REGIME_TRANSITION_FROZEN_EVIDENCE_V1"
 
@@ -85,7 +86,7 @@ def freeze(snapshot):
                              "rr_tp2":row["analyst_output"]["risk_reward"],"net_rr_after_locked_cost":verdict.get("net_rr_after_locked_cost"),
                              "locked_cost_bps_12h":verdict.get("locked_cost_bps_12h"),
                              "entry":entry,"stop_loss":stop,"tp2":tp2},
-          "challenger":verdict,"research_only":True,"paper_only":True,"live_execution":False,
+          "challenger":verdict,"transition_quality":assess_transition_quality({"candidate_direction":candidate,"frozen_evidence":{"asset_regime":asset,"btc_regime":btc,"breadth":breadth,"derivatives":derivatives,"frames":_frames(d),"net_rr_after_locked_cost":verdict.get("net_rr_after_locked_cost")}}),"research_only":True,"paper_only":True,"live_execution":False,
           "can_override_production":False,"production_threshold_unchanged":68})
     return out
 
