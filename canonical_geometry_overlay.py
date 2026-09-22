@@ -10,7 +10,7 @@ Entry/Stop/Target shown by the decision payload and preserves the legacy
 
 VERSION = "ATLAS_CANONICAL_GEOMETRY_TRUTH_V1"
 REASON_SCHEMA_VERSION = "ATLAS_GEOMETRY_REASON_CODES_V1"
-MIN_RR = 1.0
+MIN_RR = 2.0
 
 
 def _num(value):
@@ -91,7 +91,7 @@ def assess(direction, entry, stop, target):
     return _base(
         "PASS" if qualified else "BLOCK",
         qualified,
-        "RR_ONE_TO_ONE_OR_BETTER" if qualified else "RR_BELOW_ONE_TO_ONE",
+        "RR_TWO_TO_ONE_OR_BETTER" if qualified else "RR_BELOW_TWO_TO_ONE",
         [] if qualified else ["RR_BELOW_MINIMUM"],
         risk_reward=round(rr, 6),
         risk=round(risk, 10),

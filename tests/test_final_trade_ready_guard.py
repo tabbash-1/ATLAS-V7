@@ -220,3 +220,19 @@ if __name__ == '__main__':
     for t in tests:
         t()
     print(f'final trade ready guard tests: {len(tests)} passed')
+
+
+def test_conditional_neutral_alignment_is_paper_eligible_when_trader_ready():
+    d=base_row(direction_alignment='CONDITIONAL_ALIGNED_12H_NEUTRAL')
+    d['trade_plan']['rr_tp2']=2.0
+    r=guard.apply(d)
+    assert r['trade_ready'] is True
+    assert paper_final.strict_trade_ready(r) is True
+
+
+def test_paper_rejects_sub_two_r_even_if_legacy_fields_look_ready():
+    d=base_row()
+    d['trade_plan']=dict(d['trade_plan']); d['trade_plan']['rr_tp2']=1.5
+    r=guard.apply(d)
+    assert r['trade_ready'] is False
+    assert paper_final.strict_trade_ready(r) is False

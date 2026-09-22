@@ -23,9 +23,18 @@ def strict_trade_ready(decision):
         return False
     if action not in {"LONG", "SHORT"} or direction != action:
         return False
-    if gate.get("production_signal_qualified") is not True or gate.get("canonical_geometry_ready") is not True:
+    if gate.get("canonical_geometry_ready") is not True:
         return False
-    if str(gate.get("direction_alignment") or "").upper() != "ALIGNED":
+    if str(gate.get("direction_alignment") or "").upper() not in {"ALIGNED", "CONDITIONAL_ALIGNED", "CONDITIONAL_ALIGNED_12H_NEUTRAL"}:
+        return False
+    trader = gate.get("trader_brain") or {}
+    if trader.get("stage") != "TRADE_READY" or trader.get("score_is_authority") is not False:
+        return False
+    rr = trader.get("rr_tp2")
+    try:
+        if rr is None or float(rr) < 2.0:
+            return False
+    except (TypeError, ValueError):
         return False
     g = portfolio.geometry(decision)
     return bool(g and g.get("direction") == action)
