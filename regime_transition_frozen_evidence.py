@@ -61,11 +61,16 @@ def freeze(snapshot):
         if truth.get("source_of_truth")!="FINAL_TRADE_GATE" or truth.get("trade_ready") is True:continue
         candidate=_u(d.get("candidate_direction") or d.get("product_direction"))
         if candidate not in {"LONG","SHORT"}:continue
+        plan=d.get("trade_plan") or {}
+        entry=_f(plan.get("entry") or d.get("entry"))
+        stop=_f(plan.get("stop_loss") or d.get("stop_loss"))
+        tp2=_f(plan.get("tp2") or d.get("take_profit"))
         row={"candidate_direction":candidate,"canonical_product_decision":"WAIT",
              "wait_reason":truth.get("raw_wait_reason") or truth.get("wait_reason"),
              "htf_thesis":{"frames":_frames(d)},
              "htf_core_geometry":{"ready":bool((d.get("geometry_gate") or {}).get("qualified"))},
-             "analyst_output":{"risk_reward":_f((d.get("trade_plan") or {}).get("rr_tp2") or d.get("risk_reward"))}}
+             "analyst_output":{"risk_reward":_f(plan.get("rr_tp2") or d.get("risk_reward")),
+                                "entry":entry,"stop_loss":stop}}
         asset=_regime_from_decision(d)
         breadth=_breadth(snapshot,candidate)
         derivatives=_derivatives(d,candidate)
@@ -77,7 +82,9 @@ def freeze(snapshot):
           "canonical_decision":"WAIT","candidate_direction":candidate,
           "frozen_evidence":{"asset_regime":asset,"btc_regime":btc,"breadth":breadth,"derivatives":derivatives,
                              "frames":_frames(d),"geometry_ready":row["htf_core_geometry"]["ready"],
-                             "rr_tp2":row["analyst_output"]["risk_reward"],"entry":_f((d.get("trade_plan") or {}).get("entry") or d.get("entry")),"stop_loss":_f((d.get("trade_plan") or {}).get("stop_loss") or d.get("stop_loss")),"tp2":_f((d.get("trade_plan") or {}).get("tp2") or d.get("take_profit"))},
+                             "rr_tp2":row["analyst_output"]["risk_reward"],"net_rr_after_locked_cost":verdict.get("net_rr_after_locked_cost"),
+                             "locked_cost_bps_12h":verdict.get("locked_cost_bps_12h"),
+                             "entry":entry,"stop_loss":stop,"tp2":tp2},
           "challenger":verdict,"research_only":True,"paper_only":True,"live_execution":False,
           "can_override_production":False,"production_threshold_unchanged":68})
     return out
