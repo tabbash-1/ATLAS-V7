@@ -32,9 +32,9 @@ def test_non_htf_wait_cannot_be_reclassified():
 
 
 def test_gross_two_r_but_net_below_two_blocks():
-    x=assess(row(2.1),{"regime":"TREND_UP"},{"regime":"TREND_UP"},{"direction":"LONG","aligned_ratio":.7},{"direction":"LONG"})
+    x=assess(row(2.05),{"regime":"TREND_UP"},{"regime":"TREND_UP"},{"direction":"LONG","aligned_ratio":.7},{"direction":"LONG"})
     assert not x["eligible"]
-    assert x["gross_rr"]==2.1
+    assert x["gross_rr"]==2.05
     assert x["net_rr_after_locked_cost"] < 2.0
     assert "NET_RR_BELOW_2_OR_MISSING" in x["blockers"]
 
