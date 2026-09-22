@@ -6,7 +6,9 @@ thresholds, geometry, or execution.
 """
 from __future__ import annotations
 
-VERSION = "ATLAS_REGIME_TRANSITION_CHALLENGER_V2_NET_RR"\nLOCKED_ROUND_TRIP_COST_BPS = 16\nLOCKED_FUNDING_BPS_12H = 1
+VERSION = "ATLAS_REGIME_TRANSITION_CHALLENGER_V2_NET_RR"
+LOCKED_ROUND_TRIP_COST_BPS = 16
+LOCKED_FUNDING_BPS_12H = 1
 
 UP = {"TREND_UP","BREAKOUT_UP","VOLATILITY_EXPANSION_UP"}
 DOWN = {"TREND_DOWN","BREAKDOWN_DOWN","VOLATILITY_EXPANSION_DOWN"}
@@ -56,13 +58,23 @@ def assess(row, asset_regime, btc_regime, breadth=None, derivatives=None):
     geometry=((row.get("htf_core_geometry") or {}).get("ready") is True)
     rr=_f(((row.get("analyst_output") or {}).get("risk_reward")))
     if not geometry: blockers.append("GEOMETRY_NOT_READY")
-    if rr is None or rr < 2.0: blockers.append("NET_RR_BELOW_2_OR_MISSING")
+    ao=row.get("analyst_output") or {}
+    entry=_f(ao.get("entry")); stop=_f(ao.get("stop_loss"))
+    locked_cost_bps=LOCKED_ROUND_TRIP_COST_BPS+LOCKED_FUNDING_BPS_12H
+    cost_r=None; net_rr=None
+    if rr is not None and entry is not None and stop is not None:
+        risk=abs(entry-stop)
+        if risk>0:
+            cost_r=entry*(locked_cost_bps/10000.0)/risk
+            net_rr=rr-cost_r
+    if net_rr is None or net_rr < 2.0: blockers.append("NET_RR_BELOW_2_OR_MISSING")
 
     eligible=not blockers and len([x for x in evidence if not x.endswith("NO_CREDIT")])>=3
     return {
       "version":VERSION,"mode":"RESEARCH_SHADOW","decision":candidate if eligible else "WAIT",
       "eligible":eligible,"evidence":evidence,"blockers":blockers,
-      "minimum_independent_confirmations":3,"product_horizon":"4-12H",\n      "gross_rr":rr,"locked_cost_bps_12h":locked_cost_bps,"modeled_cost_r":cost_r,"net_rr_after_locked_cost":net_rr,
+      "minimum_independent_confirmations":3,"product_horizon":"4-12H",
+      "gross_rr":rr,"locked_cost_bps_12h":locked_cost_bps,"modeled_cost_r":cost_r,"net_rr_after_locked_cost":net_rr,
       "can_override_production":False,"can_change_threshold":False,
       "can_change_score":False,"can_change_geometry":False,
       "live_execution":False,
