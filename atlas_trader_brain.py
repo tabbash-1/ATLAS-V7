@@ -7,7 +7,7 @@ Legacy score is evidence only and cannot independently authorize or veto a trade
 """
 from __future__ import annotations
 
-VERSION = "ATLAS_TRADER_BRAIN_V1"
+VERSION = "ATLAS_TRADER_BRAIN_V2_NO_CHASE"
 MIN_RR = 2.0
 ACCEPTED_ALIGNMENT = {"ALIGNED", "CONDITIONAL_ALIGNED", "CONDITIONAL_ALIGNED_12H_NEUTRAL"}
 
@@ -30,6 +30,10 @@ def _plan(row):
 
 
 def _rr2(row):
+    root = row.get("trade_plan") or {}
+    rr = _num(root.get("rr_tp2"))
+    if rr is not None:
+        return rr
     p = _plan(row)
     rr = _num(p.get("rr_tp2"))
     if rr is not None:
@@ -93,10 +97,17 @@ def assess(row):
     if not geometry_ready:
         waits.append("TRADER_WAIT_VALID_LOCATION")
 
-    overextended = any(
+    score_attr = row.get("score_attribution") or ((row.get("decision_provenance") or {}).get("score_attribution") or {})
+    extension_reason = _norm(score_attr.get("extension_guard_reason"))
+    extension_adjustment = _num(score_attr.get("extension_guard_adjustment"))
+    extension_flag = any(token in extension_reason for token in ("BLOWOFF", "OVEREXTEND", "CHASE", "LATE_ENTRY"))
+    legacy_extension_flag = any(
         token in _norm(quality.get("reason") or row.get("wait_reason") or row.get("actionable_reason"))
         for token in ("OVEREXTEND", "CHASE", "LATE_ENTRY")
     )
+    overextended = bool(extension_flag or legacy_extension_flag)
+    if extension_flag and mode == "NOW":
+        waits.append("TRADER_WAIT_PULLBACK_RETEST")
     if overextended:
         waits.append("TRADER_NO_CHASE")
 
@@ -117,6 +128,9 @@ def assess(row):
         "setup_playbook": playbook,
         "entry_trigger_ready": entry == product and product in {"LONG", "SHORT"},
         "entry_mode": mode or None,
+        "desired_entry_mode": "PULLBACK_RETEST" if overextended and mode == "NOW" else (mode or None),
+        "extension_guard_reason": extension_reason or None,
+        "extension_guard_adjustment": extension_adjustment,
         "geometry_ready": geometry_ready,
         "rr_tp2": round(rr, 3) if rr is not None else None,
         "minimum_rr_required": MIN_RR,

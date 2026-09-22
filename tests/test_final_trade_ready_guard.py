@@ -236,3 +236,26 @@ def test_paper_rejects_sub_two_r_even_if_legacy_fields_look_ready():
     r=guard.apply(d)
     assert r['trade_ready'] is False
     assert paper_final.strict_trade_ready(r) is False
+
+
+def test_blowoff_now_entry_waits_for_pullback_retest():
+    d=base_row()
+    d['trade_plan']=dict(d['trade_plan']); d['trade_plan']['entry_mode']='NOW'
+    d['score_attribution']={'extension_guard_reason':'BLOWOFF_RSI_LONG','extension_guard_adjustment':-4}
+    r=guard.apply(d)
+    assert r['trade_ready'] is False
+    tb=r['final_trade_gate']['trader_brain']
+    assert tb['stage']=='WAIT_LOCATION'
+    assert tb['location_state']=='OVEREXTENDED'
+    assert tb['desired_entry_mode']=='PULLBACK_RETEST'
+    assert 'TRADER_WAIT_PULLBACK_RETEST' in r['final_trade_gate']['blockers']
+    assert 'TRADER_NO_CHASE' in r['final_trade_gate']['blockers']
+
+
+def test_blowoff_pullback_entry_can_pass_if_other_evidence_is_ready():
+    d=base_row()
+    d['trade_plan']=dict(d['trade_plan']); d['trade_plan']['entry_mode']='PULLBACK'
+    d['score_attribution']={'extension_guard_reason':'BLOWOFF_RSI_LONG','extension_guard_adjustment':-4}
+    r=guard.apply(d)
+    assert r['trade_ready'] is False
+    assert r['final_trade_gate']['trader_brain']['desired_entry_mode']=='PULLBACK'
