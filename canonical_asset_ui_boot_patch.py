@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-VERSION = "ATLAS_CANONICAL_ASSET_UI_PATCH_V4_EXPANSION_COHORT"
+VERSION = "ATLAS_CANONICAL_ASSET_UI_PATCH_V5_HYPE_EXPANSION"
 CANONICAL_UI_SYMBOLS = (
     "BINANCE:BTCUSDT",
     "BINANCE:ETHUSDT",
@@ -25,6 +25,7 @@ CANONICAL_UI_SYMBOLS = (
     "BINANCE:LINKUSDT",
     "BINANCE:AVAXUSDT",
     "BINANCE:LTCUSDT",
+    "BYBIT:HYPEUSDT",
 )
 _FILTER_OLD = "? savedAssets.filter(a => a && a.cls === 'Crypto' && String(a.symbol || '').toUpperCase().endsWith('USDT'))"
 
@@ -60,7 +61,7 @@ def _has_research_only_hype_asset_reference(text: str) -> bool:
 
 
 def transform_app_js(text: str) -> str:
-    text = _remove_research_only_hype_rows(str(text))
+    text = str(text)
     if "const CANONICAL_PRODUCTION_SYMBOLS" not in text:
         marker = "const savedAssets = JSON.parse(localStorage.getItem('atlas.assets') || 'null');"
         allowed = ",".join(repr(s) for s in CANONICAL_UI_SYMBOLS)
@@ -83,7 +84,7 @@ def apply(base: Path | str) -> dict:
     patched = transform_app_js(original)
     if patched != original:
         path.write_text(patched, encoding="utf-8")
-    hype_exposed = _has_research_only_hype_asset_reference(patched)
+    hype_exposed = "BYBIT:HYPEUSDT" in patched and _has_research_only_hype_asset_reference(patched)
     return {
         "enabled": True,
         "version": VERSION,
