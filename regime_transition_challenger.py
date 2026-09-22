@@ -6,7 +6,7 @@ thresholds, geometry, or execution.
 """
 from __future__ import annotations
 
-VERSION = "ATLAS_REGIME_TRANSITION_CHALLENGER_V1"
+VERSION = "ATLAS_REGIME_TRANSITION_CHALLENGER_V2_NET_RR"\nLOCKED_ROUND_TRIP_COST_BPS = 16\nLOCKED_FUNDING_BPS_12H = 1
 
 UP = {"TREND_UP","BREAKOUT_UP","VOLATILITY_EXPANSION_UP"}
 DOWN = {"TREND_DOWN","BREAKDOWN_DOWN","VOLATILITY_EXPANSION_DOWN"}
@@ -62,7 +62,7 @@ def assess(row, asset_regime, btc_regime, breadth=None, derivatives=None):
     return {
       "version":VERSION,"mode":"RESEARCH_SHADOW","decision":candidate if eligible else "WAIT",
       "eligible":eligible,"evidence":evidence,"blockers":blockers,
-      "minimum_independent_confirmations":3,"product_horizon":"4-12H",
+      "minimum_independent_confirmations":3,"product_horizon":"4-12H",\n      "gross_rr":rr,"locked_cost_bps_12h":locked_cost_bps,"modeled_cost_r":cost_r,"net_rr_after_locked_cost":net_rr,
       "can_override_production":False,"can_change_threshold":False,
       "can_change_score":False,"can_change_geometry":False,
       "live_execution":False,
