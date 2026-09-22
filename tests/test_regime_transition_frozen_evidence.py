@@ -24,3 +24,10 @@ def test_missing_independent_regime_fails_closed_not_recomputed():
     assert eth["challenger"]["eligible"] is False
     assert "ASSET_REGIME_NOT_ALIGNED" in eth["challenger"]["blockers"]
     assert eth["frozen_evidence"]["asset_regime"] is None
+
+
+def test_transition_quality_is_frozen_at_t0(snapshot):
+    row=freeze(snapshot)[0]
+    assert "transition_quality" in row
+    assert row["transition_quality"]["research_only"] is True
+    assert row["transition_quality"]["can_override_production"] is False
