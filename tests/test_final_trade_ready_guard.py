@@ -130,7 +130,7 @@ def test_isolated_evidence_can_bypass_only_stale_pre_final_wait_and_restore_geom
         else: os.environ[guard.EXPERIMENTAL_PROMOTION_ENV]=old
 
 
-def test_experimental_bypass_fails_closed_when_candidate_geometry_is_missing():
+def test_stale_wait_bypass_fails_closed_when_candidate_geometry_is_missing():
     old=os.environ.get(guard.EXPERIMENTAL_PROMOTION_ENV)
     os.environ[guard.EXPERIMENTAL_PROMOTION_ENV]='1'
     try:
@@ -145,7 +145,7 @@ def test_experimental_bypass_fails_closed_when_candidate_geometry_is_missing():
         else: os.environ[guard.EXPERIMENTAL_PROMOTION_ENV]=old
 
 
-def test_experimental_bypass_does_not_override_real_safety_blocker():
+def test_stale_wait_bypass_does_not_override_real_safety_blocker():
     old=os.environ.get(guard.EXPERIMENTAL_PROMOTION_ENV)
     os.environ[guard.EXPERIMENTAL_PROMOTION_ENV]='1'
     try:
