@@ -18,7 +18,7 @@ import os
 from canonical_decision_contract import from_decision
 from golden_thesis_engine import VERSION as GOLDEN_THESIS_VERSION, build as build_golden_thesis
 
-VERSION = "FINAL_TRADE_READY_GUARD_V4_STRUCTURE_CONFIRMATION"
+VERSION = "FINAL_TRADE_READY_GUARD_V5_EVIDENCE_AUTHORITY"
 PRODUCT_HORIZON = "4-12H"
 EXPERIMENTAL_PROMOTION_ENV = "ATLAS_EXPERIMENTAL_FINAL_EVIDENCE_PROMOTION"
 
@@ -146,10 +146,10 @@ def assess(row):
     structure_state = _breakout_structure_state(row)
     quality_blocked = _norm((row.get("setup_quality_gate") or {}).get("status")) == "BLOCK"
     degraded = bool(row.get("data_degraded", False))
-    experimental_promotion = _experimental_final_evidence_promotion()
+    experimental_promotion = _experimental_final_evidence_promotion()\n    alignment_accepted = alignment in {"ALIGNED", "CONDITIONAL_ALIGNED", "CONDITIONAL_ALIGNED_12H_NEUTRAL"}
     blockers = []
     if product not in {"LONG", "SHORT"}: blockers.append("HTF_PRODUCT_DIRECTION_UNRESOLVED")
-    if alignment != "ALIGNED": blockers.append("HTF_4H_12H_NOT_ALIGNED")
+    if not alignment_accepted: blockers.append("HTF_4H_12H_NOT_ALIGNED")
     if product in {"LONG", "SHORT"} and entry != product: blockers.append("ENTRY_CONFIRMATION_NOT_ALIGNED")
     if product in {"LONG", "SHORT"} and candidate != product: blockers.append("SCORE_DIRECTION_NOT_HTF_DIRECTION")
     if action in {"LONG", "SHORT"}:
@@ -166,7 +166,7 @@ def assess(row):
     if quality_blocked: blockers.append("SETUP_QUALITY_GATE_BLOCKED")
     if degraded: blockers.append("DATA_DEGRADED")
     candidate_geometry = None
-    stale_wait_candidate = bool(experimental_promotion and action not in {"LONG", "SHORT"})
+    stale_wait_candidate = bool(action not in {"LONG", "SHORT"})
     if stale_wait_candidate and not blockers and product in {"LONG", "SHORT"}:
         candidate_geometry, candidate_geometry_error = _candidate_plan_geometry(row, product)
         if candidate_geometry_error:
@@ -189,15 +189,15 @@ def assess(row):
         "structure_confirmation": structure_state,
         "blockers": blockers,
         "primary_blocker": blockers[0] if blockers else None,
-        "authority": "FINAL_12H_4H_DIRECTION_PLUS_1H_CONFIRMATION_PLUS_STRUCTURE",
+        "authority": "FINAL_EVIDENCE_4_12H_THESIS_PLUS_1H_TRIGGER_PLUS_STRUCTURE",
         "product_horizon": PRODUCT_HORIZON,
         "score_changed": False,
         "threshold_changed": False,
-        "experimental_final_evidence_promotion": experimental_promotion,
+        "experimental_final_evidence_promotion": experimental_promotion,\n        "legacy_pre_final_action_is_authority": False,\n        "accepted_alignment_classes": ["ALIGNED", "CONDITIONAL_ALIGNED", "CONDITIONAL_ALIGNED_12H_NEUTRAL"],
         "stale_pre_final_wait_bypassed": stale_wait_bypassed,
         "experimental_candidate_geometry_restored": bool(stale_wait_bypassed and candidate_geometry),
         "candidate_geometry": candidate_geometry if stale_wait_bypassed else None,
-        "can_promote_wait": experimental_promotion,
+        "can_promote_wait": True,
         "paper_trade_eligible": ready,
         "analysis_only": True,
         "live_execution": False,
@@ -331,7 +331,7 @@ def install(atlas):
         "breakout_structure_confirmation_required":True,
         "breakout_structure_confirmation_scope":"BREAKOUT_FAMILY_ONLY",
         "experimental_final_evidence_promotion_env":EXPERIMENTAL_PROMOTION_ENV,
-        "experimental_final_evidence_promotion_default":False,
+        "experimental_final_evidence_promotion_default":False,\n        "legacy_pre_final_wait_veto_removed":True,\n        "conditional_12h_neutral_alignment_supported":True,
     }
     atlas.FINAL_TRADE_READY_GUARD_STATE = state
     return state
