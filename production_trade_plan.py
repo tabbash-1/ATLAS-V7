@@ -8,7 +8,7 @@ the canonical ATLAS product horizon. This module never routes orders.
 
 from swing_target_engine import build as build_swing_targets
 
-VERSION = 'PRODUCTION_TRADE_PLAN_V5_ANALYSIS_GEOMETRY_PROVENANCE'
+VERSION = 'PRODUCTION_TRADE_PLAN_V6_TRADER_BRAIN_GEOMETRY'
 GEOMETRY_VERSION = 'ATLAS_GEOMETRY_V5_ATR_STRUCTURE_PROVENANCE'
 PRODUCT_HORIZON = '4-12H'
 PRODUCT_EVALUATION_HORIZONS = ['4h', '8h', '12h']
@@ -55,7 +55,6 @@ def build(decision):
     geom=decision.get('structural_geometry') or {}; br=geom.get('breakout') or {}
     obstacle=_num(geom.get('obstacle_price'))
     continuation=bool(geom.get('continuation_strong')); breakout=bool(br.get('confirmed'))
-    qualified=bool(decision.get('production_signal_qualified'))
     ready_raw=bool(decision.get('execution_ready'))  # legacy name; means geometry/current-entry readiness only.
     threshold=_num(decision.get('signal_threshold'))
     if threshold is None: threshold=68.0
@@ -120,7 +119,7 @@ def build(decision):
         breakout_confirmed=breakout,
     )
 
-    analysis_ready=bool(ready_raw and qualified)
+    analysis_ready=bool(ready_raw)
     status='ACTIONABLE' if analysis_ready else 'CONDITIONAL'  # legacy compatibility status.
     action=('BUY' if d=='LONG' else 'SELL') if status=='ACTIONABLE' else ('BUY_ONLY_IF' if d=='LONG' else 'SELL_ONLY_IF')
     can_execute=analysis_ready  # compatibility only; live_execution remains false.
@@ -163,7 +162,7 @@ def build(decision):
         'swing_plan':{**extended_swing,'role':'CONTEXT_ONLY','can_override_core':False},
         'preferred_target_lane':'CORE_4_12H','reference_structure':round(reference,10) if reference is not None else None,
         'reference_structure_source':reference_source,'continuation_strong':continuation,'breakout_confirmed':breakout,
-        'qualification_required':threshold,'production_qualified':qualified,'execution_ready':ready_raw,
+        'legacy_score_threshold':threshold,'score_is_authority':False,'execution_ready':ready_raw,
         'invalidation':'Re-evaluate if stop/structure fails or the verified direction changes.',
         'can_execute':can_execute,'execution_scope':'DECISION_READY_ONLY_NO_ORDER_ROUTING',
         'analysis_only':True,'live_execution':False,'research_only':True,

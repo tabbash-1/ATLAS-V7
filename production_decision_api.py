@@ -14,7 +14,7 @@ from production_signal_scoring import candle_progress, paced_relative_volume
 from market_regime_engine import analyze as independent_regime_analyze
 
 VERSION = "PRODUCTION_DECISION_API_V7_QUICK_REENTRY_GUARD+PACED_VOLUME_V1"
-GEOMETRY_MIN_RR = 1.0
+GEOMETRY_MIN_RR = 2.0
 
 
 def install(atlas):
@@ -68,12 +68,12 @@ def install(atlas):
         if rr < GEOMETRY_MIN_RR:
             return {
                 'status': 'BLOCK', 'qualified': False,
-                'reason': 'RR_BELOW_ONE_TO_ONE', 'min_risk_reward': GEOMETRY_MIN_RR,
+                'reason': 'RR_BELOW_TWO_TO_ONE', 'min_risk_reward': GEOMETRY_MIN_RR,
                 'risk_reward': round(rr, 6),
             }
         return {
             'status': 'PASS', 'qualified': True,
-            'reason': 'RR_ONE_TO_ONE_OR_BETTER', 'min_risk_reward': GEOMETRY_MIN_RR,
+            'reason': 'RR_TWO_TO_ONE_OR_BETTER', 'min_risk_reward': GEOMETRY_MIN_RR,
             'risk_reward': round(rr, 6),
         }
 

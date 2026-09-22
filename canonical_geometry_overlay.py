@@ -8,7 +8,7 @@ Entry/Stop/Target shown by the decision payload and preserves the legacy
 `execution_ready` field strictly as a compatibility alias.
 """
 
-VERSION = "ATLAS_CANONICAL_GEOMETRY_TRUTH_V1"
+VERSION = "ATLAS_CANONICAL_GEOMETRY_TRUTH_V2_SCORE_INDEPENDENT"
 REASON_SCHEMA_VERSION = "ATLAS_GEOMETRY_REASON_CODES_V1"
 MIN_RR = 2.0
 
@@ -116,8 +116,8 @@ def install(atlas):
             payload.get("stop_loss"),
             payload.get("take_profit"),
         )
-        qualified = bool(payload.get("production_signal_qualified"))
-        geometry_ready = bool(qualified and geometry.get("qualified"))
+        legacy_score_qualified = bool(payload.get("production_signal_qualified"))
+        geometry_ready = bool(geometry.get("qualified"))
 
         payload["geometry_gate"] = geometry
         payload["risk_reward"] = geometry.get("risk_reward")
@@ -127,20 +127,20 @@ def install(atlas):
         payload["geometry_reason_schema_version"] = REASON_SCHEMA_VERSION
         payload["geometry_rr_source"] = "RECOMPUTED_FROM_EXACT_ENTRY_STOP_TARGET"
         payload["score_or_threshold_changed_by_geometry"] = False
+        payload["score_is_authority"] = False
+        payload["legacy_score_qualified"] = legacy_score_qualified
 
         # Compatibility only. No order routing exists; downstream legacy readers
         # still consume this name as current-entry geometry readiness.
         payload["execution_ready"] = geometry_ready
         payload["actionable_decision"] = direction if geometry_ready else "WAIT"
-        if not qualified:
-            payload["actionable_reason"] = payload.get("wait_reason") or "SCORE_BELOW_SIGNAL_THRESHOLD"
-        elif not geometry_ready:
+        if not geometry_ready:
             payload["actionable_reason"] = geometry.get("primary_blocker") or geometry.get("reason")
         else:
             payload["actionable_reason"] = "ANALYSIS_GEOMETRY_READY"
 
-        if qualified and not geometry_ready:
-            payload["trade_plan_status"] = "SCORE_QUALIFIED_GEOMETRY_BLOCKED"
+        if not geometry_ready:
+            payload["trade_plan_status"] = "GEOMETRY_BLOCKED"
         elif geometry_ready:
             payload["trade_plan_status"] = "ANALYSIS_GEOMETRY_READY"
 

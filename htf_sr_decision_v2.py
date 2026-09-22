@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from typing import Any
 
-VERSION = "HTF_SR_DECISION_V2_NEUTRAL_REGIME"
+VERSION = "HTF_SR_DECISION_V3_TRADER_BRAIN_AUTHORITY"
 PRODUCT_HORIZON = "4-12H"
 
 
@@ -159,7 +159,6 @@ def assess(row: dict[str, Any]) -> dict[str, Any]:
     volume4 = _norm((frames.get("4h") or {}).get("volume_state"))
     proposed = _norm(row.get("candidate_direction") or row.get("entry_confirmation_direction"))
     pre_htf = _norm(row.get("pre_htf_actionable_decision"))
-    qualified = row.get("production_signal_qualified") is True
     geometry_ready = _geometry_ready(row)
     degraded = bool(row.get("data_degraded", False))
     ladder = build_sr_ladder(thesis)
@@ -183,12 +182,6 @@ def assess(row: dict[str, Any]) -> dict[str, Any]:
             blockers.append("4H_COUNTER_IMPULSE_WITH_VOLUME")
         if bd in {"LONG", "SHORT"} and bd != direction and d1_conf == "STRONG":
             blockers.append("1D_MACRO_STRONGLY_OPPOSES_4H")
-    if pre_htf not in {"LONG", "SHORT"}:
-        blockers.append("PRE_HTF_DECISION_NOT_ACTIONABLE")
-    elif direction and pre_htf != direction:
-        blockers.append("PRE_HTF_ACTION_OPPOSES_4H")
-    if not qualified:
-        blockers.append("PRODUCTION_SIGNAL_NOT_QUALIFIED")
     if not geometry_ready:
         blockers.append("CANONICAL_GEOMETRY_NOT_READY")
     if degraded:
@@ -205,7 +198,8 @@ def assess(row: dict[str, Any]) -> dict[str, Any]:
         "primary_blocker": blockers[0] if blockers else None,
         "pre_htf_action": pre_htf if pre_htf in {"LONG", "SHORT"} else "WAIT",
         "candidate_direction": proposed if proposed in {"LONG", "SHORT"} else None,
-        "production_signal_qualified": qualified,
+        "legacy_pre_htf_action": pre_htf if pre_htf in {"LONG", "SHORT"} else "WAIT",
+        "score_is_authority": False,
         "canonical_geometry_ready": geometry_ready,
         "support_resistance_ladder": ladder,
         "score_changed": False,
@@ -275,7 +269,7 @@ def install(atlas):
         "enabled": True,
         "version": VERSION,
         "product_horizon": PRODUCT_HORIZON,
-        "policy": "4H directional + 12H neutral may preserve an already-qualified pre-HTF action only with 1H agreement, no strong 1D opposition and valid geometry",
+        "policy": "4H directional + 12H neutral may preserve directional thesis with 1H agreement, no strong 1D opposition and valid geometry; legacy score/pre-HTF action are evidence only",
         "score_changed": False,
         "threshold_changed": False,
         "risk_changed": False,
