@@ -146,7 +146,8 @@ def assess(row):
     structure_state = _breakout_structure_state(row)
     quality_blocked = _norm((row.get("setup_quality_gate") or {}).get("status")) == "BLOCK"
     degraded = bool(row.get("data_degraded", False))
-    experimental_promotion = _experimental_final_evidence_promotion()\n    alignment_accepted = alignment in {"ALIGNED", "CONDITIONAL_ALIGNED", "CONDITIONAL_ALIGNED_12H_NEUTRAL"}
+    experimental_promotion = _experimental_final_evidence_promotion()
+    alignment_accepted = alignment in {"ALIGNED", "CONDITIONAL_ALIGNED", "CONDITIONAL_ALIGNED_12H_NEUTRAL"}
     blockers = []
     if product not in {"LONG", "SHORT"}: blockers.append("HTF_PRODUCT_DIRECTION_UNRESOLVED")
     if not alignment_accepted: blockers.append("HTF_4H_12H_NOT_ALIGNED")
@@ -193,7 +194,9 @@ def assess(row):
         "product_horizon": PRODUCT_HORIZON,
         "score_changed": False,
         "threshold_changed": False,
-        "experimental_final_evidence_promotion": experimental_promotion,\n        "legacy_pre_final_action_is_authority": False,\n        "accepted_alignment_classes": ["ALIGNED", "CONDITIONAL_ALIGNED", "CONDITIONAL_ALIGNED_12H_NEUTRAL"],
+        "experimental_final_evidence_promotion": experimental_promotion,
+        "legacy_pre_final_action_is_authority": False,
+        "accepted_alignment_classes": ["ALIGNED", "CONDITIONAL_ALIGNED", "CONDITIONAL_ALIGNED_12H_NEUTRAL"],
         "stale_pre_final_wait_bypassed": stale_wait_bypassed,
         "experimental_candidate_geometry_restored": bool(stale_wait_bypassed and candidate_geometry),
         "candidate_geometry": candidate_geometry if stale_wait_bypassed else None,
@@ -331,7 +334,9 @@ def install(atlas):
         "breakout_structure_confirmation_required":True,
         "breakout_structure_confirmation_scope":"BREAKOUT_FAMILY_ONLY",
         "experimental_final_evidence_promotion_env":EXPERIMENTAL_PROMOTION_ENV,
-        "experimental_final_evidence_promotion_default":False,\n        "legacy_pre_final_wait_veto_removed":True,\n        "conditional_12h_neutral_alignment_supported":True,
+        "experimental_final_evidence_promotion_default":False,
+        "legacy_pre_final_wait_veto_removed":True,
+        "conditional_12h_neutral_alignment_supported":True,
     }
     atlas.FINAL_TRADE_READY_GUARD_STATE = state
     return state
