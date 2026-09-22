@@ -1,8 +1,8 @@
 from regime_transition_challenger import assess
 
-def row(rr=2.2, reason="HTF_CONFLICT"):
+def row(rr=2.2, reason="HTF_CONFLICT", entry=100.0, stop=98.0):
     return {"candidate_direction":"LONG","canonical_product_decision":"WAIT","wait_reason":reason,
-      "htf_core_geometry":{"ready":True},"analyst_output":{"risk_reward":rr},
+      "htf_core_geometry":{"ready":True},"analyst_output":{"risk_reward":rr,"entry":entry,"stop_loss":stop},
       "htf_thesis":{"frames":{"1h":{"bias":"LONG"},"4h":{"bias":"LONG"},"12h":{"bias":"NEUTRAL"},"1d":{"bias":"NEUTRAL"}}}}
 
 def test_aligned_transition_is_shadow_long():
@@ -29,3 +29,15 @@ def test_rr_below_two_blocks():
 def test_non_htf_wait_cannot_be_reclassified():
     x=assess(row(reason="EVENT_RISK"),{"regime":"TREND_UP"},{"regime":"TREND_UP"},{"direction":"LONG","aligned_ratio":.7},{"direction":"LONG"})
     assert not x["eligible"] and "NOT_HTF_CONFLICT_WAIT" in x["blockers"]
+
+
+def test_gross_two_r_but_net_below_two_blocks():
+    x=assess(row(2.05),{"regime":"TREND_UP"},{"regime":"TREND_UP"},{"direction":"LONG","aligned_ratio":.7},{"direction":"LONG"})
+    assert not x["eligible"]
+    assert x["gross_rr"]==2.05
+    assert x["net_rr_after_locked_cost"] < 2.0
+    assert "NET_RR_BELOW_2_OR_MISSING" in x["blockers"]
+
+def test_missing_cost_geometry_fails_closed():
+    x=assess(row(2.5, entry=None, stop=None),{"regime":"TREND_UP"},{"regime":"TREND_UP"},{"direction":"LONG","aligned_ratio":.7},{"direction":"LONG"})
+    assert not x["eligible"] and x["net_rr_after_locked_cost"] is None
