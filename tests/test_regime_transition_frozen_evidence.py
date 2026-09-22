@@ -15,7 +15,8 @@ def test_frozen_snapshot_can_qualify_only_with_present_evidence():
     rows=freeze(snap(True)); eth=next(x for x in rows if x["symbol"]=="ETHUSDT")
     assert eth["challenger"]["eligible"] is True
     assert eth["frozen_evidence"]["breadth"]["aligned_ratio"]==1.0
-    assert eth["frozen_evidence"]["btc_regime"]["regime"]=="BREAKOUT_UP"\n    assert eth["frozen_evidence"]["net_rr_after_locked_cost"] > 2.0
+    assert eth["frozen_evidence"]["btc_regime"]["regime"]=="BREAKOUT_UP"
+    assert eth["frozen_evidence"]["net_rr_after_locked_cost"] > 2.0
     assert eth["can_override_production"] is False
 
 def test_missing_independent_regime_fails_closed_not_recomputed():
