@@ -96,13 +96,13 @@ def test_non_breakout_pullback_path_is_not_regressed():
     assert r['final_trade_gate']['structure_confirmation']['requires_confirmation'] is False
 
 
-def test_production_stale_wait_still_fails_closed_by_default():
+def test_stale_pre_final_wait_is_not_an_authority_when_trader_evidence_passes():
     old=os.environ.pop(guard.EXPERIMENTAL_PROMOTION_ENV, None)
     try:
         r=guard.apply(base_row(actionable_decision='WAIT'))
-        assert r['trade_ready'] is False
-        assert 'PRE_FINAL_DECISION_NOT_ACTIONABLE' in r['final_trade_gate']['blockers']
-        assert r['final_trade_gate']['experimental_final_evidence_promotion'] is False
+        assert r['trade_ready'] is True
+        assert r['final_trade_gate']['legacy_pre_final_action_is_authority'] is False
+        assert r['final_trade_gate']['score_is_authority'] is False
     finally:
         if old is not None: os.environ[guard.EXPERIMENTAL_PROMOTION_ENV]=old
 
@@ -171,11 +171,19 @@ def test_unresolved_product_direction_fails_closed_and_collapses_nested_plan():
     assert paper_final.strict_trade_ready(r) is False
 
 
-def test_candidate_direction_cannot_override_htf_product_direction():
-    r = guard.apply(base_row(candidate_direction='SHORT', product_direction='LONG', entry_confirmation_direction='LONG', direction_alignment='ALIGNED'))
+def test_legacy_score_direction_is_evidence_not_authority():
+    r = guard.apply(base_row(candidate_direction='LONG', product_direction='SHORT', entry_confirmation_direction='SHORT', direction_alignment='ALIGNED'))
+    assert r['trade_ready'] is True
+    assert r['final_trade_gate']['direction'] == 'SHORT'
+    assert r['final_trade_gate']['score_is_authority'] is False
+
+
+def test_trader_brain_requires_two_r_geometry():
+    d=base_row()
+    d['trade_plan']=dict(d['trade_plan']); d['trade_plan']['rr_tp2']=1.5
+    r=guard.apply(d)
     assert r['trade_ready'] is False
-    assert r['actionable_decision'] == 'WAIT'
-    assert 'SCORE_DIRECTION_NOT_HTF_DIRECTION' in r['final_trade_gate']['blockers']
+    assert 'TRADER_RR_BELOW_2R' in r['final_trade_gate']['blockers']
 
 
 def test_geometry_not_ready_blocks_even_with_high_legacy_readiness():

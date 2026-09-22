@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import os
 
+from atlas_trader_brain import assess as assess_trader
 from canonical_decision_contract import from_decision
 from golden_thesis_engine import VERSION as GOLDEN_THESIS_VERSION, build as build_golden_thesis
 
@@ -152,12 +153,8 @@ def assess(row):
     if product not in {"LONG", "SHORT"}: blockers.append("HTF_PRODUCT_DIRECTION_UNRESOLVED")
     if not alignment_accepted: blockers.append("HTF_4H_12H_NOT_ALIGNED")
     if product in {"LONG", "SHORT"} and entry != product: blockers.append("ENTRY_CONFIRMATION_NOT_ALIGNED")
-    if product in {"LONG", "SHORT"} and candidate != product: blockers.append("SCORE_DIRECTION_NOT_HTF_DIRECTION")
     if action in {"LONG", "SHORT"}:
         if product in {"LONG", "SHORT"} and action != product: blockers.append("ACTION_NOT_HTF_DIRECTION")
-    elif not experimental_promotion:
-        blockers.append("PRE_FINAL_DECISION_NOT_ACTIONABLE")
-    if not qualified: blockers.append("PRODUCTION_SIGNAL_NOT_QUALIFIED")
     if not geometry_ready: blockers.append(geometry_reason or "CANONICAL_GEOMETRY_NOT_READY")
     if structure_state["requires_confirmation"]:
         if not structure_state["evidence_present"]:
@@ -166,6 +163,9 @@ def assess(row):
             blockers.append("BREAKOUT_STRUCTURE_NOT_CONFIRMED")
     if quality_blocked: blockers.append("SETUP_QUALITY_GATE_BLOCKED")
     if degraded: blockers.append("DATA_DEGRADED")
+    trader = assess_trader(row)
+    for blocker in trader.get("fatal_blockers") or []:
+        blockers.append(blocker)
     candidate_geometry = None
     stale_wait_candidate = bool(action not in {"LONG", "SHORT"})
     if stale_wait_candidate and not blockers and product in {"LONG", "SHORT"}:
@@ -186,6 +186,12 @@ def assess(row):
         "pre_final_action": action if action in {"LONG", "SHORT"} else "WAIT",
         "direction_alignment": alignment or None,
         "production_signal_qualified": qualified,
+        "score_is_authority": False,
+        "trader_brain": trader,
+        "trader_stage": trader.get("stage"),
+        "setup_playbook": trader.get("setup_playbook"),
+        "location_state": trader.get("location_state"),
+        "minimum_rr_required": trader.get("minimum_rr_required"),
         "canonical_geometry_ready": geometry_ready,
         "structure_confirmation": structure_state,
         "blockers": blockers,
@@ -335,6 +341,7 @@ def install(atlas):
         "breakout_structure_confirmation_scope":"BREAKOUT_FAMILY_ONLY",
         "experimental_final_evidence_promotion_env":EXPERIMENTAL_PROMOTION_ENV,
         "experimental_final_evidence_promotion_default":False,
+        "score_is_authority":False,"trader_brain_authority":True,
         "legacy_pre_final_wait_veto_removed":True,
         "conditional_12h_neutral_alignment_supported":True,
     }
