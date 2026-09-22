@@ -32,7 +32,7 @@ def patch_production_ui():
         '  <script src="atlas-product-shell.js?v=product-shell-v7-bound-analyst-geometry"></script>',
         '  <script src="production-web-autoload.js?v=production-autoload-v6-strict-final-truth"></script>',
         '  <script src="atlas-deep-analysis-ui.js?v=rc10-1-deep-v2-primary-4-12h"></script>',
-        '  <script src="atlas-unified-terminal.js?v=unified-terminal-v7-mobile-decision-first"></script>',
+        '  <script src="atlas-unified-terminal.js?v=unified-terminal-v8-trader-brain-truth"></script>',
         '  <script src="atlas-unified-terminal-polish.js?v=unified-terminal-polish-v4-wait-cause"></script>',
         '  <script src="atlas-paper-portfolio-ui.js?v=paper-portfolio-v3-final-gate-only"></script>',
         '  <script src="atlas-research-validation-ui.js?v=research-shadow-v3-target-status"></script>',
