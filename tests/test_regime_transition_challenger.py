@@ -1,6 +1,6 @@
 from regime_transition_challenger import assess
 
-def row(rr=2.2, reason="HTF_CONFLICT", entry=100.0, stop=99.0):
+def row(rr=2.2, reason="HTF_CONFLICT", entry=100.0, stop=98.0):
     return {"candidate_direction":"LONG","canonical_product_decision":"WAIT","wait_reason":reason,
       "htf_core_geometry":{"ready":True},"analyst_output":{"risk_reward":rr,"entry":entry,"stop_loss":stop},
       "htf_thesis":{"frames":{"1h":{"bias":"LONG"},"4h":{"bias":"LONG"},"12h":{"bias":"NEUTRAL"},"1d":{"bias":"NEUTRAL"}}}}
