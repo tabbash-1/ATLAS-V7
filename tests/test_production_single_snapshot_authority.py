@@ -82,7 +82,7 @@ def test_final_production_gate_tracks_current_unified_terminal_contract():
 def test_final_trade_gate_live_smoke_tracks_current_guard_contract():
     guard = text('final_trade_ready_guard.py')
     workflow = text('.github/workflows/atlas-final-trade-gate-live-smoke.yml')
-    current_version = 'FINAL_TRADE_READY_GUARD_V4_STRUCTURE_CONFIRMATION'
+    current_version = 'FINAL_TRADE_READY_GUARD_V5_EVIDENCE_AUTHORITY'
     stale_version = 'FINAL_TRADE_READY_GUARD_V1_HTF_FAIL_CLOSED'
     assert current_version in guard
     assert current_version in workflow
