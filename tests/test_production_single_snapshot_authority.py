@@ -42,7 +42,7 @@ def test_unified_terminal_is_final_gate_only_and_wait_hides_candidate_direction(
     assert "['1d','12h','6h','4h','1h']" not in src
     assert 'p.product_direction||p.candidate_direction' not in src
     assert 'p.trade_plan' not in src
-    assert "$('auDir').textContent=actionable?decision:'—'" in src
+    assert "$('auDir').textContent=actionable?decision:(tbThesis||'—')" in src
     assert "a?.canonical_decision_id!==c.decision_id" in src
     assert "a?.decision_source_of_truth!=='FINAL_TRADE_GATE'" in src
 
