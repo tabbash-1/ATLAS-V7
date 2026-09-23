@@ -235,6 +235,13 @@ jobs:
           if not canonical_snapshot_complete:
               print('CANONICAL_CORE_SNAPSHOT_INCOMPLETE', ','.join(failed_core_symbols))
           PY
+      - name: Build prospective edge report
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 build_trade_edge_prospective_report.py
+          jq -e '.version == "ATLAS_TRADE_EDGE_PROSPECTIVE_V1" and .baseline_commit == "1015a02dc8ab25d812249d55a5ac5e27410e82ed" and .historical_rows_excluded == true and .can_override_production == false and .live_execution == false' status/trade-edge-prospective-latest.json >/dev/null
+
       - name: Verify canonical snapshot contract
         shell: bash
         run: |
@@ -258,6 +265,7 @@ jobs:
           mkdir -p "$SNAPSHOT_PAYLOAD_DIR/status/raw"
           cp status/atlas-production-latest.json "$SNAPSHOT_PAYLOAD_DIR/status/atlas-production-latest.json"
           cp status/wait-outcomes.json "$SNAPSHOT_PAYLOAD_DIR/status/wait-outcomes.json"
+          cp status/trade-edge-prospective-latest.json "$SNAPSHOT_PAYLOAD_DIR/status/trade-edge-prospective-latest.json"
           cp status/raw/*.json "$SNAPSHOT_PAYLOAD_DIR/status/raw/"
           python3 - <<'PY'
           import json, os, pathlib
@@ -274,6 +282,7 @@ jobs:
             mkdir -p status/raw status/history
             cp "$SNAPSHOT_PAYLOAD_DIR/status/atlas-production-latest.json" status/atlas-production-latest.json
             cp "$SNAPSHOT_PAYLOAD_DIR/status/wait-outcomes.json" status/wait-outcomes.json
+            cp "$SNAPSHOT_PAYLOAD_DIR/status/trade-edge-prospective-latest.json" status/trade-edge-prospective-latest.json
             cp "$SNAPSHOT_PAYLOAD_DIR/status/raw/"*.json status/raw/
             python3 - <<'PY'
           import json, os, pathlib
@@ -313,7 +322,7 @@ jobs:
                   size += n
               history.write_text(''.join(reversed(kept)))
           PY
-            git add status/atlas-production-latest.json status/raw/*.json status/history/production-snapshots.jsonl status/wait-outcomes.json
+            git add status/atlas-production-latest.json status/raw/*.json status/history/production-snapshots.jsonl status/wait-outcomes.json status/trade-edge-prospective-latest.json
             if git diff --cached --quiet; then
               published=1
               break
