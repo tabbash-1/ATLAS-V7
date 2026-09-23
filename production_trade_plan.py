@@ -55,7 +55,9 @@ def build(decision):
     geom=decision.get('structural_geometry') or {}; br=geom.get('breakout') or {}
     obstacle=_num(geom.get('obstacle_price'))
     continuation=bool(geom.get('continuation_strong')); breakout=bool(br.get('confirmed'))
-    # Legacy execution_ready is score-derived upstream and remains evidence only.\n    # Current-entry readiness is structural; score cannot authorize NOW entry.\n    ready_raw=bool(breakout and geom and decision.get('candidate_direction') in ('LONG','SHORT'))
+    # Legacy execution_ready is score-derived upstream and remains evidence only.
+    # Current-entry readiness is structural; score cannot authorize NOW entry.
+    ready_raw=bool(breakout and geom and decision.get('candidate_direction') in ('LONG','SHORT'))
     threshold=_num(decision.get('signal_threshold'))
     if threshold is None: threshold=68.0
     if px is None or atr is None or atr<=0:
