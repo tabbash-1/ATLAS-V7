@@ -37,12 +37,12 @@ def test_product_shell_binds_geometry_to_canonical_final_gate_snapshot():
 
 def test_unified_terminal_is_final_gate_only_and_wait_hides_candidate_direction():
     src = text('atlas-unified-terminal.js')
-    assert "ATLAS_UNIFIED_TERMINAL_V7_MOBILE_DECISION_FIRST" in src
+    assert "ATLAS_UNIFIED_TERMINAL_V8_TRADER_BRAIN_TRUTH" in src
     assert "const PRODUCT_FRAMES=['1d','12h','4h','1h']" in src
     assert "['1d','12h','6h','4h','1h']" not in src
     assert 'p.product_direction||p.candidate_direction' not in src
     assert 'p.trade_plan' not in src
-    assert "$('auDir').textContent=actionable?decision:'—'" in src
+    assert "$('auDir').textContent=actionable?decision:(tbThesis||'—')" in src
     assert "a?.canonical_decision_id!==c.decision_id" in src
     assert "a?.decision_source_of_truth!=='FINAL_TRADE_GATE'" in src
 
@@ -70,7 +70,7 @@ def test_unified_terminal_core_asset_authority_is_asset_agnostic():
 def test_final_production_gate_tracks_current_unified_terminal_contract():
     terminal = text('atlas-unified-terminal.js')
     workflow = text('.github/workflows/atlas-final-production-gate.yml')
-    current_version = 'ATLAS_UNIFIED_TERMINAL_V7_MOBILE_DECISION_FIRST'
+    current_version = 'ATLAS_UNIFIED_TERMINAL_V8_TRADER_BRAIN_TRUTH'
     stale_version = 'ATLAS_UNIFIED_TERMINAL_V5_STRICT_FINAL_GATE'
     assert current_version in terminal
     assert current_version in workflow
@@ -82,7 +82,7 @@ def test_final_production_gate_tracks_current_unified_terminal_contract():
 def test_final_trade_gate_live_smoke_tracks_current_guard_contract():
     guard = text('final_trade_ready_guard.py')
     workflow = text('.github/workflows/atlas-final-trade-gate-live-smoke.yml')
-    current_version = 'FINAL_TRADE_READY_GUARD_V4_STRUCTURE_CONFIRMATION'
+    current_version = 'FINAL_TRADE_READY_GUARD_V5_EVIDENCE_AUTHORITY'
     stale_version = 'FINAL_TRADE_READY_GUARD_V1_HTF_FAIL_CLOSED'
     assert current_version in guard
     assert current_version in workflow

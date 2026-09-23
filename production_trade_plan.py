@@ -164,7 +164,7 @@ def build(decision):
         'swing_plan':{**extended_swing,'role':'CONTEXT_ONLY','can_override_core':False},
         'preferred_target_lane':'CORE_4_12H','reference_structure':round(reference,10) if reference is not None else None,
         'reference_structure_source':reference_source,'continuation_strong':continuation,'breakout_confirmed':breakout,
-        'legacy_score_threshold':threshold,'score_is_authority':False,'legacy_execution_ready':bool(decision.get('execution_ready')),'execution_ready':ready_raw,
+        'qualification_required':threshold,'legacy_score_threshold':threshold,'score_is_authority':False,'legacy_execution_ready':bool(decision.get('execution_ready')),'execution_ready':ready_raw,
         'invalidation':'Re-evaluate if stop/structure fails or the verified direction changes.',
         'can_execute':can_execute,'execution_scope':'DECISION_READY_ONLY_NO_ORDER_ROUTING',
         'analysis_only':True,'live_execution':False,'research_only':True,
