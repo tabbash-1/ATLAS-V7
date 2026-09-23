@@ -188,3 +188,16 @@ def test_short_is_not_blanket_blocked():
     assert r['actionable_decision']=='SHORT'
     assert r['analyst_output']['decision']=='SHORT'
     assert r['analyst_output']['product_direction']=='SHORT'
+
+
+def test_current_audit_revalidates_market_continuation_long():
+    row=base_row(playbook='MARKET_CONTINUATION_LONG')
+    a=atlas_with(row)
+    qg.install(a)
+    r=a.production_decision('BTCUSDT')
+    assert ('LONG','TREND_UP','MARKET_CONTINUATION_LONG') not in qg.QUARANTINE
+    assert qg.REVALIDATED_SETUP_FAMILIES[('LONG','TREND_UP','MARKET_CONTINUATION_LONG')]['mean12_pct'] > 0
+    assert r['setup_quality_gate']['status']=='PASS'
+    assert r['actionable_decision']=='LONG'
+    assert r['analyst_output']['decision']=='LONG'
+    assert r['score']==75.0 and r['signal_threshold']==68.0
