@@ -2,7 +2,7 @@ import production_trade_plan as p
 
 
 def base(**kw):
-    d={'ok':True,'candidate_direction':'LONG','entry':100.0,'indicators':{'atr14':2.0},'production_signal_qualified':True,'signal_threshold':68.0,'execution_ready':True,'structural_geometry':{'obstacle_price':104.0,'obstacle_distance_pct':4.0,'continuation_strong':False,'breakout':{'confirmed':False}}}
+    d={'ok':True,'candidate_direction':'LONG','entry':100.0,'indicators':{'atr14':2.0},'production_signal_qualified':True,'signal_threshold':68.0,'execution_ready':True,'structural_geometry':{'obstacle_price':104.0,'obstacle_distance_pct':4.0,'continuation_strong':False,'breakout':{'confirmed':True}}}
     d.update(kw); return d
 
 
@@ -65,12 +65,13 @@ def test_qualified_but_geometry_blocked_never_gets_permission():
     assert x['live_execution'] is False
 
 
-def test_geometry_ready_but_unqualified_never_gets_permission():
+def test_score_unqualified_cannot_override_structural_readiness():
     x=p.build(base(execution_ready=True,production_signal_qualified=False))
-    assert x['status']=='CONDITIONAL'
-    assert x['analysis_action']=='WAIT'
-    assert x['can_execute'] is False
-    assert x['core_plan']['can_execute'] is False
+    assert x['status']=='ACTIONABLE'
+    assert x['analysis_action']=='LONG'
+    assert x['can_execute'] is True
+    assert x['core_plan']['can_execute'] is True
+    assert x['score_is_authority'] is False
     assert x['live_execution'] is False
 
 
