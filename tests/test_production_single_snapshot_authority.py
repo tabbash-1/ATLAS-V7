@@ -37,7 +37,7 @@ def test_product_shell_binds_geometry_to_canonical_final_gate_snapshot():
 
 def test_unified_terminal_is_final_gate_only_and_wait_hides_candidate_direction():
     src = text('atlas-unified-terminal.js')
-    assert "ATLAS_UNIFIED_TERMINAL_V7_MOBILE_DECISION_FIRST" in src
+    assert "ATLAS_UNIFIED_TERMINAL_V8_TRADER_BRAIN_TRUTH" in src
     assert "const PRODUCT_FRAMES=['1d','12h','4h','1h']" in src
     assert "['1d','12h','6h','4h','1h']" not in src
     assert 'p.product_direction||p.candidate_direction' not in src
@@ -70,7 +70,7 @@ def test_unified_terminal_core_asset_authority_is_asset_agnostic():
 def test_final_production_gate_tracks_current_unified_terminal_contract():
     terminal = text('atlas-unified-terminal.js')
     workflow = text('.github/workflows/atlas-final-production-gate.yml')
-    current_version = 'ATLAS_UNIFIED_TERMINAL_V7_MOBILE_DECISION_FIRST'
+    current_version = 'ATLAS_UNIFIED_TERMINAL_V8_TRADER_BRAIN_TRUTH'
     stale_version = 'ATLAS_UNIFIED_TERMINAL_V5_STRICT_FINAL_GATE'
     assert current_version in terminal
     assert current_version in workflow
