@@ -12,7 +12,7 @@ from decision_intelligence import VERSION as DECISION_INTELLIGENCE_VERSION, buil
 # Keep the public contract identifier stable for existing API/CI consumers while
 # exposing feature revisions separately.
 VERSION = 'PRODUCT_QUALITY_GATE_V2_CANONICAL_ANALYST_OUTPUT'
-FEATURE_VERSION = 'PRODUCT_QUALITY_GATE_FEATURE_V4_HTF_DIRECTION_GEOMETRY_CONTRACT'
+FEATURE_VERSION = 'PRODUCT_QUALITY_GATE_FEATURE_V5_2R_GEOMETRY_CONTRACT'
 PROFILE_VERSION = 'ATLAS_ANALYSIS_EVIDENCE_PROFILE_V1'
 PRODUCT_HORIZON = '4-12H'
 PRODUCT_LANE = 'CORE_4_12H'
@@ -193,7 +193,7 @@ def _geometry_state(row):
         rr_tp1 = _num(htf.get('rr_tp1'))
         min_rr = _num(htf.get('min_rr'))
         if min_rr is None:
-            min_rr = 1.0
+            min_rr = 2.0
         return {
             'ready': ready,
             'status': htf.get('status'),

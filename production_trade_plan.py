@@ -8,7 +8,7 @@ the canonical ATLAS product horizon. This module never routes orders.
 
 from swing_target_engine import build as build_swing_targets
 
-VERSION = 'PRODUCTION_TRADE_PLAN_V6_TRADER_BRAIN_GEOMETRY'
+VERSION = 'PRODUCTION_TRADE_PLAN_V7_SCORE_INDEPENDENT_LOCATION'
 GEOMETRY_VERSION = 'ATLAS_GEOMETRY_V5_ATR_STRUCTURE_PROVENANCE'
 PRODUCT_HORIZON = '4-12H'
 PRODUCT_EVALUATION_HORIZONS = ['4h', '8h', '12h']
@@ -55,7 +55,7 @@ def build(decision):
     geom=decision.get('structural_geometry') or {}; br=geom.get('breakout') or {}
     obstacle=_num(geom.get('obstacle_price'))
     continuation=bool(geom.get('continuation_strong')); breakout=bool(br.get('confirmed'))
-    ready_raw=bool(decision.get('execution_ready'))  # legacy name; means geometry/current-entry readiness only.
+    # Legacy execution_ready is score-derived upstream and remains evidence only.\n    # Current-entry readiness is structural; score cannot authorize NOW entry.\n    ready_raw=bool(breakout and geom and decision.get('candidate_direction') in ('LONG','SHORT'))
     threshold=_num(decision.get('signal_threshold'))
     if threshold is None: threshold=68.0
     if px is None or atr is None or atr<=0:
@@ -162,7 +162,7 @@ def build(decision):
         'swing_plan':{**extended_swing,'role':'CONTEXT_ONLY','can_override_core':False},
         'preferred_target_lane':'CORE_4_12H','reference_structure':round(reference,10) if reference is not None else None,
         'reference_structure_source':reference_source,'continuation_strong':continuation,'breakout_confirmed':breakout,
-        'legacy_score_threshold':threshold,'score_is_authority':False,'execution_ready':ready_raw,
+        'legacy_score_threshold':threshold,'score_is_authority':False,'legacy_execution_ready':bool(decision.get('execution_ready')),'execution_ready':ready_raw,
         'invalidation':'Re-evaluate if stop/structure fails or the verified direction changes.',
         'can_execute':can_execute,'execution_scope':'DECISION_READY_ONLY_NO_ORDER_ROUTING',
         'analysis_only':True,'live_execution':False,'research_only':True,
