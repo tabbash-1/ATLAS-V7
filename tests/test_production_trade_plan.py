@@ -57,7 +57,7 @@ def test_blocked_near_resistance_becomes_breakout_plan():
 
 
 def test_qualified_but_geometry_blocked_never_gets_permission():
-    x=p.build(base(execution_ready=False,production_signal_qualified=True))
+    x=p.build(base(execution_ready=False,production_signal_qualified=True,structural_geometry={'obstacle_price':104.0,'obstacle_distance_pct':4.0,'continuation_strong':False,'breakout':{'confirmed':False}}))
     assert x['status']=='CONDITIONAL'
     assert x['analysis_action']=='WAIT'
     assert x['can_execute'] is False
@@ -115,7 +115,7 @@ def test_clear_room_wait_uses_pullback():
 
 
 def test_short_ordering():
-    d=base(candidate_direction='SHORT',entry=100.0,structural_geometry={'obstacle_price':94.0,'obstacle_distance_pct':6.0,'continuation_strong':False,'breakout':{'confirmed':False}})
+    d=base(candidate_direction='SHORT',entry=100.0,structural_geometry={'obstacle_price':94.0,'obstacle_distance_pct':6.0,'continuation_strong':False,'breakout':{'confirmed':True}})
     x=p.build(d)
     assert x['stop_loss']>x['entry']>x['tp1']>x['tp2']
     assert x['rr_tp1']>=1 and x['rr_tp2']>=2
