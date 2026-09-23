@@ -12,25 +12,34 @@ from decision_intelligence import VERSION as DECISION_INTELLIGENCE_VERSION, buil
 # Keep the public contract identifier stable for existing API/CI consumers while
 # exposing feature revisions separately.
 VERSION = 'PRODUCT_QUALITY_GATE_V2_CANONICAL_ANALYST_OUTPUT'
-FEATURE_VERSION = 'PRODUCT_QUALITY_GATE_FEATURE_V5_2R_GEOMETRY_CONTRACT'
+FEATURE_VERSION = 'PRODUCT_QUALITY_GATE_FEATURE_V6_CURRENT_EVIDENCE_REVALIDATION'
 PROFILE_VERSION = 'ATLAS_ANALYSIS_EVIDENCE_PROFILE_V1'
 PRODUCT_HORIZON = '4-12H'
 PRODUCT_LANE = 'CORE_4_12H'
 
 QUARANTINE = {
+    # Only setup families still supported by the latest independent 12H audit
+    # belong here. Positive/revalidated families must not remain blocked because
+    # of stale historical constants.
     ('LONG', 'TREND_UP', 'TREND_PULLBACK_LONG'): {
-        'evidence_n12': 21,
-        'mean12_pct': -2.58138,
-        'positive12_pct': 14.29,
-        'loss_ge_1_12_pct': 71.43,
+        'evidence_n12': 14,
+        'mean12_pct': -0.15266,
+        'positive12_pct': 64.29,
+        'loss_ge_1_12_pct': 28.57,
         'source': 'status/monthly-product-audit-latest.json',
+        'evidence_generated_at': '2026-09-23T05:54:39.198476+00:00',
     },
+}
+
+REVALIDATED_SETUP_FAMILIES = {
     ('LONG', 'TREND_UP', 'MARKET_CONTINUATION_LONG'): {
-        'evidence_n12': 10,
-        'mean12_pct': -1.52820,
-        'positive12_pct': 10.0,
-        'loss_ge_1_12_pct': 80.0,
+        'evidence_n12': 16,
+        'mean12_pct': 1.63902,
+        'positive12_pct': 68.75,
+        'loss_ge_1_12_pct': 18.75,
         'source': 'status/monthly-product-audit-latest.json',
+        'evidence_generated_at': '2026-09-23T05:54:39.198476+00:00',
+        'status': 'REVALIDATED_CURRENT_EVIDENCE',
     },
 }
 
