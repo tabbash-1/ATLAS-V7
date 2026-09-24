@@ -14,3 +14,5 @@ def test_12h_neutral():
 
 def test_true_opposition():
     x=run("LONG","SHORT","LONG"); assert x["product_direction"] is None; assert x["reason"]=="4H_12H_OPPOSED"
+
+# CI refresh: neutral authority contract preserves established opposition reason.
