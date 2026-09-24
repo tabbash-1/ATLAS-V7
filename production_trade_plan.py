@@ -8,7 +8,7 @@ the canonical ATLAS product horizon. This module never routes orders.
 
 from swing_target_engine import build as build_swing_targets
 
-VERSION = 'PRODUCTION_TRADE_PLAN_V8_EVIDENCE_TRIGGER'
+VERSION = 'PRODUCTION_TRADE_PLAN_V7_SCORE_INDEPENDENT_LOCATION'
 GEOMETRY_VERSION = 'ATLAS_GEOMETRY_V5_ATR_STRUCTURE_PROVENANCE'
 PRODUCT_HORIZON = '4-12H'
 PRODUCT_EVALUATION_HORIZONS = ['4h', '8h', '12h']
@@ -57,13 +57,7 @@ def build(decision):
     continuation=bool(geom.get('continuation_strong')); breakout=bool(br.get('confirmed'))
     # Legacy execution_ready is score-derived upstream and remains evidence only.
     # Current-entry readiness is structural; score cannot authorize NOW entry.
-    # A confirmed structural breakout is sufficient, but not the only legitimate
-    # current-entry trigger. Strong continuation evidence may authorize current
-    # analysis when direction is unanimous and participation is not weak.
-    votes=int(_num(decision.get('direction_votes')) or 0)
-    rv=_num(decision.get('relative_volume')) or 0.0
-    continuation_trigger=bool(continuation and votes >= 4 and rv >= 0.80)
-    ready_raw=bool((breakout or continuation_trigger) and geom and decision.get('candidate_direction') in ('LONG','SHORT'))
+    ready_raw=bool(breakout and geom and decision.get('candidate_direction') in ('LONG','SHORT'))
     threshold=_num(decision.get('signal_threshold'))
     if threshold is None: threshold=68.0
     if px is None or atr is None or atr<=0:
@@ -128,54 +122,39 @@ def build(decision):
     )
 
     analysis_ready=bool(ready_raw)
-    status='ACTIONABLE' if analysis_ready else 'CONDITIONAL'  # legacy compatibility status.
+    status='ACTIONABLE' if analysis_ready else 'CONDITIONAL'
     action=('BUY' if d=='LONG' else 'SELL') if status=='ACTIONABLE' else ('BUY_ONLY_IF' if d=='LONG' else 'SELL_ONLY_IF')
-    can_execute=analysis_ready  # compatibility only; live_execution remains false.
+    can_execute=analysis_ready
     analysis_action=d if analysis_ready else 'WAIT'
     provenance={
-        'geometry_version':GEOMETRY_VERSION,
-        'entry_basis':entry_basis,
-        'stop_basis':stop_basis,
-        'tp1_basis':tp1_basis,
-        'tp2_basis':tp2_basis,
+        'geometry_version':GEOMETRY_VERSION,'entry_basis':entry_basis,'stop_basis':stop_basis,
+        'tp1_basis':tp1_basis,'tp2_basis':tp2_basis,
         'reference_structure':round(reference,10) if reference is not None else None,
-        'reference_structure_source':reference_source,
-        'atr14':round(atr,10),
+        'reference_structure_source':reference_source,'atr14':round(atr,10),
         'risk_atr':round(risk_atr,4) if risk_atr is not None else None,
         'risk_pct':round(risk_pct,4) if risk_pct is not None else None,
-        'breakout_confirmed':breakout,
-        'continuation_strong':continuation,
-        'continuation_entry_trigger':continuation_trigger,
-        'direction_votes':votes,
-        'relative_volume':round(rv,3),
+        'breakout_confirmed':breakout,'continuation_strong':continuation,
         'score_or_threshold_changed':False,
     }
-
-    core_plan={
-        'lane':'CORE_4_12H','role':'PRIMARY_PRODUCT_LANE','horizon':PRODUCT_HORIZON,
+    core_plan={'lane':'CORE_4_12H','role':'PRIMARY_PRODUCT_LANE','horizon':PRODUCT_HORIZON,
         'evaluation_horizons':list(PRODUCT_EVALUATION_HORIZONS),'status':status,
         'action':action,'analysis_action':analysis_action,'analysis_ready':analysis_ready,
         'direction':d,'entry_mode':mode,'entry':round(entry,10),'entry_trigger':trigger,
         'stop_loss':round(stop,10),'tp1':round(tp1,10),'tp2':round(tp2,10),
         'rr_tp1':round(rr1,3),'rr_tp2':round(rr2,3),'geometry_provenance':provenance,
-        'can_execute':can_execute,'analysis_only':True,'live_execution':False,'research_only':True,
-    }
-
-    return {
-        'version':VERSION,'geometry_version':GEOMETRY_VERSION,'status':status,'action':action,
+        'can_execute':can_execute,'analysis_only':True,'live_execution':False,'research_only':True}
+    return {'version':VERSION,'geometry_version':GEOMETRY_VERSION,'status':status,'action':action,
         'analysis_action':analysis_action,'analysis_ready':analysis_ready,'direction':d,'entry_mode':mode,
         'product_horizon':PRODUCT_HORIZON,'evaluation_horizons':list(PRODUCT_EVALUATION_HORIZONS),
         'canonical_lane':'CORE_4_12H','entry':round(entry,10),'entry_trigger':trigger,
         'stop_loss':round(stop,10),'tp1':round(tp1,10),'tp2':round(tp2,10),
-        'rr_tp1':round(rr1,3),'rr_tp2':round(rr2,3),'geometry_provenance':provenance,
-        'core_plan':core_plan,
+        'rr_tp1':round(rr1,3),'rr_tp2':round(rr2,3),'geometry_provenance':provenance,'core_plan':core_plan,
         'quick_plan':{'role':'CONTEXT_ONLY','horizon':'1-3H','tp1':round(tp1,10),'tp2':round(tp2,10),'rr_tp1':round(rr1,3),'rr_tp2':round(rr2,3),'can_override_core':False},
         'swing_plan':{**extended_swing,'role':'CONTEXT_ONLY','can_override_core':False},
         'preferred_target_lane':'CORE_4_12H','reference_structure':round(reference,10) if reference is not None else None,
         'reference_structure_source':reference_source,'continuation_strong':continuation,'breakout_confirmed':breakout,
-        'continuation_entry_trigger':continuation_trigger,
-        'qualification_required':threshold,'legacy_score_threshold':threshold,'score_is_authority':False,'legacy_execution_ready':bool(decision.get('execution_ready')),'execution_ready':ready_raw,
+        'qualification_required':threshold,'legacy_score_threshold':threshold,'score_is_authority':False,
+        'legacy_execution_ready':bool(decision.get('execution_ready')),'execution_ready':ready_raw,
         'invalidation':'Re-evaluate if stop/structure fails or the verified direction changes.',
         'can_execute':can_execute,'execution_scope':'DECISION_READY_ONLY_NO_ORDER_ROUTING',
-        'analysis_only':True,'live_execution':False,'research_only':True,
-    }
+        'analysis_only':True,'live_execution':False,'research_only':True}
