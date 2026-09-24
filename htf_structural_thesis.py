@@ -7,7 +7,7 @@ volume, location and liquidity evidence. No score/threshold changes; no orders.
 from __future__ import annotations
 import urllib.parse
 
-VERSION="HTF_STRUCTURAL_THESIS_V3_MARKET_INTELLIGENCE"
+VERSION="HTF_STRUCTURAL_THESIS_V3_1_NEUTRAL_AUTHORITY"
 ANALYSIS_MODEL_VERSION="ATLAS_MARKET_INTELLIGENCE_V1"
 PRODUCT_HORIZON="4-12H"
 TIMEFRAMES=("1h","4h","12h","1d")
@@ -123,9 +123,11 @@ def analyze_frames(frames,proposed_direction=None):
     states={tf:analyze_frame(frames.get(tf) or [],tf) for tf in TIMEFRAMES};missing=[tf for tf in TIMEFRAMES if not states[tf].get("ok")]
     if missing:return {"version":VERSION,"analysis_model_version":ANALYSIS_MODEL_VERSION,"status":"BLOCK","direction":None,"product_direction":None,"entry_confirmation_direction":proposed_direction,"direction_alignment":"UNKNOWN","reason":"HTF_DATA_INCOMPLETE","missing_timeframes":missing,"frames":states,"product_horizon":PRODUCT_HORIZON,"can_flip_from_1h_only":False,"live_execution":False}
     b4,b12,b1,bd=(states[x]["bias"] for x in ("4h","12h","1h","1d"));direction=None
-    if b4 not in ("LONG","SHORT") or b12 not in ("LONG","SHORT") or b4!=b12:status,reason="WAIT","4H_12H_NOT_ALIGNED"
+    directional4=b4 in ("LONG","SHORT"); directional12=b12 in ("LONG","SHORT"); conditional_neutral=False
+    if directional4 and directional12 and b4!=b12:status,reason="WAIT","4H_12H_NOT_ALIGNED"
+    elif not directional4 and not directional12:status,reason="WAIT","4H_12H_BOTH_NEUTRAL"
     else:
-        direction=b4;counter4=states["4h"].get("impulse") not in ("NEUTRAL","BULLISH" if direction=="LONG" else "BEARISH")
+        direction=b4 if directional4 else b12;conditional_neutral=not (directional4 and directional12);counter4=states["4h"].get("impulse") not in ("NEUTRAL","BULLISH" if direction=="LONG" else "BEARISH")
         daily=bd in ("LONG","SHORT") and bd!=direction and states["1d"].get("confidence")=="STRONG"
         if daily:status,reason="WAIT","1D_MACRO_STRONGLY_OPPOSES_HTF"
         elif counter4 and states["4h"].get("volume_state")=="EXPANDING":status,reason="WAIT","4H_COUNTER_IMPULSE_WITH_VOLUME"
@@ -135,7 +137,7 @@ def analyze_frames(frames,proposed_direction=None):
     px=_f(states["1h"].get("price"));support,resistance=_nearest_levels(states,px) if px else (None,None)
     inv=support if direction=="LONG" else resistance if direction=="SHORT" else None;level=_f(states["4h"].get("last_swing_high" if direction=="LONG" else "last_swing_low")) if direction else None
     trigger="Wait for 4H and 12H structural alignment" if not direction else f"1H confirms {direction}; 4H phase must not show expanding counter-impulse"
-    alignment="NO_PRODUCT_DIRECTION" if not direction else "NO_ENTRY_CONFIRMATION_DIRECTION" if proposed_direction not in ("LONG","SHORT") else "ALIGNED" if proposed_direction==direction else "OPPOSED"
+    alignment="NO_PRODUCT_DIRECTION" if not direction else "NO_ENTRY_CONFIRMATION_DIRECTION" if proposed_direction not in ("LONG","SHORT") else "CONDITIONAL_ALIGNED_12H_NEUTRAL" if proposed_direction==direction and conditional_neutral and b12=="NEUTRAL" else "CONDITIONAL_ALIGNED" if proposed_direction==direction and conditional_neutral else "ALIGNED" if proposed_direction==direction else "OPPOSED"
     thesis={"version":VERSION,"analysis_model_version":ANALYSIS_MODEL_VERSION,"status":status,"direction":direction,"product_direction":direction,"entry_confirmation_direction":proposed_direction,"direction_alignment":alignment,"reason":reason,"product_horizon":PRODUCT_HORIZON,"authority_timeframes":list(AUTHORITY_TIMEFRAMES),"context_timeframe":"1d","confirmation_timeframe":"1h","daily_context":bd,"daily_context_confidence":states["1d"].get("confidence"),"frames":states,"nearest_support":support,"nearest_resistance":resistance,"trigger":trigger,"trigger_level":level,"invalidation_level":inv.get("price") if inv else None,"invalidation_source":inv,"can_flip_from_1h_only":False,"score_changed":False,"threshold_changed":False,"research_only":False,"analysis_only":True,"live_execution":False}
     thesis["market_thesis"]={"macro":bd,"swing_structure":b12,"primary_structure":b4,"primary_phase":states["4h"].get("current_phase"),"entry_impulse":states["1h"].get("impulse"),"momentum":states["4h"].get("momentum_slope"),"volume":states["4h"].get("volume_state"),"price_location":states["4h"].get("price_location"),"candle":states["4h"].get("candle"),"structure_event":states["4h"].get("structure_event"),"support":support,"resistance":resistance,"primary_scenario":direction or "WAIT_FOR_ALIGNMENT","confirmation":trigger,"invalidation":thesis["invalidation_level"]}
     return thesis
