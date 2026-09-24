@@ -7,9 +7,10 @@ Legacy score is evidence only and cannot independently authorize or veto a trade
 """
 from __future__ import annotations
 
-VERSION = "ATLAS_TRADER_BRAIN_V2_NO_CHASE"
+VERSION = "ATLAS_TRADER_BRAIN_V3_EXPLICIT_HTF_CONFLICT"
 MIN_RR = 2.0
 ACCEPTED_ALIGNMENT = {"ALIGNED", "CONDITIONAL_ALIGNED", "CONDITIONAL_ALIGNED_12H_NEUTRAL"}
+EXPLICIT_CONFLICT_ALIGNMENTS = {"CONFLICT", "HTF_CONFLICT", "OPPOSED", "MISALIGNED", "DIVERGENT"}
 
 
 def _norm(v):
@@ -83,8 +84,13 @@ def assess(row):
     waits = []
     if product not in {"LONG", "SHORT"}:
         fatal.append("TRADER_NO_DIRECTIONAL_THESIS")
-    if alignment not in ACCEPTED_ALIGNMENT:
+    # Only explicit opposing HTF evidence is a fatal conflict. Missing/neutral/lagging
+    # alignment must not be mislabeled as an opposing thesis; downstream trigger and
+    # geometry gates still have to pass before TRADE_READY.
+    if alignment in EXPLICIT_CONFLICT_ALIGNMENTS:
         fatal.append("TRADER_HTF_CONFLICT")
+    elif alignment not in ACCEPTED_ALIGNMENT:
+        waits.append("TRADER_WAIT_HTF_ALIGNMENT_EVIDENCE")
     if degraded:
         fatal.append("DATA_DEGRADED")
     if quality_blocked:
