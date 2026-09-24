@@ -21,10 +21,14 @@ def apply():
     if import_needle not in text:
         raise RuntimeError("HTF import contract changed; refusing unsafe closed-candle patch")
     text = text.replace(import_needle, "from __future__ import annotations\nimport urllib.parse\nimport time\n", 1)
-    version_needle = 'VERSION="HTF_STRUCTURAL_THESIS_V3_MARKET_INTELLIGENCE"'
-    if version_needle not in text:
+    version_needles = (
+        'VERSION="HTF_STRUCTURAL_THESIS_V3_MARKET_INTELLIGENCE"',
+        'VERSION="HTF_STRUCTURAL_THESIS_V3_1_NEUTRAL_AUTHORITY"',
+    )
+    version_needle = next((needle for needle in version_needles if needle in text), None)
+    if version_needle is None:
         raise RuntimeError("HTF version contract changed; refusing unsafe closed-candle patch")
-    text = text.replace(version_needle, 'VERSION="HTF_STRUCTURAL_THESIS_V4_CLOSED_CANDLE_AUTHORITY"', 1)
+    text = text.replace(version_needle, 'VERSION="HTF_STRUCTURAL_THESIS_V4_1_CLOSED_CANDLE_NEUTRAL_AUTHORITY"', 1)
     fetch_needle = '    return [{"time":int(x[0]),"open":_f(x[1]),"high":_f(x[2]),"low":_f(x[3]),"close":_f(x[4]),"volume":_f(x[5])} for x in raw]'
     fetch_replacement = '    # HTF_CLOSED_CANDLE_AUTHORITY_V1\n    return [{"time":int(x[0]),"open":_f(x[1]),"high":_f(x[2]),"low":_f(x[3]),"close":_f(x[4]),"volume":_f(x[5]),"close_time":int(x[6])} for x in raw]'
     if fetch_needle not in text:
