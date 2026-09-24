@@ -124,7 +124,7 @@ def analyze_frames(frames,proposed_direction=None):
     if missing:return {"version":VERSION,"analysis_model_version":ANALYSIS_MODEL_VERSION,"status":"BLOCK","direction":None,"product_direction":None,"entry_confirmation_direction":proposed_direction,"direction_alignment":"UNKNOWN","reason":"HTF_DATA_INCOMPLETE","missing_timeframes":missing,"frames":states,"product_horizon":PRODUCT_HORIZON,"can_flip_from_1h_only":False,"live_execution":False}
     b4,b12,b1,bd=(states[x]["bias"] for x in ("4h","12h","1h","1d"));direction=None
     directional4=b4 in ("LONG","SHORT"); directional12=b12 in ("LONG","SHORT"); conditional_neutral=False
-    if directional4 and directional12 and b4!=b12:status,reason="WAIT","4H_12H_OPPOSED"
+    if directional4 and directional12 and b4!=b12:status,reason="WAIT","4H_12H_NOT_ALIGNED"
     elif not directional4 and not directional12:status,reason="WAIT","4H_12H_BOTH_NEUTRAL"
     else:
         direction=b4 if directional4 else b12;conditional_neutral=not (directional4 and directional12);counter4=states["4h"].get("impulse") not in ("NEUTRAL","BULLISH" if direction=="LONG" else "BEARISH")
