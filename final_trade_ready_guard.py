@@ -19,7 +19,7 @@ from atlas_trader_brain import assess as assess_trader
 from canonical_decision_contract import from_decision
 from golden_thesis_engine import VERSION as GOLDEN_THESIS_VERSION, build as build_golden_thesis
 
-VERSION = "FINAL_TRADE_READY_GUARD_V5_EVIDENCE_AUTHORITY"
+VERSION = "FINAL_TRADE_READY_GUARD_V6_BLOCKER_SEMANTICS"
 PRODUCT_HORIZON = "4-12H"
 EXPERIMENTAL_PROMOTION_ENV = "ATLAS_EXPERIMENTAL_FINAL_EVIDENCE_PROMOTION"
 
@@ -166,6 +166,8 @@ def assess(row):
     trader = assess_trader(row)
     for blocker in trader.get("fatal_blockers") or []:
         blockers.append(blocker)
+    # Trader wait reasons describe trigger/location state; they are not fatal evidence.
+    # The authoritative entry/alignment/geometry checks above still keep the gate fail-closed.
     candidate_geometry = None
     stale_wait_candidate = bool(action not in {"LONG", "SHORT"})
     if stale_wait_candidate and not blockers and product in {"LONG", "SHORT"}:
