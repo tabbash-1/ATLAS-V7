@@ -7,7 +7,7 @@ Legacy score is evidence only and cannot independently authorize or veto a trade
 """
 from __future__ import annotations
 
-VERSION = "ATLAS_TRADER_BRAIN_V3_EXPLICIT_HTF_CONFLICT"
+VERSION = "ATLAS_TRADER_BRAIN_V4_BLOCKER_SEMANTICS"
 MIN_RR = 2.0
 ACCEPTED_ALIGNMENT = {"ALIGNED", "CONDITIONAL_ALIGNED", "CONDITIONAL_ALIGNED_12H_NEUTRAL"}
 EXPLICIT_CONFLICT_ALIGNMENTS = {"CONFLICT", "HTF_CONFLICT", "OPPOSED", "MISALIGNED", "DIVERGENT"}
@@ -140,7 +140,8 @@ def assess(row):
         "geometry_ready": geometry_ready,
         "rr_tp2": round(rr, 3) if rr is not None else None,
         "minimum_rr_required": MIN_RR,
-        "fatal_blockers": list(dict.fromkeys(fatal + waits)),
+        "fatal_blockers": list(dict.fromkeys(fatal)),
+        "wait_blockers": list(dict.fromkeys(waits)),
         "legacy_score": _num(row.get("score") or (row.get("analyst_output") or {}).get("confidence")),
         "score_is_authority": False,
         "decision_rule": "THESIS_LOCATION_SETUP_TRIGGER_GEOMETRY",
