@@ -22,5 +22,13 @@ jobs:
           git add status/profitability-feature-attribution-latest.json
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "research: update numeric feature attribution [skip ci] [skip render]"
-          git pull --rebase origin main
-          git push
+          for attempt in 1 2 3 4 5; do
+            git pull --rebase origin main
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            echo "Concurrent main update detected; retrying push (${attempt}/5)" >&2
+            sleep $((attempt * 2))
+          done
+          echo "Failed to publish attribution artifact after 5 concurrent-update retries" >&2
+          exit 1
