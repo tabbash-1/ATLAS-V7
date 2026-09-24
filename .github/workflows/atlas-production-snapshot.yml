@@ -235,6 +235,13 @@ jobs:
           if not canonical_snapshot_complete:
               print('CANONICAL_CORE_SNAPSHOT_INCOMPLETE', ','.join(failed_core_symbols))
           PY
+      - name: Refresh canonical Production path settlement
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 offline_production_path_settlement.py
+          jq -e '.schema == "ATLAS_OFFLINE_PRODUCTION_PATH_SETTLEMENT_V3_CANONICAL_FINAL_GATE" and .episode_semantics == "FIRST_CANONICAL_FINAL_TRADE_GATE_TRADE_READY_OBSERVATION_PER_CONTIGUOUS_SYMBOL_DIRECTION_EPISODE" and .research_only == true and .live_execution == false and .can_override_production == false' status/production-path-settlement-latest.json >/dev/null
+
       - name: Build prospective edge report
         shell: bash
         run: |
@@ -266,6 +273,7 @@ jobs:
           cp status/atlas-production-latest.json "$SNAPSHOT_PAYLOAD_DIR/status/atlas-production-latest.json"
           cp status/wait-outcomes.json "$SNAPSHOT_PAYLOAD_DIR/status/wait-outcomes.json"
           cp status/trade-edge-prospective-latest.json "$SNAPSHOT_PAYLOAD_DIR/status/trade-edge-prospective-latest.json"
+          cp status/production-path-settlement-latest.json "$SNAPSHOT_PAYLOAD_DIR/status/production-path-settlement-latest.json"
           cp status/raw/*.json "$SNAPSHOT_PAYLOAD_DIR/status/raw/"
           python3 - <<'PY'
           import json, os, pathlib
@@ -283,6 +291,7 @@ jobs:
             cp "$SNAPSHOT_PAYLOAD_DIR/status/atlas-production-latest.json" status/atlas-production-latest.json
             cp "$SNAPSHOT_PAYLOAD_DIR/status/wait-outcomes.json" status/wait-outcomes.json
             cp "$SNAPSHOT_PAYLOAD_DIR/status/trade-edge-prospective-latest.json" status/trade-edge-prospective-latest.json
+            cp "$SNAPSHOT_PAYLOAD_DIR/status/production-path-settlement-latest.json" status/production-path-settlement-latest.json
             cp "$SNAPSHOT_PAYLOAD_DIR/status/raw/"*.json status/raw/
             python3 - <<'PY'
           import json, os, pathlib
@@ -322,7 +331,7 @@ jobs:
                   size += n
               history.write_text(''.join(reversed(kept)))
           PY
-            git add status/atlas-production-latest.json status/raw/*.json status/history/production-snapshots.jsonl status/wait-outcomes.json status/trade-edge-prospective-latest.json
+            git add status/atlas-production-latest.json status/raw/*.json status/history/production-snapshots.jsonl status/wait-outcomes.json status/trade-edge-prospective-latest.json status/production-path-settlement-latest.json
             if git diff --cached --quiet; then
               published=1
               break
