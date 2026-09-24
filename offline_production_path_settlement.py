@@ -23,7 +23,7 @@ HISTORY = ROOT / "status/history/production-snapshots.jsonl"
 LEDGER = ROOT / "status/history/production-path-settlement.jsonl"
 LATEST = ROOT / "status/production-path-settlement-latest.json"
 HORIZON_H = 12
-SCHEMA = "ATLAS_OFFLINE_PRODUCTION_PATH_SETTLEMENT_V2_PROVIDER_CHAIN"
+SCHEMA = "ATLAS_OFFLINE_PRODUCTION_PATH_SETTLEMENT_V3_CANONICAL_FINAL_GATE"
 
 
 def fnum(v):
@@ -54,10 +54,18 @@ def load_snapshots():
 
 
 def canonical_geometry(decision: dict[str, Any]):
-    if not decision.get("signal_qualified"):
+    truth = decision.get("canonical_decision") or {}
+    if not (truth.get("schema") == "ATLAS_CANONICAL_DECISION_TRUTH_V1"
+            and truth.get("canonical_source_present") is True
+            and truth.get("source_of_truth") == "FINAL_TRADE_GATE"
+            and truth.get("trade_ready") is True
+            and str(truth.get("decision") or "").upper() in {"LONG","SHORT"}):
         return None
     plan = decision.get("trade_plan") or {}
-    direction = str(plan.get("direction") or decision.get("candidate_direction") or "").upper()
+    direction = str(truth.get("decision") or "").upper()
+    plan_direction = str(plan.get("direction") or "").upper()
+    if plan_direction and plan_direction != direction:
+        return None
     entry = fnum(plan.get("entry")); stop = fnum(plan.get("stop_loss")); tp1 = fnum(plan.get("tp1")); tp2 = fnum(plan.get("tp2"))
     rr1 = fnum(plan.get("rr_tp1")); rr2 = fnum(plan.get("rr_tp2"))
     if direction not in {"LONG", "SHORT"} or None in (entry, stop, tp2):
@@ -101,7 +109,9 @@ def build_episodes(snapshots):
             ep = {"id": episode_id(symbol, captured, g), "symbol": symbol, "captured_at": captured,
                   "captured_at_ms": int(t.timestamp() * 1000), "score": fnum(d.get("score")),
                   "threshold": fnum(d.get("signal_threshold")), "playbook": d.get("playbook"),
-                  "regime": d.get("regime"), "execution_ready_at_capture": bool(d.get("execution_ready")),
+                  "regime": d.get("regime"), "canonical_trade_ready_at_capture": True,
+                  "canonical_decision_id": ((d.get("canonical_decision") or {}).get("decision_id")),
+                  "execution_ready_at_capture": bool(d.get("execution_ready")),
                   "geometry": g}
             episodes.append(ep)
             active[symbol] = {"direction": g["direction"], "id": ep["id"]}
@@ -303,8 +313,8 @@ def main():
         if i and i % 12 == 0: time.sleep(0.3)
     report = {"schema":SCHEMA, "generated_at":dt.datetime.now(dt.timezone.utc).isoformat(), "horizon_hours":HORIZON_H,
               "source_history":str(HISTORY.relative_to(ROOT)),
-              "episode_semantics":"FIRST_QUALIFIED_OBSERVATION_PER_CONTIGUOUS_SYMBOL_DIRECTION_EPISODE",
-              "methodology":"Canonical Production entry/SL/TP2 frozen at episode start; public provider chain; first 5m touch, 1m refinement for same-5m ambiguity; excursions stop at terminal first-touch; expired positions marked to market at 12h.",
+              "episode_semantics":"FIRST_CANONICAL_FINAL_TRADE_GATE_TRADE_READY_OBSERVATION_PER_CONTIGUOUS_SYMBOL_DIRECTION_EPISODE",
+              "methodology":"Only explicit canonical FINAL_TRADE_GATE TRADE_READY decisions enter this cohort. Production entry/SL/TP2 are frozen at episode start; public provider chain; first 5m touch, 1m refinement for same-5m ambiguity; excursions stop at terminal first-touch; expired positions marked to market at 12h.",
               "research_only":True, "live_execution":False, "can_override_production":False, "can_change_threshold":False,
               "production_threshold_unchanged":68, "summary":summarize(rows), "records":rows}
     LATEST.parent.mkdir(parents=True, exist_ok=True); LATEST.write_text(json.dumps(report,indent=2,sort_keys=True))
