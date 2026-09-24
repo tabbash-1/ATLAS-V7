@@ -8,7 +8,7 @@ the canonical ATLAS product horizon. This module never routes orders.
 
 from swing_target_engine import build as build_swing_targets
 
-VERSION = 'PRODUCTION_TRADE_PLAN_V7_SCORE_INDEPENDENT_LOCATION'
+VERSION = 'PRODUCTION_TRADE_PLAN_V8_EVIDENCE_TRIGGER'
 GEOMETRY_VERSION = 'ATLAS_GEOMETRY_V5_ATR_STRUCTURE_PROVENANCE'
 PRODUCT_HORIZON = '4-12H'
 PRODUCT_EVALUATION_HORIZONS = ['4h', '8h', '12h']
@@ -57,7 +57,13 @@ def build(decision):
     continuation=bool(geom.get('continuation_strong')); breakout=bool(br.get('confirmed'))
     # Legacy execution_ready is score-derived upstream and remains evidence only.
     # Current-entry readiness is structural; score cannot authorize NOW entry.
-    ready_raw=bool(breakout and geom and decision.get('candidate_direction') in ('LONG','SHORT'))
+    # A confirmed structural breakout is sufficient, but not the only legitimate
+    # current-entry trigger. Strong continuation evidence may authorize current
+    # analysis when direction is unanimous and participation is not weak.
+    votes=int(_num(decision.get('direction_votes')) or 0)
+    rv=_num(decision.get('relative_volume')) or 0.0
+    continuation_trigger=bool(continuation and votes >= 4 and rv >= 0.80)
+    ready_raw=bool((breakout or continuation_trigger) and geom and decision.get('candidate_direction') in ('LONG','SHORT'))
     threshold=_num(decision.get('signal_threshold'))
     if threshold is None: threshold=68.0
     if px is None or atr is None or atr<=0:
@@ -139,6 +145,9 @@ def build(decision):
         'risk_pct':round(risk_pct,4) if risk_pct is not None else None,
         'breakout_confirmed':breakout,
         'continuation_strong':continuation,
+        'continuation_entry_trigger':continuation_trigger,
+        'direction_votes':votes,
+        'relative_volume':round(rv,3),
         'score_or_threshold_changed':False,
     }
 
@@ -164,6 +173,7 @@ def build(decision):
         'swing_plan':{**extended_swing,'role':'CONTEXT_ONLY','can_override_core':False},
         'preferred_target_lane':'CORE_4_12H','reference_structure':round(reference,10) if reference is not None else None,
         'reference_structure_source':reference_source,'continuation_strong':continuation,'breakout_confirmed':breakout,
+        'continuation_entry_trigger':continuation_trigger,
         'qualification_required':threshold,'legacy_score_threshold':threshold,'score_is_authority':False,'legacy_execution_ready':bool(decision.get('execution_ready')),'execution_ready':ready_raw,
         'invalidation':'Re-evaluate if stop/structure fails or the verified direction changes.',
         'can_execute':can_execute,'execution_scope':'DECISION_READY_ONLY_NO_ORDER_ROUTING',
