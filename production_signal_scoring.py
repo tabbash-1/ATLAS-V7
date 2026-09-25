@@ -93,18 +93,20 @@ def structural_obstacle(ks, px, direction):
 
 def breakout_context(ks, px, direction, votes, mom24, atr, paced_rv):
     high24, low24 = prior_range(ks)
-    current = (ks or [{}])[-1]
-    op = _f(current.get('open'), px)
-    body_atr = abs(px - op) / atr if atr else 0.0
-    progress = candle_progress(current)
-    # A live intrabar poke is not a confirmed breakout. Require the 1H bar to be
-    # effectively closed before authorizing breakout-family confirmation.
-    closed_1h = progress >= 0.98
+    # Breakout confirmation must use the last fully completed 1H candle.
+    # A 98%-complete live candle can still reverse before close and must never
+    # authorize a production breakout.
+    completed = list(ks or [])[:-1]
+    current = (completed or [{}])[-1]
+    close_px = _f(current.get('close'), px)
+    op = _f(current.get('open'), close_px)
+    body_atr = abs(close_px - op) / atr if atr else 0.0
+    closed_1h = bool(completed)
     if direction == 'LONG':
-        beyond = high24 is not None and px > high24
+        beyond = high24 is not None and close_px > high24
         momentum_ok = mom24 > 0
     else:
-        beyond = low24 is not None and px < low24
+        beyond = low24 is not None and close_px < low24
         momentum_ok = mom24 < 0
     confirmed = bool(closed_1h and beyond and votes == 4 and momentum_ok and (paced_rv >= 0.80 or body_atr >= 0.35))
     return {
@@ -115,7 +117,7 @@ def breakout_context(ks, px, direction, votes, mom24, atr, paced_rv):
         'prior_24h_low': low24,
         'current_body_atr': round(body_atr, 4),
         'paced_relative_volume': round(paced_rv, 3),
-        'confirmation_rule': 'CLOSED_1H_AND_4_VOTES_AND_RANGE_BREAK_AND_(RV_PACE>=0.8_OR_BODY>=0.35ATR)',
+        'confirmation_rule': 'LAST_FULLY_COMPLETED_1H_AND_4_VOTES_AND_RANGE_BREAK_AND_(RV_PACE>=0.8_OR_BODY>=0.35ATR)',
     }
 
 
