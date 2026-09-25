@@ -77,9 +77,7 @@ def build(root: Path) -> dict[str, Any]:
     forward_trade_ready = int(forward.get("trade_ready_count") or 0)
     forward_wait = int(forward.get("wait_directional_count") or 0)
     geometry_rows = sum(1 for x in trades if isinstance(x.get("geometry"), dict))
-    closed = int(portfolio.get("closed") or 0)
-    entries = int(portfolio.get("entries") or len(trades))
-
+ 
     # Portfolio aggregates in the source paper ledger may include legacy rows
     # that were deliberately excluded above. Never expose those aggregates as
     # official executable performance for the strict cohort.
@@ -168,6 +166,12 @@ def validate(payload: dict[str, Any]) -> None:
         raise RuntimeError("canonical outcome snapshot horizon mismatch")
     if payload.get("legacy_backfill_allowed") is not False:
         raise RuntimeError("legacy backfill is not allowed")
+    rows = ((payload.get("signals") or {}).get("rows") or [])
+    path = payload.get("path_summary") or {}
+    if int(path.get("entries") or 0) != len(rows):
+        raise RuntimeError("strict outcome summary does not match eligible rows")
+    if not rows and any(path.get(k) not in (None, 0) for k in ("closed", "wins", "losses", "net_r", "avg_r", "profit_factor", "max_drawdown_pct")):
+        raise RuntimeError("legacy performance leaked into empty strict cohort")
     for row in ((payload.get("signals") or {}).get("rows") or []):
         if row.get("decision_source_of_truth") != SOURCE or not row.get("decision_id"):
             raise RuntimeError("noncanonical trade row in outcome snapshot")
