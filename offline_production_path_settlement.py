@@ -217,9 +217,14 @@ def event_from(candles, g):
     tp1_seen = False
     for c in candles:
         sl, tp1, tp2 = touches(c, g["stop_loss"]), touches(c, g["tp1"]), touches(c, g["tp2"])
-        if sl and (tp1 or tp2): return "AMBIGUOUS", c, tp1_seen
-        if sl: return "SL", c, tp1_seen
+        # Once TP1 has been observed, the canonical paper-management policy moves
+        # the remaining position to breakeven. A later original-SL touch must not
+        # be booked as a full -1R loss.
+        be = tp1_seen and touches(c, g["entry"])
+        if sl and (tp1 or tp2 or be): return "AMBIGUOUS", c, tp1_seen
         if tp2: return "TP2", c, True
+        if be: return "BREAKEVEN_AFTER_TP1", c, True
+        if sl: return "SL", c, tp1_seen
         if tp1: tp1_seen = True
     return ("TP1_ONLY" if tp1_seen else "NONE"), None, tp1_seen
 
@@ -235,7 +240,7 @@ def excursions(candles, g):
 
 def excursion_window(candles, event, event_candle, refined_1m=None, refined_event_candle=None):
     """Return only price bars observable through the terminal first-touch event."""
-    if event not in {"SL", "TP2"} or not event_candle:
+    if event not in {"SL", "TP2", "BREAKEVEN_AFTER_TP1"} or not event_candle:
         return candles, "FULL_HORIZON"
     event_open = int(event_candle["open_time"])
     before = [c for c in candles if int(c["open_time"]) < event_open]
@@ -264,7 +269,7 @@ def settle(ep, now_ms):
         if ev == "AMBIGUOUS" and candle:
             one, provider_1m = market_klines(ep["symbol"], "1", candle["open_time"], candle["open_time"] + 5*60_000 - 1)
             ev1, c1, tp1_before_1m = event_from(one, ep["geometry"])
-            if ev1 in {"SL", "TP2"}:
+            if ev1 in {"SL", "TP2", "BREAKEVEN_AFTER_TP1"}:
                 ev, refined_candle = ev1, c1
             else:
                 ev = "AMBIGUOUS"
@@ -273,6 +278,7 @@ def settle(ep, now_ms):
         scoped, excursion_scope = excursion_window(candles, ev, candle, one, refined_candle)
         mfe, mae = excursions(scoped, ep["geometry"])
         if ev == "SL": status, r, terminal = "LOSS", -1.0, True
+        elif ev == "BREAKEVEN_AFTER_TP1": status, r, terminal = "BREAKEVEN_AFTER_TP1", 0.0, True
         elif ev == "TP2": status, r, terminal = "WIN_TP2", float(ep["geometry"]["rr_tp2"]), True
         elif ev == "AMBIGUOUS": status, r, terminal = "AMBIGUOUS", None, False
         else:
@@ -318,7 +324,7 @@ def main():
     report = {"schema":SCHEMA, "generated_at":dt.datetime.now(dt.timezone.utc).isoformat(), "horizon_hours":HORIZON_H,
               "source_history":str(HISTORY.relative_to(ROOT)),
               "episode_semantics":"FIRST_CANONICAL_FINAL_TRADE_GATE_TRADE_READY_AND_EXECUTION_READY_OBSERVATION_PER_CONTIGUOUS_SYMBOL_DIRECTION_EPISODE",
-              "methodology":"Only explicit canonical FINAL_TRADE_GATE TRADE_READY decisions that were also execution_ready at capture enter this executable cohort. Conditional/non-executable plans remain research evidence but are excluded from executable performance. Production entry/SL/TP2 are frozen at episode start; public provider chain; first 5m touch, 1m refinement for same-5m ambiguity; excursions stop at terminal first-touch; expired positions marked to market at 12h.",
+              "methodology":"Only explicit canonical FINAL_TRADE_GATE TRADE_READY decisions that were also execution_ready at capture enter this executable cohort. Conditional/non-executable plans remain research evidence but are excluded from executable performance. Production entry/SL/TP2 are frozen at episode start; after TP1 the remaining position is protected at breakeven for canonical paper-performance accounting; public provider chain; first 5m touch, 1m refinement for same-5m ambiguity; excursions stop at terminal first-touch; expired positions marked to market at 12h.",
               "research_only":True, "live_execution":False, "can_override_production":False, "can_change_threshold":False,
               "production_threshold_unchanged":68, "summary":summarize(rows), "records":rows}
     LATEST.parent.mkdir(parents=True, exist_ok=True); LATEST.write_text(json.dumps(report,indent=2,sort_keys=True))
