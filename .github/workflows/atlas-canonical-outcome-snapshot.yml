@@ -43,14 +43,16 @@ jobs:
           import json
           from pathlib import Path
           p=json.loads(Path('status/canonical-outcomes-latest.json').read_text())
-          assert p['schema']=='ATLAS_CANONICAL_OUTCOME_SNAPSHOT_V1'
+          assert p['schema']=='ATLAS_CANONICAL_OUTCOME_SNAPSHOT_V3_STRICT_EXECUTION_ELIGIBILITY'
           assert p['decision_source_of_truth']=='FINAL_TRADE_GATE'
           assert p['evaluation_horizons_h']==[4,8,12]
           assert p['legacy_backfill_allowed'] is False
           assert p['legacy_score_path_research_included'] is False
           assert p['safety']['live_execution'] is False
           assert p['safety']['can_override_production'] is False
+          assert p['execution_eligibility_policy']=='REQUIRE_EXPLICIT_EXECUTION_READY_TRUE'
           for r in p['signals']['rows']:
+              assert r['execution_ready_at_capture'] is True
               assert r['decision_source_of_truth']=='FINAL_TRADE_GATE'
               assert r['decision_id']
               assert r['evaluation_horizons_h']==[4,8,12]
