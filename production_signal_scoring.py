@@ -92,11 +92,15 @@ def structural_obstacle(ks, px, direction):
 
 
 def breakout_context(ks, px, direction, votes, mom24, atr, paced_rv):
-    high24, low24 = prior_range(ks)
+    # The breakout bar is the last completed candle, so its comparison range
+    # must end one candle earlier. Including the breakout bar itself would make
+    # a true close above/below the range mathematically impossible.
+    completed = list(ks or [])[:-1]
+    high24, low24 = prior_range(completed)
+
     # Breakout confirmation must use the last fully completed 1H candle.
     # A 98%-complete live candle can still reverse before close and must never
     # authorize a production breakout.
-    completed = list(ks or [])[:-1]
     current = (completed or [{}])[-1]
     close_px = _f(current.get('close'), px)
     op = _f(current.get('open'), close_px)
