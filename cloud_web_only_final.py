@@ -64,6 +64,22 @@ class FinalWebOnlyHandler(ns["WebOnlyHandler"]):
                 return self._json(payload)
             except Exception as exc:
                 return self._json({"error":"evidence control center unavailable","detail":str(exc),"research_only":True,"live_execution":False,"can_override_production":False}, 503)
+        if parsed.path == "/api/decision/all":
+            rows=[]
+            for symbol in list(getattr(atlas, "ON_DEMAND_SYMBOLS", ())):
+                try:
+                    d=atlas.production_decision(symbol)
+                    rows.append(d)
+                except Exception as exc:
+                    rows.append({"ok":False,"symbol":symbol,"error":f"{type(exc).__name__}: {exc}","research_only":True,"live_execution":False})
+            return self._json({
+                "ok": all(bool(x.get("ok")) for x in rows),
+                "schema":"ATLAS_PRODUCTION_ALL_ASSETS_V1",
+                "count":len(rows),
+                "assets":rows,
+                "product_horizon":"4-12H",
+                "research_only":True,"analysis_only":True,"live_execution":False,
+            })
         if parsed.path == "/api/runtime/status":
             whale = _whale_snapshot()
             outcomes = _outcome_snapshot()
