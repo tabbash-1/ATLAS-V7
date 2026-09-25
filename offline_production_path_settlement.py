@@ -221,7 +221,10 @@ def event_from(candles, g):
         # the remaining position to breakeven. A later original-SL touch must not
         # be booked as a full -1R loss.
         be = tp1_seen and touches(c, g["entry"])
-        if sl and (tp1 or tp2 or be): return "AMBIGUOUS", c, tp1_seen
+        # Same-bar ordering is unknowable from OHLC. Refine any competing
+        # TP1/TP2/SL/BE touches to 1m instead of assuming a favorable sequence.
+        competing = sum(bool(x) for x in (sl, tp1, tp2, be)) > 1
+        if competing: return "AMBIGUOUS", c, tp1_seen
         if tp2: return "TP2", c, True
         if be: return "BREAKEVEN_AFTER_TP1", c, True
         if sl: return "SL", c, tp1_seen
