@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-VERSION = "ATLAS_CANONICAL_OUTCOME_SNAPSHOT_V1"
+VERSION = "ATLAS_CANONICAL_OUTCOME_SNAPSHOT_V2_EXECUTION_ELIGIBILITY"
 SOURCE = "FINAL_TRADE_GATE"
 HORIZONS = [4, 8, 12]
 PAPER_SCHEMA = "ATLAS_PAPER_PORTFOLIO_10K_V3_CANONICAL_TRUTH"
@@ -37,6 +37,13 @@ def _trade_rows(paper: dict[str, Any]) -> list[dict[str, Any]]:
         decision_id = row.get("decision_id") or row.get("id")
         direction = str(row.get("direction") or "").upper()
         if source != SOURCE or not decision_id or direction not in {"LONG", "SHORT"}:
+            continue
+        # A Final-Gate label alone is not sufficient for executable-performance
+        # accounting.  If capture-time execution eligibility is explicitly false,
+        # preserve the row in research upstream but exclude it from the official
+        # executable cohort.  Missing legacy fields remain accepted for backward
+        # compatibility with the canonical paper ledger.
+        if row.get("execution_ready_at_capture") is False:
             continue
         row["decision_id"] = str(decision_id)
         row["decision_source_of_truth"] = SOURCE
@@ -81,7 +88,8 @@ def build(root: Path) -> dict[str, Any]:
         "evaluation_horizons_h": HORIZONS,
         "legacy_backfill_allowed": False,
         "legacy_score_path_research_included": False,
-        "official_trade_authority": "PAPER_PORTFOLIO_CANONICAL_FINAL_GATE_ENTRIES",
+        "official_trade_authority": "PAPER_PORTFOLIO_CANONICAL_FINAL_GATE_EXECUTION_ELIGIBLE_ENTRIES",
+        "execution_eligibility_policy": "EXCLUDE_EXPLICIT_EXECUTION_READY_FALSE",
         "signals": {
             "count": len(trades),
             "rows": trades,
