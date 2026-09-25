@@ -2,14 +2,14 @@
   "decision_source_of_truth": "FINAL_TRADE_GATE",
   "epoch": {
     "id": "HTF_SR_V2_2026-09-14",
-    "terminal_rows": 17
+    "terminal_rows": 18
   },
   "evidence_quality": {
     "path_only_rows": 4,
     "retroactive_provenance_inference_allowed": false,
-    "rows_with_frozen_entry_provenance": 13
+    "rows_with_frozen_entry_provenance": 14
   },
-  "generated_at": "2026-09-25T07:59:14.101067+00:00",
+  "generated_at": "2026-09-25T13:04:24.309870+00:00",
   "interpretation": {
     "automatic_strategy_change": false,
     "current_rows_are_diagnostic_not_causal_proof": true,
@@ -1222,6 +1222,91 @@
       "time_to_mfe_peak_h": 10.4225,
       "time_to_tp1_h": 0.6725,
       "tp1_reached": true
+    },
+    {
+      "captured_at": "2026-09-25T10:32:37.526029+00:00",
+      "checkpoint_r": {
+        "12": null,
+        "4": null,
+        "8": null
+      },
+      "decision_id": "ca84497edfb8a681ab60c1c6",
+      "decision_provenance": {
+        "breakout_confirmed": true,
+        "candidate_direction": "LONG",
+        "continuation_strong": false,
+        "entry_mode": "NOW",
+        "final_trade_ready_reason": null,
+        "frozen_before_outcome": true,
+        "futures_adjustment": -3.5,
+        "futures_alignment": "OPPOSED",
+        "futures_alignment_source": "FROZEN_SCORE_ATTRIBUTION",
+        "futures_score": null,
+        "htf_alignment_class": "NO_ENTRY_CONFIRMATION_DIRECTION",
+        "htf_regime": "NOT_CONDITIONAL_NEUTRAL_REGIME",
+        "htf_v2_blockers": [
+          "4H_DIRECTION_UNRESOLVED",
+          "12H_NOT_NEUTRAL"
+        ],
+        "htf_v2_eligible": false,
+        "market_regime": "BREAKOUT_UP",
+        "playbook": "BREAKOUT_CONFIRMED_LONG",
+        "product_horizon": "4-12H",
+        "production_signal_qualified": true,
+        "production_threshold_locked": 68,
+        "relative_volume": 2.063,
+        "scenario_readiness": "CONDITIONAL_SCENARIO_READY",
+        "scenario_reason": "HTF_THESIS_AND_PRICE_ACTION_COMPATIBLE",
+        "schema": "ATLAS_ENTRY_DECISION_PROVENANCE_V1",
+        "score": 72.0,
+        "score_attribution": {
+          "continuation_obstacle_reason": "UNCHANGED",
+          "continuation_obstacle_relief": 0,
+          "extension_guard_adjustment": 0,
+          "extension_guard_reason": "RSI_SANE",
+          "final_score": 72,
+          "formula": "trend_base + paced_volume_bonus + relative_strength_adjustment + futures_adjustment + continuation_aware_obstacle_adjustment + momentum_adjustment + market_breadth_adjustment + extension_guard_adjustment",
+          "futures_adjustment": -3.5,
+          "futures_reason": "OPPOSED",
+          "market_breadth_adjustment": 1,
+          "momentum_adjustment": 4,
+          "obstacle_adjustment": -8.0,
+          "obstacle_adjustment_before_continuation": -8.0,
+          "obstacle_distance_pct": 0.193,
+          "obstacle_reason": "VERY_CLOSE_PRIOR_STRUCTURE",
+          "obstacle_source": "PRIOR_SWING_HIGH",
+          "raw_score": 71.5,
+          "relative_strength_adjustment": 0,
+          "relative_strength_reason": "NEUTRAL",
+          "trend_base": 68,
+          "volume_bonus": 10
+        },
+        "setup_quality_status": "PASS",
+        "source_of_truth": "FINAL_TRADE_GATE",
+        "strategy_epoch_id": "HTF_SR_V2_2026-09-14",
+        "threshold": 68.0
+      },
+      "direction": "LONG",
+      "evidence_quality": "PATH_PLUS_FROZEN_DECISION_PROVENANCE",
+      "hours_to_terminal": 0.5396,
+      "mae_r": 0.1353,
+      "mfe_r": 3.0768,
+      "primary_attribution": "POSITIVE_CONTROL_TP2",
+      "r_multiple": 2.0,
+      "score": 72.0,
+      "score_margin": 4.0,
+      "secondary_tags": [
+        "LOW_SCORE_MARGIN",
+        "NONSTANDARD_HTF_ALIGNMENT",
+        "FUTURES_OPPOSED_AT_ENTRY"
+      ],
+      "symbol": "SOLUSDT",
+      "terminal_status": "WIN_TP2",
+      "threshold": 68.0,
+      "time_to_mae_peak_h": 0.0396,
+      "time_to_mfe_peak_h": 0.5396,
+      "time_to_tp1_h": 0.5396,
+      "tp1_reached": true
     }
   ],
   "safety": {
@@ -1242,10 +1327,10 @@
   "summary": {
     "by_direction": {
       "LONG": {
-        "avg_r": 0.2414,
-        "n": 14,
-        "net_r": 3.3801,
-        "positive_pct": 42.86
+        "avg_r": 0.3587,
+        "n": 15,
+        "net_r": 5.3801,
+        "positive_pct": 46.67
       },
       "SHORT": {
         "avg_r": -0.5233,
@@ -1298,10 +1383,10 @@
         "positive_pct": 100.0
       },
       "SOLUSDT": {
-        "avg_r": 0.2628,
-        "n": 3,
-        "net_r": 0.7884,
-        "positive_pct": 33.33
+        "avg_r": 0.6971,
+        "n": 4,
+        "net_r": 2.7884,
+        "positive_pct": 50.0
       },
       "XRPUSDT": {
         "avg_r": -1.0,
@@ -1322,19 +1407,20 @@
       "IMMEDIATE_ADVERSE_MOVE": 3,
       "INSUFFICIENT_FOLLOW_THROUGH_THEN_REVERSAL": 6,
       "PARTIAL_EDGE_NO_TP2": 2,
-      "POSITIVE_CONTROL_TP2": 5
+      "POSITIVE_CONTROL_TP2": 6
     },
     "secondary_tags": {
       "FULL_RISK_INVALIDATION": 9,
-      "FUTURES_OPPOSED_AT_ENTRY": 6,
+      "FUTURES_OPPOSED_AT_ENTRY": 7,
       "HIGH_SCORE_ENTRY": 16,
       "LATE_FAVORABLE_PEAK_THEN_REVERSAL": 2,
       "LATE_HORIZON_REVERSAL": 2,
+      "LOW_SCORE_MARGIN": 1,
       "MARGINAL_THRESHOLD_ENTRY": 1,
-      "NONSTANDARD_HTF_ALIGNMENT": 7,
+      "NONSTANDARD_HTF_ALIGNMENT": 8,
       "STOP_WITHIN_1H": 2,
       "STOP_WITHIN_4H": 4
     },
-    "terminal": 17
+    "terminal": 18
   }
 }
