@@ -213,8 +213,8 @@ def touches(c, p):
     return c["low"] <= p <= c["high"]
 
 
-def event_from(candles, g):
-    tp1_seen = False
+def event_from(candles, g, tp1_seen_initial=False):
+    tp1_seen = bool(tp1_seen_initial)
     for c in candles:
         sl, tp1, tp2 = touches(c, g["stop_loss"]), touches(c, g["tp1"]), touches(c, g["tp2"])
         # Once TP1 has been observed, the canonical paper-management policy moves
@@ -271,7 +271,7 @@ def settle(ep, now_ms):
         refined_candle = None
         if ev == "AMBIGUOUS" and candle:
             one, provider_1m = market_klines(ep["symbol"], "1", candle["open_time"], candle["open_time"] + 5*60_000 - 1)
-            ev1, c1, tp1_before_1m = event_from(one, ep["geometry"])
+            ev1, c1, tp1_before_1m = event_from(one, ep["geometry"], tp1_seen_initial=tp1_seen)
             if ev1 in {"SL", "TP2", "BREAKEVEN_AFTER_TP1"}:
                 ev, refined_candle = ev1, c1
             else:
