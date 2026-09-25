@@ -7,8 +7,8 @@ volume, location and liquidity evidence. No score/threshold changes; no orders.
 from __future__ import annotations
 import urllib.parse
 
-VERSION="HTF_STRUCTURAL_THESIS_V3_1_NEUTRAL_AUTHORITY"
-ANALYSIS_MODEL_VERSION="ATLAS_MARKET_INTELLIGENCE_V1"
+VERSION="HTF_STRUCTURAL_THESIS_V4_MARKET_CONTEXT"
+ANALYSIS_MODEL_VERSION="ATLAS_MARKET_INTELLIGENCE_V2_STRUCTURE_LOCATION"
 PRODUCT_HORIZON="4-12H"
 TIMEFRAMES=("1h","4h","12h","1d")
 AUTHORITY_TIMEFRAMES=("12h","4h")
@@ -107,6 +107,29 @@ def analyze_frame(rows,timeframe):
     out["structure_event"]="BOS_UP" if breakout=="BREAKOUT_UP" and bias=="LONG" else "BOS_DOWN" if breakout=="BREAKDOWN_DOWN" and bias=="SHORT" else "POTENTIAL_CHOCH_UP" if breakout=="BREAKOUT_UP" and bias=="SHORT" else "POTENTIAL_CHOCH_DOWN" if breakout=="BREAKDOWN_DOWN" and bias=="LONG" else "NONE"
     return out
 
+def _context_risk(states,direction,px):
+    """Reject late entries into HTF opposing liquidity/location; fail closed, no direction flip."""
+    if direction not in ("LONG","SHORT") or not px:return None
+    s4=states.get("4h") or {}; s12=states.get("12h") or {}; s1=states.get("1h") or {}
+    atr=_f(s4.get("atr14")) or _f(s1.get("atr14")); ap=(atr/px) if atr and px else 0.0
+    # A trend label alone is not enough: do not sell the bottom or buy the top of the active HTF range.
+    loc4=s4.get("price_location"); loc12=s12.get("price_location")
+    if direction=="SHORT" and (loc4=="NEAR_SUPPORT" or loc12=="NEAR_SUPPORT"):
+        return "SHORT_INTO_HTF_SUPPORT"
+    if direction=="LONG" and (loc4=="NEAR_RESISTANCE" or loc12=="NEAR_RESISTANCE"):
+        return "LONG_INTO_HTF_RESISTANCE"
+    # Do not chase an already extended impulse without a fresh structural event.
+    r6=_f(s4.get("return_6_bars_pct"),0.0)/100.0
+    event=s4.get("structure_event")
+    extended=max(2.0*ap,0.02)
+    if direction=="SHORT" and r6<=-extended and event!="BOS_DOWN":return "LATE_SHORT_AFTER_EXTENSION"
+    if direction=="LONG" and r6>=extended and event!="BOS_UP":return "LATE_LONG_AFTER_EXTENSION"
+    # Opposing rejection at the entry frame means timing is not confirmed yet.
+    candle=(s1.get("candle") or {}).get("pattern")
+    if direction=="SHORT" and candle in ("HAMMER_REJECTION","BULLISH_ENGULFING"):return "1H_BULLISH_REJECTION_AGAINST_SHORT"
+    if direction=="LONG" and candle in ("SHOOTING_STAR_REJECTION","BEARISH_ENGULFING"):return "1H_BEARISH_REJECTION_AGAINST_LONG"
+    return None
+
 def _nearest_levels(states,px):
     sup,res=[],[]
     for tf in ("4h","12h","1d"):
@@ -139,7 +162,7 @@ def analyze_frames(frames,proposed_direction=None):
     trigger="Wait for 4H and 12H structural alignment" if not direction else f"1H confirms {direction}; 4H phase must not show expanding counter-impulse"
     alignment="NO_PRODUCT_DIRECTION" if not direction else "NO_ENTRY_CONFIRMATION_DIRECTION" if proposed_direction not in ("LONG","SHORT") else "CONDITIONAL_ALIGNED_12H_NEUTRAL" if proposed_direction==direction and conditional_neutral and b12=="NEUTRAL" else "CONDITIONAL_ALIGNED" if proposed_direction==direction and conditional_neutral else "ALIGNED" if proposed_direction==direction else "OPPOSED"
     thesis={"version":VERSION,"analysis_model_version":ANALYSIS_MODEL_VERSION,"status":status,"direction":direction,"product_direction":direction,"entry_confirmation_direction":proposed_direction,"direction_alignment":alignment,"reason":reason,"product_horizon":PRODUCT_HORIZON,"authority_timeframes":list(AUTHORITY_TIMEFRAMES),"context_timeframe":"1d","confirmation_timeframe":"1h","daily_context":bd,"daily_context_confidence":states["1d"].get("confidence"),"frames":states,"nearest_support":support,"nearest_resistance":resistance,"trigger":trigger,"trigger_level":level,"invalidation_level":inv.get("price") if inv else None,"invalidation_source":inv,"can_flip_from_1h_only":False,"score_changed":False,"threshold_changed":False,"research_only":False,"analysis_only":True,"live_execution":False}
-    thesis["market_thesis"]={"macro":bd,"swing_structure":b12,"primary_structure":b4,"primary_phase":states["4h"].get("current_phase"),"entry_impulse":states["1h"].get("impulse"),"momentum":states["4h"].get("momentum_slope"),"volume":states["4h"].get("volume_state"),"price_location":states["4h"].get("price_location"),"candle":states["4h"].get("candle"),"structure_event":states["4h"].get("structure_event"),"support":support,"resistance":resistance,"primary_scenario":direction or "WAIT_FOR_ALIGNMENT","confirmation":trigger,"invalidation":thesis["invalidation_level"]}
+    thesis["market_thesis"]={"macro":bd,"swing_structure":b12,"primary_structure":b4,"primary_phase":states["4h"].get("current_phase"),"entry_impulse":states["1h"].get("impulse"),"momentum":states["4h"].get("momentum_slope"),"volume":states["4h"].get("volume_state"),"price_location":states["4h"].get("price_location"),"candle":states["4h"].get("candle"),"structure_event":states["4h"].get("structure_event"),"context_risk":_context_risk(states,direction,px),"support":support,"resistance":resistance,"primary_scenario":direction or "WAIT_FOR_ALIGNMENT","confirmation":trigger,"invalidation":thesis["invalidation_level"]}
     return thesis
 
 def _fetch_klines(atlas,symbol,interval,limit=220):
