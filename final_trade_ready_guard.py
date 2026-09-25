@@ -19,7 +19,7 @@ from atlas_trader_brain import assess as assess_trader
 from canonical_decision_contract import from_decision
 from golden_thesis_engine import VERSION as GOLDEN_THESIS_VERSION, build as build_golden_thesis
 
-VERSION = "FINAL_TRADE_READY_GUARD_V7_WAIT_GATES"
+VERSION = "FINAL_TRADE_READY_GUARD_V8_QUALIFICATION_ENFORCED"
 PRODUCT_HORIZON = "4-12H"
 EXPERIMENTAL_PROMOTION_ENV = "ATLAS_EXPERIMENTAL_FINAL_EVIDENCE_PROMOTION"
 
@@ -150,6 +150,7 @@ def assess(row):
     experimental_promotion = _experimental_final_evidence_promotion()
     alignment_accepted = alignment in {"ALIGNED", "CONDITIONAL_ALIGNED", "CONDITIONAL_ALIGNED_12H_NEUTRAL"}
     blockers = []
+    if not qualified: blockers.append("PRODUCTION_SIGNAL_NOT_QUALIFIED")
     if product not in {"LONG", "SHORT"}: blockers.append("HTF_PRODUCT_DIRECTION_UNRESOLVED")
     if not alignment_accepted: blockers.append("HTF_4H_12H_NOT_ALIGNED")
     if product in {"LONG", "SHORT"} and entry != product: blockers.append("ENTRY_CONFIRMATION_NOT_ALIGNED")
@@ -190,6 +191,7 @@ def assess(row):
         "direction_alignment": alignment or None,
         "production_signal_qualified": qualified,
         "score_is_authority": False,
+        "production_qualification_required": True,
         "trader_brain": trader,
         "trader_stage": trader.get("stage"),
         "setup_playbook": trader.get("setup_playbook"),
