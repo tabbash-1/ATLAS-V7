@@ -9,7 +9,7 @@ rather than the current candle's own high/low.
 
 import time
 
-VERSION = "PROD_SIGNAL_SCORING_V8_CLOSED_BAR_DIRECTION"
+VERSION = "PROD_SIGNAL_SCORING_V9_CLOSED_BAR_EVIDENCE"
 LOOKBACK_BARS = 96
 RANGE_BARS = 24
 
@@ -158,7 +158,9 @@ def install(atlas):
         progress = candle_progress(ks[-1])
         rv = paced_relative_volume(raw_rv, progress)
         sup, res, sd, rd = atlas._cloud_sr(ks)
-        rel = 50.0 if symbol == 'BTCUSDT' else atlas._cloud_relative(ks, btc_ks)
+        # Relative-strength direction evidence must also be closed-bar based.
+        closed_btc = list(btc_ks or [])[:-1] if len(list(btc_ks or [])) > 1 else list(btc_ks or [])
+        rel = 50.0 if symbol == 'BTCUSDT' else atlas._cloud_relative(closed, closed_btc)
         closed_px = closed_closes[-1]
         mom24 = ((closed_px / closed_closes[-25]) - 1) * 100 if len(closed_closes) >= 25 and closed_closes[-25] else 0.0
 
