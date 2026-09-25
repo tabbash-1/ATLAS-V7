@@ -187,6 +187,11 @@ def assess(row: dict[str, Any]) -> dict[str, Any]:
     if degraded:
         blockers.append("DATA_DEGRADED")
 
+    if row.get("production_signal_qualified") is not True:
+        blockers.append("PRODUCTION_SIGNAL_NOT_QUALIFIED")
+    if pre_htf not in {"LONG", "SHORT"}:
+        blockers.append("PRE_HTF_DECISION_NOT_ACTIONABLE")
+
     blockers = list(dict.fromkeys(blockers))
     eligible = direction is not None and not blockers
     return {
