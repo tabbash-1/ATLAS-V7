@@ -7,7 +7,7 @@ change Production, thresholds, FINAL_TRADE_GATE, alerts, or execution.
 from __future__ import annotations
 import datetime as dt
 
-VERSION="ATLAS_TRADE_EDGE_PROSPECTIVE_V1"
+VERSION="ATLAS_TRADE_EDGE_PROSPECTIVE_V2_POST_FIX_COHORT"
 MIN_PROOF_N=20
 MIN_FAMILY_N=8
 MIN_AVG_R=0.10
@@ -63,6 +63,7 @@ def evaluate(records, baseline_at, baseline_commit):
                overall["profit_factor_r"] is not None and overall["profit_factor_r"]>=MIN_PROFIT_FACTOR)
     return {
       "version":VERSION,"baseline_at":baseline_at,"baseline_commit":baseline_commit,
+      "cohort_policy":"STRICTLY_AFTER_FIX_BASELINE",
       "overall":overall,"families":families,
       "proof_status":"PROSPECTIVE_EDGE_PROVEN" if proof else "COLLECTING_OR_NOT_PROVEN",
       "proof_rules":{"min_n":MIN_PROOF_N,"min_family_n":MIN_FAMILY_N,"min_avg_r":MIN_AVG_R,"min_profit_factor_r":MIN_PROFIT_FACTOR},
