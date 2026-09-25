@@ -7,20 +7,20 @@
     "slippage_bps_per_side": 3.0
   },
   "criteria_locked_before_evaluation": true,
-  "eligible_prospective_rows": 12,
+  "eligible_prospective_rows": 13,
   "epoch_id": "HTF_SR_V2_2026-09-14",
-  "generated_at": "2026-09-25T08:09:51.928418+00:00",
+  "generated_at": "2026-09-25T14:08:55.906275+00:00",
   "hypotheses": [
     {
-      "champion_net_r": 1.0714,
-      "changed": 12,
-      "delta_net_r": 0.8835,
-      "eligible": 12,
-      "evaluable": 12,
+      "champion_net_r": 2.8992,
+      "changed": 13,
+      "delta_net_r": -0.9443,
+      "eligible": 13,
+      "evaluable": 13,
       "formal_ready": false,
       "id": "DELAY_ENTRY_1H_CONFIRM",
       "min_n": 30,
-      "paired_n": 12,
+      "paired_n": 13,
       "production_impact": "NONE",
       "promotion_allowed": false,
       "rows": [
@@ -234,6 +234,18 @@
           "symbol": "LTCUSDT",
           "terminal": "TP2",
           "tp1_reached": true
+        },
+        {
+          "captured_at": "2026-09-25T10:32:37.526029+00:00",
+          "champion_net_r": 1.8278,
+          "decision_id": "ca84497edfb8a681ab60c1c6",
+          "delayed_entry": 120.82,
+          "direction": "LONG",
+          "policy_effect": "SKIPPED_BY_SHADOW_POLICY",
+          "provider": "BINANCE_DATA_API_SPOT",
+          "shadow_net_r": 0.0,
+          "state": "SHADOW_SKIP_GEOMETRY_INVALID_AT_DELAYED_ENTRY",
+          "symbol": "SOLUSDT"
         }
       ],
       "rule": "first fully post-decision clock-aligned 1H candle must close in trade direction; enter at its close using original quantity and absolute SL/TP",
@@ -242,15 +254,15 @@
       "state": "COLLECTING_PATH_REPLAY"
     },
     {
-      "champion_net_r": 1.0714,
+      "champion_net_r": 2.8992,
       "changed": 4,
       "delta_net_r": -2.1817,
-      "eligible": 12,
-      "evaluable": 12,
+      "eligible": 13,
+      "evaluable": 13,
       "formal_ready": false,
       "id": "EARLY_MOMENTUM_FAILFAST_EXIT",
       "min_n": 30,
-      "paired_n": 12,
+      "paired_n": 13,
       "production_impact": "NONE",
       "promotion_allowed": false,
       "rows": [
@@ -433,23 +445,35 @@
           "shadow_net_r": 1.9389,
           "state": "NO_FAILFAST_TRIGGER",
           "symbol": "LTCUSDT"
+        },
+        {
+          "captured_at": "2026-09-25T10:32:37.526029+00:00",
+          "champion_net_r": 1.8278,
+          "champion_terminal": "TP2",
+          "decision_id": "ca84497edfb8a681ab60c1c6",
+          "direction": "LONG",
+          "policy_effect": "UNCHANGED_CHAMPION_PATH",
+          "provider": "BINANCE_DATA_API_SPOT",
+          "shadow_net_r": 1.8278,
+          "state": "NO_FAILFAST_TRIGGER",
+          "symbol": "SOLUSDT"
         }
       ],
       "rule": "before TP1/SL, exit at first fully post-decision 1H close within first 4H at <= -0.25 original R",
       "shadow_action": "REPRICE_EXIT",
-      "shadow_net_r": -1.1103,
+      "shadow_net_r": 0.7175,
       "state": "COLLECTING_PATH_REPLAY"
     },
     {
-      "champion_net_r": -1.2518,
+      "champion_net_r": 0.576,
       "changed": 0,
       "delta_net_r": 0.0,
-      "eligible": 12,
-      "evaluable": 10,
+      "eligible": 13,
+      "evaluable": 11,
       "formal_ready": false,
       "id": "PROFIT_PROTECTION_TIME_DECAY",
       "min_n": 30,
-      "paired_n": 10,
+      "paired_n": 11,
       "production_impact": "NONE",
       "promotion_allowed": false,
       "rows": [
@@ -594,11 +618,23 @@
           "shadow_net_r": 1.9389,
           "state": "NO_PROTECTION_TRIGGER",
           "symbol": "LTCUSDT"
+        },
+        {
+          "captured_at": "2026-09-25T10:32:37.526029+00:00",
+          "champion_net_r": 1.8278,
+          "decision_id": "ca84497edfb8a681ab60c1c6",
+          "direction": "LONG",
+          "policy_effect": "UNCHANGED_CHAMPION_PATH",
+          "provider": "BINANCE_DATA_API_SPOT",
+          "reason": "TERMINAL_OR_TP1_BEFORE_8H",
+          "shadow_net_r": 1.8278,
+          "state": "NO_PROTECTION_TRIGGER",
+          "symbol": "SOLUSDT"
         }
       ],
       "rule": "at the locked 8H checkpoint, if TP1 has not been reached and mark-to-market is >= +0.15 original R, exit shadow at that fully observed 8H price",
       "shadow_action": "REPRICE_EXIT",
-      "shadow_net_r": -1.2518,
+      "shadow_net_r": 0.576,
       "state": "COLLECTING_PATH_REPLAY"
     }
   ],
