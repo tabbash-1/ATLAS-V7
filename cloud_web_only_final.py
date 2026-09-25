@@ -46,12 +46,37 @@ def _outcome_snapshot():
     return load_canonical_outcomes(BASE)
 
 
-def _outcome_rows(snapshot, symbol=None):
+def _outcome_rows(snapshot, symbol=None, scope="signals"):
     rows = list(((snapshot.get("signals") or {}).get("rows") or []))
+    if scope == "execution":
+        rows = [x for x in rows if x.get("execution_ready_at_capture") is not False]
     if symbol:
         symbol = str(symbol).upper()
         rows = [x for x in rows if str(x.get("symbol") or "").upper() == symbol]
     return rows
+
+
+def _scoped_outcome_summary(rows):
+    rs = []
+    for row in rows:
+        value = row.get("r_multiple")
+        if value is None:
+            continue
+        try:
+            rs.append(float(value))
+        except Exception:
+            continue
+    wins = [x for x in rs if x > 0]
+    losses = [x for x in rs if x < 0]
+    gross_win = sum(wins)
+    gross_loss = abs(sum(losses))
+    return {
+        "rows": len(rows), "settled_r_rows": len(rs),
+        "wins": len(wins), "losses": len(losses),
+        "net_r": round(sum(rs), 4) if rs else None,
+        "avg_r": round(sum(rs) / len(rs), 4) if rs else None,
+        "profit_factor_r": round(gross_win / gross_loss, 4) if gross_loss else None,
+    }
 
 
 class FinalWebOnlyHandler(ns["WebOnlyHandler"]):
@@ -129,7 +154,7 @@ class FinalWebOnlyHandler(ns["WebOnlyHandler"]):
                 horizon = -1
             if horizon not in (4, 8, 12):
                 return self._json({"error":"official outcome horizon must be one of 4, 8, 12","research_only":True,"live_execution":False}, 400)
-            rows = _outcome_rows(snapshot, symbol=symbol)
+            rows = _outcome_rows(snapshot, symbol=symbol, scope=scope)
             base = {
                 "schema": snapshot.get("schema"),
                 "state": snapshot.get("state", "READY"),
@@ -150,7 +175,8 @@ class FinalWebOnlyHandler(ns["WebOnlyHandler"]):
             if parsed.path == "/api/outcomes/ledger":
                 return self._json({**base, "rows": rows, "count": len(rows)})
             if parsed.path == "/api/outcomes/summary":
-                return self._json({**base, "summary": snapshot.get("summary") or {}, "signal_count": len(rows)})
+                return self._json({**base, "summary": _scoped_outcome_summary(rows), "signal_count": len(rows),
+                                   "source_summary": snapshot.get("summary") or {}})
             if parsed.path == "/api/outcomes/path-ledger":
                 return self._json({**base, "rows": rows, "count": len(rows), "path_semantics":"CANONICAL_PAPER_TRADE_PATH_ONLY"})
             if parsed.path == "/api/outcomes/path-summary":
