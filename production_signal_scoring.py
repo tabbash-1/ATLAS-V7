@@ -9,7 +9,7 @@ rather than the current candle's own high/low.
 
 import time
 
-VERSION = "PROD_SIGNAL_SCORING_V6_BREAKOUT_AWARE+PARTIAL_VOLUME_TIME_FIX_V1"
+VERSION = "PROD_SIGNAL_SCORING_V7_CLOSED_CANDLE_BREAKOUT_CONFIRMATION"
 LOOKBACK_BARS = 96
 RANGE_BARS = 24
 
@@ -96,21 +96,26 @@ def breakout_context(ks, px, direction, votes, mom24, atr, paced_rv):
     current = (ks or [{}])[-1]
     op = _f(current.get('open'), px)
     body_atr = abs(px - op) / atr if atr else 0.0
+    progress = candle_progress(current)
+    # A live intrabar poke is not a confirmed breakout. Require the 1H bar to be
+    # effectively closed before authorizing breakout-family confirmation.
+    closed_1h = progress >= 0.98
     if direction == 'LONG':
         beyond = high24 is not None and px > high24
         momentum_ok = mom24 > 0
     else:
         beyond = low24 is not None and px < low24
         momentum_ok = mom24 < 0
-    confirmed = bool(beyond and votes == 4 and momentum_ok and (paced_rv >= 0.80 or body_atr >= 0.35))
+    confirmed = bool(closed_1h and beyond and votes == 4 and momentum_ok and (paced_rv >= 0.80 or body_atr >= 0.35))
     return {
         'confirmed': confirmed,
+        'closed_1h_confirmation': closed_1h,
         'beyond_prior_24h_range': bool(beyond),
         'prior_24h_high': high24,
         'prior_24h_low': low24,
         'current_body_atr': round(body_atr, 4),
         'paced_relative_volume': round(paced_rv, 3),
-        'confirmation_rule': '4_VOTES_AND_RANGE_BREAK_AND_(RV_PACE>=0.8_OR_BODY>=0.35ATR)',
+        'confirmation_rule': 'CLOSED_1H_AND_4_VOTES_AND_RANGE_BREAK_AND_(RV_PACE>=0.8_OR_BODY>=0.35ATR)',
     }
 
 
