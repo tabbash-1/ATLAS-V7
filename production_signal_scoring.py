@@ -9,7 +9,7 @@ rather than the current candle's own high/low.
 
 import time
 
-VERSION = "PROD_SIGNAL_SCORING_V7_CLOSED_CANDLE_BREAKOUT_CONFIRMATION"
+VERSION = "PROD_SIGNAL_SCORING_V8_CLOSED_BAR_DIRECTION"
 LOOKBACK_BARS = 96
 RANGE_BARS = 24
 
@@ -142,9 +142,13 @@ def install(atlas):
         closes = [x['close'] for x in ks]
         vols = [x['volume'] for x in ks]
         px = closes[-1]
-        ema20 = atlas._ema(closes[-80:], 20)
-        ema50 = atlas._ema(closes[-120:], 50)
-        rsi = atlas._rsi(closes, 14)
+        # Direction must come from completed 1H evidence. The live candle may be
+        # used for pacing/location, but it cannot flip the production thesis.
+        closed = ks[:-1] if len(ks) > 1 else ks
+        closed_closes = [x['close'] for x in closed]
+        ema20 = atlas._ema(closed_closes[-80:], 20)
+        ema50 = atlas._ema(closed_closes[-120:], 50)
+        rsi = atlas._rsi(closed_closes, 14)
         atr = atlas._atr(ks, 14)
         if not px or not ema20 or not ema50 or not atr or atr <= 0:
             return None
@@ -155,10 +159,11 @@ def install(atlas):
         rv = paced_relative_volume(raw_rv, progress)
         sup, res, sd, rd = atlas._cloud_sr(ks)
         rel = 50.0 if symbol == 'BTCUSDT' else atlas._cloud_relative(ks, btc_ks)
-        mom24 = ((px / closes[-25]) - 1) * 100 if len(closes) >= 25 and closes[-25] else 0.0
+        closed_px = closed_closes[-1]
+        mom24 = ((closed_px / closed_closes[-25]) - 1) * 100 if len(closed_closes) >= 25 and closed_closes[-25] else 0.0
 
-        long_votes = sum((px >= ema20, ema20 >= ema50, rsi >= 50, mom24 >= 0))
-        short_votes = sum((px <= ema20, ema20 <= ema50, rsi <= 50, mom24 <= 0))
+        long_votes = sum((closed_px >= ema20, ema20 >= ema50, rsi >= 50, mom24 >= 0))
+        short_votes = sum((closed_px <= ema20, ema20 <= ema50, rsi <= 50, mom24 <= 0))
         if max(long_votes, short_votes) < 3 or long_votes == short_votes:
             return None
         direction = 'LONG' if long_votes > short_votes else 'SHORT'
