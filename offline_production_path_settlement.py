@@ -23,7 +23,7 @@ HISTORY = ROOT / "status/history/production-snapshots.jsonl"
 LEDGER = ROOT / "status/history/production-path-settlement.jsonl"
 LATEST = ROOT / "status/production-path-settlement-latest.json"
 HORIZON_H = 12
-SCHEMA = "ATLAS_OFFLINE_PRODUCTION_PATH_SETTLEMENT_V3_CANONICAL_FINAL_GATE"
+SCHEMA = "ATLAS_OFFLINE_PRODUCTION_PATH_SETTLEMENT_V4_EXECUTION_ELIGIBLE"
 
 
 def fnum(v):
@@ -100,7 +100,11 @@ def build_episodes(snapshots):
         for symbol, d in (snap.get("decisions") or {}).items():
             g = canonical_geometry(d or {})
             current = active.get(symbol)
-            if not g:
+            # A canonical directional idea is not an executable episode unless
+            # the capture-time execution gate also passed. Keep conditional /
+            # breakout-watch plans out of executable performance accounting.
+            execution_ready = bool((d or {}).get("execution_ready"))
+            if not g or not execution_ready:
                 active[symbol] = None
                 continue
             if current and current.get("direction") == g["direction"]:
@@ -111,7 +115,7 @@ def build_episodes(snapshots):
                   "threshold": fnum(d.get("signal_threshold")), "playbook": d.get("playbook"),
                   "regime": d.get("regime"), "canonical_trade_ready_at_capture": True,
                   "canonical_decision_id": ((d.get("canonical_decision") or {}).get("decision_id")),
-                  "execution_ready_at_capture": bool(d.get("execution_ready")),
+                  "execution_ready_at_capture": True,
                   "geometry": g}
             episodes.append(ep)
             active[symbol] = {"direction": g["direction"], "id": ep["id"]}
@@ -313,8 +317,8 @@ def main():
         if i and i % 12 == 0: time.sleep(0.3)
     report = {"schema":SCHEMA, "generated_at":dt.datetime.now(dt.timezone.utc).isoformat(), "horizon_hours":HORIZON_H,
               "source_history":str(HISTORY.relative_to(ROOT)),
-              "episode_semantics":"FIRST_CANONICAL_FINAL_TRADE_GATE_TRADE_READY_OBSERVATION_PER_CONTIGUOUS_SYMBOL_DIRECTION_EPISODE",
-              "methodology":"Only explicit canonical FINAL_TRADE_GATE TRADE_READY decisions enter this cohort. Production entry/SL/TP2 are frozen at episode start; public provider chain; first 5m touch, 1m refinement for same-5m ambiguity; excursions stop at terminal first-touch; expired positions marked to market at 12h.",
+              "episode_semantics":"FIRST_CANONICAL_FINAL_TRADE_GATE_TRADE_READY_AND_EXECUTION_READY_OBSERVATION_PER_CONTIGUOUS_SYMBOL_DIRECTION_EPISODE",
+              "methodology":"Only explicit canonical FINAL_TRADE_GATE TRADE_READY decisions that were also execution_ready at capture enter this executable cohort. Conditional/non-executable plans remain research evidence but are excluded from executable performance. Production entry/SL/TP2 are frozen at episode start; public provider chain; first 5m touch, 1m refinement for same-5m ambiguity; excursions stop at terminal first-touch; expired positions marked to market at 12h.",
               "research_only":True, "live_execution":False, "can_override_production":False, "can_change_threshold":False,
               "production_threshold_unchanged":68, "summary":summarize(rows), "records":rows}
     LATEST.parent.mkdir(parents=True, exist_ok=True); LATEST.write_text(json.dumps(report,indent=2,sort_keys=True))
