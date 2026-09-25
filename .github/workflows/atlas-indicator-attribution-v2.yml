@@ -1,0 +1,22 @@
+name: ATLAS Indicator Attribution V2
+
+on:
+  pull_request:
+    paths:
+      - 'indicator_attribution_v2.py'
+      - '.github/workflows/atlas-indicator-attribution-v2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax
+        run: python3 -m py_compile indicator_attribution_v2.py historical_core_4_12h_replay.py
+      - name: Run 730-day symbol-side attribution audit
+        run: python3 indicator_attribution_v2.py
