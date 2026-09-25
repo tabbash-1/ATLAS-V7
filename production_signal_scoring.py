@@ -142,14 +142,15 @@ def install(atlas):
         closes = [x['close'] for x in ks]
         vols = [x['volume'] for x in ks]
         px = closes[-1]
-        # Direction must come from completed 1H evidence. The live candle may be
-        # used for pacing/location, but it cannot flip the production thesis.
+        # Direction and volatility/risk geometry must come from completed 1H evidence.
+        # The live candle may be used for pacing/location, but it cannot flip the
+        # production thesis or repaint ATR-based risk/target geometry.
         closed = ks[:-1] if len(ks) > 1 else ks
         closed_closes = [x['close'] for x in closed]
         ema20 = atlas._ema(closed_closes[-80:], 20)
         ema50 = atlas._ema(closed_closes[-120:], 50)
         rsi = atlas._rsi(closed_closes, 14)
-        atr = atlas._atr(ks, 14)
+        atr = atlas._atr(closed, 14)
         if not px or not ema20 or not ema50 or not atr or atr <= 0:
             return None
 
