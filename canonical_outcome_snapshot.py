@@ -80,6 +80,39 @@ def build(root: Path) -> dict[str, Any]:
     closed = int(portfolio.get("closed") or 0)
     entries = int(portfolio.get("entries") or len(trades))
 
+    # Portfolio aggregates in the source paper ledger may include legacy rows
+    # that were deliberately excluded above. Never expose those aggregates as
+    # official executable performance for the strict cohort.
+    strict_portfolio = {
+        "entries": len(trades),
+        "closed": 0,
+        "open_or_unresolved": len(trades),
+        "wins": 0,
+        "losses": 0,
+        "win_rate_pct": None,
+        "avg_r": None,
+        "net_r": None,
+        "profit_factor": None,
+        "max_drawdown_pct": None,
+    }
+    if trades:
+        settled = [r for r in trades if isinstance(r.get("r_multiple"), (int, float))]
+        rs = [float(r["r_multiple"]) for r in settled]
+        wins_n = sum(1 for x in rs if x > 0)
+        losses_n = sum(1 for x in rs if x < 0)
+        gross_win = sum(x for x in rs if x > 0)
+        gross_loss = abs(sum(x for x in rs if x < 0))
+        strict_portfolio.update({
+            "closed": len(settled),
+            "open_or_unresolved": len(trades) - len(settled),
+            "wins": wins_n,
+            "losses": losses_n,
+            "win_rate_pct": round(100.0 * wins_n / len(settled), 2) if settled else None,
+            "avg_r": round(sum(rs) / len(rs), 4) if rs else None,
+            "net_r": round(sum(rs), 4) if rs else None,
+            "profit_factor": round(gross_win / gross_loss, 4) if gross_loss > 0 else (None if not rs else float("inf")),
+        })
+
     return {
         "schema": VERSION,
         "generated_at": _iso_now(),
@@ -95,22 +128,13 @@ def build(root: Path) -> dict[str, Any]:
             "rows": trades,
         },
         "summary": {
-            "portfolio": portfolio,
+            "portfolio": strict_portfolio,
             "checkpoint_summary": checkpoints,
             "forward_trade_ready_count": forward_trade_ready,
             "forward_wait_directional_count": forward_wait,
         },
         "path_summary": {
-            "entries": entries,
-            "closed": closed,
-            "open_or_unresolved": int(portfolio.get("open_or_unresolved") or 0),
-            "wins": int(portfolio.get("wins") or 0),
-            "losses": int(portfolio.get("losses") or 0),
-            "win_rate_pct": portfolio.get("win_rate_pct"),
-            "avg_r": portfolio.get("avg_r"),
-            "net_r": portfolio.get("net_r"),
-            "profit_factor": portfolio.get("profit_factor"),
-            "max_drawdown_pct": portfolio.get("max_drawdown_pct"),
+            **strict_portfolio,
         },
         "geometry_status": {
             "canonical_trade_rows": len(trades),
