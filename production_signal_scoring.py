@@ -91,7 +91,7 @@ def structural_obstacle(ks, px, direction):
     return None, None, 'NO_PRIOR_SUPPORT_AHEAD'
 
 
-def breakout_context(ks, px, direction, votes, mom24, atr, paced_rv):
+def breakout_context(ks, px, direction, votes, mom24, atr, paced_rv, closed_rv=None):
     # The breakout bar is the last completed candle, so its comparison range
     # must end one candle earlier. Including the breakout bar itself would make
     # a true close above/below the range mathematically impossible.
@@ -112,7 +112,8 @@ def breakout_context(ks, px, direction, votes, mom24, atr, paced_rv):
     else:
         beyond = low24 is not None and close_px < low24
         momentum_ok = mom24 < 0
-    confirmed = bool(closed_1h and beyond and votes == 4 and momentum_ok and (paced_rv >= 0.80 or body_atr >= 0.35))
+    volume_confirmation = closed_rv if closed_rv is not None else 0.0
+    confirmed = bool(closed_1h and beyond and votes == 4 and momentum_ok and (volume_confirmation >= 0.80 or body_atr >= 0.35))
     return {
         'confirmed': confirmed,
         'closed_1h_confirmation': closed_1h,
@@ -121,6 +122,7 @@ def breakout_context(ks, px, direction, votes, mom24, atr, paced_rv):
         'prior_24h_low': low24,
         'current_body_atr': round(body_atr, 4),
         'paced_relative_volume': round(paced_rv, 3),
+        'closed_breakout_relative_volume': round(volume_confirmation, 3),
         'confirmation_rule': 'LAST_FULLY_COMPLETED_1H_AND_4_VOTES_AND_RANGE_BREAK_AND_(RV_PACE>=0.8_OR_BODY>=0.35ATR)',
     }
 
@@ -223,7 +225,10 @@ def install(atlas):
             futures_reason = 'SHADOW_ONLY_UNVALIDATED_PROVIDER'
 
         level, obstacle, obstacle_source = structural_obstacle(ks, px, direction)
-        breakout = breakout_context(ks, px, direction, votes, mom24, atr, rv)
+        closed_vols = [x['volume'] for x in closed]
+        closed_vol_base = sum(closed_vols[-21:-1]) / 20 if len(closed_vols) >= 21 else (closed_vols[-1] if closed_vols else 0)
+        closed_rv = (closed_vols[-1] / closed_vol_base) if closed_vols and closed_vol_base else 1.0
+        breakout = breakout_context(ks, px, direction, votes, mom24, atr, rv, closed_rv=closed_rv)
         obstacle_adj, obstacle_reason = obstacle_adjustment(obstacle, obstacle_source, breakout['confirmed'])
 
         raw_score = trend_base + volume_bonus + relative_strength_adjustment + futures_adjustment + obstacle_adj
