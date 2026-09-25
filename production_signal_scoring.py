@@ -9,7 +9,7 @@ rather than the current candle's own high/low.
 
 import time
 
-VERSION = "PROD_SIGNAL_SCORING_V9_CLOSED_BAR_EVIDENCE"
+VERSION = "PROD_SIGNAL_SCORING_V10_DIRECTIONAL_ATR_TARGETS"
 LOOKBACK_BARS = 96
 RANGE_BARS = 24
 
@@ -245,9 +245,12 @@ def install(atlas):
             target = level
             target_source = obstacle_source
         else:
+            # Keep target provenance explicit: confirmed breakouts may project
+            # farther than ordinary trend candidates, but neither projection
+            # is evidence of an actual structural obstacle.
             extension = 1.6 if breakout['confirmed'] else 1.4
             target = px + atr * extension if direction == 'LONG' else px - atr * extension
-            target_source = 'ATR_EXTENSION_AFTER_CLEAR_STRUCTURE'
+            target_source = 'ATR_EXTENSION_CONFIRMED_BREAKOUT' if breakout['confirmed'] else 'ATR_EXTENSION_TREND_CANDIDATE'
         reward = (target - px) if direction == 'LONG' else (px - target)
         rr = (reward / risk) if risk > 0 and reward > 0 else None
 
