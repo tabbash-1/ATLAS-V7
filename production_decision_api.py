@@ -227,6 +227,14 @@ def install(atlas):
                 result=atlas.production_decision(symbol); return self._json(result,200 if result.get('ok') else 400)
             except Exception as exc:
                 return self._json({'ok':False,'error':f'{type(exc).__name__}: {exc}','source':VERSION,'research_only':True,'live_execution':False},500)
+        if u.path=='/api/decision/all':
+            rows=[]
+            for symbol in tuple(atlas.ON_DEMAND_SYMBOLS):
+                try:
+                    rows.append(atlas.production_decision(symbol))
+                except Exception as exc:
+                    rows.append({'ok':False,'symbol':symbol,'error':f'{type(exc).__name__}: {exc}','source':VERSION,'research_only':True,'live_execution':False})
+            return self._json({'ok':all(bool(x.get('ok')) for x in rows),'schema':'ATLAS_PRODUCTION_ALL_ASSETS_V1','count':len(rows),'assets':rows,'research_only':True,'live_execution':False})
         return original_get(self)
     atlas.Handler.do_GET=do_GET
     return {'enabled':True,'version':VERSION,'endpoint':'/api/decision/current','geometry_gate_min_rr':GEOMETRY_MIN_RR,'quick_lane':'1-2H_SHADOW_ONLY','quick_reentry_guard':'PERSISTENT_ACTIVE_DEDUP_PLUS_POST_STOP_COOLDOWN','tactical_lane':'1-3H_RESEARCH_ONLY'}
