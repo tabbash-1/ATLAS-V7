@@ -66,6 +66,7 @@ class FinalWebOnlyHandler(ns["WebOnlyHandler"]):
                 return self._json({"error":"evidence control center unavailable","detail":str(exc),"research_only":True,"live_execution":False,"can_override_production":False}, 503)
         if parsed.path == "/api/decision/all":
             rows=[]
+            # Canonical universe is enforced by cloud_production_canonical before serving.
             for symbol in list(getattr(atlas, "ON_DEMAND_SYMBOLS", ())):
                 try:
                     d=atlas.production_decision(symbol)
