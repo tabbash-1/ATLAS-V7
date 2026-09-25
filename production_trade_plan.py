@@ -8,7 +8,7 @@ the canonical ATLAS product horizon. This module never routes orders.
 
 from swing_target_engine import build as build_swing_targets
 
-VERSION = 'PRODUCTION_TRADE_PLAN_V7_SCORE_INDEPENDENT_LOCATION'
+VERSION = 'PRODUCTION_TRADE_PLAN_V8_CONFIRMED_CONTINUATION_ENTRY'
 GEOMETRY_VERSION = 'ATLAS_GEOMETRY_V5_ATR_STRUCTURE_PROVENANCE'
 PRODUCT_HORIZON = '4-12H'
 PRODUCT_EVALUATION_HORIZONS = ['4h', '8h', '12h']
@@ -57,7 +57,10 @@ def build(decision):
     continuation=bool(geom.get('continuation_strong')); breakout=bool(br.get('confirmed'))
     # Legacy execution_ready is score-derived upstream and remains evidence only.
     # Current-entry readiness is structural; score cannot authorize NOW entry.
-    ready_raw=bool(breakout and geom and decision.get('candidate_direction') in ('LONG','SHORT'))
+    # NOW entry requires a confirmed structure break plus a strong continuation
+    # state. A bare breakout flag is insufficient and was a source of weak/late
+    # breakout entries in the settled baseline.
+    ready_raw=bool(breakout and continuation and geom and decision.get('candidate_direction') in ('LONG','SHORT'))
     threshold=_num(decision.get('signal_threshold'))
     if threshold is None: threshold=68.0
     if px is None or atr is None or atr<=0:
