@@ -8,7 +8,7 @@ the canonical ATLAS product horizon. This module never routes orders.
 
 from swing_target_engine import build as build_swing_targets
 
-VERSION = 'PRODUCTION_TRADE_PLAN_V8_CONFIRMED_CONTINUATION_ENTRY'
+VERSION = 'PRODUCTION_TRADE_PLAN_V9_DIRECTIONAL_TARGET_GEOMETRY'
 GEOMETRY_VERSION = 'ATLAS_GEOMETRY_V5_ATR_STRUCTURE_PROVENANCE'
 PRODUCT_HORIZON = '4-12H'
 PRODUCT_EVALUATION_HORIZONS = ['4h', '8h', '12h']
@@ -100,7 +100,10 @@ def build(decision):
     stop=base_stop
     risk=abs(entry-stop)
     one_r=entry+s*risk
-    structural_tp=obstacle if obstacle is not None and ((d=='LONG' and obstacle>one_r) or (d=='SHORT' and obstacle<one_r)) else None
+    # Only use structure that is actually ahead of the planned entry. A stale
+    # obstacle behind entry must never become a target after a breakout/pullback.
+    obstacle_ahead = obstacle is not None and ((d=='LONG' and obstacle>entry) or (d=='SHORT' and obstacle<entry))
+    structural_tp=obstacle if obstacle_ahead and ((d=='LONG' and obstacle>one_r) or (d=='SHORT' and obstacle<one_r)) else None
     tp1=structural_tp if structural_tp is not None else one_r
     tp1_basis='PRIOR_STRUCTURAL_OBSTACLE' if structural_tp is not None else 'MINIMUM_1R'
     extension_mult=2.2 if continuation or breakout else 1.8
