@@ -71,25 +71,46 @@ jobs:
           PY
             return 1
           }
-          # Run independent reads concurrently. Every request is bounded, so total
-          # collection latency is bounded by the slowest request rather than the sum.
-          fetch_json runtime /api/runtime/status & pids=($!)
-          fetch_json readiness /api/production/readiness & pids+=($!)
-          fetch_json outcomes /api/outcomes/summary & pids+=($!)
-          fetch_json geometry /api/outcomes/geometry-status & pids+=($!)
-          fetch_json ai_status /api/ai/council/status & pids+=($!)
-          for s in BTCUSDT ETHUSDT SOLUSDT XRPUSDT BNBUSDT DOGEUSDT ZECUSDT ADAUSDT LINKUSDT AVAXUSDT LTCUSDT HYPEUSDT; do
-            fetch_json "decision_${s}" "/api/decision/current?symbol=${s}" & pids+=($!)
-          done
-          for pid in "${pids[@]}"; do wait "$pid" || true; done
+          # Keep concurrency bounded. Render is a single Production service; an
+          # unbounded fan-out can self-inflict timeouts and make canonical coverage fail.
+          run_bounded() {
+            local limit="$1"; shift
+            local -a pids=()
+            while (( "$#" )); do
+              local name="$1" path="$2"; shift 2
+              fetch_json "$name" "$path" & pids+=($!)
+              if (( ${#pids[@]} >= limit )); then
+                for pid in "${pids[@]}"; do wait "$pid" || true; done
+                pids=()
+              fi
+            done
+            for pid in "${pids[@]}"; do wait "$pid" || true; done
+          }
 
-          # AI council is shadow research only and is collected concurrently after the
-          # canonical Production reads; failures here cannot become Production authority.
-          pids=()
-          for s in BTCUSDT ETHUSDT SOLUSDT XRPUSDT BNBUSDT DOGEUSDT ZECUSDT ADAUSDT LINKUSDT AVAXUSDT LTCUSDT HYPEUSDT; do
-            fetch_json "ai_${s}" "/api/ai/council?symbol=${s}" & pids+=($!)
-          done
-          for pid in "${pids[@]}"; do wait "$pid" || true; done
+          # Warm lightweight service endpoints first, then canonical decisions with a
+          # conservative concurrency of 3 to bound wall time without overloading Render.
+          run_bounded 3 runtime /api/runtime/status readiness /api/production/readiness outcomes /api/outcomes/summary geometry /api/outcomes/geometry-status ai_status /api/ai/council/status
+          run_bounded 3 \
+            decision_BTCUSDT "/api/decision/current?symbol=BTCUSDT" \
+            decision_ETHUSDT "/api/decision/current?symbol=ETHUSDT" \
+            decision_SOLUSDT "/api/decision/current?symbol=SOLUSDT" \
+            decision_XRPUSDT "/api/decision/current?symbol=XRPUSDT" \
+            decision_BNBUSDT "/api/decision/current?symbol=BNBUSDT" \
+            decision_DOGEUSDT "/api/decision/current?symbol=DOGEUSDT" \
+            decision_ZECUSDT "/api/decision/current?symbol=ZECUSDT" \
+            decision_ADAUSDT "/api/decision/current?symbol=ADAUSDT" \
+            decision_LINKUSDT "/api/decision/current?symbol=LINKUSDT" \
+            decision_AVAXUSDT "/api/decision/current?symbol=AVAXUSDT" \
+            decision_LTCUSDT "/api/decision/current?symbol=LTCUSDT" \
+            decision_HYPEUSDT "/api/decision/current?symbol=HYPEUSDT"
+
+          # AI council is shadow research only. Keep it bounded separately so it cannot
+          # starve canonical Production reads.
+          run_bounded 3 \
+            ai_BTCUSDT "/api/ai/council?symbol=BTCUSDT" ai_ETHUSDT "/api/ai/council?symbol=ETHUSDT" ai_SOLUSDT "/api/ai/council?symbol=SOLUSDT" \
+            ai_XRPUSDT "/api/ai/council?symbol=XRPUSDT" ai_BNBUSDT "/api/ai/council?symbol=BNBUSDT" ai_DOGEUSDT "/api/ai/council?symbol=DOGEUSDT" \
+            ai_ZECUSDT "/api/ai/council?symbol=ZECUSDT" ai_ADAUSDT "/api/ai/council?symbol=ADAUSDT" ai_LINKUSDT "/api/ai/council?symbol=LINKUSDT" \
+            ai_AVAXUSDT "/api/ai/council?symbol=AVAXUSDT" ai_LTCUSDT "/api/ai/council?symbol=LTCUSDT" ai_HYPEUSDT "/api/ai/council?symbol=HYPEUSDT"
 
           # Second-pass recovery for failed canonical decisions. A transient Render
           # 5xx/non-JSON response must not silently become a successful-looking cycle.
