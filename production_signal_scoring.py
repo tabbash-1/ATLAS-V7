@@ -123,7 +123,7 @@ def breakout_context(ks, px, direction, votes, mom24, atr, paced_rv, closed_rv=N
         'current_body_atr': round(body_atr, 4),
         'paced_relative_volume': round(paced_rv, 3),
         'closed_breakout_relative_volume': round(volume_confirmation, 3),
-        'confirmation_rule': 'LAST_FULLY_COMPLETED_1H_AND_4_VOTES_AND_RANGE_BREAK_AND_(RV_PACE>=0.8_OR_BODY>=0.35ATR)',
+        'confirmation_rule': 'LAST_FULLY_COMPLETED_1H_AND_4_VOTES_AND_RANGE_BREAK_AND_(CLOSED_RV>=0.8_OR_BODY>=0.35ATR)',
     }
 
 
