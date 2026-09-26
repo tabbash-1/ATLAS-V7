@@ -103,7 +103,7 @@ def build_episodes(snapshots):
             # A canonical directional idea is not an executable episode unless
             # the capture-time execution gate also passed. Keep conditional /
             # breakout-watch plans out of executable performance accounting.
-            execution_ready = bool((d or {}).get("execution_ready"))
+            execution_ready = (d or {}).get("execution_ready") is True
             if not g or not execution_ready:
                 active[symbol] = None
                 continue
