@@ -172,7 +172,7 @@ def assess(row):
         blockers.append(blocker)
     candidate_geometry = None
     stale_wait_candidate = bool(action not in {"LONG", "SHORT"})
-    if stale_wait_candidate and not blockers and product in {"LONG", "SHORT"}:
+    if stale_wait_candidate and experimental_promotion and not blockers and product in {"LONG", "SHORT"}:
         candidate_geometry, candidate_geometry_error = _candidate_plan_geometry(row, product)
         if candidate_geometry_error:
             blockers.append(candidate_geometry_error)
@@ -211,7 +211,7 @@ def assess(row):
         "stale_pre_final_wait_bypassed": stale_wait_bypassed,
         "experimental_candidate_geometry_restored": bool(stale_wait_bypassed and candidate_geometry),
         "candidate_geometry": candidate_geometry if stale_wait_bypassed else None,
-        "can_promote_wait": True,
+        "can_promote_wait": experimental_promotion,
         "paper_trade_eligible": ready,
         "analysis_only": True,
         "live_execution": False,
