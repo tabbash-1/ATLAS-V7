@@ -7,7 +7,7 @@ Legacy score is evidence only and cannot independently authorize or veto a trade
 """
 from __future__ import annotations
 
-VERSION = "ATLAS_TRADER_BRAIN_V4_BLOCKER_SEMANTICS"
+VERSION = "ATLAS_TRADER_BRAIN_V5_SHORT_PULLBACK_CONFIRMATION"
 MIN_RR = 2.0
 ACCEPTED_ALIGNMENT = {"ALIGNED", "CONDITIONAL_ALIGNED", "CONDITIONAL_ALIGNED_12H_NEUTRAL"}
 EXPLICIT_CONFLICT_ALIGNMENTS = {"CONFLICT", "HTF_CONFLICT", "OPPOSED", "MISALIGNED", "DIVERGENT"}
@@ -59,6 +59,31 @@ def _playbook(row):
     if "PULLBACK" in raw or mode == "PULLBACK":
         return "TREND_PULLBACK"
     return "STRUCTURAL_CONTINUATION"
+
+
+def _short_pullback_confirmed(row):
+    """Require fresh 1H bearish resumption before a TREND_PULLBACK SHORT is ready."""
+    thesis = row.get("htf_thesis") or {}
+    frame = ((thesis.get("frames") or {}).get("1h") or {})
+    impulse = _norm(frame.get("impulse"))
+    bias = _norm(frame.get("bias") or frame.get("structural_direction"))
+    candle = frame.get("candle") or {}
+    candle_direction = _norm(candle.get("direction"))
+    pattern = _norm(candle.get("pattern"))
+    bearish_pattern = pattern in {"BEARISH_ENGULFING", "SHOOTING_STAR_REJECTION", "BEARISH_DISPLACEMENT"}
+    confirmed = bool(
+        impulse == "BEARISH"
+        and bias == "SHORT"
+        and (candle_direction == "BEARISH" or bearish_pattern)
+    )
+    return confirmed, {
+        "timeframe": "1h",
+        "impulse": impulse or None,
+        "bias": bias or None,
+        "candle_direction": candle_direction or None,
+        "candle_pattern": pattern or None,
+        "rule": "1H_SHORT_BIAS_PLUS_BEARISH_IMPULSE_PLUS_BEARISH_CANDLE",
+    }
 
 
 def assess(row):
@@ -132,6 +157,8 @@ def assess(row):
         "alignment_class": alignment or None,
         "location_state": "OVEREXTENDED" if overextended else ("VALID" if geometry_ready else "WAIT"),
         "setup_playbook": playbook,
+        "short_pullback_resumption_confirmed": short_pullback_confirmed,
+        "short_pullback_resumption_evidence": short_pullback_evidence,
         "entry_trigger_ready": entry == product and product in {"LONG", "SHORT"},
         "entry_mode": mode or None,
         "desired_entry_mode": "PULLBACK_RETEST" if overextended and mode == "NOW" else (mode or None),
