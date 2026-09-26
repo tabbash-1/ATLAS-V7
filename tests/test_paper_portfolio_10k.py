@@ -181,7 +181,7 @@ def test_settlement_exposes_path_timing_metadata():
         candles=[
             {'open_time':0,'open':100.0,'high':100.4,'low':99.7,'close':100.2},
             {'open_time':300_000,'open':100.2,'high':101.2,'low':100.0,'close':101.0},
-            {'open_time':600_000,'open':101.0,'high':102.1,'low':100.9,'close':102.0},
+            {'open_time':600_000,'open':101.0,'high':102.1,'low':101.0,'close':102.0},
         ]
         p.market_klines=lambda symbol, interval, start, end: (candles,'TEST')
         row={'id':'timing','captured_at_ms':0,'symbol':'BTCUSDT','geometry':{
