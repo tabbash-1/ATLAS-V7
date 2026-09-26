@@ -104,7 +104,7 @@ def geometry(decision: dict[str, Any]):
 
 def trade_ready(decision: dict[str, Any]) -> bool:
     truth = from_decision(decision)
-    return bool(truth.get("trade_ready") is True and truth.get("source_of_truth") == "FINAL_TRADE_GATE" and geometry(decision))
+    return bool(truth.get("trade_ready") is True and truth.get("source_of_truth") == "FINAL_TRADE_GATE" and decision.get("execution_ready") is True and geometry(decision))
 
 
 def _path(obj: dict[str, Any], *paths: str):
@@ -236,7 +236,7 @@ def enroll_new(manifest, cohort, snapshots, observed_through, sizing_equity):
                 "schema":"ATLAS_PAPER_PORTFOLIO_10K_ENTRY_V3_CANONICAL_TRUTH","id":eid,"decision_id":truth["decision_id"],"portfolio_id":manifest["portfolio_id"],
                 "captured_at":captured,"captured_at_ms":int(t.timestamp()*1000),"symbol":symbol,"direction":direction,
                 "asset_cohort":cohort_for(symbol),"asset_universe_epoch":ASSET_UNIVERSE_EPOCH,
-                "decision_source":"FINAL_TRADE_GATE","decision_action":"TRADE_READY","canonical_truth_schema":truth["schema"],
+                "decision_source":"FINAL_TRADE_GATE","decision_action":"TRADE_READY","canonical_truth_schema":truth["schema"],"execution_ready_at_capture":True,
                 "product_horizon":g.get("product_horizon") or PRODUCT_HORIZON,"canonical_lane":g.get("canonical_lane") or "CORE_4_12H",
                 "evaluation_horizons":["4h","8h","12h"],
                 "score":fnum(d.get("score")),"threshold":fnum(d.get("signal_threshold")),
@@ -260,12 +260,13 @@ def checkpoint_entry(row: dict[str, Any], checkpoint_h: float, now_ms: int):
         ev,candle,tp1_seen=event_from(candles,g)
         if ev=="AMBIGUOUS" and candle:
             one,p1=market_klines(row["symbol"],"1",candle["open_time"],candle["open_time"]+5*60_000-1)
-            ev1,c1,tp1_1=event_from(one,g)
-            if ev1 in {"SL","TP2"}: ev,candle=ev1,c1 or candle
+            ev1,c1,tp1_1=event_from(one,g,tp1_seen_initial=tp1_seen)
+            if ev1 in {"SL","TP2","BREAKEVEN_AFTER_TP1"}: ev,candle=ev1,c1 or candle
             else: ev="AMBIGUOUS"
             tp1_seen=tp1_seen or tp1_1; provider += "+1M:"+p1
         if ev=="SL": status,r="LOSS_BY_CHECKPOINT",-1.0
         elif ev=="TP2": status,r="TP2_BY_CHECKPOINT",float(g["rr_tp2"])
+        elif ev=="BREAKEVEN_AFTER_TP1": status,r="BREAKEVEN_AFTER_TP1",0.0
         elif ev=="AMBIGUOUS": status,r="AMBIGUOUS",None
         else:
             last=candles[-1]["close"]
@@ -331,8 +332,8 @@ def settle_entry(row: dict[str, Any], horizon_h: float, now_ms: int):
         if ev == "AMBIGUOUS" and candle:
             parent_5m_open = int(candle["open_time"])
             one, p1 = market_klines(row["symbol"], "1", candle["open_time"], candle["open_time"]+5*60_000-1)
-            ev1, c1, tp1_1 = event_from(one, g)
-            if ev1 in {"SL","TP2"}:
+            ev1, c1, tp1_1 = event_from(one, g, tp1_seen_initial=tp1_seen)
+            if ev1 in {"SL","TP2","BREAKEVEN_AFTER_TP1"}:
                 ev, candle = ev1, c1 or candle
                 refinement_rows = one
             else:
@@ -340,7 +341,7 @@ def settle_entry(row: dict[str, Any], horizon_h: float, now_ms: int):
             tp1_seen = tp1_seen or tp1_1; provider += "+1M:"+p1
         excursion_rows = _excursion_rows_through_terminal(
             candles,
-            candle if ev in {"SL", "TP2"} else None,
+            candle if ev in {"SL", "TP2", "BREAKEVEN_AFTER_TP1"} else None,
             parent_5m_open=parent_5m_open,
             refinement_rows=refinement_rows,
         )
@@ -350,6 +351,7 @@ def settle_entry(row: dict[str, Any], horizon_h: float, now_ms: int):
         timing = path_timing(excursion_rows, g, start)
         if ev == "SL": status,r,terminal,exit_ms="LOSS",-1.0,True,int(candle["open_time"] if candle else maturity)
         elif ev == "TP2": status,r,terminal,exit_ms="WIN_TP2",float(g["rr_tp2"]),True,int(candle["open_time"] if candle else maturity)
+        elif ev == "BREAKEVEN_AFTER_TP1": status,r,terminal,exit_ms="BREAKEVEN_AFTER_TP1",0.0,True,int(candle["open_time"] if candle else maturity)
         elif ev == "AMBIGUOUS": status,r,terminal,exit_ms="AMBIGUOUS",None,False,None
         else:
             if now_ms < maturity:
@@ -361,7 +363,7 @@ def settle_entry(row: dict[str, Any], horizon_h: float, now_ms: int):
         return {"id":row["id"],"status":status,"terminal":terminal,"r_multiple":None if r is None else round(float(r),4),
                 "exit_at_ms":exit_ms,"tp1_reached":bool(tp1_seen),"mfe_r":mfe,"mae_r":mae,
                 **timing,"terminal_refined_to_1m":bool(refinement_rows is not None),
-                "excursion_scope":"THROUGH_TERMINAL_EVENT" if ev in {"SL","TP2"} else ("OBSERVED_TO_NOW" if now_ms < maturity else "FULL_HORIZON"),
+                "excursion_scope":"THROUGH_TERMINAL_EVENT" if ev in {"SL","TP2","BREAKEVEN_AFTER_TP1"} else ("OBSERVED_TO_NOW" if now_ms < maturity else "FULL_HORIZON"),
                 "market_source":provider}
     except Exception as e:
         return {"id":row["id"],"status":"MARKET_DATA_ERROR","terminal":False,"r_multiple":None,"exit_at_ms":None,"error":str(e)[:700]}
