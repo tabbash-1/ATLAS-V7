@@ -172,13 +172,17 @@ def assess(row):
         blockers.append(blocker)
     candidate_geometry = None
     stale_wait_candidate = bool(action not in {"LONG", "SHORT"})
+    # A pre-final WAIT must remain WAIT unless the explicit promotion experiment is enabled.
+    # Merely having no other blockers is not authority to synthesize TRADE_READY.
+    if stale_wait_candidate and not experimental_promotion:
+        blockers.append("PRE_FINAL_WAIT_PROMOTION_DISABLED")
     if stale_wait_candidate and experimental_promotion and not blockers and product in {"LONG", "SHORT"}:
         candidate_geometry, candidate_geometry_error = _candidate_plan_geometry(row, product)
         if candidate_geometry_error:
             blockers.append(candidate_geometry_error)
     blockers = list(dict.fromkeys(x for x in blockers if x))
     ready = not blockers
-    stale_wait_bypassed = bool(stale_wait_candidate and ready)
+    stale_wait_bypassed = bool(stale_wait_candidate and experimental_promotion and ready)
     return {
         "version": VERSION,
         "status": "TRADE_READY" if ready else "WAIT",
