@@ -195,6 +195,18 @@ def test_settlement_exposes_path_timing_metadata():
         p.market_klines=old_market
 
 
+def test_repeated_tp1_touch_does_not_make_later_tp2_ambiguous():
+    candles=[
+        {'open_time':0,'open':100.0,'high':101.2,'low':100.0,'close':101.0},
+        {'open_time':300_000,'open':101.0,'high':102.1,'low':101.0,'close':102.0},
+    ]
+    g={'direction':'LONG','entry':100.0,'stop_loss':99.0,'tp1':101.0,'tp2':102.0,'rr_tp2':2.0,'risk_abs':1.0}
+    ev,candle,tp1_seen=p.event_from(candles,g)
+    assert ev=='TP2'
+    assert candle['open_time']==300_000
+    assert tp1_seen is True
+
+
 def test_tp2_settles_immediately_before_12h_maturity():
     old_market=p.market_klines
     try:
