@@ -71,7 +71,7 @@ jobs:
         run: |
           set -euo pipefail
           python canonical_outcome_snapshot.py
-          jq -e '.schema == "ATLAS_CANONICAL_OUTCOME_SNAPSHOT_V1" and .decision_source_of_truth == "FINAL_TRADE_GATE" and .evaluation_horizons_h == [4,8,12]' status/canonical-outcomes-latest.json >/dev/null
+          jq -e '.schema == "ATLAS_CANONICAL_OUTCOME_SNAPSHOT_V3_STRICT_EXECUTION_ELIGIBILITY" and .decision_source_of_truth == "FINAL_TRADE_GATE" and .evaluation_horizons_h == [4,8,12]' status/canonical-outcomes-latest.json >/dev/null
       - name: Commit research reports only when data changed
         run: |
           git config user.name 'atlas-offline-research-bot'
