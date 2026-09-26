@@ -14,8 +14,8 @@ MARKER = "HTF_CLOSED_CANDLE_AUTHORITY_V1"
 
 def apply():
     text = TARGET.read_text(encoding="utf-8")
-    if MARKER in text:
-        print("ATLAS HTF closed-candle patch: already installed", flush=True)
+    if MARKER in text or 'candle_policy"]="CLOSED_CANDLES_ONLY"' in text:
+        print("ATLAS HTF closed-candle policy: already integrated", flush=True)
         return
     import_needle = "from __future__ import annotations\nimport urllib.parse\n"
     if import_needle not in text:
