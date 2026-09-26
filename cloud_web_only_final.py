@@ -49,7 +49,7 @@ def _outcome_snapshot():
 def _outcome_rows(snapshot, symbol=None, scope="signals"):
     rows = list(((snapshot.get("signals") or {}).get("rows") or []))
     if scope == "execution":
-        rows = [x for x in rows if x.get("execution_ready_at_capture") is not False]
+        rows = [x for x in rows if x.get("execution_ready_at_capture") is True]
     if symbol:
         symbol = str(symbol).upper()
         rows = [x for x in rows if str(x.get("symbol") or "").upper() == symbol]
