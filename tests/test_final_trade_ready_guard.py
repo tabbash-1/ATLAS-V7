@@ -89,11 +89,46 @@ def test_breakout_without_canonical_confirmation_evidence_fails_closed():
     assert 'BREAKOUT_CONFIRMATION_EVIDENCE_MISSING' in r['final_trade_gate']['blockers']
 
 
-def test_non_breakout_pullback_path_is_not_regressed():
-    d = base_row(playbook='TREND_PULLBACK_SHORT')
+def _confirmed_short_pullback_thesis():
+    return {
+        'frames': {
+            '1h': {
+                'bias': 'SHORT',
+                'impulse': 'BEARISH',
+                'candle': {'direction': 'BEARISH', 'pattern': 'BEARISH_ENGULFING'},
+            }
+        }
+    }
+
+
+def test_non_breakout_pullback_requires_fresh_bearish_resumption():
+    d = base_row(playbook='TREND_PULLBACK_SHORT', htf_thesis=_confirmed_short_pullback_thesis())
     r = guard.apply(d)
     assert r['trade_ready'] is True
     assert r['final_trade_gate']['structure_confirmation']['requires_confirmation'] is False
+    assert r['final_trade_gate']['trader_brain']['short_pullback_resumption_confirmed'] is True
+
+
+def test_short_pullback_without_resumption_fails_closed():
+    d = base_row(
+        playbook='TREND_PULLBACK_SHORT',
+        htf_thesis={'frames': {'1h': {
+            'bias': 'SHORT',
+            'impulse': 'BULLISH',
+            'candle': {'direction': 'BULLISH', 'pattern': 'NORMAL'},
+        }}},
+    )
+    r = guard.apply(d)
+    assert r['trade_ready'] is False
+    assert 'TRADER_WAIT_SHORT_PULLBACK_RESUMPTION' in r['final_trade_gate']['blockers']
+    assert r['final_trade_gate']['trader_brain']['short_pullback_resumption_confirmed'] is False
+
+
+def test_short_pullback_missing_1h_evidence_fails_closed():
+    d = base_row(playbook='TREND_PULLBACK_SHORT')
+    r = guard.apply(d)
+    assert r['trade_ready'] is False
+    assert 'TRADER_WAIT_SHORT_PULLBACK_RESUMPTION' in r['final_trade_gate']['blockers']
 
 
 def test_stale_pre_final_wait_is_not_an_authority_when_trader_evidence_passes():
