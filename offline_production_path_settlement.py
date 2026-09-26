@@ -223,7 +223,7 @@ def event_from(candles, g, tp1_seen_initial=False):
         be = tp1_seen and touches(c, g["entry"])
         # Same-bar ordering is unknowable from OHLC. Refine any competing
         # TP1/TP2/SL/BE touches to 1m instead of assuming a favorable sequence.
-        competing = sum(bool(x) for x in (sl, tp1, tp2, be)) > 1
+        # A repeated TP1 touch after TP1 was already reached is not a competing\n        # event. Counting it again falsely turns a later clean TP2/BE candle into\n        # AMBIGUOUS. Only a *new* TP1 touch participates in ordering ambiguity.\n        new_tp1 = tp1 and not tp1_seen\n        competing = sum(bool(x) for x in (sl, new_tp1, tp2, be)) > 1
         if competing: return "AMBIGUOUS", c, tp1_seen
         if tp2: return "TP2", c, True
         if be: return "BREAKEVEN_AFTER_TP1", c, True
