@@ -19,6 +19,8 @@ def strict_trade_ready(decision):
     direction = str(gate.get("direction") or "").upper()
     if decision.get("trade_ready") is not True:
         return False
+    if decision.get("execution_ready") is not True:
+        return False
     if gate.get("trade_ready") is not True or str(gate.get("status") or "").upper() != "TRADE_READY":
         return False
     if action not in {"LONG", "SHORT"} or direction != action:
