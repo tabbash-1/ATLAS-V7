@@ -26,7 +26,7 @@ def _status(n, minimum):
 
 def build(adaptive, canonical):
     a = adaptive.get("overall") or {}
-    c = canonical.get("path_summary") or (canonical.get("summary") or {}).get("portfolio") or {}
+    c = canonical.get("portfolio") or canonical.get("path_summary") or (canonical.get("summary") or {}).get("portfolio") or {}
     an = int(a.get("n", adaptive.get("settled_candidates", 0)) or 0)
     cn = int(c.get("entries", c.get("closed", 0)) or 0)
     allowed = an >= MIN_ADAPTIVE_FOR_COMPARISON and cn >= MIN_CANONICAL_FOR_COMPARISON
@@ -88,7 +88,7 @@ def build(adaptive, canonical):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--adaptive", default="status/adaptive-evidence-shadow-outcomes-latest.json")
-    ap.add_argument("--canonical", default="status/canonical-outcomes-latest.json")
+    ap.add_argument("--canonical", default="status/paper-portfolio-10k-latest.json")
     ap.add_argument("--out", default="status/adaptive-evidence-comparison-latest.json")
     args = ap.parse_args()
     result = build(_load(args.adaptive), _load(args.canonical))
