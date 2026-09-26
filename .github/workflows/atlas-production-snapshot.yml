@@ -33,7 +33,7 @@ on:
   # previous 7,27,47 expression but also gives GitHub a workflow-definition
   # change to re-register the scheduled trigger after observed scheduler drift.
   schedule:
-    - cron: '7-59/20 * * * *'
+    - cron: '7,27,47 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -255,6 +255,24 @@ jobs:
           set -euo pipefail
           ! grep -q '/api/outcomes/path-summary' .github/workflows/atlas-production-snapshot.yml
           ! grep -q '/api/outcomes/settlement-status' .github/workflows/atlas-production-snapshot.yml
+          python3 - <<'PY'
+          import datetime, json
+          p='status/atlas-production-latest.json'
+          x=json.load(open(p))
+          captured=datetime.datetime.fromisoformat(x['captured_at'].replace('Z','+00:00'))
+          age=(datetime.datetime.now(datetime.timezone.utc)-captured).total_seconds()
+          if age < 0 or age > 1800:
+              raise SystemExit(f'STALE_CANONICAL_SNAPSHOT age_seconds={age:.1f}')
+          for symbol,d in (x.get('decisions') or {}).items():
+              if not d.get('ok'): continue
+              ts=d.get('generated_at') or d.get('captured_at')
+              if not ts: raise SystemExit(f'MISSING_DECISION_TIMESTAMP {symbol}')
+              dt=datetime.datetime.fromisoformat(ts.replace('Z','+00:00'))
+              decision_age=(datetime.datetime.now(datetime.timezone.utc)-dt).total_seconds()
+              if decision_age < -300 or decision_age > 1800:
+                  raise SystemExit(f'STALE_DECISION {symbol} age_seconds={decision_age:.1f}')
+          print('CANONICAL_SNAPSHOT_FRESHNESS_OK')
+          PY
           jq -e '.schema == "ATLAS_PRODUCTION_SNAPSHOT_V12_CANONICAL_TRUTH" and .decision_source_of_truth == "FINAL_TRADE_GATE" and .product_horizon == "4-12H" and .evaluation_horizons_h == [4,8,12] and .settlement_status.web_runtime_dependency == false and .realized_r.source == "COMMITTED_OFFLINE_PRODUCTION_PATH_SETTLEMENT" and .decision_summary.noncanonical_count == 0 and .canonical_coverage.canonical_snapshot_complete == true and .canonical_coverage.canonical_coverage_pct == 100' status/atlas-production-latest.json >/dev/null
           jq -e '.schema == "ATLAS_WAIT_OUTCOME_TRACKER_V4_CANONICAL_TRUTH" and .decision_source_of_truth == "FINAL_TRADE_GATE" and .horizons_hours == [4,8,12] and .legacy_backfill_performed == false' status/wait-outcomes.json >/dev/null
           jq -e '[.decisions[] | select(.ok == true) | .canonical_decision | select(.schema != "ATLAS_CANONICAL_DECISION_TRUTH_V1" or .canonical_source_present != true or .source_of_truth != "FINAL_TRADE_GATE")] | length == 0' status/atlas-production-latest.json >/dev/null
