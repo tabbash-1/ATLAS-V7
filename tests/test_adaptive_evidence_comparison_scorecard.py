@@ -37,3 +37,28 @@ def test_cost_basis_is_explicitly_different():
     assert r["adaptive_shadow_forward"]["cost_basis_bps"]==10
     assert r["canonical_production_forward"]["cost_basis"]=="GROSS_CANONICAL_COSTS_NOT_DEDUCTED"
     assert "must not be claimed" in r["comparison"]["important_note"]
+
+
+def test_canonical_paper_portfolio_v3_top_level_portfolio_is_read():
+    canonical = {
+        "schema": "ATLAS_PAPER_PORTFOLIO_10K_V3_CANONICAL_TRUTH",
+        "decision_source_of_truth": "FINAL_TRADE_GATE",
+        "portfolio": {
+            "entries": 21,
+            "closed": 21,
+            "win_rate_pct": 47.62,
+            "avg_r": 0.2557,
+            "net_r": 5.3693,
+            "profit_factor": 1.5159,
+            "max_drawdown_pct": 2.98,
+        },
+    }
+    r = m.build(_adaptive(23), canonical)
+    c = r["canonical_production_forward"]
+    assert c["n"] == 21
+    assert c["net_r_gross"] == 5.3693
+    assert c["profit_factor_gross"] == 1.5159
+    assert c["max_drawdown_pct"] == 2.98
+    assert r["comparison"]["allowed"] is True
+    assert r["can_override_production"] is False
+    assert r["production_threshold_unchanged"] == 68
