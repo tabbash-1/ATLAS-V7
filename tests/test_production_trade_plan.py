@@ -2,7 +2,7 @@ import production_trade_plan as p
 
 
 def base(**kw):
-    d={'ok':True,'candidate_direction':'LONG','entry':100.0,'indicators':{'atr14':2.0},'production_signal_qualified':True,'signal_threshold':68.0,'execution_ready':True,'structural_geometry':{'obstacle_price':104.0,'obstacle_distance_pct':4.0,'continuation_strong':False,'breakout':{'confirmed':True}}}
+    d={'ok':True,'candidate_direction':'LONG','entry':100.0,'indicators':{'atr14':2.0},'production_signal_qualified':True,'signal_threshold':68.0,'execution_ready':True,'structural_geometry':{'obstacle_price':104.0,'obstacle_distance_pct':4.0,'continuation_strong':True,'breakout':{'confirmed':True}}}
     d.update(kw); return d
 
 
@@ -115,7 +115,7 @@ def test_clear_room_wait_uses_pullback():
 
 
 def test_short_ordering():
-    d=base(candidate_direction='SHORT',entry=100.0,structural_geometry={'obstacle_price':94.0,'obstacle_distance_pct':6.0,'continuation_strong':False,'breakout':{'confirmed':True}})
+    d=base(candidate_direction='SHORT',entry=100.0,structural_geometry={'obstacle_price':94.0,'obstacle_distance_pct':6.0,'continuation_strong':True,'breakout':{'confirmed':True}})
     x=p.build(d)
     assert x['stop_loss']>x['entry']>x['tp1']>x['tp2']
     assert x['rr_tp1']>=1 and x['rr_tp2']>=2
