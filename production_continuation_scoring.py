@@ -1,10 +1,9 @@
 """ATLAS Production continuation-aware scoring overlay.
 
 Adds market-wide continuation evidence without lowering the canonical Production
-threshold. Strong directional momentum, broad crypto participation and sane RSI
-can reduce an otherwise excessive nearby-structure penalty and can extend the
-structural target beyond a nearby prior swing when continuation evidence is
-strong. Weak breadth, weak momentum or blow-off RSI never receive the relief.
+threshold. Momentum and breadth remain bounded score inputs, but strong continuation
+cannot relieve a nearby structural obstacle or extend the structural target.
+The continuation flag alone never promotes a trade.
 """
 from __future__ import annotations
 
@@ -149,7 +148,6 @@ def install(atlas):
         ks = atlas._spot_klines(symbol)
         closes = [float(x["close"]) for x in ks]
         rsi = atlas._rsi(closes, 14) if closes else None
-        atr = atlas._atr(ks, 14) if ks else None
         mom24 = _f(row.get("momentum_24h_pct"), 0.0) or 0.0
         votes = int(row.get("direction_votes") or 0)
         market = breadth()
@@ -199,19 +197,6 @@ def install(atlas):
         row["continuation_context"] = cont
         row["continuation_scoring_version"] = VERSION
         row["scoring_version"] = f"{row.get('scoring_version')}+{VERSION}"
-
-        level = _f(row.get("structural_obstacle_price"))
-        distance = _f(attr.get("obstacle_distance_pct"))
-        px = _f(row.get("entry"))
-        if False and cont["strong"] and level is not None and px is not None and atr and atr > 0 and distance is not None and distance <= 1.5:
-            target = level + atr * 1.4 if direction == "LONG" else level - atr * 1.4
-            risk = atr * 1.2
-            reward = target - px if direction == "LONG" else px - target
-            rr = reward / risk if risk > 0 and reward > 0 else None
-            row["structural_target"] = round(target, 10)
-            row["structural_target_source"] = "CONTINUATION_EXTENSION_BEYOND_PRIOR_STRUCTURE"
-            row["rr_tp2"] = round(rr, 3) if rr is not None else None
-            row["playbook_primary"] = "MARKET_CONTINUATION_LONG" if direction == "LONG" else "MARKET_CONTINUATION_SHORT"
 
         return row
 
