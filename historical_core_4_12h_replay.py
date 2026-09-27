@@ -101,9 +101,11 @@ def signal(hist1h):
     a=atr(hist1h)
     if not a:return {"ready":False,"reason":"NO_ATR","score":score,"side":side}
     entry=hist1h[-1]["c"]
+    e20_1h=ema([x["c"] for x in hist1h[-55:]],20)
+    extension_atr=((e20_1h-entry)/a if side=="SHORT" else (entry-e20_1h)/a) if e20_1h and a else None
     stop=entry-1.5*a if side=="LONG" else entry+1.5*a
     target=entry+3*a if side=="LONG" else entry-3*a
-    return {"ready":True,"score":score,"side":side,"entry":entry,"stop":stop,"target":target,"rsi":round(rs,4) if rs is not None else None,"d1":d1,"breakout":bool((side=="LONG" and recent4[-1]["c"]>max(x["h"] for x in recent4[-4:-1])) or (side=="SHORT" and recent4[-1]["c"]<min(x["l"] for x in recent4[-4:-1]))),"volume_confirmed":bool(vols and hist1h[-1]["v"] >= statistics.mean(vols))}
+    return {"ready":True,"score":score,"side":side,"entry":entry,"stop":stop,"target":target,"rsi":round(rs,4) if rs is not None else None,"d1":d1,"breakout":bool((side=="LONG" and recent4[-1]["c"]>max(x["h"] for x in recent4[-4:-1])) or (side=="SHORT" and recent4[-1]["c"]<min(x["l"] for x in recent4[-4:-1]))),"volume_confirmed":bool(vols and hist1h[-1]["v"] >= statistics.mean(vols)),"extension_atr":round(extension_atr,4) if extension_atr is not None else None}
 
 
 def settle(sig,future):
@@ -129,7 +131,7 @@ def replay_symbol(symbol,days,end_ms=None):
         if not s["ready"]:
             blockers[s["reason"]]=blockers.get(s["reason"],0)+1; i+=4; continue
         r,out=settle(s,rows[i+1:i+13])
-        trades.append({"t":rows[i]["t"],"symbol":symbol,"side":s["side"],"score":s["score"],"rsi":s.get("rsi"),"d1":s.get("d1"),"breakout":s.get("breakout"),"volume_confirmed":s.get("volume_confirmed"),"r":round(r,4),"outcome":out})
+        trades.append({"t":rows[i]["t"],"symbol":symbol,"side":s["side"],"score":s["score"],"rsi":s.get("rsi"),"d1":s.get("d1"),"breakout":s.get("breakout"),"volume_confirmed":s.get("volume_confirmed"),"extension_atr":s.get("extension_atr"),"r":round(r,4),"outcome":out})
         i+=12
     return trades,blockers
 
@@ -161,6 +163,10 @@ def main():
       "d1_breakout_volume":summary([t for t in short if t.get("d1")=="SHORT" and t.get("breakout") and t.get("volume_confirmed")]),
       "rsi_25_40":summary([t for t in short if t.get("rsi") is not None and 25<=t["rsi"]<=40]),
       "rsi_40_48":summary([t for t in short if t.get("rsi") is not None and 40<t["rsi"]<=48]),
+      "extension_le_0_5atr":summary([t for t in short if t.get("extension_atr") is not None and t["extension_atr"]<=0.5]),
+      "extension_0_5_1atr":summary([t for t in short if t.get("extension_atr") is not None and 0.5<t["extension_atr"]<=1.0]),
+      "extension_gt_1atr":summary([t for t in short if t.get("extension_atr") is not None and t["extension_atr"]>1.0]),
+      "rsi25_40_extension_le_0_5":summary([t for t in short if t.get("rsi") is not None and 25<=t["rsi"]<=40 and t.get("extension_atr") is not None and t["extension_atr"]<=0.5]),
     }
     by_symbol_side={sym:{side:summary([t for t in alltr if t["symbol"]==sym and t["side"]==side]) for side in ("LONG","SHORT")} for sym in a.symbols}
     result={"schema":VERSION,"research_only":True,"live_execution":False,"can_override_production":False,"forward_proof_equivalent":False,"exact_production_scorer":False,"interpretation":"RETROSPECTIVE_POINT_IN_TIME_THESIS_REPLAY_NOT_FORWARD_PROOF","days":a.days,"replay_end_ms":replay_end_ms,"threshold":THRESHOLD,"symbols":a.symbols,"assumptions":{"signal_uses_past_and_current_closed_1h_only":True,"entry_reference":"decision close","evaluation_horizon_h":12,"intrabar_both_hit":"STOP_FIRST_CONSERVATIVE","risk_per_trade_pct":1.0,"fees_funding_slippage_included":False,"score_is_theory_proxy_not_exact_production_score":True},"overall":summary(alltr),"by_symbol":by,"by_side":by_side,"by_score":by_score,"by_outcome":by_outcome,"short_diagnostics":short_diagnostics,"by_symbol_side":by_symbol_side,"blockers":blockers,"sample_trades":alltr[:10]}
