@@ -54,3 +54,18 @@ def test_canonical_outcome_summary_reports_drawdown_from_strict_settled_rows():
     text = (ROOT / "canonical_outcome_snapshot.py").read_text(encoding="utf-8")
     assert 'drawdowns = [float(r["drawdown_after_pct"]) for r in settled' in text
     assert '"max_drawdown_pct": round(max(drawdowns), 4) if drawdowns else None' in text
+
+
+def test_canonical_outcome_writers_share_one_serial_concurrency_group():
+    paper = PAPER.read_text(encoding="utf-8")
+    forward = FORWARD.read_text(encoding="utf-8")
+    assert "group: atlas-canonical-outcome-writers" in paper
+    assert "group: atlas-canonical-outcome-writers" in forward
+    assert "cancel-in-progress: false" in paper
+    assert "cancel-in-progress: false" in forward
+
+
+def test_offline_forward_uses_shared_status_writer():
+    text = FORWARD.read_text(encoding="utf-8")
+    assert "scripts/commit_status_with_retry.sh" in text
+    assert "git pull --rebase origin main" not in text
