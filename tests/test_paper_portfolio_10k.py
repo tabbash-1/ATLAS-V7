@@ -90,7 +90,7 @@ def test_terminal_excursions_ignore_post_exit_adverse_spike():
     old_market=p.market_klines
     try:
         candles=[
-            {'open_time':0,'open':100.0,'high':100.4,'low':99.2,'close':99.5},
+            {'open_time':0,'open':100.0,'high':100.4,'low':98.9,'close':99.5},
             {'open_time':300_000,'open':99.5,'high':99.8,'low':97.8,'close':98.0},
             {'open_time':600_000,'open':98.0,'high':105.4,'low':97.9,'close':104.0},
         ]
