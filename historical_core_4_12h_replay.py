@@ -169,7 +169,19 @@ def main():
       "rsi25_40_extension_le_0_5":summary([t for t in short if t.get("rsi") is not None and 25<=t["rsi"]<=40 and t.get("extension_atr") is not None and t["extension_atr"]<=0.5]),
     }
     by_symbol_side={sym:{side:summary([t for t in alltr if t["symbol"]==sym and t["side"]==side]) for side in ("LONG","SHORT")} for sym in a.symbols}
-    result={"schema":VERSION,"research_only":True,"live_execution":False,"can_override_production":False,"forward_proof_equivalent":False,"exact_production_scorer":False,"interpretation":"RETROSPECTIVE_POINT_IN_TIME_THESIS_REPLAY_NOT_FORWARD_PROOF","days":a.days,"replay_end_ms":replay_end_ms,"threshold":THRESHOLD,"symbols":a.symbols,"assumptions":{"signal_uses_past_and_current_closed_1h_only":True,"entry_reference":"decision close","evaluation_horizon_h":12,"intrabar_both_hit":"STOP_FIRST_CONSERVATIVE","risk_per_trade_pct":1.0,"fees_funding_slippage_included":False,"score_is_theory_proxy_not_exact_production_score":True},"overall":summary(alltr),"by_symbol":by,"by_side":by_side,"by_score":by_score,"by_outcome":by_outcome,"short_diagnostics":short_diagnostics,"by_symbol_side":by_symbol_side,"blockers":blockers,"sample_trades":alltr[:10]}
+    # Frozen hypothesis validation: define from prior diagnostics, then split chronologically 70/30.
+    short_candidate=[t for t in short if t.get("rsi") is not None and 25<=t["rsi"]<=40 and t.get("extension_atr") is not None and t["extension_atr"]<=0.5]
+    ordered=sorted(alltr,key=lambda t:t["t"]); split_t=ordered[int(len(ordered)*0.70)]["t"] if ordered else 0
+    candidate_validation={
+      "rule":"SHORT RSI 25-40 AND EMA20 extension <=0.5 ATR",
+      "split":"chronological 70/30 by all-trade timeline; rule frozen before holdout inspection",
+      "split_t":split_t,
+      "development":summary([t for t in short_candidate if t["t"]<split_t]),
+      "holdout":summary([t for t in short_candidate if t["t"]>=split_t]),
+      "all":summary(short_candidate),
+      "by_symbol":{sym:summary([t for t in short_candidate if t["symbol"]==sym]) for sym in a.symbols}
+    }
+    result={"schema":VERSION,"research_only":True,"live_execution":False,"can_override_production":False,"forward_proof_equivalent":False,"exact_production_scorer":False,"interpretation":"RETROSPECTIVE_POINT_IN_TIME_THESIS_REPLAY_NOT_FORWARD_PROOF","days":a.days,"replay_end_ms":replay_end_ms,"threshold":THRESHOLD,"symbols":a.symbols,"assumptions":{"signal_uses_past_and_current_closed_1h_only":True,"entry_reference":"decision close","evaluation_horizon_h":12,"intrabar_both_hit":"STOP_FIRST_CONSERVATIVE","risk_per_trade_pct":1.0,"fees_funding_slippage_included":False,"score_is_theory_proxy_not_exact_production_score":True},"overall":summary(alltr),"by_symbol":by,"by_side":by_side,"by_score":by_score,"by_outcome":by_outcome,"short_diagnostics":short_diagnostics,"short_candidate_validation":candidate_validation,"by_symbol_side":by_symbol_side,"blockers":blockers,"sample_trades":alltr[:10]}
     print("ATLAS_REPLAY_RESULT="+json.dumps(result,sort_keys=True))
 
 if __name__=="__main__":main()
