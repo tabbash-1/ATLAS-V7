@@ -29,6 +29,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
@@ -66,12 +67,8 @@ jobs:
           PYTHONPATH=. python tests/test_trade_path_settlement.py
       - name: Commit generated snapshot
         run: |
-          git add status/canonical-outcomes-latest.json
-          if git diff --cached --quiet; then
-            echo 'snapshot unchanged'
-            exit 0
-          fi
-          git config user.name 'atlas-outcome-snapshot'
-          git config user.email 'atlas-outcomes@users.noreply.github.com'
-          git commit -m 'outcomes: update canonical final-gate snapshot [skip ci] [skip render]'
-          git push origin HEAD:main
+          bash scripts/commit_status_with_retry.sh \
+            'atlas-outcome-snapshot' \
+            'atlas-outcomes@users.noreply.github.com' \
+            'outcomes: update canonical final-gate snapshot [skip ci] [skip render]' \
+            'status/canonical-outcomes-latest.json'
