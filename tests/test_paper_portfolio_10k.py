@@ -90,8 +90,8 @@ def test_terminal_excursions_ignore_post_exit_adverse_spike():
     old_market=p.market_klines
     try:
         candles=[
-            {'open_time':0,'open':100.0,'high':100.2,'low':99.2,'close':99.5},
-            {'open_time':300_000,'open':99.5,'high':100.4,'low':97.8,'close':98.0},
+            {'open_time':0,'open':100.0,'high':100.4,'low':99.2,'close':99.5},
+            {'open_time':300_000,'open':99.5,'high':99.8,'low':97.8,'close':98.0},
             {'open_time':600_000,'open':98.0,'high':105.4,'low':97.9,'close':104.0},
         ]
         p.market_klines=lambda symbol, interval, start, end: (candles,'TEST')
@@ -112,8 +112,8 @@ def test_terminal_excursions_use_1m_refinement_only_through_resolved_exit():
     try:
         five=[{'open_time':0,'open':100.0,'high':101.2,'low':97.8,'close':99.0}]
         one=[
-            {'open_time':0,'open':100.0,'high':100.3,'low':99.0,'close':99.3},
-            {'open_time':60_000,'open':99.3,'high':100.4,'low':97.9,'close':98.0},
+            {'open_time':0,'open':100.0,'high':100.4,'low':99.0,'close':99.3},
+            {'open_time':60_000,'open':99.3,'high':99.8,'low':97.9,'close':98.0},
             {'open_time':120_000,'open':98.0,'high':101.5,'low':98.0,'close':101.0},
         ]
         def fake_market(symbol, interval, start, end):
