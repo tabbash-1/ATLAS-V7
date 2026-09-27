@@ -4,32 +4,30 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PAPER = ROOT / ".github/workflows/atlas-paper-portfolio-10k.yml"
 FORWARD = ROOT / ".github/workflows/atlas-offline-forward-evaluation.yml"
+SNAPSHOT = ROOT / ".github/workflows/atlas-canonical-outcome-snapshot.yml"
 CANONICAL = "status/canonical-outcomes-latest.json"
 BUILDER = "python canonical_outcome_snapshot.py"
 
 
-def _assert_producer_sync(path: Path) -> None:
-    text = path.read_text(encoding="utf-8")
-    assert BUILDER in text, f"{path.name} must rebuild canonical outcomes in-process"
-    assert CANONICAL in text, f"{path.name} must commit the rebuilt canonical outcome snapshot"
-    build_pos = text.index(BUILDER)
-    markers = [
-        x for x in (
-            text.find("git commit", build_pos),
-            text.find("commit_status_with_retry.sh", build_pos),
-        ) if x >= 0
-    ]
-    assert markers, f"{path.name} must publish the rebuilt canonical outcome snapshot"
-    commit_pos = min(markers)
-    assert build_pos < commit_pos, f"{path.name} must rebuild canonical outcomes before committing"
+def test_canonical_snapshot_has_single_publication_owner():
+    paper = PAPER.read_text(encoding="utf-8")
+    forward = FORWARD.read_text(encoding="utf-8")
+    snapshot = SNAPSHOT.read_text(encoding="utf-8")
+    assert BUILDER not in paper
+    assert BUILDER not in forward
+    assert CANONICAL not in paper
+    assert CANONICAL not in forward
+    assert BUILDER in snapshot
+    assert CANONICAL in snapshot
+    assert "scripts/commit_status_with_retry.sh" in snapshot
+    assert "group: atlas-canonical-outcome-snapshot" in snapshot
+    assert "cancel-in-progress: false" in snapshot
 
 
-def test_paper_portfolio_refreshes_canonical_outcomes_atomically():
-    _assert_producer_sync(PAPER)
-
-
-def test_offline_forward_refreshes_canonical_outcomes_atomically():
-    _assert_producer_sync(FORWARD)
+def test_source_publishers_trigger_canonical_owner():
+    snapshot = SNAPSHOT.read_text(encoding="utf-8")
+    assert "status/paper-portfolio-10k-latest.json" in snapshot
+    assert "status/offline-forward-evaluation-latest.json" in snapshot
 
 
 def test_canonical_outcome_migration_preserves_only_proven_prospective_entries():
@@ -56,25 +54,16 @@ def test_canonical_outcome_summary_reports_drawdown_from_strict_settled_rows():
     assert '"max_drawdown_pct": round(max(drawdowns), 4) if drawdowns else None' in text
 
 
-def test_canonical_outcome_writers_share_one_serial_concurrency_group():
+def test_evidence_publishers_checkout_latest_main_before_generation():
+    for path in (PAPER, FORWARD, SNAPSHOT):
+        text = path.read_text(encoding="utf-8")
+        assert "ref: main" in text
+        assert "fetch-depth: 0" in text
+
+
+def test_source_publishers_use_safe_status_writer():
     paper = PAPER.read_text(encoding="utf-8")
     forward = FORWARD.read_text(encoding="utf-8")
-    assert "group: atlas-canonical-outcome-writers" in paper
-    assert "group: atlas-canonical-outcome-writers" in forward
-    assert "cancel-in-progress: false" in paper
-    assert "cancel-in-progress: false" in forward
-
-
-def test_offline_forward_uses_shared_status_writer():
-    text = FORWARD.read_text(encoding="utf-8")
-    assert "scripts/commit_status_with_retry.sh" in text
-    assert "git pull --rebase origin main" not in text
-
-
-def test_canonical_outcome_writers_checkout_latest_main_before_generation():
-    paper = PAPER.read_text(encoding="utf-8")
-    forward = FORWARD.read_text(encoding="utf-8")
-    assert "ref: main" in paper
-    assert "ref: main" in forward
-    assert "fetch-depth: 0" in paper
-    assert "fetch-depth: 0" in forward
+    assert "scripts/commit_status_with_retry.sh" in paper
+    assert "scripts/commit_status_with_retry.sh" in forward
+    assert "git pull --rebase origin main" not in forward
