@@ -43,8 +43,28 @@ def _trade_rows(paper: dict[str, Any]) -> list[dict[str, Any]]:
         # preserve the row in research upstream but exclude it from the official
         # executable cohort.  Missing legacy fields remain accepted for backward
         # compatibility with the canonical paper ledger.
-        if row.get("execution_ready_at_capture") is not True:
+        explicit_execution_ready = row.get("execution_ready_at_capture")
+        if explicit_execution_ready is False:
             continue
+        if explicit_execution_ready is not True:
+            # Migration-safe handling for prospective canonical ledger rows written
+            # before execution_ready_at_capture was added to the entry schema.
+            # These are not backfilled candidates: they were already enrolled as
+            # FINAL_TRADE_GATE TRADE_READY events with frozen canonical geometry.
+            legacy_prospective_eligible = (
+                row.get("schema") == "ATLAS_PAPER_PORTFOLIO_10K_ENTRY_V3_CANONICAL_TRUTH"
+                and row.get("decision_action") == "TRADE_READY"
+                and row.get("canonical_truth_schema") == "ATLAS_CANONICAL_DECISION_TRUTH_V1"
+                and row.get("paper_only") is True
+                and row.get("live_execution") is False
+                and isinstance(row.get("geometry"), dict)
+            )
+            if not legacy_prospective_eligible:
+                continue
+            row["execution_eligibility_provenance"] = "LEGACY_PROSPECTIVE_CANONICAL_ENROLLMENT"
+        else:
+            row["execution_eligibility_provenance"] = "EXPLICIT_CAPTURE_FLAG"
+        row["execution_ready_at_capture"] = True
         row["decision_id"] = str(decision_id)
         row["decision_source_of_truth"] = SOURCE
         row["evaluation_horizons_h"] = HORIZONS
