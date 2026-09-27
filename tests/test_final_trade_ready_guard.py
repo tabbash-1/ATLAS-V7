@@ -8,6 +8,11 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 import final_trade_ready_guard as guard
 import paper_portfolio_10k_final as paper_final
 
+# Most fixtures exercise downstream SHORT mechanics; opt them into the isolated
+# SHORT evidence cohort explicitly. A dedicated test below verifies Production
+# remains quarantined when the env flag is absent.
+os.environ[guard.SHORT_PRODUCTION_ENV] = '1'
+
 
 def base_row(**extra):
     row = {
@@ -44,6 +49,17 @@ def base_row(**extra):
     }
     row.update(extra)
     return row
+
+
+def test_short_is_quarantined_by_default_without_explicit_env():
+    old = os.environ.pop(guard.SHORT_PRODUCTION_ENV, None)
+    try:
+        r = guard.apply(base_row())
+        assert r['trade_ready'] is False
+        assert 'SHORT_EDGE_NOT_PROVEN_PRODUCTION_QUARANTINE' in r['final_trade_gate']['blockers']
+    finally:
+        if old is not None:
+            os.environ[guard.SHORT_PRODUCTION_ENV] = old
 
 
 def test_aligned_actionable_is_certified_trade_ready():
