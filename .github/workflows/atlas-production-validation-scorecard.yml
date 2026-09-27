@@ -14,6 +14,7 @@ on:
     branches: [main]
     paths:
       - 'production_validation_scorecard.py'
+      - 'tests/test_production_validation_scorecard.py'
       - 'status/canonical-outcomes-latest.json'
       - '.github/workflows/atlas-production-validation-scorecard.yml'
   schedule:
@@ -66,7 +67,7 @@ jobs:
           import json
           from pathlib import Path
           p=json.loads(Path('status/production-validation-latest.json').read_text())
-          assert p['schema']=='ATLAS_PRODUCTION_VALIDATION_SCORECARD_V1'
+          assert p['schema']=='ATLAS_PRODUCTION_VALIDATION_SCORECARD_V2_DIAGNOSTICS'
           assert p['decision_source_of_truth']=='FINAL_TRADE_GATE'
           assert p['epoch']['id']=='HTF_SR_V2_2026-09-14'
           assert p['sample_readiness']['formal_min_terminal']==30
@@ -77,6 +78,8 @@ jobs:
           assert p['cost_model']['slippage_bps_per_side']==3.0
           assert p['cost_model']['funding_bps_per_12h']==1.0
           assert p['cost_model']['production_impact']=='NONE'
+          assert p['diagnostic_cohorts']['research_only'] is True
+          assert p['diagnostic_cohorts']['production_impact']=='NONE'
           assert p['safety']['production_threshold']==68
           assert p['safety']['can_override_production'] is False
           assert p['safety']['live_execution'] is False
