@@ -64,3 +64,17 @@ def test_cost_summary_never_improves_gross_r_under_cost_assumption():
     s=m._cost_summary([a,b])
     assert s["net_r"] < -.5
     assert s["estimated_total_cost_usd"] > 0
+
+
+def test_diagnostic_cohorts_are_evidence_only_and_split_frozen_provenance():
+    a=row("2026-09-16T00:00:00Z",2,"LONG",10200,200,"WIN_TP2",True)
+    a["decision_provenance"]={"htf_v2_eligible":True,"futures_alignment":"ALIGNED","continuation_strong":False}
+    b=row("2026-09-17T00:00:00Z",-1,"LONG",10100,-100,"LOSS",False)
+    b["decision_provenance"]={"htf_v2_eligible":False,"futures_alignment":"OPPOSED","continuation_strong":True}
+    z=m._diagnostic_cohorts([a,b])
+    assert z["research_only"] is True
+    assert z["production_impact"]=="NONE"
+    assert z["cohorts"]["htf_v2_eligible"]["net_r"]==2.0
+    assert z["cohorts"]["htf_v2_ineligible"]["net_r"]==-1.0
+    assert z["cohorts"]["futures_aligned"]["n"]==1
+    assert z["cohorts"]["futures_opposed"]["n"]==1
