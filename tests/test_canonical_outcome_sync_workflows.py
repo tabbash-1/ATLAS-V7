@@ -30,3 +30,14 @@ def test_paper_portfolio_refreshes_canonical_outcomes_atomically():
 
 def test_offline_forward_refreshes_canonical_outcomes_atomically():
     _assert_producer_sync(FORWARD)
+
+
+def test_canonical_outcome_migration_preserves_only_proven_prospective_entries():
+    text = (ROOT / "canonical_outcome_snapshot.py").read_text(encoding="utf-8")
+    assert 'legacy_prospective_eligible = (' in text
+    assert 'row.get("decision_action") == "TRADE_READY"' in text
+    assert 'row.get("canonical_truth_schema") == "ATLAS_CANONICAL_DECISION_TRUTH_V1"' in text
+    assert 'row.get("paper_only") is True' in text
+    assert 'row.get("live_execution") is False' in text
+    assert 'execution_eligibility_provenance' in text
+    assert 'row["execution_ready_at_capture"] = True' in text
