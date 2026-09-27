@@ -147,11 +147,12 @@ def test_short_pullback_missing_1h_evidence_fails_closed():
     assert 'TRADER_WAIT_SHORT_PULLBACK_RESUMPTION' in r['final_trade_gate']['blockers']
 
 
-def test_stale_pre_final_wait_is_not_an_authority_when_trader_evidence_passes():
+def test_stale_pre_final_wait_fails_closed_without_explicit_experiment():
     old=os.environ.pop(guard.EXPERIMENTAL_PROMOTION_ENV, None)
     try:
         r=guard.apply(base_row(actionable_decision='WAIT'))
-        assert r['trade_ready'] is True
+        assert r['trade_ready'] is False
+        assert 'PRE_FINAL_WAIT_PROMOTION_DISABLED' in r['final_trade_gate']['blockers']
         assert r['final_trade_gate']['legacy_pre_final_action_is_authority'] is False
         assert r['final_trade_gate']['score_is_authority'] is False
     finally:
