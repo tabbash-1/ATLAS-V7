@@ -15,9 +15,9 @@ SYMBOLS = ["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","DOGEUSDT","ZECUSDT"]
 THRESHOLD = 68
 
 
-def fetch_1h(symbol, days):
+def fetch_1h(symbol, days, end_ms=None):
     need = days * 24 + 300
-    out=[]; end=int(time.time()*1000)
+    out=[]; end=int(end_ms if end_ms is not None else time.time()*1000)
     while len(out)<need:
         lim=min(1000, need-len(out))
         q=urllib.parse.urlencode({"symbol":symbol,"interval":"1h","limit":lim,"endTime":end})
@@ -119,8 +119,8 @@ def settle(sig,future):
     return max(-1,min(2,r)),"EXPIRED"
 
 
-def replay_symbol(symbol,days):
-    rows=fetch_1h(symbol,days)
+def replay_symbol(symbol,days,end_ms=None):
+    rows=fetch_1h(symbol,days,end_ms)
     warm=60*12
     trades=[]; blockers={}
     i=warm
@@ -143,16 +143,17 @@ def summary(trades):
 
 
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument("--days",type=int,default=180);ap.add_argument("--symbols",nargs="*",default=SYMBOLS);a=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument("--days",type=int,default=180);ap.add_argument("--end-ms",type=int,default=None,help="Freeze replay end timestamp for reproducibility");ap.add_argument("--symbols",nargs="*",default=SYMBOLS);a=ap.parse_args()
+    replay_end_ms=a.end_ms if a.end_ms is not None else (int(time.time()*1000)//3600000)*3600000
     alltr=[]; by={}; blockers={}
     for sym in a.symbols:
-        t,b=replay_symbol(sym,a.days);alltr+=t;by[sym]=summary(t);blockers[sym]=b
+        t,b=replay_symbol(sym,a.days,replay_end_ms);alltr+=t;by[sym]=summary(t);blockers[sym]=b
         print(sym,json.dumps(by[sym],sort_keys=True),flush=True)
     by_side={side:summary([t for t in alltr if t["side"]==side]) for side in ("LONG","SHORT")}
     by_score={str(score):summary([t for t in alltr if t["score"]==score]) for score in sorted(set(t["score"] for t in alltr))}
     by_outcome={name:len([t for t in alltr if t["outcome"]==name]) for name in sorted(set(t["outcome"] for t in alltr))}
     by_symbol_side={sym:{side:summary([t for t in alltr if t["symbol"]==sym and t["side"]==side]) for side in ("LONG","SHORT")} for sym in a.symbols}
-    result={"schema":VERSION,"research_only":True,"live_execution":False,"can_override_production":False,"forward_proof_equivalent":False,"exact_production_scorer":False,"interpretation":"RETROSPECTIVE_POINT_IN_TIME_THESIS_REPLAY_NOT_FORWARD_PROOF","days":a.days,"threshold":THRESHOLD,"symbols":a.symbols,"assumptions":{"signal_uses_past_and_current_closed_1h_only":True,"entry_reference":"decision close","evaluation_horizon_h":12,"intrabar_both_hit":"STOP_FIRST_CONSERVATIVE","risk_per_trade_pct":1.0,"fees_funding_slippage_included":False,"score_is_theory_proxy_not_exact_production_score":True},"overall":summary(alltr),"by_symbol":by,"by_side":by_side,"by_score":by_score,"by_outcome":by_outcome,"by_symbol_side":by_symbol_side,"blockers":blockers,"sample_trades":alltr[:10]}
+    result={"schema":VERSION,"research_only":True,"live_execution":False,"can_override_production":False,"forward_proof_equivalent":False,"exact_production_scorer":False,"interpretation":"RETROSPECTIVE_POINT_IN_TIME_THESIS_REPLAY_NOT_FORWARD_PROOF","days":a.days,"replay_end_ms":replay_end_ms,"threshold":THRESHOLD,"symbols":a.symbols,"assumptions":{"signal_uses_past_and_current_closed_1h_only":True,"entry_reference":"decision close","evaluation_horizon_h":12,"intrabar_both_hit":"STOP_FIRST_CONSERVATIVE","risk_per_trade_pct":1.0,"fees_funding_slippage_included":False,"score_is_theory_proxy_not_exact_production_score":True},"overall":summary(alltr),"by_symbol":by,"by_side":by_side,"by_score":by_score,"by_outcome":by_outcome,"by_symbol_side":by_symbol_side,"blockers":blockers,"sample_trades":alltr[:10]}
     print("ATLAS_REPLAY_RESULT="+json.dumps(result,sort_keys=True))
 
 if __name__=="__main__":main()
