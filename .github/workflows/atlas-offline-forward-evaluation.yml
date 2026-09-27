@@ -19,8 +19,8 @@ permissions:
   contents: write
 
 concurrency:
-  group: atlas-canonical-outcome-writers
-  cancel-in-progress: false
+  group: atlas-offline-forward-evaluation
+  cancel-in-progress: true
 
 jobs:
   evaluate:
@@ -68,11 +68,6 @@ jobs:
           print('WAIT_REASONS',json.dumps(x['wait_reason_counts'],sort_keys=True))
           print('SHADOW_GUARDRAILS',json.dumps(g,sort_keys=True))
           PY
-      - name: Refresh canonical outcome snapshot from authoritative inputs
-        run: |
-          set -euo pipefail
-          python canonical_outcome_snapshot.py
-          jq -e '.schema == "ATLAS_CANONICAL_OUTCOME_SNAPSHOT_V4_SETTLEMENT_AWARE" and .decision_source_of_truth == "FINAL_TRADE_GATE" and .evaluation_horizons_h == [4,8,12]' status/canonical-outcomes-latest.json >/dev/null
       - name: Commit research reports only when data changed
         run: |
           bash scripts/commit_status_with_retry.sh \
@@ -80,5 +75,4 @@ jobs:
             'atlas-offline-research-bot@users.noreply.github.com' \
             'chore: update canonical offline forward research [skip ci] [skip render]' \
             'status/offline-forward-evaluation-latest.json' \
-            'status/forward-robustness-guardrails-latest.json' \
-            'status/canonical-outcomes-latest.json'
+            'status/forward-robustness-guardrails-latest.json'
