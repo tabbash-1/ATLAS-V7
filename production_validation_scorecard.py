@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-VERSION = "ATLAS_PRODUCTION_VALIDATION_SCORECARD_V1"
+VERSION = "ATLAS_PRODUCTION_VALIDATION_SCORECARD_V2_DIAGNOSTICS"
 SOURCE = "FINAL_TRADE_GATE"
 EPOCH_ID = "HTF_SR_V2_2026-09-14"
 EPOCH_START = dt.datetime(2026, 9, 14, 12, 31, 29, tzinfo=dt.timezone.utc)
@@ -112,6 +112,36 @@ def _max_dd_pct(rows: list[dict[str, Any]]) -> float | None:
     return round(worst, 4)
 
 
+def _diagnostic_cohorts(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Descriptive frozen-provenance cohorts. Never changes Production."""
+    terminal = [x for x in rows if (x.get("settlement") or {}).get("terminal") is True]
+    def summarize(part):
+        rs = [float((x.get("settlement") or {}).get("r_multiple")) for x in part if (x.get("settlement") or {}).get("r_multiple") is not None]
+        return {
+            "n": len(rs),
+            "net_r": round(sum(rs), 4) if rs else None,
+            "avg_r": round(sum(rs) / len(rs), 4) if rs else None,
+            "positive_pct": round(100 * sum(r > 0 for r in rs) / len(rs), 2) if rs else None,
+        }
+    cohorts = {}
+    for name, predicate in (
+        ("htf_v2_eligible", lambda p: p.get("htf_v2_eligible") is True),
+        ("htf_v2_ineligible", lambda p: p.get("htf_v2_eligible") is False),
+        ("futures_aligned", lambda p: str(p.get("futures_alignment") or "").upper() == "ALIGNED"),
+        ("futures_opposed", lambda p: str(p.get("futures_alignment") or "").upper() == "OPPOSED"),
+        ("continuation_strong", lambda p: p.get("continuation_strong") is True),
+        ("continuation_not_strong", lambda p: p.get("continuation_strong") is False),
+    ):
+        part = [x for x in terminal if predicate(x.get("decision_provenance") or {})]
+        cohorts[name] = summarize(part)
+    return {
+        "research_only": True,
+        "production_impact": "NONE",
+        "minimum_formal_sample": MIN_FORMAL_SAMPLE,
+        "cohorts": cohorts,
+    }
+
+
 def _summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
     terminal = [x for x in rows if (x.get("settlement") or {}).get("terminal") is True]
     rs = [float((x.get("settlement") or {}).get("r_multiple")) for x in terminal if (x.get("settlement") or {}).get("r_multiple") is not None]
@@ -168,6 +198,7 @@ def build(root: Path) -> dict[str, Any]:
         "state": state,
         "sample_readiness": {"formal_min_terminal": MIN_FORMAL_SAMPLE, "terminal": n, "ready": formal_ready, "remaining": max(0, MIN_FORMAL_SAMPLE - n)},
         "post_v2": summary,
+        "diagnostic_cohorts": _diagnostic_cohorts(post),
         "cost_model": {"schema":"ATLAS_VALIDATION_COST_MODEL_V1","fee_bps_per_side":FEE_BPS_PER_SIDE,
                        "slippage_bps_per_side":SLIPPAGE_BPS_PER_SIDE,"funding_bps_per_12h":FUNDING_BPS_PER_12H,
                        "funding_treatment":"CONSERVATIVE_ABSOLUTE_COST_ASSUMPTION","exchange_execution_evidence":False,
@@ -191,6 +222,7 @@ def validate(p: dict[str, Any]) -> None:
     assert p.get("safety", {}).get("production_threshold") == 68
     assert p.get("safety", {}).get("can_override_production") is False
     assert p.get("cost_model", {}).get("production_impact") == "NONE"
+    assert p.get("diagnostic_cohorts", {}).get("production_impact") == "NONE"
     assert p.get("cost_model", {}).get("fee_bps_per_side") == 5.0
     assert p.get("cost_model", {}).get("slippage_bps_per_side") == 3.0
     assert p.get("interpretation", {}).get("profitability_claim_allowed") is False
