@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-VERSION = "ATLAS_CANONICAL_OUTCOME_SNAPSHOT_V3_STRICT_EXECUTION_ELIGIBILITY"
+VERSION = "ATLAS_CANONICAL_OUTCOME_SNAPSHOT_V4_SETTLEMENT_AWARE"
 SOURCE = "FINAL_TRADE_GATE"
 HORIZONS = [4, 8, 12]
 PAPER_SCHEMA = "ATLAS_PAPER_PORTFOLIO_10K_V3_CANONICAL_TRUTH"
@@ -114,8 +114,8 @@ def build(root: Path) -> dict[str, Any]:
         "max_drawdown_pct": None,
     }
     if trades:
-        settled = [r for r in trades if isinstance(r.get("r_multiple"), (int, float))]
-        rs = [float(r["r_multiple"]) for r in settled]
+        settled = [r for r in trades if isinstance((r.get("settlement") or {}).get("r_multiple"), (int, float))]
+        rs = [float((r.get("settlement") or {})["r_multiple"]) for r in settled]
         wins_n = sum(1 for x in rs if x > 0)
         losses_n = sum(1 for x in rs if x < 0)
         gross_win = sum(x for x in rs if x > 0)
@@ -140,7 +140,7 @@ def build(root: Path) -> dict[str, Any]:
         "legacy_backfill_allowed": False,
         "legacy_score_path_research_included": False,
         "official_trade_authority": "PAPER_PORTFOLIO_CANONICAL_FINAL_GATE_EXECUTION_ELIGIBLE_ENTRIES",
-        "execution_eligibility_policy": "REQUIRE_EXPLICIT_EXECUTION_READY_TRUE",
+        "execution_eligibility_policy": "EXPLICIT_READY_OR_PROVEN_LEGACY_PROSPECTIVE_CANONICAL_ENROLLMENT",
         "signals": {
             "count": len(trades),
             "rows": trades,
