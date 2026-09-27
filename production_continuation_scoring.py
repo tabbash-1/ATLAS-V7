@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import time
 
-VERSION = "PROD_CONTINUATION_SCORING_V1"
+VERSION = "PROD_CONTINUATION_SCORING_V2_EVIDENCE_ONLY"
 BREADTH_TTL_SECONDS = 45
 MIN_BREADTH_ASSETS = 5
 
@@ -157,7 +157,9 @@ def install(atlas):
 
         attr = dict(row.get("score_attribution") or {})
         old_obstacle = _f(attr.get("obstacle_adjustment"), 0.0) or 0.0
-        new_obstacle, relief, relief_reason = relieved_obstacle_adjustment(old_obstacle, cont["strong"])
+        # Continuation is descriptive evidence only. It must never erase a nearby
+        # structural obstacle penalty or manufacture Production qualification.
+        new_obstacle, relief, relief_reason = old_obstacle, 0, "EVIDENCE_ONLY_NO_STRUCTURE_RELIEF"
         mom_adj = momentum_adjustment(direction, mom24, rsi)
         breadth_adj = breadth_adjustment(direction, market)
         guard_adj, guard_reason = extension_guard_adjustment(direction, rsi)
@@ -201,7 +203,7 @@ def install(atlas):
         level = _f(row.get("structural_obstacle_price"))
         distance = _f(attr.get("obstacle_distance_pct"))
         px = _f(row.get("entry"))
-        if cont["strong"] and level is not None and px is not None and atr and atr > 0 and distance is not None and distance <= 1.5:
+        if False and cont["strong"] and level is not None and px is not None and atr and atr > 0 and distance is not None and distance <= 1.5:
             target = level + atr * 1.4 if direction == "LONG" else level - atr * 1.4
             risk = atr * 1.2
             reward = target - px if direction == "LONG" else px - target
@@ -218,6 +220,9 @@ def install(atlas):
         "enabled": True,
         "version": VERSION,
         "threshold_unchanged": True,
+        "continuation_evidence_only": True,
+        "can_relieve_structure_penalty": False,
+        "can_extend_structural_target": False,
         "breadth_assets": list(getattr(atlas, "ON_DEMAND_SYMBOLS", ())),
     }
     return atlas.PRODUCTION_CONTINUATION_SCORING_STATE
