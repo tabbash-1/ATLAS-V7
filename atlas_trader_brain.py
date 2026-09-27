@@ -104,6 +104,10 @@ def assess(row):
     mode = _norm(plan.get("entry_mode"))
     rr = _rr2(row)
     playbook = _playbook(row)
+    short_pullback_confirmed, short_pullback_evidence = _short_pullback_confirmed(row)
+    if product == "SHORT" and playbook == "TREND_PULLBACK" and not short_pullback_confirmed:
+        # Thesis may remain valid, but do not enter before fresh bearish resumption.
+        pass
 
     fatal = []
     waits = []
@@ -127,6 +131,8 @@ def assess(row):
         waits.append("TRADER_WAIT_1H_TRIGGER")
     if not geometry_ready:
         waits.append("TRADER_WAIT_VALID_LOCATION")
+    if product == "SHORT" and playbook == "TREND_PULLBACK" and not short_pullback_confirmed:
+        waits.append("TRADER_WAIT_SHORT_PULLBACK_RESUMPTION")
 
     score_attr = row.get("score_attribution") or ((row.get("decision_provenance") or {}).get("score_attribution") or {})
     extension_reason = _norm(score_attr.get("extension_guard_reason"))
