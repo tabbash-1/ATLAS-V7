@@ -10,7 +10,7 @@ from __future__ import annotations
 import argparse, json, math, statistics, time, urllib.parse, urllib.request
 from dataclasses import dataclass
 
-VERSION = "ATLAS_CORE_4_12H_HISTORICAL_REPLAY_V1"
+VERSION = "ATLAS_CORE_4_12H_HISTORICAL_REPLAY_V2_DIAGNOSTICS"
 SYMBOLS = ["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","DOGEUSDT","ZECUSDT"]
 THRESHOLD = 68
 
@@ -148,7 +148,11 @@ def main():
     for sym in a.symbols:
         t,b=replay_symbol(sym,a.days);alltr+=t;by[sym]=summary(t);blockers[sym]=b
         print(sym,json.dumps(by[sym],sort_keys=True),flush=True)
-    result={"schema":VERSION,"research_only":True,"live_execution":False,"can_override_production":False,"forward_proof_equivalent":False,"exact_production_scorer":False,"interpretation":"RETROSPECTIVE_POINT_IN_TIME_THESIS_REPLAY_NOT_FORWARD_PROOF","days":a.days,"threshold":THRESHOLD,"symbols":a.symbols,"assumptions":{"signal_uses_past_and_current_closed_1h_only":True,"entry_reference":"decision close","evaluation_horizon_h":12,"intrabar_both_hit":"STOP_FIRST_CONSERVATIVE","risk_per_trade_pct":1.0,"fees_funding_slippage_included":False,"score_is_theory_proxy_not_exact_production_score":True},"overall":summary(alltr),"by_symbol":by,"blockers":blockers,"sample_trades":alltr[:10]}
+    by_side={side:summary([t for t in alltr if t["side"]==side]) for side in ("LONG","SHORT")}
+    by_score={str(score):summary([t for t in alltr if t["score"]==score]) for score in sorted(set(t["score"] for t in alltr))}
+    by_outcome={name:len([t for t in alltr if t["outcome"]==name]) for name in sorted(set(t["outcome"] for t in alltr))}
+    by_symbol_side={sym:{side:summary([t for t in alltr if t["symbol"]==sym and t["side"]==side]) for side in ("LONG","SHORT")} for sym in a.symbols}
+    result={"schema":VERSION,"research_only":True,"live_execution":False,"can_override_production":False,"forward_proof_equivalent":False,"exact_production_scorer":False,"interpretation":"RETROSPECTIVE_POINT_IN_TIME_THESIS_REPLAY_NOT_FORWARD_PROOF","days":a.days,"threshold":THRESHOLD,"symbols":a.symbols,"assumptions":{"signal_uses_past_and_current_closed_1h_only":True,"entry_reference":"decision close","evaluation_horizon_h":12,"intrabar_both_hit":"STOP_FIRST_CONSERVATIVE","risk_per_trade_pct":1.0,"fees_funding_slippage_included":False,"score_is_theory_proxy_not_exact_production_score":True},"overall":summary(alltr),"by_symbol":by,"by_side":by_side,"by_score":by_score,"by_outcome":by_outcome,"by_symbol_side":by_symbol_side,"blockers":blockers,"sample_trades":alltr[:10]}
     print("ATLAS_REPLAY_RESULT="+json.dumps(result,sort_keys=True))
 
 if __name__=="__main__":main()
