@@ -41,3 +41,10 @@ def test_canonical_outcome_migration_preserves_only_proven_prospective_entries()
     assert 'row.get("live_execution") is False' in text
     assert 'execution_eligibility_provenance' in text
     assert 'row["execution_ready_at_capture"] = True' in text
+
+
+def test_canonical_outcome_summary_uses_nested_settlement_truth():
+    text = (ROOT / "canonical_outcome_snapshot.py").read_text(encoding="utf-8")
+    assert '(r.get("settlement") or {}).get("r_multiple")' in text
+    assert 'r.get("r_multiple")' not in text
+    assert 'EXPLICIT_READY_OR_PROVEN_LEGACY_PROSPECTIVE_CANONICAL_ENROLLMENT' in text
