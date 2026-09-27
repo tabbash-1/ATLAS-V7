@@ -66,21 +66,19 @@ class FakeAtlas:
         return rows
 
 
-def test_strong_broad_rally_can_clear_excessive_obstacle_penalty():
+def test_strong_broad_rally_is_evidence_only_and_cannot_clear_structure_penalty():
     atlas = FakeAtlas()
     continuation.install(atlas)
     row = atlas.cloud_score_symbol('BTCUSDT', atlas._spot_klines('BTCUSDT'))
     assert row['continuation_context']['strong'] is True, row
     assert row['score_attribution']['obstacle_adjustment_before_continuation'] == -8
-    assert row['score_attribution']['obstacle_adjustment'] == -3
-    assert row['score_attribution']['momentum_adjustment'] == 6
-    assert row['score_attribution']['market_breadth_adjustment'] == 3
-    assert row['final_score'] >= 68, row
-    assert row['production_signal_qualified'] is True
-    assert row['structural_target_source'] == 'CONTINUATION_EXTENSION_BEYOND_PRIOR_STRUCTURE'
-    assert row['structural_target'] > row['structural_obstacle_price']
-    assert row['rr_tp2'] > 1.0
-
+    assert row['score_attribution']['obstacle_adjustment'] == -8
+    assert row['score_attribution']['continuation_obstacle_relief'] == 0
+    assert row['score_attribution']['continuation_obstacle_reason'] == 'EVIDENCE_ONLY_NO_STRUCTURE_RELIEF'
+    assert row['structural_target_source'] == 'PRIOR_SWING_HIGH'
+    assert atlas.PRODUCTION_CONTINUATION_SCORING_STATE['continuation_evidence_only'] is True
+    assert atlas.PRODUCTION_CONTINUATION_SCORING_STATE['can_relieve_structure_penalty'] is False
+    assert atlas.PRODUCTION_CONTINUATION_SCORING_STATE['can_extend_structural_target'] is False
 
 def test_weak_breadth_does_not_relieve_obstacle():
     breadth = {'available': 8, 'long_fraction': 0.375, 'short_fraction': 0.25}
@@ -114,7 +112,7 @@ def test_momentum_tiers_are_monotonic_but_bounded():
 
 
 if __name__ == '__main__':
-    test_strong_broad_rally_can_clear_excessive_obstacle_penalty()
+    test_strong_broad_rally_is_evidence_only_and_cannot_clear_structure_penalty()
     test_weak_breadth_does_not_relieve_obstacle()
     test_blowoff_rsi_blocks_momentum_bonus_and_continuation_relief()
     test_momentum_tiers_are_monotonic_but_bounded()
