@@ -120,6 +120,7 @@ def build(root: Path) -> dict[str, Any]:
         losses_n = sum(1 for x in rs if x < 0)
         gross_win = sum(x for x in rs if x > 0)
         gross_loss = abs(sum(x for x in rs if x < 0))
+        drawdowns = [float(r["drawdown_after_pct"]) for r in settled if isinstance(r.get("drawdown_after_pct"), (int, float))]
         strict_portfolio.update({
             "closed": len(settled),
             "open_or_unresolved": len(trades) - len(settled),
@@ -129,6 +130,7 @@ def build(root: Path) -> dict[str, Any]:
             "avg_r": round(sum(rs) / len(rs), 4) if rs else None,
             "net_r": round(sum(rs), 4) if rs else None,
             "profit_factor": round(gross_win / gross_loss, 4) if gross_loss > 0 else (None if not rs else float("inf")),
+            "max_drawdown_pct": round(max(drawdowns), 4) if drawdowns else None,
         })
 
     return {
