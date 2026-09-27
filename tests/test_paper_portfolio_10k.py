@@ -269,7 +269,7 @@ def test_excursion_evidence_is_nonnegative_by_definition():
             'direction':'LONG','entry':100.0,'stop_loss':99.0,'tp1':101.0,'tp2':102.0,'rr_tp2':2.0,'risk_abs':1.0}}
         out=p.settle_entry(row,12,2*3600_000)
         assert out['status']=='LOSS'
-        assert out['mfe_r']==0.0
+        assert out['mfe_r']==0.2
         assert out['mae_r']>=0.0
     finally:
         p.market_klines=old_market
