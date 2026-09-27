@@ -69,3 +69,12 @@ def test_offline_forward_uses_shared_status_writer():
     text = FORWARD.read_text(encoding="utf-8")
     assert "scripts/commit_status_with_retry.sh" in text
     assert "git pull --rebase origin main" not in text
+
+
+def test_canonical_outcome_writers_checkout_latest_main_before_generation():
+    paper = PAPER.read_text(encoding="utf-8")
+    forward = FORWARD.read_text(encoding="utf-8")
+    assert "ref: main" in paper
+    assert "ref: main" in forward
+    assert "fetch-depth: 0" in paper
+    assert "fetch-depth: 0" in forward
