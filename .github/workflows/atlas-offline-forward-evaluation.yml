@@ -19,8 +19,8 @@ permissions:
   contents: write
 
 concurrency:
-  group: atlas-offline-forward-evaluation
-  cancel-in-progress: true
+  group: atlas-canonical-outcome-writers
+  cancel-in-progress: false
 
 jobs:
   evaluate:
@@ -74,10 +74,10 @@ jobs:
           jq -e '.schema == "ATLAS_CANONICAL_OUTCOME_SNAPSHOT_V4_SETTLEMENT_AWARE" and .decision_source_of_truth == "FINAL_TRADE_GATE" and .evaluation_horizons_h == [4,8,12]' status/canonical-outcomes-latest.json >/dev/null
       - name: Commit research reports only when data changed
         run: |
-          git config user.name 'atlas-offline-research-bot'
-          git config user.email 'atlas-offline-research-bot@users.noreply.github.com'
-          git add status/offline-forward-evaluation-latest.json status/forward-robustness-guardrails-latest.json status/canonical-outcomes-latest.json
-          if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'chore: update canonical offline forward research [skip ci] [skip render]'
-          git pull --rebase origin main
-          git push
+          bash scripts/commit_status_with_retry.sh \
+            'atlas-offline-research-bot' \
+            'atlas-offline-research-bot@users.noreply.github.com' \
+            'chore: update canonical offline forward research [skip ci] [skip render]' \
+            'status/offline-forward-evaluation-latest.json' \
+            'status/forward-robustness-guardrails-latest.json' \
+            'status/canonical-outcomes-latest.json'
