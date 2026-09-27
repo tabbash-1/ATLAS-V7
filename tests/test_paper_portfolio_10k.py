@@ -230,7 +230,7 @@ def test_tp2_settles_immediately_before_12h_maturity():
 def test_stop_settles_immediately_before_12h_maturity():
     old_market=p.market_klines
     try:
-        candles=[{'open_time':0,'open':100.0,'high':100.2,'low':98.8,'close':99.0}]
+        candles=[{'open_time':0,'open':100.0,'high':100.0,'low':98.8,'close':99.0}]
         p.market_klines=lambda symbol, interval, start, end: (candles,'TEST')
         row={'id':'early-sl','captured_at_ms':0,'symbol':'BTCUSDT','geometry':{
             'direction':'LONG','entry':100.0,'stop_loss':99.0,'tp1':101.0,'tp2':102.0,'rr_tp2':2.0,'risk_abs':1.0}}
