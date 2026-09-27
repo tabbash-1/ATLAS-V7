@@ -262,7 +262,7 @@ def test_no_terminal_hit_stays_open_before_maturity_with_observed_path_only():
 def test_excursion_evidence_is_nonnegative_by_definition():
     old_market=p.market_klines
     try:
-        candles=[{'open_time':0,'open':99.5,'high':99.7,'low':98.8,'close':99.0},
+        candles=[{'open_time':0,'open':100.0,'high':100.2,'low':98.8,'close':99.0},
                  {'open_time':300_000,'open':99.0,'high':99.2,'low':98.7,'close':98.9}]
         p.market_klines=lambda symbol, interval, start, end: (candles,'TEST')
         row={'id':'floor','captured_at_ms':0,'symbol':'BTCUSDT','geometry':{
