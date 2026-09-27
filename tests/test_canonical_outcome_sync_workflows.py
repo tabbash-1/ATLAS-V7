@@ -48,3 +48,9 @@ def test_canonical_outcome_summary_uses_nested_settlement_truth():
     assert '(r.get("settlement") or {}).get("r_multiple")' in text
     assert 'r.get("r_multiple")' not in text
     assert 'EXPLICIT_READY_OR_PROVEN_LEGACY_PROSPECTIVE_CANONICAL_ENROLLMENT' in text
+
+
+def test_canonical_outcome_summary_reports_drawdown_from_strict_settled_rows():
+    text = (ROOT / "canonical_outcome_snapshot.py").read_text(encoding="utf-8")
+    assert 'drawdowns = [float(r["drawdown_after_pct"]) for r in settled' in text
+    assert '"max_drawdown_pct": round(max(drawdowns), 4) if drawdowns else None' in text
