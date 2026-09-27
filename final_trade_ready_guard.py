@@ -19,13 +19,19 @@ from atlas_trader_brain import assess as assess_trader
 from canonical_decision_contract import from_decision
 from golden_thesis_engine import VERSION as GOLDEN_THESIS_VERSION, build as build_golden_thesis
 
-VERSION = "FINAL_TRADE_READY_GUARD_V8_QUALIFICATION_ENFORCED"
+VERSION = "FINAL_TRADE_READY_GUARD_V9_SHORT_EVIDENCE_QUARANTINE"
+SHORT_PRODUCTION_ENV = "ATLAS_SHORT_PRODUCTION_ENABLED"
 PRODUCT_HORIZON = "4-12H"
 EXPERIMENTAL_PROMOTION_ENV = "ATLAS_EXPERIMENTAL_FINAL_EVIDENCE_PROMOTION"
 
 
 def _norm(v):
     return str(v or "").strip().upper()
+
+
+def _short_production_enabled():
+    """SHORT remains observable/researchable but cannot become TRADE_READY by default."""
+    return str(os.environ.get(SHORT_PRODUCTION_ENV, "")).strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _experimental_final_evidence_promotion():
@@ -150,6 +156,7 @@ def assess(row):
     experimental_promotion = _experimental_final_evidence_promotion()
     alignment_accepted = alignment in {"ALIGNED", "CONDITIONAL_ALIGNED", "CONDITIONAL_ALIGNED_12H_NEUTRAL"}
     blockers = []
+    if product == "SHORT" and not _short_production_enabled(): blockers.append("SHORT_EDGE_NOT_PROVEN_PRODUCTION_QUARANTINE")
     if not qualified: blockers.append("PRODUCTION_SIGNAL_NOT_QUALIFIED")
     if product not in {"LONG", "SHORT"}: blockers.append("HTF_PRODUCT_DIRECTION_UNRESOLVED")
     if not alignment_accepted: blockers.append("HTF_4H_12H_NOT_ALIGNED")
