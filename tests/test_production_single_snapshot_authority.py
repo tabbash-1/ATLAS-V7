@@ -96,13 +96,15 @@ def test_final_trade_gate_live_smoke_tracks_current_guard_contract():
 
 def test_paper_ui_consumes_only_canonical_outcome_summary():
     src = text('atlas-paper-portfolio-ui.js')
-    assert '/api/outcomes/summary?scope=signals&horizon=12' in src
-    assert '/api/research/paper-portfolio-10k' not in src
+    assert "const ENDPOINT='/api/research/canonical-paper-portfolio-10k'" in src
+    assert "d.decision_source_of_truth!=='FINAL_TRADE_GATE'" in src
     assert 'Prospective analyst_output LONG/SHORT' not in src
     assert "d.decision_source_of_truth!=='FINAL_TRADE_GATE'" in src
-    assert "d.evaluation_horizons_h.join(',')!=='4,8,12'" in src
-    assert "d.legacy_backfill_allowed!==false" in src
-    assert 'CANONICAL_SIGNAL_COUNT_MISMATCH' in src
+    assert "d.evaluation_horizons.join(',')!=='4h,8h,12h'" in src
+    assert "d.paper_only!==true" in src
+    assert "d.live_execution!==false" in src
+    assert "d.can_override_production!==false" in src
+    assert 'CANONICAL_TRADE_COUNT_MISMATCH' in src
 
 
 def test_production_decision_rejects_stale_responses():

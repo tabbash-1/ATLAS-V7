@@ -69,6 +69,7 @@ def test_cost_model_matches_locked_phase4_assumptions_at_12h():
 def test_safety_constants_are_locked():
     assert m.ACTIVATION_AT=="2026-09-18T07:10:00+00:00"
     assert m.THRESHOLD==68 and m.MIN_N==30
+    assert m.SOURCE_SCHEMA=="ATLAS_PRODUCTION_VALIDATION_SCORECARD_V2_DIAGNOSTICS"
     assert m.FAILFAST_ADVERSE_R==-.25 and m.FAILFAST_WINDOW_H==4
     assert {x["id"] for x in m.PATH_HYPOTHESES}=={"DELAY_ENTRY_1H_CONFIRM","EARLY_MOMENTUM_FAILFAST_EXIT","PROFIT_PROTECTION_TIME_DECAY"}
 
