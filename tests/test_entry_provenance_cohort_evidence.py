@@ -65,6 +65,7 @@ def test_prelocked_negative_feature_can_only_nominate_shadow_test():
 
 
 def test_safety_constants_are_locked():
+    assert m.SOURCE_SCHEMA=="ATLAS_PRODUCTION_VALIDATION_SCORECARD_V2_DIAGNOSTICS"
     assert m.THRESHOLD==68
     assert m.MIN_TOTAL_PROVENANCE==30
     assert m.MIN_BUCKET_N==10
