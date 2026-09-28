@@ -74,6 +74,7 @@ def test_entry_provenance_freezer_is_compact_and_preoutcome():
 def test_safety_contract_constants():
     assert m.THRESHOLD==68.0
     assert m.EPOCH_ID=="HTF_SR_V2_2026-09-14"
+    assert m.SOURCE_SCHEMA=="ATLAS_PRODUCTION_VALIDATION_SCORECARD_V2_DIAGNOSTICS"
 
 
 def test_path_timing_can_tag_early_favorable_reversal_without_causal_claim():
