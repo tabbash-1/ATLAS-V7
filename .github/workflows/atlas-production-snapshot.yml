@@ -31,11 +31,9 @@ on:
       - 'continuous-forward-ui.js'
       - 'forward-champion-ui.js'
       - 'opportunity-scanner-ui.js'
-  # Keep a single explicit 20-minute cadence. This semantically matches the
-  # previous 7,27,47 expression but also gives GitHub a workflow-definition
-  # change to re-register the scheduled trigger after observed scheduler drift.
+  # Explicit 20-minute cadence. This workflow is the canonical Production monitor.
   schedule:
-    - cron: '7,27,47 * * * *'
+    - cron: '*/20 * * * *'
   workflow_dispatch:
 
 permissions:
