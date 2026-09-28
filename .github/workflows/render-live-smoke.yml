@@ -32,7 +32,7 @@ jobs:
               jq -e '
                 .ok == true and .runtime == "WEB_ONLY_FINAL" and .product_horizon == "4-12H" and
                 .production_threshold == 68 and .live_execution == false and
-                .final_trade_ready_guard.version == "FINAL_TRADE_READY_GUARD_V1_HTF_FAIL_CLOSED" and
+                .final_trade_ready_guard.version == "FINAL_TRADE_READY_GUARD_V9_SHORT_EVIDENCE_QUARANTINE" and
                 .final_trade_ready_guard.fail_closed == true and
                 .final_trade_ready_guard.paper_portfolio_authority == "final_trade_gate" and
                 .final_trade_ready_guard.golden_thesis_version == "ATLAS_GOLDEN_THESIS_ENGINE_V1_SHADOW" and
@@ -63,7 +63,7 @@ jobs:
               code=$(curl -L --connect-timeout 10 --max-time 60 -sS -w '%{http_code}' -o "$out" "$base/api/decision/current?symbol=$symbol&t=$(date +%s)" || true)
               if [[ "$code" =~ ^2 ]] && jq -e '
                 .ok == true and (.trade_ready|type) == "boolean" and
-                .final_trade_gate.version == "FINAL_TRADE_READY_GUARD_V1_HTF_FAIL_CLOSED" and
+                .final_trade_gate.version == "FINAL_TRADE_READY_GUARD_V9_SHORT_EVIDENCE_QUARANTINE" and
                 .canonical_decision.schema == "ATLAS_CANONICAL_DECISION_TRUTH_V1" and
                 .canonical_decision.product_horizon == "4-12H" and
                 .golden_thesis.version == "ATLAS_GOLDEN_THESIS_ENGINE_V1_SHADOW" and
