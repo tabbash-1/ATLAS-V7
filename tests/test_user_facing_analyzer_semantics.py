@@ -21,7 +21,8 @@ def test_canonical_forward_ui_is_distinct_and_stale_aware():
     assert 'Research/shadow analyst_output never counts as portfolio P&amp;L.' in js
     assert 'no research substitution' in js
     assert "source_of_truth:'FINAL_TRADE_GATE'" in js
-    assert 'legacy_backfill_allowed!==false' in js
+    assert 'no historical backfill' in js
+    assert 'No research fallback allowed' in js
     assert 'STALE_HOURS=2' in js
     assert 'paper_only:true' in js
     assert 'live_execution:false' in js
