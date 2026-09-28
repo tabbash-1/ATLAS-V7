@@ -12,24 +12,15 @@ from decision_intelligence import VERSION as DECISION_INTELLIGENCE_VERSION, buil
 # Keep the public contract identifier stable for existing API/CI consumers while
 # exposing feature revisions separately.
 VERSION = 'PRODUCT_QUALITY_GATE_V2_CANONICAL_ANALYST_OUTPUT'
-FEATURE_VERSION = 'PRODUCT_QUALITY_GATE_FEATURE_V6_CURRENT_EVIDENCE_REVALIDATION'
+FEATURE_VERSION = 'PRODUCT_QUALITY_GATE_FEATURE_V7_STALE_QUARANTINE_REMOVAL'
 PROFILE_VERSION = 'ATLAS_ANALYSIS_EVIDENCE_PROFILE_V1'
 PRODUCT_HORIZON = '4-12H'
 PRODUCT_LANE = 'CORE_4_12H'
 
-QUARANTINE = {
-    # Only setup families still supported by the latest independent 12H audit
-    # belong here. Positive/revalidated families must not remain blocked because
-    # of stale historical constants.
-    ('LONG', 'TREND_UP', 'TREND_PULLBACK_LONG'): {
-        'evidence_n12': 14,
-        'mean12_pct': -0.15266,
-        'positive12_pct': 64.29,
-        'loss_ge_1_12_pct': 28.57,
-        'source': 'status/monthly-product-audit-latest.json',
-        'evidence_generated_at': '2026-09-23T05:54:39.198476+00:00',
-    },
-}
+# No setup family is kept in a Production veto from stale embedded evidence.
+# A future quarantine must be promoted from current independent evidence and
+# committed together with its current evidence timestamp and regression proof.
+QUARANTINE = {}
 
 REVALIDATED_SETUP_FAMILIES = {
     ('LONG', 'TREND_UP', 'MARKET_CONTINUATION_LONG'): {
