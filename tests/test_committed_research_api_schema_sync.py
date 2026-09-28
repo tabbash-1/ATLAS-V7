@@ -9,6 +9,7 @@ def test_report_registry_tracks_current_committed_schemas():
         '/api/research/forward-robustness-guardrails': 'ATLAS_FORWARD_ROBUSTNESS_GUARDRAILS_V2_CANONICAL_TRUTH',
         '/api/research/prospective-direction-guardrail': 'ATLAS_PROSPECTIVE_DIRECTION_GUARDRAIL_V1_4H',
         '/api/research/paper-portfolio-10k': 'ATLAS_PAPER_10K_ANALYST_OUTPUT_V1',
+        '/api/research/canonical-paper-portfolio-10k': 'ATLAS_PAPER_PORTFOLIO_10K_V3_CANONICAL_TRUTH',
         '/api/research/learning-engine': 'ATLAS_LEARNING_ENGINE_V1',
     }
     assert {route: spec[1] for route, spec in api.REPORTS.items()} == expected
