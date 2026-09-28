@@ -27,7 +27,7 @@ from execution_cost_model import cost_bps_to_r
 ROOT = Path(__file__).resolve().parent
 PATH = ROOT / 'status/production-path-settlement-latest.json'
 HISTORY = ROOT / 'status/history/production-snapshots.jsonl'
-SCHEMA = 'ATLAS_OFFLINE_PRODUCTION_PATH_SETTLEMENT_V4_NO_FAKE_REALIZED_R'
+SCHEMA = 'ATLAS_OFFLINE_PRODUCTION_PATH_SETTLEMENT_V5_SCOPED_NO_FAKE_REALIZED_R'
 
 FACTOR_KEYS = {
     'trend_base': 'trend_base',
