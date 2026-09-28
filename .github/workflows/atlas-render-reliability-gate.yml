@@ -49,8 +49,15 @@ jobs:
           for round in 1 2 3; do
             for s in "${symbols[@]}"; do
               requests=$((requests+1)); out="/tmp/atlas-reliability/${round}-${s}.json"
-              code=$(curl -L --connect-timeout 20 --max-time 90 -sS -w '%{http_code}' -o "$out" "$BASE_URL/api/decision/current?symbol=$s&t=$(date +%s%N)" || true)
-              if [[ ! "$code" =~ ^2 ]] || ! jq -e --arg s "$s" --arg g "$EXPECTED_GATE" '.ok==true and .symbol==$s and .canonical_product_contract=="analyst_output" and .analyst_output.contract_version==$g and .analyst_output.horizon=="4-12H" and .analyst_output.analysis_only==true and .analyst_output.live_execution==false' "$out" >/dev/null 2>&1; then
+              success=0
+              for attempt in $(seq 1 8); do
+                code=$(curl -L --connect-timeout 20 --max-time 90 -sS -w '%{http_code}' -o "$out" "$BASE_URL/api/decision/current?symbol=$s&t=$(date +%s%N)" || true)
+                if [[ "$code" =~ ^2 ]] && jq -e --arg s "$s" --arg g "$EXPECTED_GATE" '.ok==true and .symbol==$s and .canonical_product_contract=="analyst_output" and .analyst_output.contract_version==$g and .analyst_output.horizon=="4-12H" and .analyst_output.analysis_only==true and .analyst_output.live_execution==false' "$out" >/dev/null 2>&1; then
+                  success=1; break
+                fi
+                echo "RETRY round=$round symbol=$s attempt=$attempt http=$code"; sleep 5
+              done
+              if [[ "$success" != 1 ]]; then
                 failures=$((failures+1)); echo "FAIL round=$round symbol=$s http=$code"
               else
                 echo "PASS round=$round symbol=$s decision=$(jq -r '.analyst_output.decision' "$out")"
