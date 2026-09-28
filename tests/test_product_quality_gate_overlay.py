@@ -39,27 +39,26 @@ def htf_geometry(ready=True, reason=None):
     }
 
 
-def test_quarantined_setup_demotes_only_product_action():
+def test_stale_pullback_quarantine_no_longer_demotes_product_action():
     a=atlas_with(base_row())
     qg.install(a)
     r=a.production_decision('BTCUSDT')
-    assert r['setup_quality_gate']['status']=='BLOCK'
+    assert r['setup_quality_gate']['status']=='PASS'
     assert r['production_signal_qualified'] is True
     assert r['score']==75.0 and r['signal_threshold']==68.0
     assert r['production_threshold_changed_by_quality_gate'] is False
-    assert r['actionable_decision']=='WAIT'
-    assert r['primary_analysis']['decision']=='WAIT'
-    assert r['primary_analysis']['analysis_ready'] is False
-    assert r['best_available_action']['action']=='WAIT'
-    assert r['analyst_output']['decision']=='WAIT'
-    assert r['analyst_output']['entry'] is None
+    assert r['actionable_decision']=='LONG'
+    assert r['primary_analysis']['decision']=='LONG'
+    assert r['analyst_output']['decision']=='LONG'
+    assert r['analyst_output']['entry']==100.0
     assert r['analyst_output']['candidate_plan']['entry']==100.0
     assert r['analyst_output']['horizon']=='4-12H'
     assert r['analyst_output']['confidence_basis']=='PRODUCTION_SCORE_NOT_PROBABILITY'
-    assert r['analyst_output']['evidence_profile']['quality']=='BLOCKED'
+    assert r['analyst_output']['evidence_profile']['quality']=='NORMAL'
     assert r['analyst_output']['geometry_readiness']['ready'] is True
     assert r['canonical_product_contract']=='analyst_output'
     assert r['canonical_product_direction']=='LONG'
+    assert ('LONG','TREND_UP','TREND_PULLBACK_LONG') not in qg.QUARANTINE
     assert r['analysis_only'] is True and r['live_execution'] is False
 
 
