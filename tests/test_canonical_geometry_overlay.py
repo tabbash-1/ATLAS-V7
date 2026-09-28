@@ -20,11 +20,11 @@ def test_short_geometry_recomputes_rr_from_exact_levels():
     assert g['risk_reward'] == 2.0
 
 
-def test_geometry_blocks_rr_below_one_with_exact_code():
+def test_geometry_blocks_rr_below_two_with_exact_code():
     g = assess('LONG', 100.0, 98.0, 101.0)
     assert g['status'] == 'BLOCK'
     assert g['qualified'] is False
-    assert g['reason'] == 'RR_BELOW_ONE_TO_ONE'
+    assert g['reason'] == 'RR_BELOW_TWO_TO_ONE'
     assert g['primary_blocker'] == 'RR_BELOW_MINIMUM'
     assert g['blocker_codes'] == ['RR_BELOW_MINIMUM']
     assert g['risk_reward'] == 0.5
