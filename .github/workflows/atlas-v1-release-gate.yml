@@ -48,7 +48,7 @@ jobs:
       BASE_URL: https://atlas-v7.onrender.com
       EXPECTED_GATE: PRODUCT_QUALITY_GATE_V2_CANONICAL_ANALYST_OUTPUT
       EXPECTED_PROFILE: ATLAS_ANALYSIS_EVIDENCE_PROFILE_V1
-      EXPECTED_CANONICAL_GEOMETRY: ATLAS_CANONICAL_GEOMETRY_TRUTH_V1
+      EXPECTED_CANONICAL_GEOMETRY: ATLAS_CANONICAL_GEOMETRY_TRUTH_V2_SCORE_INDEPENDENT
     steps:
       - uses: actions/checkout@v4
 
@@ -160,7 +160,7 @@ jobs:
           grep -q '"order_routing": False' atlas_release_contract.py
           grep -q '"live_execution": False' atlas_release_contract.py
           grep -q '"score_or_threshold_changed_by_release": False' atlas_release_contract.py
-          grep -q 'ATLAS_CANONICAL_GEOMETRY_TRUTH_V1' canonical_geometry_overlay.py
+          grep -q 'ATLAS_CANONICAL_GEOMETRY_TRUTH_V2_SCORE_INDEPENDENT' canonical_geometry_overlay.py
           grep -q 'RECOMPUTED_FROM_EXACT_ENTRY_STOP_TARGET' canonical_geometry_overlay.py
           PYTHONPATH=. python - <<'PY'
           from tests.test_user_facing_analyzer_semantics import (
