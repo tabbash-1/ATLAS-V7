@@ -89,5 +89,5 @@ def test_product_shell_identity_is_analysis_only():
 def test_canonical_paper_ui_uses_valid_cache_busting_query():
     js=Path('atlas-paper-portfolio-ui.js').read_text()
     assert "const ENDPOINT='/api/research/canonical-paper-portfolio-10k'" in js
-    assert "fetch(\`${ENDPOINT}?t=${Date.now()}\`" in js
-    assert "fetch(\`${ENDPOINT}&t=${Date.now()}\`" not in js
+    assert "fetch(`${ENDPOINT}?t=${Date.now()}`" in js
+    assert "fetch(`${ENDPOINT}&t=${Date.now()}`" not in js
