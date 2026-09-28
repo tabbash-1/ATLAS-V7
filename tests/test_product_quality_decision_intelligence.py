@@ -73,7 +73,7 @@ def test_installed_layer_preserves_score_threshold_decision_and_geometry():
     assert state['decision_intelligence_can_override'] is False
 
 
-def test_quarantine_still_has_authority_over_shadow_intelligence():
+def test_stale_quarantine_cannot_override_canonical_decision():
     raw = _production_row()
     raw['regime'] = 'TREND_UP'
     raw['playbook'] = 'TREND_PULLBACK_LONG'
@@ -81,9 +81,10 @@ def test_quarantine_still_has_authority_over_shadow_intelligence():
     gate.install(atlas)
     out = atlas.production_decision('BTCUSDT')
 
-    assert out['pre_quality_gate_actionable_decision'] == 'LONG'
-    assert out['canonical_product_decision'] == 'WAIT'
-    assert out['analyst_output']['decision'] == 'WAIT'
-    assert out['decision_intelligence']['canonical_decision'] == 'WAIT'
+    assert 'pre_quality_gate_actionable_decision' not in out
+    assert out['setup_quality_gate']['status'] == 'PASS'
+    assert out['canonical_product_decision'] == 'LONG'
+    assert out['analyst_output']['decision'] == 'LONG'
+    assert out['decision_intelligence']['canonical_decision'] == 'LONG'
     assert out['decision_intelligence']['can_override_canonical_decision'] is False
-    assert '4_12H_SETUP_FAMILY_FAILED_FORWARD_EVIDENCE_GATE' in out['decision_intelligence']['hard_blockers']
+    assert ('LONG','TREND_UP','TREND_PULLBACK_LONG') not in gate.QUARANTINE
