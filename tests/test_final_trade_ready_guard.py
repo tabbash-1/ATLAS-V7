@@ -311,3 +311,19 @@ def test_blowoff_pullback_entry_can_pass_if_other_evidence_is_ready():
     r=guard.apply(d)
     assert r['trade_ready'] is False
     assert r['final_trade_gate']['trader_brain']['desired_entry_mode']=='PULLBACK'
+
+def test_validated_execution_costs_must_leave_at_least_two_r():
+    d=base_row()
+    d['trade_plan']=dict(d['trade_plan']); d['trade_plan']['rr_tp2']=2.0
+    d['execution_cost']={'validated':True,'fee_bps':5.0,'spread_bps':1.0,'slippage_bps':2.0}
+    r=guard.apply(d)
+    assert r['trade_ready'] is False
+    assert 'NET_RR_AFTER_COSTS_BELOW_2R' in r['final_trade_gate']['blockers']
+    assert r['final_trade_gate']['net_rr_after_costs']['net_rr'] < 2.0
+
+def test_missing_cost_evidence_is_disclosed_not_invented():
+    r=guard.apply(base_row())
+    n=r['final_trade_gate']['net_rr_after_costs']
+    assert n['validated'] is False
+    assert n['reason']=='EXECUTION_COST_EVIDENCE_UNAVAILABLE'
+    assert r['final_trade_gate']['net_rr_cost_evidence_required_for_claim'] is True
