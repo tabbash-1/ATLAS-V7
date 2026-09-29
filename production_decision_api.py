@@ -13,7 +13,7 @@ from quick_reentry_guard import QuickReentryGuard
 from production_signal_scoring import candle_progress, paced_relative_volume
 from market_regime_engine import analyze as independent_regime_analyze
 
-VERSION = "PRODUCTION_DECISION_API_V7_QUICK_REENTRY_GUARD+PACED_VOLUME_V1"
+VERSION = "PRODUCTION_DECISION_API_V8_1_5ATR_RISK_CONSISTENCY"
 GEOMETRY_MIN_RR = 2.0
 
 
@@ -135,8 +135,8 @@ def install(atlas):
         stop=target=rr=None
         if isinstance(row,dict):
             rr=atlas.fnum(row.get('rr_tp2'))
-            if candidate_direction=='LONG' and atr: stop,target=px-atr*1.2,res
-            elif candidate_direction=='SHORT' and atr: stop,target=px+atr*1.2,sup
+            if candidate_direction=='LONG' and atr: stop,target=px-atr*1.5,res
+            elif candidate_direction=='SHORT' and atr: stop,target=px+atr*1.5,sup
 
         geometry=geometry_assessment(candidate_direction, px, stop, target, rr)
         execution_ready=bool(qualified and geometry.get('qualified'))
