@@ -1,121 +1,63 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import datetime as dt
-import json
-import pathlib
+import datetime as dt, json, pathlib
 from collections import Counter
 
-ROOT = pathlib.Path(__file__).resolve().parent
-PORTFOLIO = ROOT / 'status/paper-portfolio-10k-analyst-latest.json'
-INTEGRITY = ROOT / 'status/paper-portfolio-10k-analyst-integrity.json'
-ATTRIBUTION = ROOT / 'status/analyst-forward-attribution-latest.json'
-OUT = ROOT / 'status/product-readiness-latest.json'
-SCHEMA = 'ATLAS_PRODUCT_READINESS_GATE_V1'
-CONTRACT = 'analyst_output'
-HORIZON = '4-12H'
-MIN_MATURED_12H = 30
-MIN_DIRECTIONAL_MATURED = 5
-
+ROOT=pathlib.Path(__file__).resolve().parent
+OUTCOMES=ROOT/'status/canonical-outcomes-latest.json'
+INTEGRITY=ROOT/'status/paper-portfolio-10k-integrity.json'
+OUT=ROOT/'status/product-readiness-latest.json'
+SCHEMA='ATLAS_PRODUCT_READINESS_GATE_V2_FINAL_GATE_AUTHORITY'
+SOURCE='FINAL_TRADE_GATE'
+HORIZON='4-12H'
+MIN_MATURED_12H=30
+MIN_DIRECTIONAL_MATURED=5
 
 def load(path):
-    if not path.exists():
-        return None
-    return json.loads(path.read_text(encoding='utf-8'))
+    return json.loads(path.read_text(encoding='utf-8')) if path.exists() else None
 
+def _check(name,passed,observed=None,required=None,severity='BLOCKER'):
+    return {'name':name,'passed':bool(passed),'observed':observed,'required':required,'severity':severity}
 
-def _bool_check(name, passed, observed=None, required=None, severity='BLOCKER'):
+def build(outcomes=None,integrity=None,attribution=None):
+    outcomes=outcomes if outcomes is not None else load(OUTCOMES)
+    integrity=integrity if integrity is not None else load(INTEGRITY)
+    safety=(outcomes or {}).get('safety') or {}
+    rows=list(((outcomes or {}).get('signals') or {}).get('rows') or [])
+    path=(outcomes or {}).get('path_summary') or {}
+    checks=[
+      _check('CANONICAL_FINAL_TRADE_GATE_AUTHORITY',bool(outcomes) and outcomes.get('decision_source_of_truth')==SOURCE,None if not outcomes else outcomes.get('decision_source_of_truth'),SOURCE),
+      _check('CANONICAL_4_12H_HORIZON',bool(outcomes) and outcomes.get('product_horizon')==HORIZON,None if not outcomes else outcomes.get('product_horizon'),HORIZON),
+      _check('ANALYSIS_ONLY_NO_LIVE_EXECUTION',bool(outcomes) and safety.get('live_execution') is False and safety.get('can_override_production') is False,None if not outcomes else {'live_execution':safety.get('live_execution'),'can_override_production':safety.get('can_override_production')},{'live_execution':False,'can_override_production':False}),
+      _check('APPEND_ONLY_CANONICAL_LEDGER',bool(integrity) and integrity.get('append_only_verified') is True,None if not integrity else integrity.get('append_only_verified'),True),
+      _check('STRICT_EXECUTION_ELIGIBILITY',bool(outcomes) and outcomes.get('legacy_backfill_allowed') is False and outcomes.get('legacy_score_path_research_included') is False,None if not outcomes else {'legacy_backfill_allowed':outcomes.get('legacy_backfill_allowed'),'legacy_score_path_research_included':outcomes.get('legacy_score_path_research_included')},{'legacy_backfill_allowed':False,'legacy_score_path_research_included':False}),
+    ]
+    settled=[r for r in rows if isinstance((r.get('settlement') or {}).get('r_multiple'),(int,float))]
+    dirs=Counter(str(r.get('direction') or 'UNKNOWN').upper() for r in settled)
+    n=len(settled)
+    checks.append(_check('MINIMUM_MATURED_12H_SAMPLE',n>=MIN_MATURED_12H,n,MIN_MATURED_12H,'EVIDENCE_BLOCKER'))
+    for d in ('LONG','SHORT'):
+        checks.append(_check(f'MINIMUM_{d}_MATURED_SAMPLE',dirs.get(d,0)>=MIN_DIRECTIONAL_MATURED,dirs.get(d,0),MIN_DIRECTIONAL_MATURED,'EVIDENCE_BLOCKER'))
+    avg_r=path.get('avg_r'); net_r=path.get('net_r')
+    checks.append(_check('POSITIVE_FORWARD_AVERAGE_R',n>=MIN_MATURED_12H and isinstance(avg_r,(int,float)) and avg_r>0,avg_r,'> 0 after minimum sample','EVIDENCE_BLOCKER'))
+    checks.append(_check('POSITIVE_FORWARD_NET_R',n>=MIN_MATURED_12H and isinstance(net_r,(int,float)) and net_r>0,net_r,'> 0 after minimum sample','EVIDENCE_BLOCKER'))
+    technical=all(c['passed'] for c in checks if c['severity']=='BLOCKER')
+    evidence=all(c['passed'] for c in checks if c['severity']=='EVIDENCE_BLOCKER')
+    state='BLOCKED_TECHNICAL' if not technical else ('FORWARD_EVIDENCE_GATE_PASSED' if evidence else 'TECHNICALLY_READY_EVIDENCE_PENDING')
     return {
-        'name': name,
-        'passed': bool(passed),
-        'observed': observed,
-        'required': required,
-        'severity': severity,
+      'schema':SCHEMA,'generated_at':dt.datetime.now(dt.timezone.utc).isoformat(),
+      'product_identity':'CRYPTO_TRADE_INTELLIGENCE_AND_ANALYSIS_SYSTEM','canonical_contract':SOURCE,
+      'decision_source_of_truth':SOURCE,'product_horizon':HORIZON,'analysis_only':True,'live_execution':False,
+      'can_override_production':False,'production_score_threshold_changed':False,'state':state,
+      'technical_ready':technical,'forward_evidence_ready':evidence,
+      'claim_policy':{'may_claim_technically_operational':technical,'may_claim_forward_edge_validated':evidence,'may_claim_profitable':False,'note':'Readiness is evaluated only from prospective FINAL_TRADE_GATE execution-eligible paper evidence. Profitability still requires costs and larger independent forward evidence.'},
+      'preregistered_evidence_requirements':{'minimum_matured_12h_entries':MIN_MATURED_12H,'minimum_matured_per_direction':MIN_DIRECTIONAL_MATURED,'average_r':'> 0','net_r':'> 0'},
+      'observed':{'entries':len(rows),'matured_12h_terminal':n,'matured_by_direction':dict(sorted(dirs.items())),'avg_r':avg_r,'net_r':net_r,'append_only_verified':None if not integrity else integrity.get('append_only_verified'),'official_trade_authority':None if not outcomes else outcomes.get('official_trade_authority')},
+      'checks':checks,'blockers':[c for c in checks if not c['passed']],
+      'research_lane_excluded_from_readiness':'analyst_output'
     }
-
-
-def build(portfolio=None, integrity=None, attribution=None):
-    portfolio = portfolio if portfolio is not None else load(PORTFOLIO)
-    integrity = integrity if integrity is not None else load(INTEGRITY)
-    attribution = attribution if attribution is not None else load(ATTRIBUTION)
-
-    checks = []
-    checks.append(_bool_check('CANONICAL_ANALYST_CONTRACT', bool(portfolio) and portfolio.get('canonical_contract') == CONTRACT, None if not portfolio else portfolio.get('canonical_contract'), CONTRACT))
-    checks.append(_bool_check('CANONICAL_4_12H_HORIZON', bool(portfolio) and portfolio.get('product_horizon') == HORIZON, None if not portfolio else portfolio.get('product_horizon'), HORIZON))
-    checks.append(_bool_check('ANALYSIS_ONLY_NO_LIVE_EXECUTION', bool(portfolio) and portfolio.get('live_execution') is False and portfolio.get('can_override_production') is False, None if not portfolio else {'live_execution': portfolio.get('live_execution'), 'can_override_production': portfolio.get('can_override_production')}, {'live_execution': False, 'can_override_production': False}))
-    checks.append(_bool_check('APPEND_ONLY_FORWARD_LEDGER', bool(integrity) and integrity.get('append_only_verified') is True, None if not integrity else integrity.get('append_only_verified'), True))
-    checks.append(_bool_check('ATTRIBUTION_IS_EVIDENCE_ONLY', bool(attribution) and attribution.get('analysis_only') is True and attribution.get('live_execution') is False and attribution.get('can_override_production') is False and attribution.get('can_change_score') is False and attribution.get('can_change_threshold') is False, None if not attribution else {'analysis_only': attribution.get('analysis_only'), 'live_execution': attribution.get('live_execution'), 'can_override_production': attribution.get('can_override_production'), 'can_change_score': attribution.get('can_change_score'), 'can_change_threshold': attribution.get('can_change_threshold')}, {'analysis_only': True, 'live_execution': False, 'can_override_production': False, 'can_change_score': False, 'can_change_threshold': False}))
-
-    trades = list((portfolio or {}).get('trades') or [])
-    matured = [t for t in trades if ((t.get('settlement') or {}).get('terminal') is True)]
-    direction_counts = Counter(str(t.get('direction') or 'UNKNOWN').upper() for t in matured)
-    portfolio_stats = (portfolio or {}).get('portfolio') or {}
-    matured_n = len(matured)
-    checks.append(_bool_check('MINIMUM_MATURED_12H_SAMPLE', matured_n >= MIN_MATURED_12H, matured_n, MIN_MATURED_12H, 'EVIDENCE_BLOCKER'))
-    for direction in ('LONG', 'SHORT'):
-        checks.append(_bool_check(f'MINIMUM_{direction}_MATURED_SAMPLE', direction_counts.get(direction, 0) >= MIN_DIRECTIONAL_MATURED, direction_counts.get(direction, 0), MIN_DIRECTIONAL_MATURED, 'EVIDENCE_BLOCKER'))
-
-    avg_r = portfolio_stats.get('avg_r')
-    net_r = portfolio_stats.get('net_r')
-    checks.append(_bool_check('POSITIVE_FORWARD_AVERAGE_R', matured_n >= MIN_MATURED_12H and isinstance(avg_r, (int, float)) and avg_r > 0, avg_r, '> 0 after minimum sample', 'EVIDENCE_BLOCKER'))
-    checks.append(_bool_check('POSITIVE_FORWARD_NET_R', matured_n >= MIN_MATURED_12H and isinstance(net_r, (int, float)) and net_r > 0, net_r, '> 0 after minimum sample', 'EVIDENCE_BLOCKER'))
-
-    technical_names = {'CANONICAL_ANALYST_CONTRACT','CANONICAL_4_12H_HORIZON','ANALYSIS_ONLY_NO_LIVE_EXECUTION','APPEND_ONLY_FORWARD_LEDGER','ATTRIBUTION_IS_EVIDENCE_ONLY'}
-    technical_ready = all(c['passed'] for c in checks if c['name'] in technical_names)
-    evidence_ready = all(c['passed'] for c in checks if c['severity'] == 'EVIDENCE_BLOCKER')
-
-    if not technical_ready:
-        state = 'BLOCKED_TECHNICAL'
-    elif not evidence_ready:
-        state = 'TECHNICALLY_READY_EVIDENCE_PENDING'
-    else:
-        state = 'FORWARD_EVIDENCE_GATE_PASSED'
-
-    blockers = [c for c in checks if not c['passed']]
-    return {
-        'schema': SCHEMA,
-        'generated_at': dt.datetime.now(dt.timezone.utc).isoformat(),
-        'product_identity': 'CRYPTO_TRADE_INTELLIGENCE_AND_ANALYSIS_SYSTEM',
-        'canonical_contract': CONTRACT,
-        'product_horizon': HORIZON,
-        'analysis_only': True,
-        'live_execution': False,
-        'can_override_production': False,
-        'production_score_threshold_changed': False,
-        'state': state,
-        'technical_ready': technical_ready,
-        'forward_evidence_ready': evidence_ready,
-        'claim_policy': {
-            'may_claim_technically_operational': technical_ready,
-            'may_claim_forward_edge_validated': evidence_ready,
-            'may_claim_profitable': False,
-            'note': 'Profitability remains a stronger claim than this gate; fees/slippage/funding and larger independent forward evidence remain required.',
-        },
-        'preregistered_evidence_requirements': {
-            'minimum_matured_12h_entries': MIN_MATURED_12H,
-            'minimum_matured_per_direction': MIN_DIRECTIONAL_MATURED,
-            'average_r': '> 0',
-            'net_r': '> 0',
-        },
-        'observed': {
-            'entries': len(trades),
-            'matured_12h_terminal': matured_n,
-            'matured_by_direction': dict(sorted(direction_counts.items())),
-            'avg_r': avg_r,
-            'net_r': net_r,
-            'append_only_verified': None if not integrity else integrity.get('append_only_verified'),
-            'attribution_context_complete': None if not attribution else ((attribution.get('counts') or {}).get('context_complete')),
-        },
-        'checks': checks,
-        'blockers': blockers,
-    }
-
 
 def main():
-    out = build()
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps(out, indent=2, sort_keys=True) + '\n', encoding='utf-8')
-    print(json.dumps({'state': out['state'], 'technical_ready': out['technical_ready'], 'forward_evidence_ready': out['forward_evidence_ready'], 'blockers': [b['name'] for b in out['blockers']]}, sort_keys=True))
-
-
-if __name__ == '__main__':
-    main()
+    out=build(); OUT.write_text(json.dumps(out,indent=2,sort_keys=True)+'\n',encoding='utf-8')
+    print(json.dumps({'state':out['state'],'technical_ready':out['technical_ready'],'forward_evidence_ready':out['forward_evidence_ready'],'blockers':[b['name'] for b in out['blockers']]},sort_keys=True))
+if __name__=='__main__': main()
