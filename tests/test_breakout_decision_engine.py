@@ -33,8 +33,11 @@ def test_confirmed_breakout_clears_false_obstacle_penalty():
     rows=base_series()
     prior_high=max(x['high'] for x in rows[-25:-1])
     px=prior_high + 1.0
-    rows[-1]=candle(100, px, high=px+0.2, low=px-0.7, open_=px-0.8)
-    ctx=scoring.breakout_context(rows, px, 'LONG', 4, 2.0, 1.0, 1.0)
+    # Breakout confirmation is closed-candle only: make the penultimate candle
+    # the completed breakout and keep a separate live candle after it.
+    rows[-2]=candle(99, px, high=px+0.2, low=px-0.7, open_=px-0.8)
+    rows[-1]=candle(100, px+0.05, high=px+0.1, low=px-0.05, open_=px)
+    ctx=scoring.breakout_context(rows, px+0.05, 'LONG', 4, 2.0, 1.0, 1.0, closed_rv=1.0)
     assert ctx['confirmed'] is True
     adj, reason=scoring.obstacle_adjustment(None, 'NO_PRIOR_RESISTANCE_AHEAD', True)
     assert adj == 3
