@@ -7,7 +7,7 @@ Legacy score is evidence only and cannot independently authorize or veto a trade
 """
 from __future__ import annotations
 
-VERSION = "ATLAS_TRADER_BRAIN_V5_SHORT_PULLBACK_CONFIRMATION"
+VERSION = "ATLAS_TRADER_BRAIN_V6_THREE_CONFIRMATIONS"
 MIN_RR = 2.0
 ACCEPTED_ALIGNMENT = {"ALIGNED", "CONDITIONAL_ALIGNED", "CONDITIONAL_ALIGNED_12H_NEUTRAL"}
 EXPLICIT_CONFLICT_ALIGNMENTS = {"CONFLICT", "HTF_CONFLICT", "OPPOSED", "MISALIGNED", "DIVERGENT"}
@@ -134,7 +134,30 @@ def assess(row):
     if product == "SHORT" and playbook == "TREND_PULLBACK" and not short_pullback_confirmed:
         waits.append("TRADER_WAIT_SHORT_PULLBACK_RESUMPTION")
 
+    # Require at least three independent evidence families before TRADE_READY.
+    # Score itself is deliberately excluded: it is a summary, not an independent confirmation.
     score_attr = row.get("score_attribution") or ((row.get("decision_provenance") or {}).get("score_attribution") or {})
+    confirmations = []
+    if product in {"LONG", "SHORT"} and alignment in ACCEPTED_ALIGNMENT:
+        confirmations.append("HTF_STRUCTURE")
+    if entry == product and product in {"LONG", "SHORT"}:
+        confirmations.append("MOMENTUM_1H_TRIGGER")
+    try:
+        rv = float(row.get("relative_volume"))
+    except (TypeError, ValueError):
+        rv = None
+    if rv is not None and rv >= 1.0:
+        confirmations.append("VOLUME")
+    futures_available = row.get("futures_available") is True
+    futures_reason = _norm(score_attr.get("futures_reason"))
+    if futures_available and futures_reason == "ALIGNED":
+        confirmations.append("DERIVATIVES")
+    if geometry_ready:
+        confirmations.append("STRUCTURE_LOCATION")
+    confirmations = list(dict.fromkeys(confirmations))
+    if len(confirmations) < 3:
+        waits.append("TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS")
+
     extension_reason = _norm(score_attr.get("extension_guard_reason"))
     extension_adjustment = _num(score_attr.get("extension_guard_adjustment"))
     extension_flag = any(token in extension_reason for token in ("BLOWOFF", "OVEREXTEND", "CHASE", "LATE_ENTRY"))
@@ -173,6 +196,9 @@ def assess(row):
         "geometry_ready": geometry_ready,
         "rr_tp2": round(rr, 3) if rr is not None else None,
         "minimum_rr_required": MIN_RR,
+        "independent_confirmations": confirmations,
+        "independent_confirmation_count": len(confirmations),
+        "minimum_independent_confirmations_required": 3,
         "fatal_blockers": list(dict.fromkeys(fatal)),
         "wait_blockers": list(dict.fromkeys(waits)),
         "legacy_score": _num(row.get("score") or (row.get("analyst_output") or {}).get("confidence")),
