@@ -8,7 +8,7 @@ management plans are exposed only when their level order and actual R:R are vali
 MIN_EXECUTION_RR = 1.0
 TP1_REALIZE_FRACTION = 0.50
 REMAINDER_FRACTION = 1.0 - TP1_REALIZE_FRACTION
-POLICY_VERSION = 'ATLAS_EXECUTION_RISK_V1_STRUCTURAL_TP1_PROTECT'
+POLICY_VERSION = 'ATLAS_EXECUTION_RISK_V2_STRUCTURAL_1_5ATR_TP1_PROTECT'
 
 
 def _fnum(value):
@@ -156,13 +156,13 @@ def _execution_geometry_from_live(atlas, symbol, decision):
 
     if direction == 'LONG':
         target = resistance if resistance is not None and resistance > entry else None
-        atr_stop = entry - 1.2 * atr
+        atr_stop = entry - 1.5 * atr
         structural_stop = support if support is not None and support < entry else None
         stops = [x for x in (atr_stop, structural_stop) if x is not None and 0 < x < entry]
         stop = min(stops) if stops else None
     else:
         target = support if support is not None and support < entry else None
-        atr_stop = entry + 1.2 * atr
+        atr_stop = entry + 1.5 * atr
         structural_stop = resistance if resistance is not None and resistance > entry else None
         stops = [x for x in (atr_stop, structural_stop) if x is not None and x > entry]
         stop = max(stops) if stops else None
@@ -302,7 +302,7 @@ def install(atlas):
                 'reason': 'STRUCTURE_PLUS_ATR_FLOOR_ACTUAL_RR' if geometry['valid'] else 'STRUCTURAL_RR_BELOW_ONE_TO_ONE',
                 'min_risk_reward': MIN_EXECUTION_RR,
                 'risk_reward': round(rr, 6),
-                'stop_method': 'FARTHER_OF_STRUCTURE_OR_1_2_ATR',
+                'stop_method': 'FARTHER_OF_STRUCTURE_OR_1_5_ATR',
                 'target_method': 'NEXT_STRUCTURAL_SUPPORT_RESISTANCE',
             }
 
