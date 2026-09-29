@@ -9,7 +9,7 @@ rather than the current candle's own high/low.
 
 import time
 
-VERSION = "PROD_SIGNAL_SCORING_V10_DIRECTIONAL_ATR_TARGETS"
+VERSION = "PROD_SIGNAL_SCORING_V11_1_5ATR_RISK_CONSISTENCY"
 LOOKBACK_BARS = 96
 RANGE_BARS = 24
 
@@ -252,7 +252,7 @@ def install(atlas):
         else:
             pb = 'TREND_PULLBACK_LONG' if direction == 'LONG' else 'TREND_PULLBACK_SHORT'
 
-        risk = atr * 1.2
+        risk = atr * 1.5
         if level is not None:
             target = level
             target_source = obstacle_source
