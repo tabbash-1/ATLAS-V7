@@ -8,7 +8,7 @@ the canonical ATLAS product horizon. This module never routes orders.
 
 from swing_target_engine import build as build_swing_targets
 
-VERSION = 'PRODUCTION_TRADE_PLAN_V9_DIRECTIONAL_TARGET_GEOMETRY'
+VERSION = 'PRODUCTION_TRADE_PLAN_V10_MIN_1_5ATR_INVALIDATION'
 GEOMETRY_VERSION = 'ATLAS_GEOMETRY_V6_MIN_1_5_ATR_INVALIDATION'
 PRODUCT_HORIZON = '4-12H'
 PRODUCT_EVALUATION_HORIZONS = ['4h', '8h', '12h']
