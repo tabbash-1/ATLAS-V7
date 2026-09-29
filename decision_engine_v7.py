@@ -4,7 +4,7 @@ import production_signal_scoring as scoring
 import futures_provider_chain
 import production_trade_plan
 
-VERSION = 'DECISION_ENGINE_V11_CANONICAL_PUBLIC_GEOMETRY'
+VERSION = 'DECISION_ENGINE_V12_1_5ATR_QUALIFICATION_GEOMETRY'
 
 
 def opportunity_state(direction, qualified, execution_ready, plan_status=None):
@@ -99,7 +99,7 @@ def install(atlas):
                 target=level+atr*1.4 if direction=='LONG' else level-atr*1.4; target_source='CONTINUATION_EXTENSION_BEYOND_PRIOR_STRUCTURE'
             elif target is None:
                 target=px+atr*extension if direction=='LONG' else px-atr*extension; target_source='ATR_EXTENSION_AFTER_CLEAR_STRUCTURE'
-            stop=px-atr*1.2 if direction=='LONG' else px+atr*1.2; risk=abs(px-stop)
+            stop=px-atr*1.5 if direction=='LONG' else px+atr*1.5; risk=abs(px-stop)
             reward=(target-px) if direction=='LONG' else (px-target); rr=reward/risk if risk>0 and reward>0 else None
             directional=bool(rr is not None and ((direction=='LONG' and stop<px<target) or (direction=='SHORT' and target<px<stop)))
             geometry_ok=bool(directional and rr>=1.0); qualified=bool(result.get('production_signal_qualified'))
