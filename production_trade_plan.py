@@ -9,7 +9,7 @@ the canonical ATLAS product horizon. This module never routes orders.
 from swing_target_engine import build as build_swing_targets
 
 VERSION = 'PRODUCTION_TRADE_PLAN_V9_DIRECTIONAL_TARGET_GEOMETRY'
-GEOMETRY_VERSION = 'ATLAS_GEOMETRY_V5_ATR_STRUCTURE_PROVENANCE'
+GEOMETRY_VERSION = 'ATLAS_GEOMETRY_V6_MIN_1_5_ATR_INVALIDATION'
 PRODUCT_HORIZON = '4-12H'
 PRODUCT_EVALUATION_HORIZONS = ['4h', '8h', '12h']
 
@@ -66,10 +66,10 @@ def build(decision):
     if px is None or atr is None or atr<=0:
         return {'status':'WAIT','direction':d,'entry_mode':'NONE','reason':'ATR_OR_PRICE_UNAVAILABLE','version':VERSION,'geometry_version':GEOMETRY_VERSION,'product_horizon':PRODUCT_HORIZON,'analysis_only':True,'live_execution':False}
 
-    base_stop=px-s*atr*1.2
+    base_stop=px-s*atr*1.5
     entry=px; mode='NOW'; trigger='Canonical analysis is valid while the verified setup and structure remain intact.'
     reference=obstacle; reference_source='STRUCTURAL_OBSTACLE' if obstacle is not None else None
-    stop_basis='CURRENT_PRICE_PLUS_1_2_ATR_INVALIDATION'
+    stop_basis='CURRENT_PRICE_PLUS_1_5_ATR_INVALIDATION'
     entry_basis='VERIFIED_CURRENT_PRICE'
 
     if not ready_raw:
@@ -83,17 +83,17 @@ def build(decision):
             entry=blocker+s*buffer
             mode='BREAKOUT'
             trigger=('LONG analysis activates only after a verified 1H close/hold above ' if d=='LONG' else 'SHORT analysis activates only after a verified 1H close/hold below ')+f'{blocker:.8g}.'
-            base_stop=entry-s*atr*.85
+            base_stop=entry-s*atr*1.5
             reference=blocker; reference_source=blocker_source
             entry_basis='STRUCTURE_BREAK_PLUS_BUFFER'
-            stop_basis='POST_BREAKOUT_ENTRY_PLUS_0_85_ATR_INVALIDATION'
+            stop_basis='POST_BREAKOUT_ENTRY_PLUS_1_5_ATR_INVALIDATION'
         else:
             entry=px-s*atr*.35
             mode='PULLBACK'
             trigger='Analysis activates only if the pullback holds trend structure and verified directional evidence remains valid.'
-            base_stop=entry-s*atr*.9
+            base_stop=entry-s*atr*1.5
             entry_basis='ATR_PULLBACK_0_35'
-            stop_basis='PULLBACK_ENTRY_PLUS_0_9_ATR_INVALIDATION'
+            stop_basis='PULLBACK_ENTRY_PLUS_1_5_ATR_INVALIDATION'
             if blocker is not None:
                 reference=blocker; reference_source=blocker_source
 
