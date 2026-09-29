@@ -65,7 +65,7 @@ jobs:
                jq -e '
                  . as $root
                  | .ok == true
-                 and .htf_thesis.version == "HTF_STRUCTURAL_THESIS_V4_CLOSED_CANDLE_AUTHORITY"
+                 and .htf_thesis.version == "HTF_STRUCTURAL_THESIS_V4_MARKET_CONTEXT"
                  and .htf_thesis.candle_policy == "CLOSED_CANDLES_ONLY"
                  and .htf_thesis.in_progress_candles_can_change_authority == false
                  and .htf_thesis.authority_timeframes == ["12h","4h"]
@@ -81,7 +81,7 @@ jobs:
             sleep 10
           done
           if [[ "$htf_ok" != "1" ]]; then
-            echo "ATLAS live decision did not expose the V4 closed-candle HTF contract." >&2
+            echo "ATLAS live decision did not expose the current V4 closed-candle HTF contract." >&2
             echo "Last HTTP code: ${decision_code:-none}" >&2
             jq '{ok,symbol,actionable_decision,direction_authority,htf_thesis:.htf_thesis}' "$decision_tmp" >&2 || cat "$decision_tmp" >&2 || true
             exit 1
