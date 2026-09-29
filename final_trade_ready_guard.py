@@ -19,7 +19,7 @@ from atlas_trader_brain import assess as assess_trader
 from canonical_decision_contract import from_decision
 from golden_thesis_engine import VERSION as GOLDEN_THESIS_VERSION, build as build_golden_thesis
 
-VERSION = "FINAL_TRADE_READY_GUARD_V9_SHORT_EVIDENCE_QUARANTINE"
+VERSION = "FINAL_TRADE_READY_GUARD_V10_NET_RR_DISCLOSURE"
 SHORT_PRODUCTION_ENV = "ATLAS_SHORT_PRODUCTION_ENABLED"
 PRODUCT_HORIZON = "4-12H"
 EXPERIMENTAL_PROMOTION_ENV = "ATLAS_EXPERIMENTAL_FINAL_EVIDENCE_PROMOTION"
@@ -109,6 +109,28 @@ def _breakout_structure_state(row):
     }
 
 
+def _net_rr_state(row):
+    """Evaluate RR after explicit execution costs when validated cost evidence exists.
+
+    Missing live cost evidence is disclosed, not fabricated. Gross 2R remains the
+    fail-closed geometry floor; a validated cost snapshot may only add a blocker.
+    """
+    plan=row.get("trade_plan") or {}
+    entry=plan.get("entry"); stop=plan.get("stop_loss"); gross=plan.get("rr_tp2")
+    cost=row.get("execution_cost") or row.get("execution_cost_model") or {}
+    try:
+        entry=float(entry); stop=float(stop); gross=float(gross)
+    except (TypeError, ValueError):
+        return {"validated":False,"gross_rr":gross,"net_rr":None,"reason":"NET_RR_GEOMETRY_UNAVAILABLE"}
+    if cost.get("validated") is not True:
+        return {"validated":False,"gross_rr":gross,"net_rr":None,"reason":"EXECUTION_COST_EVIDENCE_UNAVAILABLE"}
+    try:
+        from execution_cost_model import apply_cost_to_r
+        out=apply_cost_to_r(gross,entry=entry,risk_abs=abs(entry-stop),fee_bps=cost.get("fee_bps"),spread_bps=cost.get("spread_bps"),slippage_bps=cost.get("slippage_bps"))
+    except Exception as exc:
+        return {"validated":False,"gross_rr":gross,"net_rr":None,"reason":"EXECUTION_COST_EVIDENCE_INVALID","error":str(exc)}
+    return {"validated":bool(out and out.get("validated_cost_inputs")),"gross_rr":gross,"net_rr":None if not out else out.get("net_r"),"execution_cost_r":None if not out else out.get("execution_cost_r"),"round_trip_cost_bps":None if not out else out.get("round_trip_cost_bps"),"reason":"NET_RR_VALIDATED" if out and out.get("validated_cost_inputs") else "EXECUTION_COST_EVIDENCE_INVALID"}
+
 def _candidate_plan_geometry(row, direction):
     """Return a complete, directionally valid candidate plan or a fail-closed reason."""
     analyst = row.get("analyst_output") or {}
@@ -154,6 +176,7 @@ def assess(row):
     quality_blocked = _norm((row.get("setup_quality_gate") or {}).get("status")) == "BLOCK"
     degraded = bool(row.get("data_degraded", False))
     experimental_promotion = _experimental_final_evidence_promotion()
+    net_rr = _net_rr_state(row)
     alignment_accepted = alignment in {"ALIGNED", "CONDITIONAL_ALIGNED", "CONDITIONAL_ALIGNED_12H_NEUTRAL"}
     blockers = []
     if product == "SHORT" and not _short_production_enabled(): blockers.append("SHORT_EDGE_NOT_PROVEN_PRODUCTION_QUARANTINE")
@@ -171,6 +194,7 @@ def assess(row):
             blockers.append("BREAKOUT_STRUCTURE_NOT_CONFIRMED")
     if quality_blocked: blockers.append("SETUP_QUALITY_GATE_BLOCKED")
     if degraded: blockers.append("DATA_DEGRADED")
+    if net_rr.get("validated") and (net_rr.get("net_rr") is None or net_rr.get("net_rr") < 2.0): blockers.append("NET_RR_AFTER_COSTS_BELOW_2R")
     trader = assess_trader(row)
     for blocker in trader.get("fatal_blockers") or []:
         blockers.append(blocker)
@@ -208,6 +232,8 @@ def assess(row):
         "setup_playbook": trader.get("setup_playbook"),
         "location_state": trader.get("location_state"),
         "minimum_rr_required": trader.get("minimum_rr_required"),
+        "net_rr_after_costs": net_rr,
+        "net_rr_cost_evidence_required_for_claim": True,
         "canonical_geometry_ready": geometry_ready,
         "structure_confirmation": structure_state,
         "blockers": blockers,
