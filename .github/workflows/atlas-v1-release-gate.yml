@@ -84,7 +84,9 @@ jobs:
           set -euo pipefail
           jq -e '
             .technical_ready == true and
-            .canonical_contract == "analyst_output" and
+            .canonical_contract == "FINAL_TRADE_GATE" and
+            .decision_source_of_truth == "FINAL_TRADE_GATE" and
+            .research_lane_excluded_from_readiness == "analyst_output" and
             .product_horizon == "4-12H" and
             .analysis_only == true and
             .live_execution == false and
