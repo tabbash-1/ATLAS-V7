@@ -9,35 +9,28 @@
       "severity": "EVIDENCE_BLOCKER"
     },
     {
-      "name": "MINIMUM_SHORT_MATURED_SAMPLE",
-      "observed": 3,
-      "passed": false,
-      "required": 5,
-      "severity": "EVIDENCE_BLOCKER"
-    },
-    {
       "name": "POSITIVE_FORWARD_AVERAGE_R",
-      "observed": -0.3063,
+      "observed": 0.15,
       "passed": false,
       "required": "> 0 after minimum sample",
       "severity": "EVIDENCE_BLOCKER"
     },
     {
       "name": "POSITIVE_FORWARD_NET_R",
-      "observed": -6.4323,
+      "observed": 3.1509,
       "passed": false,
       "required": "> 0 after minimum sample",
       "severity": "EVIDENCE_BLOCKER"
     }
   ],
   "can_override_production": false,
-  "canonical_contract": "analyst_output",
+  "canonical_contract": "FINAL_TRADE_GATE",
   "checks": [
     {
-      "name": "CANONICAL_ANALYST_CONTRACT",
-      "observed": "analyst_output",
+      "name": "CANONICAL_FINAL_TRADE_GATE_AUTHORITY",
+      "observed": "FINAL_TRADE_GATE",
       "passed": true,
-      "required": "analyst_output",
+      "required": "FINAL_TRADE_GATE",
       "severity": "BLOCKER"
     },
     {
@@ -61,28 +54,22 @@
       "severity": "BLOCKER"
     },
     {
-      "name": "APPEND_ONLY_FORWARD_LEDGER",
+      "name": "APPEND_ONLY_CANONICAL_LEDGER",
       "observed": true,
       "passed": true,
       "required": true,
       "severity": "BLOCKER"
     },
     {
-      "name": "ATTRIBUTION_IS_EVIDENCE_ONLY",
+      "name": "STRICT_EXECUTION_ELIGIBILITY",
       "observed": {
-        "analysis_only": true,
-        "can_change_score": false,
-        "can_change_threshold": false,
-        "can_override_production": false,
-        "live_execution": false
+        "legacy_backfill_allowed": false,
+        "legacy_score_path_research_included": false
       },
       "passed": true,
       "required": {
-        "analysis_only": true,
-        "can_change_score": false,
-        "can_change_threshold": false,
-        "can_override_production": false,
-        "live_execution": false
+        "legacy_backfill_allowed": false,
+        "legacy_score_path_research_included": false
       },
       "severity": "BLOCKER"
     },
@@ -95,28 +82,28 @@
     },
     {
       "name": "MINIMUM_LONG_MATURED_SAMPLE",
-      "observed": 18,
+      "observed": 16,
       "passed": true,
       "required": 5,
       "severity": "EVIDENCE_BLOCKER"
     },
     {
       "name": "MINIMUM_SHORT_MATURED_SAMPLE",
-      "observed": 3,
-      "passed": false,
+      "observed": 5,
+      "passed": true,
       "required": 5,
       "severity": "EVIDENCE_BLOCKER"
     },
     {
       "name": "POSITIVE_FORWARD_AVERAGE_R",
-      "observed": -0.3063,
+      "observed": 0.15,
       "passed": false,
       "required": "> 0 after minimum sample",
       "severity": "EVIDENCE_BLOCKER"
     },
     {
       "name": "POSITIVE_FORWARD_NET_R",
-      "observed": -6.4323,
+      "observed": 3.1509,
       "passed": false,
       "required": "> 0 after minimum sample",
       "severity": "EVIDENCE_BLOCKER"
@@ -126,22 +113,23 @@
     "may_claim_forward_edge_validated": false,
     "may_claim_profitable": false,
     "may_claim_technically_operational": true,
-    "note": "Profitability remains a stronger claim than this gate; fees/slippage/funding and larger independent forward evidence remain required."
+    "note": "Readiness is evaluated only from prospective FINAL_TRADE_GATE execution-eligible paper evidence. Profitability still requires costs and larger independent forward evidence."
   },
+  "decision_source_of_truth": "FINAL_TRADE_GATE",
   "forward_evidence_ready": false,
-  "generated_at": "2026-09-29T05:29:16.486358+00:00",
+  "generated_at": "2026-09-29T05:38:32.402008+00:00",
   "live_execution": false,
   "observed": {
     "append_only_verified": true,
-    "attribution_context_complete": 25,
-    "avg_r": -0.3063,
-    "entries": 25,
+    "avg_r": 0.15,
+    "entries": 21,
     "matured_12h_terminal": 21,
     "matured_by_direction": {
-      "LONG": 18,
-      "SHORT": 3
+      "LONG": 16,
+      "SHORT": 5
     },
-    "net_r": -6.4323
+    "net_r": 3.1509,
+    "official_trade_authority": "PAPER_PORTFOLIO_CANONICAL_FINAL_GATE_EXECUTION_ELIGIBLE_ENTRIES"
   },
   "preregistered_evidence_requirements": {
     "average_r": "> 0",
@@ -152,7 +140,8 @@
   "product_horizon": "4-12H",
   "product_identity": "CRYPTO_TRADE_INTELLIGENCE_AND_ANALYSIS_SYSTEM",
   "production_score_threshold_changed": false,
-  "schema": "ATLAS_PRODUCT_READINESS_GATE_V1",
+  "research_lane_excluded_from_readiness": "analyst_output",
+  "schema": "ATLAS_PRODUCT_READINESS_GATE_V2_FINAL_GATE_AUTHORITY",
   "state": "TECHNICALLY_READY_EVIDENCE_PENDING",
   "technical_ready": true
 }
