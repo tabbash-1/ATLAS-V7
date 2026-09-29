@@ -92,10 +92,9 @@ jobs:
           assert a.build()['analysis_only'] is True
           assert a.build()['live_execution'] is False
           assert a.build()['can_override_production'] is False
-          p={'canonical_contract':'analyst_output','product_horizon':'4-12H','live_execution':False,'can_override_production':False,'portfolio':{'avg_r':0.4,'net_r':12.0},'trades':[]}
+          p={'decision_source_of_truth':'FINAL_TRADE_GATE','product_horizon':'4-12H','legacy_backfill_allowed':False,'legacy_score_path_research_included':False,'safety':{'live_execution':False,'can_override_production':False},'signals':{'rows':[]},'path_summary':{'avg_r':0.4,'net_r':12.0},'official_trade_authority':'PAPER_PORTFOLIO_CANONICAL_FINAL_GATE_EXECUTION_ELIGIBLE_ENTRIES'}
           i={'append_only_verified':True}
-          x={'analysis_only':True,'live_execution':False,'can_override_production':False,'can_change_score':False,'can_change_threshold':False,'counts':{'context_complete':0}}
-          out=g.build(p,i,x)
+          out=g.build(p,i)
           assert out['technical_ready'] is True
           assert out['forward_evidence_ready'] is False
           assert out['state']=='TECHNICALLY_READY_EVIDENCE_PENDING'
