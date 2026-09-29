@@ -59,7 +59,7 @@ jobs:
           fi
 
           htf_ok=0
-          for attempt in $(seq 1 12); do
+          for attempt in $(seq 1 24); do
             decision_code="$(curl -L --connect-timeout 20 --max-time 60 -sS -w '%{http_code}' -o "$decision_tmp" "${BASE_URL}/api/decision/current?symbol=BNBUSDT" || true)"
             if [[ "$decision_code" =~ ^2 ]] && jq -e . "$decision_tmp" >/dev/null 2>&1 && \
                jq -e '
@@ -77,7 +77,7 @@ jobs:
               htf_ok=1
               break
             fi
-            echo "Waiting for live closed-candle HTF authority (attempt ${attempt}/12, HTTP ${decision_code:-none})"
+            echo "Waiting for live closed-candle HTF authority (attempt ${attempt}/24, HTTP ${decision_code:-none})"
             sleep 10
           done
           if [[ "$htf_ok" != "1" ]]; then
