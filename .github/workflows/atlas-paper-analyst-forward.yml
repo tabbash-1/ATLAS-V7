@@ -86,8 +86,14 @@ jobs:
           git commit -m 'chore: update canonical analyst forward evidence [skip ci] [skip render]'
           git reset --hard HEAD
           git clean -fd
-          git pull --rebase origin main
-          git push
+          for attempt in $(seq 1 8); do
+            git pull --rebase origin main
+            if git push; then exit 0; fi
+            echo "Concurrent evidence writer advanced main; retrying push attempt $attempt/8"
+            sleep 3
+          done
+          echo "Unable to publish canonical analyst evidence after bounded concurrency retries" >&2
+          exit 1
 
   collect_threshold_64:
     runs-on: ubuntu-latest
