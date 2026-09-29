@@ -310,5 +310,14 @@ jobs:
           git commit -m 'chore: update isolated threshold-64 net evidence [skip ci] [skip render]'
           git reset --hard HEAD
           git clean -fd
-          git pull --rebase origin main
-          git push
+          for attempt in $(seq 1 6); do
+            git fetch origin main
+            git rebase origin/main
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            echo "Concurrent evidence writer advanced main; retrying push (attempt ${attempt}/6)"
+            sleep $((attempt * 2))
+          done
+          echo "Failed to publish isolated T64 evidence after concurrency retries." >&2
+          exit 1
