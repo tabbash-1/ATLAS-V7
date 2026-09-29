@@ -39,7 +39,7 @@ def test_strict_smoke_and_render_boot_follow_current_ui_contracts():
 
     assert "canonicalContract:'canonical_decision'" in production
     assert "sourceOfTruth:'FINAL_TRADE_GATE'" in production
-    assert '/api/outcomes/summary?scope=signals&horizon=12' in text('atlas-paper-portfolio-ui.js')
+    assert '/api/research/canonical-paper-portfolio-10k' in text('atlas-paper-portfolio-ui.js')
 
 
 if __name__ == '__main__':
