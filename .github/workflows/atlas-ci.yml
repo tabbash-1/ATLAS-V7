@@ -137,7 +137,7 @@ jobs:
           grep -q '5M_PATH_WITH_1M_SAME_CANDLE_RESOLUTION' trade_path_settlement.py
           grep -q 'MIN_EXECUTION_RR = 1.0' execution_outcome_scope.py
           grep -q 'STRUCTURAL_SUPPORT_RESISTANCE_ACTUAL_RR' execution_risk_management.py
-          grep -q 'ATLAS_EXECUTION_RISK_V1_STRUCTURAL_TP1_PROTECT' execution_risk_management.py
+          grep -q 'ATLAS_EXECUTION_RISK_V2_STRUCTURAL_1_5ATR_TP1_PROTECT' execution_risk_management.py
           grep -q 'BREAKEVEN_ENTRY' execution_risk_management.py
       - name: Verify product shell single-authority invariants
         run: |
@@ -213,7 +213,7 @@ jobs:
           grep -q '"stop_loss":99.0' "$ATLAS_DATA_DIR/trade_geometry.jsonl"
           grep -q '"rr_tp2":4.0' "$ATLAS_DATA_DIR/trade_geometry.jsonl"
           grep -q 'STRUCTURAL_SUPPORT_RESISTANCE_ACTUAL_RR' "$ATLAS_DATA_DIR/trade_geometry.jsonl"
-          grep -q 'ATLAS_EXECUTION_RISK_V1_STRUCTURAL_TP1_PROTECT' "$ATLAS_DATA_DIR/trade_geometry.jsonl"
+          grep -q 'ATLAS_EXECUTION_RISK_V2_STRUCTURAL_1_5ATR_TP1_PROTECT' "$ATLAS_DATA_DIR/trade_geometry.jsonl"
           curl --fail --silent 'http://127.0.0.1:18080/api/outcomes/geometry-status' | grep -q '"archive_rows": 1'
 
           stop_server
