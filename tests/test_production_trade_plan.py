@@ -38,10 +38,10 @@ def test_geometry_provenance_is_complete_and_does_not_change_threshold():
     assert x['qualification_required']==71.0
     assert g['geometry_version']==p.GEOMETRY_VERSION
     assert g['entry_basis']=='VERIFIED_CURRENT_PRICE'
-    assert g['stop_basis']=='CURRENT_PRICE_PLUS_1_2_ATR_INVALIDATION'
+    assert g['stop_basis']=='CURRENT_PRICE_PLUS_1_5_ATR_INVALIDATION'
     assert g['tp1_basis'] in ('PRIOR_STRUCTURAL_OBSTACLE','MINIMUM_1R')
     assert g['tp2_basis'].startswith('MAX_2R_OR_')
-    assert g['risk_atr']>0 and g['risk_pct']>0
+    assert g['risk_atr']>=1.5 and g['risk_pct']>0
     assert g['score_or_threshold_changed'] is False
 
 
