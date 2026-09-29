@@ -72,7 +72,7 @@ jobs:
           import scenario_evidence_pipeline as p
           import scenario_evidence_reliable_runner as r
           for sym in ('BTCUSDT','ETHUSDT'):
-              row=r.fetch_decision_retry(sym, delays=(0,2,4,8))
+              row=r.fetch_decision_retry(sym)
               sc=row.get('htf_scenario_engine') or {}
               assert sc.get('version') == 'HTF_SCENARIO_ENGINE_V1', (sym,sc)
               assert sc.get('can_change_score') is False, (sym,sc)
