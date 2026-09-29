@@ -115,15 +115,16 @@ jobs:
           curl -fsSL --retry 6 --retry-delay 5 --retry-all-errors --connect-timeout 10 --max-time 50 \
             "$base/api/research/canonical-paper-portfolio-10k" -o /tmp/outcomes.json
           jq -e '
-            .schema == "ATLAS_CANONICAL_OUTCOME_SNAPSHOT_V1"
+            .ok == true
+            and .schema == "ATLAS_PAPER_PORTFOLIO_10K_V3_CANONICAL_TRUTH"
             and .decision_source_of_truth == "FINAL_TRADE_GATE"
             and .product_horizon == "4-12H"
-            and .evaluation_horizons_h == [4,8,12]
-            and .legacy_backfill_allowed == false
-            and .scope == "signals"
-            and .horizon_h == 12
-            and (.summary.portfolio.starting_equity_usd == 10000)
-            and (.signal_count == .summary.portfolio.entries)
+            and .evaluation_horizons == ["4h","8h","12h"]
+            and .paper_only == true
+            and .live_execution == false
+            and .can_override_production == false
+            and (.portfolio.starting_equity_usd == 10000)
+            and ((.trades|length) == .portfolio.entries)
           ' /tmp/outcomes.json >/dev/null
 
           curl -fsSL --retry 6 --retry-delay 5 --retry-all-errors --connect-timeout 10 --max-time 50 \
@@ -147,5 +148,5 @@ jobs:
           ! grep -q 'd.product_direction||d.candidate_direction' /tmp/autoload.js
 
           echo 'LIVE_STRICT_PRODUCT_TRUTH_OK'
-          jq '{decision_source_of_truth,evaluation_horizons_h,signal_count,portfolio:.summary.portfolio}' /tmp/outcomes.json
+          jq '{decision_source_of_truth,evaluation_horizons,portfolio}' /tmp/outcomes.json
           jq '{symbol,canonical_decision}' /tmp/zec.json
