@@ -65,6 +65,7 @@ jobs:
           python3 analyst_output_forward_capture.py
           python3 paper_portfolio_10k_analyst_output.py
           python3 analyst_forward_attribution.py
+          python3 canonical_outcome_snapshot.py
           python3 atlas_product_readiness_gate.py
           python3 - <<'PY'
           import json
@@ -73,6 +74,7 @@ jobs:
           assert x['production_threshold_unchanged']==68
           assert x['paper_only'] is True and x['live_execution'] is False and x['can_override_production'] is False
           assert r['production_score_threshold_changed'] is False
+          assert r['decision_source_of_truth']=='FINAL_TRADE_GATE' and r['research_lane_excluded_from_readiness']=='analyst_output'
           assert r['claim_policy']['may_claim_profitable'] is False
           print('T68_UNCHANGED',x['portfolio'])
           PY
