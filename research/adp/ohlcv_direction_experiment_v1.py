@@ -5,7 +5,9 @@ Standalone TradingView-like feature research. Uses closed 1H OHLCV only.
 No ATLAS score/gate features. Research-only and cannot mutate Production.
 """
 from __future__ import annotations
-import argparse,json,statistics,time
+import argparse,json,statistics,time,sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from historical_core_4_12h_replay import fetch_1h,ema,atr,resample
 
 SYMBOLS=["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","BNBUSDT","DOGEUSDT","ZECUSDT","ADAUSDT","LINKUSDT","AVAXUSDT","LTCUSDT"]
