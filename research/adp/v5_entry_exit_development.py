@@ -30,15 +30,18 @@ def main():
  ap=argparse.ArgumentParser();ap.add_argument("--days",type=int,default=730);ap.add_argument("--end-ms",type=int);a=ap.parse_args()
  end=a.end_ms or (int(time.time()*1000)//3600000)*3600000;cut=end-365*24*3600*1000
  configs=[(h,tp,sl) for h in (4,8,12) for tp,sl in ((.5,.5),(.75,.5),(1,.5),(1,.75),(1,1),(1.5,.75),(1.5,1),(2,1))]
+ market={s:fetch_1h(s,a.days,end) for s in SYMBOLS}
+ signals={}
+ for sym,d in market.items():
+  signals[sym]=[i for i in range(120,len(d)-12) if d[i]["t"]<cut and setup(d[:i+1])]
  out={}
- for cfg in configs:
-  hold,tp,sl=cfg;vals=[]
-  for sym in SYMBOLS:
-   d=fetch_1h(sym,a.days,end);i=120
-   while i<len(d)-12 and d[i]["t"]<cut:
-    if setup(d[:i+1]):
-     r,j=exit_ret(d,i,hold,tp,sl);vals.append(r);i=max(i+1,j)
-    else:i+=1
+ for hold,tp,sl in configs:
+  vals=[]
+  for sym,d in market.items():
+   next_allowed=-1
+   for i in signals[sym]:
+    if i<next_allowed:continue
+    r,j=exit_ret(d,i,hold,tp,sl);vals.append(r);next_allowed=j
   out[f"h{hold}_tp{tp}_sl{sl}"]=stats(vals)
  eligible=[(k,v) for k,v in out.items() if v["n"]>=1000 and v["profit_factor"] is not None]
  best=max(eligible,key=lambda kv:(kv[1]["profit_factor"],kv[1]["avg_net_pct"])) if eligible else (None,None)
