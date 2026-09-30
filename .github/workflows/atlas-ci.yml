@@ -230,19 +230,12 @@ jobs:
           curl --fail --silent 'http://127.0.0.1:18080/api/outcomes/geometry-status' | grep -q '"archive_rows": 1'
   adp-direction-research:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Run frozen ADP V7 untouched holdout
+      - name: Verify ADP research governance
         run: |
           set -euo pipefail
-          python research/adp/v7_frozen_holdout.py --days 730 | tee /tmp/adp-v7-test.log
-          grep '^ADP_V7_TEST=' /tmp/adp-v7-test.log | sed 's/^ADP_V7_TEST=//' > /tmp/adp-v7-test.json
-          test -s /tmp/adp-v7-test.json
-      - uses: actions/upload-artifact@v4
-        with:
-          name: adp-v7-untouched-holdout
-          path: /tmp/adp-v7-test.json
+          python -m pytest -q tests/test_adp_research_governance.py
