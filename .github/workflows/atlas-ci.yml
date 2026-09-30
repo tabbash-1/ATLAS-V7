@@ -228,3 +228,24 @@ jobs:
           grep -q '"forward_observation_id"' "$ATLAS_DATA_DIR/confluence_memory.jsonl"
           test -f "$ATLAS_DATA_DIR/trade_geometry.jsonl"
           curl --fail --silent 'http://127.0.0.1:18080/api/outcomes/geometry-status' | grep -q '"archive_rows": 1'
+  adp-direction-research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run isolated ADP V1 research
+        run: |
+          set -euo pipefail
+          python research/adp/ohlcv_direction_experiment_v1.py --days 365 | tee /tmp/adp.log
+          grep '^ADP_RESULT=' /tmp/adp.log | sed 's/^ADP_RESULT=//' > /tmp/adp-result.json
+          test -s /tmp/adp-result.json
+          python research/adp/v2_candidate_scan.py --days 365 | tee /tmp/adp-v2.log
+          grep '^ADP_V2_SCAN=' /tmp/adp-v2.log | sed 's/^ADP_V2_SCAN=//' > /tmp/adp-v2-result.json
+          test -s /tmp/adp-v2-result.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: adp-direction-v1-result
+          path: |\n            /tmp/adp-result.json\n            /tmp/adp-v2-result.json
