@@ -48,3 +48,6 @@ For every candidate:
 
 ## CI validity guard
 A research run is valid only when the experiment exits successfully and emits a non-empty `ADP_RESULT`; green CI without that payload is invalid evidence.
+
+## V2 candidate scan
+V2 candidates are selected using development and validation only. Untouched-test outcomes must remain sealed until one candidate is frozen.
