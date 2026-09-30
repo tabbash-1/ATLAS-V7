@@ -15,9 +15,9 @@ jobs:
         with:
           python-version: '3.11'
       - name: Run frozen ADP V1
-        run: python research/adp/ohlcv_direction_experiment_v1.py --days 365 | tee /tmp/adp.log
+        run: |\n          set -o pipefail\n          python research/adp/ohlcv_direction_experiment_v1.py --days 365 | tee /tmp/adp.log
       - name: Extract result
-        run: grep '^ADP_RESULT=' /tmp/adp.log | sed 's/^ADP_RESULT=//' > research/adp/ohlcv_direction_experiment_v1_result.json
+        run: |\n          grep '^ADP_RESULT=' /tmp/adp.log | sed 's/^ADP_RESULT=//' > research/adp/ohlcv_direction_experiment_v1_result.json\n          test -s research/adp/ohlcv_direction_experiment_v1_result.json
       - uses: actions/upload-artifact@v4
         with:
           name: adp-direction-v1-result
