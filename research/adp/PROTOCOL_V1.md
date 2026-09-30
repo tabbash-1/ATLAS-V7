@@ -45,3 +45,6 @@ For every candidate:
 - cost-adjusted trade expectancy when mapped to BUY/SELL
 - comparison with baselines
 - explicit discovery vs validation vs untouched test
+
+## CI validity guard
+A research run is valid only when the experiment exits successfully and emits a non-empty `ADP_RESULT`; green CI without that payload is invalid evidence.
