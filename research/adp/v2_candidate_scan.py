@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""ADP V2 candidate scan. Development + validation only; test labels stay sealed."""\n# V2_SEALED_VALIDATION_RUN
+"""ADP V2 candidate scan. Development + validation only; test labels stay sealed."""
+# V2_SEALED_VALIDATION_RUN
 from __future__ import annotations
 import argparse,json,statistics,time,sys
 from pathlib import Path
