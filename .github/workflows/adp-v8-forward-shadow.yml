@@ -1,0 +1,26 @@
+name: ADP V8 Forward Shadow
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 * * * *'
+permissions:
+  contents: write
+jobs:
+  forward-shadow:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: research/adp-v2-validation
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run frozen forward shadow
+        run: python research/adp/v8_forward_shadow.py
+      - name: Commit forward evidence
+        run: |
+          git config user.name "atlas-research-bot"
+          git config user.email "atlas-research-bot@users.noreply.github.com"
+          git add status/adp-v8-forward-ledger.json status/adp-v8-forward-status.json
+          git diff --cached --quiet || git commit -m "research: update ADP V8 forward evidence"
+          git push origin HEAD:research/adp-v2-validation
