@@ -27,7 +27,7 @@
         "tp2_hits": 1
       }
     },
-    "candidate_short_observations": 536,
+    "candidate_short_observations": 543,
     "episodes": [
       {
         "accepted_at": null,
@@ -1256,11 +1256,10 @@
         "observations": 1,
         "outcomes": {
           "12h": {
-            "market_source": "HYPERLIQUID_PUBLIC",
+            "error": "all_market_providers_failed: binance=HYPE_NOT_ON_BINANCE_SPOT_CHAIN | cryptocompare=HTTP Error 401: Unauthorized",
             "matured": true,
-            "positive": true,
-            "r_multiple": 2.0,
-            "status": "TP2"
+            "r_multiple": null,
+            "status": "MARKET_DATA_ERROR"
           },
           "4h": {
             "error": "all_market_providers_failed: binance=HYPE_NOT_ON_BINANCE_SPOT_CHAIN | cryptocompare=HTTP Error 401: Unauthorized",
@@ -1422,8 +1421,8 @@
             "market_source": "HYPERLIQUID_PUBLIC",
             "matured": true,
             "positive": true,
-            "r_multiple": 2.0,
-            "status": "TP2"
+            "r_multiple": 5.7788,
+            "status": "MARK_TO_MARKET"
           },
           "4h": {
             "error": "all_market_providers_failed: binance=HYPE_NOT_ON_BINANCE_SPOT_CHAIN | cryptocompare=HTTP Error 401: Unauthorized",
@@ -1432,11 +1431,10 @@
             "status": "MARKET_DATA_ERROR"
           },
           "8h": {
-            "market_source": "HYPERLIQUID_PUBLIC",
+            "error": "all_market_providers_failed: binance=HYPE_NOT_ON_BINANCE_SPOT_CHAIN | cryptocompare=HTTP Error 401: Unauthorized",
             "matured": true,
-            "positive": true,
-            "r_multiple": 2.0,
-            "status": "TP2"
+            "r_multiple": null,
+            "status": "MARKET_DATA_ERROR"
           }
         },
         "started_at": "2026-09-13T00:04:24.501488+00:00",
@@ -10252,9 +10250,11 @@
         "observations": 1,
         "outcomes": {
           "12h": {
-            "matured": false,
-            "r_multiple": null,
-            "status": "NOT_MATURED"
+            "market_source": "BINANCE_DATA_API_SPOT",
+            "matured": true,
+            "positive": false,
+            "r_multiple": -1.0,
+            "status": "SL"
           },
           "4h": {
             "market_source": "BINANCE_DATA_API_SPOT",
@@ -10264,46 +10264,607 @@
             "status": "SL"
           },
           "8h": {
-            "matured": false,
-            "r_multiple": null,
-            "status": "NOT_MATURED"
+            "market_source": "BINANCE_DATA_API_SPOT",
+            "matured": true,
+            "positive": false,
+            "r_multiple": -1.0,
+            "status": "SL"
           }
         },
         "started_at": "2026-09-30T06:51:38.270694+00:00",
         "started_at_ms": 1790751098270,
         "symbol": "BTCUSDT"
+      },
+      {
+        "accepted_at": null,
+        "accepted_delay_minutes": null,
+        "entry_cost_snapshot": {
+          "basis": "LIVE_OKX_SWAP_L2_PLUS_CONFIGURED_TAKER_FEE",
+          "best_ask": 0.2426,
+          "best_bid": 0.2425,
+          "blockers": [],
+          "buy_quote_filled": 1000.0,
+          "buy_vwap": 0.24260000000000004,
+          "candidate_direction": "SHORT",
+          "captured_at": "2026-09-30T19:30:16.681828+00:00",
+          "contract_base_value": 100.0,
+          "contract_basis": "LINEAR_BASE_CTVAL",
+          "fee_bps": 5.0,
+          "freeze_role": "CANDIDATE_ENTRY_TIME_EVIDENCE_ONLY",
+          "full_spread_bps": 4.122861,
+          "instrument": "ADA-USDT-SWAP",
+          "live_execution": false,
+          "research_notional_usdt": 1000.0,
+          "research_only": true,
+          "round_trip_cost_bps": 14.122861,
+          "sell_quote_filled": 1000.0,
+          "sell_vwap": 0.24249999999999997,
+          "slippage_bps": 0.0,
+          "spread_bps": 2.061431,
+          "symbol": "ADAUSDT",
+          "validated": true,
+          "venue": "OKX_USDT_SWAP",
+          "version": "EXECUTION_COST_MODEL_V2_NET_R"
+        },
+        "ever_accepted": false,
+        "geometry": {
+          "direction": "SHORT",
+          "entry": 0.2411428571,
+          "risk_abs": 0.006857142900000002,
+          "rr_tp2": 2.0,
+          "stop_loss": 0.248,
+          "tp1": 0.2342857143,
+          "tp2": 0.2274285714
+        },
+        "initial_blockers": [
+          "PRODUCTION_SIGNAL_NOT_QUALIFIED",
+          "HTF_4H_12H_NOT_ALIGNED",
+          "ENTRY_CONFIRMATION_NOT_ALIGNED",
+          "RR_BELOW_TWO_TO_ONE",
+          "BREAKOUT_STRUCTURE_NOT_CONFIRMED",
+          "TRADER_HTF_CONFLICT",
+          "TRADER_WAIT_1H_TRIGGER",
+          "TRADER_WAIT_VALID_LOCATION",
+          "TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS"
+        ],
+        "initial_decision": "WAIT",
+        "initial_direction_alignment": "OPPOSED",
+        "initial_direction_state": "OPPOSED",
+        "initial_entry_confirmation_direction": "SHORT",
+        "initial_primary_blocker": "PRODUCTION_SIGNAL_NOT_QUALIFIED",
+        "initial_product_direction": "LONG",
+        "initial_score": 60.0,
+        "max_score": 60.0,
+        "observations": 1,
+        "outcomes": {
+          "12h": {
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          },
+          "4h": {
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          },
+          "8h": {
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          }
+        },
+        "started_at": "2026-09-30T19:29:22.852484+00:00",
+        "started_at_ms": 1790796562852,
+        "symbol": "ADAUSDT"
+      },
+      {
+        "accepted_at": null,
+        "accepted_delay_minutes": null,
+        "entry_cost_snapshot": {
+          "basis": "LIVE_OKX_SWAP_L2_PLUS_CONFIGURED_TAKER_FEE",
+          "best_ask": 10.913,
+          "best_bid": 10.912,
+          "blockers": [],
+          "buy_quote_filled": 1000.0,
+          "buy_vwap": 10.914460825635214,
+          "candidate_direction": "SHORT",
+          "captured_at": "2026-09-30T19:30:31.531278+00:00",
+          "contract_base_value": 1.0,
+          "contract_basis": "LINEAR_BASE_CTVAL",
+          "fee_bps": 5.0,
+          "freeze_role": "CANDIDATE_ENTRY_TIME_EVIDENCE_ONLY",
+          "full_spread_bps": 0.91638,
+          "instrument": "AVAX-USDT-SWAP",
+          "live_execution": false,
+          "research_notional_usdt": 1000.0,
+          "research_only": true,
+          "round_trip_cost_bps": 12.254991,
+          "sell_quote_filled": 1000.0,
+          "sell_vwap": 10.912,
+          "slippage_bps": 0.669305,
+          "spread_bps": 0.45819,
+          "symbol": "AVAXUSDT",
+          "validated": true,
+          "venue": "OKX_USDT_SWAP",
+          "version": "EXECUTION_COST_MODEL_V2_NET_R"
+        },
+        "ever_accepted": false,
+        "geometry": {
+          "direction": "SHORT",
+          "entry": 10.7861571429,
+          "risk_abs": 0.2526428570999997,
+          "rr_tp2": 2.0,
+          "stop_loss": 11.0388,
+          "tp1": 10.5335142857,
+          "tp2": 10.2808714286
+        },
+        "initial_blockers": [
+          "PRODUCTION_SIGNAL_NOT_QUALIFIED",
+          "HTF_4H_12H_NOT_ALIGNED",
+          "ENTRY_CONFIRMATION_NOT_ALIGNED",
+          "BREAKOUT_STRUCTURE_NOT_CONFIRMED",
+          "TRADER_HTF_CONFLICT",
+          "TRADER_WAIT_1H_TRIGGER",
+          "TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS"
+        ],
+        "initial_decision": "WAIT",
+        "initial_direction_alignment": "OPPOSED",
+        "initial_direction_state": "OPPOSED",
+        "initial_entry_confirmation_direction": "SHORT",
+        "initial_primary_blocker": "PRODUCTION_SIGNAL_NOT_QUALIFIED",
+        "initial_product_direction": "LONG",
+        "initial_score": 60.0,
+        "max_score": 60.0,
+        "observations": 1,
+        "outcomes": {
+          "12h": {
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          },
+          "4h": {
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          },
+          "8h": {
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          }
+        },
+        "started_at": "2026-09-30T19:29:22.852484+00:00",
+        "started_at_ms": 1790796562852,
+        "symbol": "AVAXUSDT"
+      },
+      {
+        "accepted_at": null,
+        "accepted_delay_minutes": null,
+        "entry_cost_snapshot": {
+          "basis": "LIVE_OKX_SWAP_L2_PLUS_CONFIGURED_TAKER_FEE",
+          "best_ask": 14.265,
+          "best_bid": 14.264,
+          "blockers": [],
+          "buy_quote_filled": 1000.0,
+          "buy_vwap": 14.265,
+          "candidate_direction": "SHORT",
+          "captured_at": "2026-09-30T19:30:24.579740+00:00",
+          "contract_base_value": 1.0,
+          "contract_basis": "LINEAR_BASE_CTVAL",
+          "fee_bps": 5.0,
+          "freeze_role": "CANDIDATE_ENTRY_TIME_EVIDENCE_ONLY",
+          "full_spread_bps": 0.701041,
+          "instrument": "LINK-USDT-SWAP",
+          "live_execution": false,
+          "research_notional_usdt": 1000.0,
+          "research_only": true,
+          "round_trip_cost_bps": 10.701041,
+          "sell_quote_filled": 1000.0,
+          "sell_vwap": 14.264,
+          "slippage_bps": 0.0,
+          "spread_bps": 0.350521,
+          "symbol": "LINKUSDT",
+          "validated": true,
+          "venue": "OKX_USDT_SWAP",
+          "version": "EXECUTION_COST_MODEL_V2_NET_R"
+        },
+        "ever_accepted": false,
+        "geometry": {
+          "direction": "SHORT",
+          "entry": 14.0289142857,
+          "risk_abs": 0.33128571429999987,
+          "rr_tp2": 2.0,
+          "stop_loss": 14.3602,
+          "tp1": 13.6976285714,
+          "tp2": 13.3663428571
+        },
+        "initial_blockers": [
+          "HTF_4H_12H_NOT_ALIGNED",
+          "ENTRY_CONFIRMATION_NOT_ALIGNED",
+          "BREAKOUT_STRUCTURE_NOT_CONFIRMED",
+          "TRADER_HTF_CONFLICT",
+          "TRADER_WAIT_1H_TRIGGER",
+          "TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS"
+        ],
+        "initial_decision": "WAIT",
+        "initial_direction_alignment": "OPPOSED",
+        "initial_direction_state": "OPPOSED",
+        "initial_entry_confirmation_direction": "SHORT",
+        "initial_primary_blocker": "HTF_4H_12H_NOT_ALIGNED",
+        "initial_product_direction": "LONG",
+        "initial_score": 68.0,
+        "max_score": 68.0,
+        "observations": 1,
+        "outcomes": {
+          "12h": {
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          },
+          "4h": {
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          },
+          "8h": {
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          }
+        },
+        "started_at": "2026-09-30T19:29:22.852484+00:00",
+        "started_at_ms": 1790796562852,
+        "symbol": "LINKUSDT"
+      },
+      {
+        "accepted_at": null,
+        "accepted_delay_minutes": null,
+        "entry_cost_snapshot": {
+          "basis": "LIVE_OKX_SWAP_L2_PLUS_CONFIGURED_TAKER_FEE",
+          "best_ask": 66.18,
+          "best_bid": 66.17,
+          "blockers": [],
+          "buy_quote_filled": 1000.0,
+          "buy_vwap": 66.1823890252621,
+          "candidate_direction": "SHORT",
+          "captured_at": "2026-09-30T19:30:37.387006+00:00",
+          "contract_base_value": 1.0,
+          "contract_basis": "LINEAR_BASE_CTVAL",
+          "fee_bps": 5.0,
+          "freeze_role": "CANDIDATE_ENTRY_TIME_EVIDENCE_ONLY",
+          "full_spread_bps": 1.511145,
+          "instrument": "LTC-USDT-SWAP",
+          "live_execution": false,
+          "research_notional_usdt": 1000.0,
+          "research_only": true,
+          "round_trip_cost_bps": 11.872134,
+          "sell_quote_filled": 1000.0,
+          "sell_vwap": 66.17,
+          "slippage_bps": 0.180495,
+          "spread_bps": 0.755572,
+          "symbol": "LTCUSDT",
+          "validated": true,
+          "venue": "OKX_USDT_SWAP",
+          "version": "EXECUTION_COST_MODEL_V2_NET_R"
+        },
+        "ever_accepted": false,
+        "geometry": {
+          "direction": "SHORT",
+          "entry": 65.5499285714,
+          "risk_abs": 1.2010714286000024,
+          "rr_tp2": 2.0,
+          "stop_loss": 66.751,
+          "tp1": 64.3488571429,
+          "tp2": 63.1477857143
+        },
+        "initial_blockers": [
+          "HTF_PRODUCT_DIRECTION_UNRESOLVED",
+          "HTF_4H_12H_NOT_ALIGNED",
+          "RR_BELOW_TWO_TO_ONE",
+          "TRADER_NO_DIRECTIONAL_THESIS",
+          "TRADER_WAIT_HTF_ALIGNMENT_EVIDENCE",
+          "TRADER_WAIT_VALID_LOCATION",
+          "TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS"
+        ],
+        "initial_decision": "WAIT",
+        "initial_direction_alignment": "NO_PRODUCT_DIRECTION",
+        "initial_direction_state": "UNRESOLVED",
+        "initial_entry_confirmation_direction": "SHORT",
+        "initial_primary_blocker": "HTF_PRODUCT_DIRECTION_UNRESOLVED",
+        "initial_product_direction": null,
+        "initial_score": 70.0,
+        "max_score": 70.0,
+        "observations": 1,
+        "outcomes": {
+          "12h": {
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          },
+          "4h": {
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          },
+          "8h": {
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          }
+        },
+        "started_at": "2026-09-30T19:29:22.852484+00:00",
+        "started_at_ms": 1790796562852,
+        "symbol": "LTCUSDT"
+      },
+      {
+        "accepted_at": null,
+        "accepted_delay_minutes": null,
+        "entry_cost_snapshot": {
+          "basis": "LIVE_OKX_SWAP_L2_PLUS_CONFIGURED_TAKER_FEE",
+          "best_ask": 117.75,
+          "best_bid": 117.74,
+          "blockers": [],
+          "buy_quote_filled": 1000.0,
+          "buy_vwap": 117.75,
+          "candidate_direction": "SHORT",
+          "captured_at": "2026-09-30T19:29:38.935536+00:00",
+          "contract_base_value": 1.0,
+          "contract_basis": "LINEAR_BASE_CTVAL",
+          "fee_bps": 5.0,
+          "freeze_role": "CANDIDATE_ENTRY_TIME_EVIDENCE_ONLY",
+          "full_spread_bps": 0.849293,
+          "instrument": "SOL-USDT-SWAP",
+          "live_execution": false,
+          "research_notional_usdt": 1000.0,
+          "research_only": true,
+          "round_trip_cost_bps": 10.849293,
+          "sell_quote_filled": 1000.0,
+          "sell_vwap": 117.74000000000001,
+          "slippage_bps": 0.0,
+          "spread_bps": 0.424646,
+          "symbol": "SOLUSDT",
+          "validated": true,
+          "venue": "OKX_USDT_SWAP",
+          "version": "EXECUTION_COST_MODEL_V2_NET_R"
+        },
+        "ever_accepted": false,
+        "geometry": {
+          "direction": "SHORT",
+          "entry": 117.4244285714,
+          "risk_abs": 2.3335714285999956,
+          "rr_tp2": 2.0,
+          "stop_loss": 119.758,
+          "tp1": 115.0908571429,
+          "tp2": 112.7572857143
+        },
+        "initial_blockers": [
+          "HTF_4H_12H_NOT_ALIGNED",
+          "ENTRY_CONFIRMATION_NOT_ALIGNED",
+          "RR_BELOW_TWO_TO_ONE",
+          "BREAKOUT_STRUCTURE_NOT_CONFIRMED",
+          "TRADER_HTF_CONFLICT",
+          "TRADER_WAIT_1H_TRIGGER",
+          "TRADER_WAIT_VALID_LOCATION",
+          "TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS"
+        ],
+        "initial_decision": "WAIT",
+        "initial_direction_alignment": "OPPOSED",
+        "initial_direction_state": "OPPOSED",
+        "initial_entry_confirmation_direction": "SHORT",
+        "initial_primary_blocker": "HTF_4H_12H_NOT_ALIGNED",
+        "initial_product_direction": "LONG",
+        "initial_score": 69.0,
+        "max_score": 69.0,
+        "observations": 1,
+        "outcomes": {
+          "12h": {
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          },
+          "4h": {
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          },
+          "8h": {
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          }
+        },
+        "started_at": "2026-09-30T19:29:22.852484+00:00",
+        "started_at_ms": 1790796562852,
+        "symbol": "SOLUSDT"
+      },
+      {
+        "accepted_at": null,
+        "accepted_delay_minutes": null,
+        "entry_cost_snapshot": {
+          "basis": "LIVE_OKX_SWAP_L2_PLUS_CONFIGURED_TAKER_FEE",
+          "best_ask": 1.4909,
+          "best_bid": 1.4908,
+          "blockers": [],
+          "buy_quote_filled": 1000.0,
+          "buy_vwap": 1.4909,
+          "candidate_direction": "SHORT",
+          "captured_at": "2026-09-30T19:29:46.235168+00:00",
+          "contract_base_value": 100.0,
+          "contract_basis": "LINEAR_BASE_CTVAL",
+          "fee_bps": 5.0,
+          "freeze_role": "CANDIDATE_ENTRY_TIME_EVIDENCE_ONLY",
+          "full_spread_bps": 0.670758,
+          "instrument": "XRP-USDT-SWAP",
+          "live_execution": false,
+          "research_notional_usdt": 1000.0,
+          "research_only": true,
+          "round_trip_cost_bps": 10.670758,
+          "sell_quote_filled": 1000.0,
+          "sell_vwap": 1.4908,
+          "slippage_bps": 0.0,
+          "spread_bps": 0.335379,
+          "symbol": "XRPUSDT",
+          "validated": true,
+          "venue": "OKX_USDT_SWAP",
+          "version": "EXECUTION_COST_MODEL_V2_NET_R"
+        },
+        "ever_accepted": false,
+        "geometry": {
+          "direction": "SHORT",
+          "entry": 1.4804121429,
+          "risk_abs": 0.026817857100000175,
+          "rr_tp2": 2.0,
+          "stop_loss": 1.50723,
+          "tp1": 1.4535942857,
+          "tp2": 1.4267764286
+        },
+        "initial_blockers": [
+          "PRODUCTION_SIGNAL_NOT_QUALIFIED",
+          "HTF_4H_12H_NOT_ALIGNED",
+          "ENTRY_CONFIRMATION_NOT_ALIGNED",
+          "BREAKOUT_STRUCTURE_NOT_CONFIRMED",
+          "TRADER_HTF_CONFLICT",
+          "TRADER_WAIT_1H_TRIGGER",
+          "TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS"
+        ],
+        "initial_decision": "WAIT",
+        "initial_direction_alignment": "OPPOSED",
+        "initial_direction_state": "OPPOSED",
+        "initial_entry_confirmation_direction": "SHORT",
+        "initial_primary_blocker": "PRODUCTION_SIGNAL_NOT_QUALIFIED",
+        "initial_product_direction": "LONG",
+        "initial_score": 59.0,
+        "max_score": 59.0,
+        "observations": 1,
+        "outcomes": {
+          "12h": {
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          },
+          "4h": {
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          },
+          "8h": {
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          }
+        },
+        "started_at": "2026-09-30T19:29:22.852484+00:00",
+        "started_at_ms": 1790796562852,
+        "symbol": "XRPUSDT"
+      },
+      {
+        "accepted_at": null,
+        "accepted_delay_minutes": null,
+        "entry_cost_snapshot": {
+          "basis": "LIVE_OKX_SWAP_L2_PLUS_CONFIGURED_TAKER_FEE",
+          "best_ask": 1416.81,
+          "best_bid": 1416.8,
+          "blockers": [],
+          "buy_quote_filled": 1000.0,
+          "buy_vwap": 1416.81,
+          "candidate_direction": "SHORT",
+          "captured_at": "2026-09-30T19:30:09.931019+00:00",
+          "contract_base_value": 0.01,
+          "contract_basis": "LINEAR_BASE_CTVAL",
+          "fee_bps": 5.0,
+          "freeze_role": "CANDIDATE_ENTRY_TIME_EVIDENCE_ONLY",
+          "full_spread_bps": 0.070581,
+          "instrument": "ZEC-USDT-SWAP",
+          "live_execution": false,
+          "research_notional_usdt": 1000.0,
+          "research_only": true,
+          "round_trip_cost_bps": 10.070581,
+          "sell_quote_filled": 1000.0,
+          "sell_vwap": 1416.8,
+          "slippage_bps": 0.0,
+          "spread_bps": 0.035291,
+          "symbol": "ZECUSDT",
+          "validated": true,
+          "venue": "OKX_USDT_SWAP",
+          "version": "EXECUTION_COST_MODEL_V2_NET_R"
+        },
+        "ever_accepted": false,
+        "geometry": {
+          "direction": "SHORT",
+          "entry": 1428.668,
+          "risk_abs": 48.03428571430004,
+          "rr_tp2": 2.0,
+          "stop_loss": 1476.7022857143,
+          "tp1": 1380.6337142857,
+          "tp2": 1332.5994285714
+        },
+        "initial_blockers": [
+          "SHORT_EDGE_NOT_PROVEN_PRODUCTION_QUARANTINE",
+          "RR_BELOW_TWO_TO_ONE",
+          "TRADER_WAIT_VALID_LOCATION",
+          "TRADER_WAIT_SHORT_PULLBACK_RESUMPTION"
+        ],
+        "initial_decision": "WAIT",
+        "initial_direction_alignment": "ALIGNED",
+        "initial_direction_state": "ALIGNED",
+        "initial_entry_confirmation_direction": "SHORT",
+        "initial_primary_blocker": "SHORT_EDGE_NOT_PROVEN_PRODUCTION_QUARANTINE",
+        "initial_product_direction": "SHORT",
+        "initial_score": 66.0,
+        "max_score": 66.0,
+        "observations": 1,
+        "outcomes": {
+          "12h": {
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          },
+          "4h": {
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          },
+          "8h": {
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          }
+        },
+        "started_at": "2026-09-30T19:29:22.852484+00:00",
+        "started_at_ms": 1790796562852,
+        "symbol": "ZECUSDT"
       }
     ],
     "ever_accepted_episodes": 5,
     "included_in_paper_pnl": false,
     "independence_rule": "ONE_CONTINUOUS_CANDIDATE_SHORT_RUN_PER_SYMBOL_IS_ONE_EPISODE",
-    "independent_short_episodes": 126,
-    "never_accepted_episodes": 121,
+    "independent_short_episodes": 133,
+    "never_accepted_episodes": 128,
     "observational_only": true,
     "rejected": {
       "12h": {
-        "avg_r": -0.8854,
-        "episodes": 121,
+        "avg_r": -0.8786,
+        "episodes": 128,
         "matured": 114,
-        "positive_pct": 18.4,
-        "sl_hits": 74,
-        "tp2_hits": 9
+        "positive_pct": 17.5,
+        "sl_hits": 75,
+        "tp2_hits": 7
       },
       "4h": {
         "avg_r": -0.9574,
-        "episodes": 121,
+        "episodes": 128,
         "matured": 114,
         "positive_pct": 20.2,
         "sl_hits": 61,
         "tp2_hits": 5
       },
       "8h": {
-        "avg_r": -0.9017,
-        "episodes": 121,
+        "avg_r": -0.9283,
+        "episodes": 128,
         "matured": 113,
-        "positive_pct": 20.4,
-        "sl_hits": 68,
-        "tp2_hits": 8
+        "positive_pct": 19.5,
+        "sl_hits": 69,
+        "tp2_hits": 7
       }
     },
     "rejected_by_initial_blocker_nonexclusive": {
@@ -10335,106 +10896,106 @@
       },
       "BREAKOUT_STRUCTURE_NOT_CONFIRMED": {
         "12h": {
-          "avg_r": -1.3048,
-          "episodes": 72,
-          "matured": 71,
+          "avg_r": -1.3006,
+          "episodes": 77,
+          "matured": 72,
           "positive_pct": 4.2,
-          "sl_hits": 59,
+          "sl_hits": 60,
           "tp2_hits": 1
         },
         "4h": {
           "avg_r": -1.4594,
-          "episodes": 72,
+          "episodes": 77,
           "matured": 72,
           "positive_pct": 2.8,
           "sl_hits": 51,
           "tp2_hits": 1
         },
         "8h": {
-          "avg_r": -1.4101,
-          "episodes": 72,
-          "matured": 71,
+          "avg_r": -1.4044,
+          "episodes": 77,
+          "matured": 72,
           "positive_pct": 4.2,
-          "sl_hits": 56,
+          "sl_hits": 57,
           "tp2_hits": 1
         }
       },
       "ENTRY_CONFIRMATION_NOT_ALIGNED": {
         "12h": {
-          "avg_r": -0.7951,
-          "episodes": 47,
-          "matured": 44,
-          "positive_pct": 15.9,
-          "sl_hits": 31,
+          "avg_r": -0.7996,
+          "episodes": 52,
+          "matured": 45,
+          "positive_pct": 15.6,
+          "sl_hits": 32,
           "tp2_hits": 3
         },
         "4h": {
           "avg_r": -0.9368,
-          "episodes": 47,
+          "episodes": 52,
           "matured": 45,
           "positive_pct": 17.8,
           "sl_hits": 24,
           "tp2_hits": 3
         },
         "8h": {
-          "avg_r": -0.8181,
-          "episodes": 47,
-          "matured": 44,
-          "positive_pct": 20.5,
-          "sl_hits": 27,
+          "avg_r": -0.8221,
+          "episodes": 52,
+          "matured": 45,
+          "positive_pct": 20.0,
+          "sl_hits": 28,
           "tp2_hits": 3
         }
       },
       "HTF_4H_12H_NOT_ALIGNED": {
         "12h": {
-          "avg_r": -0.8498,
-          "episodes": 113,
+          "avg_r": -0.8425,
+          "episodes": 119,
           "matured": 106,
-          "positive_pct": 19.8,
-          "sl_hits": 67,
-          "tp2_hits": 9
+          "positive_pct": 18.9,
+          "sl_hits": 68,
+          "tp2_hits": 7
         },
         "4h": {
           "avg_r": -0.9293,
-          "episodes": 113,
+          "episodes": 119,
           "matured": 106,
           "positive_pct": 21.7,
           "sl_hits": 54,
           "tp2_hits": 5
         },
         "8h": {
-          "avg_r": -0.8632,
-          "episodes": 113,
+          "avg_r": -0.8918,
+          "episodes": 119,
           "matured": 105,
-          "positive_pct": 21.9,
-          "sl_hits": 61,
-          "tp2_hits": 8
+          "positive_pct": 21.0,
+          "sl_hits": 62,
+          "tp2_hits": 7
         }
       },
       "HTF_PRODUCT_DIRECTION_UNRESOLVED": {
         "12h": {
-          "avg_r": -0.8887,
-          "episodes": 66,
-          "matured": 62,
-          "positive_pct": 22.6,
+          "avg_r": -0.8741,
+          "episodes": 67,
+          "matured": 61,
+          "positive_pct": 21.3,
           "sl_hits": 36,
-          "tp2_hits": 6
+          "tp2_hits": 4
         },
         "4h": {
           "avg_r": -0.9238,
-          "episodes": 66,
+          "episodes": 67,
           "matured": 61,
           "positive_pct": 24.6,
           "sl_hits": 30,
           "tp2_hits": 2
         },
         "8h": {
-          "avg_r": -0.8958,
-          "episodes": 66,
-          "matured": 61,
-          "positive_pct": 23.0,
+          "avg_r": -0.944,
+          "episodes": 67,
+          "matured": 60,
+          "positive_pct": 21.7,
           "sl_hits": 34,
-          "tp2_hits": 5
+          "tp2_hits": 4
         }
       },
       "PRE_FINAL_DECISION_NOT_ACTIONABLE": {
@@ -10465,34 +11026,34 @@
       },
       "PRODUCTION_SIGNAL_NOT_QUALIFIED": {
         "12h": {
-          "avg_r": -0.8482,
-          "episodes": 58,
+          "avg_r": -0.834,
+          "episodes": 61,
           "matured": 55,
-          "positive_pct": 25.5,
-          "sl_hits": 33,
-          "tp2_hits": 7
+          "positive_pct": 23.6,
+          "sl_hits": 34,
+          "tp2_hits": 5
         },
         "4h": {
           "avg_r": -1.1135,
-          "episodes": 58,
+          "episodes": 61,
           "matured": 54,
           "positive_pct": 18.5,
           "sl_hits": 29,
           "tp2_hits": 3
         },
         "8h": {
-          "avg_r": -0.9751,
-          "episodes": 58,
+          "avg_r": -1.0306,
+          "episodes": 61,
           "matured": 54,
-          "positive_pct": 22.2,
-          "sl_hits": 33,
-          "tp2_hits": 6
+          "positive_pct": 20.4,
+          "sl_hits": 34,
+          "tp2_hits": 5
         }
       },
       "RR_BELOW_TWO_TO_ONE": {
         "12h": {
           "avg_r": 0.2252,
-          "episodes": 11,
+          "episodes": 15,
           "matured": 11,
           "positive_pct": 54.5,
           "sl_hits": 3,
@@ -10500,7 +11061,7 @@
         },
         "4h": {
           "avg_r": 0.0989,
-          "episodes": 11,
+          "episodes": 15,
           "matured": 11,
           "positive_pct": 45.5,
           "sl_hits": 3,
@@ -10508,7 +11069,7 @@
         },
         "8h": {
           "avg_r": 0.3919,
-          "episodes": 11,
+          "episodes": 15,
           "matured": 11,
           "positive_pct": 63.6,
           "sl_hits": 3,
@@ -10544,7 +11105,7 @@
       "SHORT_EDGE_NOT_PROVEN_PRODUCTION_QUARANTINE": {
         "12h": {
           "avg_r": -1.0,
-          "episodes": 2,
+          "episodes": 3,
           "matured": 2,
           "positive_pct": 0.0,
           "sl_hits": 2,
@@ -10552,7 +11113,7 @@
         },
         "4h": {
           "avg_r": -1.0,
-          "episodes": 2,
+          "episodes": 3,
           "matured": 2,
           "positive_pct": 0.0,
           "sl_hits": 2,
@@ -10560,7 +11121,7 @@
         },
         "8h": {
           "avg_r": -1.0,
-          "episodes": 2,
+          "episodes": 3,
           "matured": 2,
           "positive_pct": 0.0,
           "sl_hits": 2,
@@ -10569,27 +11130,27 @@
       },
       "TRADER_HTF_CONFLICT": {
         "12h": {
-          "avg_r": -0.5701,
-          "episodes": 41,
-          "matured": 39,
-          "positive_pct": 20.5,
-          "sl_hits": 26,
+          "avg_r": -0.5808,
+          "episodes": 46,
+          "matured": 40,
+          "positive_pct": 20.0,
+          "sl_hits": 27,
           "tp2_hits": 3
         },
         "4h": {
           "avg_r": -0.6382,
-          "episodes": 41,
+          "episodes": 46,
           "matured": 40,
           "positive_pct": 27.5,
           "sl_hits": 19,
           "tp2_hits": 3
         },
         "8h": {
-          "avg_r": -0.5541,
-          "episodes": 41,
-          "matured": 39,
-          "positive_pct": 28.2,
-          "sl_hits": 21,
+          "avg_r": -0.5653,
+          "episodes": 46,
+          "matured": 40,
+          "positive_pct": 27.5,
+          "sl_hits": 22,
           "tp2_hits": 3
         }
       },
@@ -10622,7 +11183,7 @@
       "TRADER_NO_DIRECTIONAL_THESIS": {
         "12h": {
           "avg_r": -0.7733,
-          "episodes": 16,
+          "episodes": 17,
           "matured": 16,
           "positive_pct": 25.0,
           "sl_hits": 7,
@@ -10630,7 +11191,7 @@
         },
         "4h": {
           "avg_r": -0.5639,
-          "episodes": 16,
+          "episodes": 17,
           "matured": 16,
           "positive_pct": 37.5,
           "sl_hits": 6,
@@ -10638,7 +11199,7 @@
         },
         "8h": {
           "avg_r": -0.4755,
-          "episodes": 16,
+          "episodes": 17,
           "matured": 16,
           "positive_pct": 31.2,
           "sl_hits": 6,
@@ -10647,34 +11208,34 @@
       },
       "TRADER_WAIT_1H_TRIGGER": {
         "12h": {
-          "avg_r": -0.4537,
-          "episodes": 33,
-          "matured": 31,
-          "positive_pct": 22.6,
-          "sl_hits": 23,
+          "avg_r": -0.4708,
+          "episodes": 38,
+          "matured": 32,
+          "positive_pct": 21.9,
+          "sl_hits": 24,
           "tp2_hits": 3
         },
         "4h": {
           "avg_r": -0.6893,
-          "episodes": 33,
+          "episodes": 38,
           "matured": 32,
           "positive_pct": 21.9,
           "sl_hits": 17,
           "tp2_hits": 3
         },
         "8h": {
-          "avg_r": -0.6062,
-          "episodes": 33,
-          "matured": 31,
-          "positive_pct": 25.8,
-          "sl_hits": 19,
+          "avg_r": -0.6185,
+          "episodes": 38,
+          "matured": 32,
+          "positive_pct": 25.0,
+          "sl_hits": 20,
           "tp2_hits": 3
         }
       },
       "TRADER_WAIT_HTF_ALIGNMENT_EVIDENCE": {
         "12h": {
           "avg_r": -0.7916,
-          "episodes": 8,
+          "episodes": 9,
           "matured": 8,
           "positive_pct": 37.5,
           "sl_hits": 4,
@@ -10682,7 +11243,7 @@
         },
         "4h": {
           "avg_r": -0.8774,
-          "episodes": 8,
+          "episodes": 9,
           "matured": 8,
           "positive_pct": 12.5,
           "sl_hits": 4,
@@ -10690,7 +11251,7 @@
         },
         "8h": {
           "avg_r": -0.9316,
-          "episodes": 8,
+          "episodes": 9,
           "matured": 8,
           "positive_pct": 12.5,
           "sl_hits": 4,
@@ -10699,34 +11260,34 @@
       },
       "TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS": {
         "12h": {
-          "avg_r": -0.0955,
-          "episodes": 7,
-          "matured": 6,
-          "positive_pct": 50.0,
-          "sl_hits": 2,
+          "avg_r": -0.2247,
+          "episodes": 13,
+          "matured": 7,
+          "positive_pct": 42.9,
+          "sl_hits": 3,
           "tp2_hits": 0
         },
         "4h": {
           "avg_r": -0.4684,
-          "episodes": 7,
+          "episodes": 13,
           "matured": 7,
           "positive_pct": 28.6,
           "sl_hits": 3,
           "tp2_hits": 0
         },
         "8h": {
-          "avg_r": -0.2099,
-          "episodes": 7,
-          "matured": 6,
-          "positive_pct": 33.3,
-          "sl_hits": 2,
+          "avg_r": -0.3227,
+          "episodes": 13,
+          "matured": 7,
+          "positive_pct": 28.6,
+          "sl_hits": 3,
           "tp2_hits": 0
         }
       },
       "TRADER_WAIT_SHORT_PULLBACK_RESUMPTION": {
         "12h": {
           "avg_r": -1.0,
-          "episodes": 1,
+          "episodes": 2,
           "matured": 1,
           "positive_pct": 0.0,
           "sl_hits": 1,
@@ -10734,7 +11295,7 @@
         },
         "4h": {
           "avg_r": -1.0,
-          "episodes": 1,
+          "episodes": 2,
           "matured": 1,
           "positive_pct": 0.0,
           "sl_hits": 1,
@@ -10742,7 +11303,7 @@
         },
         "8h": {
           "avg_r": -1.0,
-          "episodes": 1,
+          "episodes": 2,
           "matured": 1,
           "positive_pct": 0.0,
           "sl_hits": 1,
@@ -10752,7 +11313,7 @@
       "TRADER_WAIT_VALID_LOCATION": {
         "12h": {
           "avg_r": 0.5279,
-          "episodes": 8,
+          "episodes": 12,
           "matured": 8,
           "positive_pct": 75.0,
           "sl_hits": 2,
@@ -10760,7 +11321,7 @@
         },
         "4h": {
           "avg_r": 0.2513,
-          "episodes": 8,
+          "episodes": 12,
           "matured": 8,
           "positive_pct": 50.0,
           "sl_hits": 2,
@@ -10768,7 +11329,7 @@
         },
         "8h": {
           "avg_r": 0.4345,
-          "episodes": 8,
+          "episodes": 12,
           "matured": 8,
           "positive_pct": 62.5,
           "sl_hits": 2,
@@ -10789,12 +11350,12 @@
       "positive_pct": 10.53
     },
     "4h": {
-      "avg_r": -0.6831,
+      "avg_r": -0.6989,
       "extended_target_evaluable": 0,
       "extended_target_hit_rate_pct": null,
       "extended_target_hits": 0,
-      "matured": 19,
-      "positive_pct": 31.58
+      "matured": 20,
+      "positive_pct": 30.0
     },
     "8h": {
       "avg_r": -0.8204,
@@ -10820,334 +11381,40 @@
   },
   "decision_diagnostics": {
     "analyst_decisions": {
-      "LONG": 27,
+      "LONG": 28,
       "SHORT": 18,
-      "WAIT": 1295
+      "WAIT": 1306
     },
     "candidate_directions": {
-      "LONG": 644,
-      "NONE": 160,
-      "SHORT": 536
+      "LONG": 647,
+      "NONE": 162,
+      "SHORT": 543
     },
     "final_gate_blockers": {
       "ACTION_NOT_HTF_DIRECTION": 28,
-      "BREAKOUT_STRUCTURE_NOT_CONFIRMED": 500,
-      "ENTRY_CONFIRMATION_NOT_ALIGNED": 246,
-      "HTF_4H_12H_NOT_ALIGNED": 867,
-      "HTF_PRODUCT_DIRECTION_UNRESOLVED": 621,
-      "NO_DIRECTION": 160,
+      "BREAKOUT_STRUCTURE_NOT_CONFIRMED": 505,
+      "ENTRY_CONFIRMATION_NOT_ALIGNED": 253,
+      "HTF_4H_12H_NOT_ALIGNED": 877,
+      "HTF_PRODUCT_DIRECTION_UNRESOLVED": 624,
+      "NO_DIRECTION": 162,
       "PRE_FINAL_DECISION_NOT_ACTIONABLE": 40,
-      "PRODUCTION_SIGNAL_NOT_QUALIFIED": 453,
-      "RR_BELOW_TWO_TO_ONE": 111,
+      "PRODUCTION_SIGNAL_NOT_QUALIFIED": 459,
+      "RR_BELOW_TWO_TO_ONE": 116,
       "SCORE_DIRECTION_NOT_HTF_DIRECTION": 85,
       "SETUP_QUALITY_GATE_BLOCKED": 459,
-      "SHORT_EDGE_NOT_PROVEN_PRODUCTION_QUARANTINE": 17,
-      "TRADER_HTF_CONFLICT": 159,
+      "SHORT_EDGE_NOT_PROVEN_PRODUCTION_QUARANTINE": 18,
+      "TRADER_HTF_CONFLICT": 164,
       "TRADER_NO_CHASE": 13,
-      "TRADER_NO_DIRECTIONAL_THESIS": 160,
-      "TRADER_RR_BELOW_2R": 66,
-      "TRADER_WAIT_1H_TRIGGER": 149,
-      "TRADER_WAIT_HTF_ALIGNMENT_EVIDENCE": 137,
-      "TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS": 54,
+      "TRADER_NO_DIRECTIONAL_THESIS": 163,
+      "TRADER_RR_BELOW_2R": 68,
+      "TRADER_WAIT_1H_TRIGGER": 156,
+      "TRADER_WAIT_HTF_ALIGNMENT_EVIDENCE": 142,
+      "TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS": 64,
       "TRADER_WAIT_PULLBACK_RETEST": 1,
-      "TRADER_WAIT_SHORT_PULLBACK_RESUMPTION": 2,
-      "TRADER_WAIT_VALID_LOCATION": 148
+      "TRADER_WAIT_SHORT_PULLBACK_RESUMPTION": 3,
+      "TRADER_WAIT_VALID_LOCATION": 155
     },
     "recent_observations": [
-      {
-        "analyst_decision": "WAIT",
-        "candidate_cost_validated": true,
-        "candidate_direction": "SHORT",
-        "canonical_geometry_ready": true,
-        "captured_at": "2026-09-30T00:34:24.928674+00:00",
-        "direction_alignment": "OPPOSED",
-        "entry_confirmation_direction": "SHORT",
-        "final_gate_blockers": [
-          "PRODUCTION_SIGNAL_NOT_QUALIFIED",
-          "HTF_4H_12H_NOT_ALIGNED",
-          "ENTRY_CONFIRMATION_NOT_ALIGNED",
-          "TRADER_HTF_CONFLICT",
-          "TRADER_WAIT_1H_TRIGGER",
-          "TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS"
-        ],
-        "final_gate_primary_blocker": "PRODUCTION_SIGNAL_NOT_QUALIFIED",
-        "product_direction": "LONG",
-        "production_signal_qualified": false,
-        "score": 58.0,
-        "stale_pre_final_wait_bypassed": false,
-        "symbol": "DOGEUSDT",
-        "threshold": 64.0
-      },
-      {
-        "analyst_decision": "WAIT",
-        "candidate_cost_validated": true,
-        "candidate_direction": "SHORT",
-        "canonical_geometry_ready": false,
-        "captured_at": "2026-09-30T00:34:24.928674+00:00",
-        "direction_alignment": "OPPOSED",
-        "entry_confirmation_direction": "SHORT",
-        "final_gate_blockers": [
-          "PRODUCTION_SIGNAL_NOT_QUALIFIED",
-          "HTF_4H_12H_NOT_ALIGNED",
-          "ENTRY_CONFIRMATION_NOT_ALIGNED",
-          "RR_BELOW_TWO_TO_ONE",
-          "BREAKOUT_STRUCTURE_NOT_CONFIRMED",
-          "TRADER_HTF_CONFLICT",
-          "TRADER_WAIT_1H_TRIGGER",
-          "TRADER_WAIT_VALID_LOCATION",
-          "TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS"
-        ],
-        "final_gate_primary_blocker": "PRODUCTION_SIGNAL_NOT_QUALIFIED",
-        "product_direction": "LONG",
-        "production_signal_qualified": false,
-        "score": 51.0,
-        "stale_pre_final_wait_bypassed": false,
-        "symbol": "ETHUSDT",
-        "threshold": 64.0
-      },
-      {
-        "analyst_decision": "WAIT",
-        "candidate_cost_validated": true,
-        "candidate_direction": "SHORT",
-        "canonical_geometry_ready": false,
-        "captured_at": "2026-09-30T00:34:24.928674+00:00",
-        "direction_alignment": "NO_PRODUCT_DIRECTION",
-        "entry_confirmation_direction": "SHORT",
-        "final_gate_blockers": [
-          "HTF_PRODUCT_DIRECTION_UNRESOLVED",
-          "HTF_4H_12H_NOT_ALIGNED",
-          "RR_BELOW_TWO_TO_ONE",
-          "TRADER_NO_DIRECTIONAL_THESIS",
-          "TRADER_WAIT_HTF_ALIGNMENT_EVIDENCE",
-          "TRADER_WAIT_VALID_LOCATION",
-          "TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS"
-        ],
-        "final_gate_primary_blocker": "HTF_PRODUCT_DIRECTION_UNRESOLVED",
-        "product_direction": null,
-        "production_signal_qualified": true,
-        "score": 71.0,
-        "stale_pre_final_wait_bypassed": false,
-        "symbol": "HYPEUSDT",
-        "threshold": 64.0
-      },
-      {
-        "analyst_decision": "WAIT",
-        "candidate_cost_validated": true,
-        "candidate_direction": "SHORT",
-        "canonical_geometry_ready": true,
-        "captured_at": "2026-09-30T00:34:24.928674+00:00",
-        "direction_alignment": "OPPOSED",
-        "entry_confirmation_direction": "SHORT",
-        "final_gate_blockers": [
-          "PRODUCTION_SIGNAL_NOT_QUALIFIED",
-          "HTF_4H_12H_NOT_ALIGNED",
-          "ENTRY_CONFIRMATION_NOT_ALIGNED",
-          "BREAKOUT_STRUCTURE_NOT_CONFIRMED",
-          "TRADER_HTF_CONFLICT",
-          "TRADER_WAIT_1H_TRIGGER",
-          "TRADER_NO_CHASE"
-        ],
-        "final_gate_primary_blocker": "PRODUCTION_SIGNAL_NOT_QUALIFIED",
-        "product_direction": "LONG",
-        "production_signal_qualified": false,
-        "score": 53.0,
-        "stale_pre_final_wait_bypassed": false,
-        "symbol": "LINKUSDT",
-        "threshold": 64.0
-      },
-      {
-        "analyst_decision": "WAIT",
-        "candidate_cost_validated": true,
-        "candidate_direction": "SHORT",
-        "canonical_geometry_ready": true,
-        "captured_at": "2026-09-30T00:34:24.928674+00:00",
-        "direction_alignment": "NO_PRODUCT_DIRECTION",
-        "entry_confirmation_direction": "SHORT",
-        "final_gate_blockers": [
-          "HTF_PRODUCT_DIRECTION_UNRESOLVED",
-          "HTF_4H_12H_NOT_ALIGNED",
-          "BREAKOUT_STRUCTURE_NOT_CONFIRMED",
-          "TRADER_NO_DIRECTIONAL_THESIS",
-          "TRADER_WAIT_HTF_ALIGNMENT_EVIDENCE",
-          "TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS"
-        ],
-        "final_gate_primary_blocker": "HTF_PRODUCT_DIRECTION_UNRESOLVED",
-        "product_direction": null,
-        "production_signal_qualified": true,
-        "score": 73.0,
-        "stale_pre_final_wait_bypassed": false,
-        "symbol": "LTCUSDT",
-        "threshold": 64.0
-      },
-      {
-        "analyst_decision": "WAIT",
-        "candidate_cost_validated": null,
-        "candidate_direction": "NONE",
-        "canonical_geometry_ready": false,
-        "captured_at": "2026-09-30T00:34:24.928674+00:00",
-        "direction_alignment": "NO_ENTRY_CONFIRMATION_DIRECTION",
-        "entry_confirmation_direction": null,
-        "final_gate_blockers": [
-          "PRODUCTION_SIGNAL_NOT_QUALIFIED",
-          "HTF_4H_12H_NOT_ALIGNED",
-          "ENTRY_CONFIRMATION_NOT_ALIGNED",
-          "NO_DIRECTION",
-          "TRADER_RR_BELOW_2R",
-          "TRADER_WAIT_HTF_ALIGNMENT_EVIDENCE",
-          "TRADER_WAIT_1H_TRIGGER",
-          "TRADER_WAIT_VALID_LOCATION",
-          "TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS"
-        ],
-        "final_gate_primary_blocker": "PRODUCTION_SIGNAL_NOT_QUALIFIED",
-        "product_direction": "LONG",
-        "production_signal_qualified": false,
-        "score": null,
-        "stale_pre_final_wait_bypassed": false,
-        "symbol": "SOLUSDT",
-        "threshold": 64.0
-      },
-      {
-        "analyst_decision": "WAIT",
-        "candidate_cost_validated": true,
-        "candidate_direction": "SHORT",
-        "canonical_geometry_ready": false,
-        "captured_at": "2026-09-30T00:34:24.928674+00:00",
-        "direction_alignment": "NO_PRODUCT_DIRECTION",
-        "entry_confirmation_direction": "SHORT",
-        "final_gate_blockers": [
-          "PRODUCTION_SIGNAL_NOT_QUALIFIED",
-          "HTF_PRODUCT_DIRECTION_UNRESOLVED",
-          "HTF_4H_12H_NOT_ALIGNED",
-          "RR_BELOW_TWO_TO_ONE",
-          "TRADER_NO_DIRECTIONAL_THESIS",
-          "TRADER_WAIT_HTF_ALIGNMENT_EVIDENCE",
-          "TRADER_WAIT_VALID_LOCATION",
-          "TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS"
-        ],
-        "final_gate_primary_blocker": "PRODUCTION_SIGNAL_NOT_QUALIFIED",
-        "product_direction": null,
-        "production_signal_qualified": false,
-        "score": 58.0,
-        "stale_pre_final_wait_bypassed": false,
-        "symbol": "XRPUSDT",
-        "threshold": 64.0
-      },
-      {
-        "analyst_decision": "WAIT",
-        "candidate_cost_validated": true,
-        "candidate_direction": "SHORT",
-        "canonical_geometry_ready": true,
-        "captured_at": "2026-09-30T00:34:24.928674+00:00",
-        "direction_alignment": "NO_PRODUCT_DIRECTION",
-        "entry_confirmation_direction": "SHORT",
-        "final_gate_blockers": [
-          "HTF_PRODUCT_DIRECTION_UNRESOLVED",
-          "HTF_4H_12H_NOT_ALIGNED",
-          "TRADER_NO_DIRECTIONAL_THESIS",
-          "TRADER_WAIT_HTF_ALIGNMENT_EVIDENCE",
-          "TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS"
-        ],
-        "final_gate_primary_blocker": "HTF_PRODUCT_DIRECTION_UNRESOLVED",
-        "product_direction": null,
-        "production_signal_qualified": true,
-        "score": 69.0,
-        "stale_pre_final_wait_bypassed": false,
-        "symbol": "ZECUSDT",
-        "threshold": 64.0
-      },
-      {
-        "analyst_decision": "WAIT",
-        "candidate_cost_validated": true,
-        "candidate_direction": "LONG",
-        "canonical_geometry_ready": true,
-        "captured_at": "2026-09-30T06:51:38.270694+00:00",
-        "direction_alignment": "ALIGNED",
-        "entry_confirmation_direction": "LONG",
-        "final_gate_blockers": [
-          "PRODUCTION_SIGNAL_NOT_QUALIFIED"
-        ],
-        "final_gate_primary_blocker": "PRODUCTION_SIGNAL_NOT_QUALIFIED",
-        "product_direction": "LONG",
-        "production_signal_qualified": false,
-        "score": 63.0,
-        "stale_pre_final_wait_bypassed": false,
-        "symbol": "ADAUSDT",
-        "threshold": 64.0
-      },
-      {
-        "analyst_decision": "WAIT",
-        "candidate_cost_validated": true,
-        "candidate_direction": "LONG",
-        "canonical_geometry_ready": false,
-        "captured_at": "2026-09-30T06:51:38.270694+00:00",
-        "direction_alignment": "ALIGNED",
-        "entry_confirmation_direction": "LONG",
-        "final_gate_blockers": [
-          "RR_BELOW_TWO_TO_ONE",
-          "TRADER_WAIT_VALID_LOCATION",
-          "TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS"
-        ],
-        "final_gate_primary_blocker": "RR_BELOW_TWO_TO_ONE",
-        "product_direction": "LONG",
-        "production_signal_qualified": true,
-        "score": 73.0,
-        "stale_pre_final_wait_bypassed": false,
-        "symbol": "AVAXUSDT",
-        "threshold": 64.0
-      },
-      {
-        "analyst_decision": "WAIT",
-        "candidate_cost_validated": true,
-        "candidate_direction": "LONG",
-        "canonical_geometry_ready": false,
-        "captured_at": "2026-09-30T06:51:38.270694+00:00",
-        "direction_alignment": "OPPOSED",
-        "entry_confirmation_direction": "LONG",
-        "final_gate_blockers": [
-          "SHORT_EDGE_NOT_PROVEN_PRODUCTION_QUARANTINE",
-          "PRODUCTION_SIGNAL_NOT_QUALIFIED",
-          "HTF_4H_12H_NOT_ALIGNED",
-          "ENTRY_CONFIRMATION_NOT_ALIGNED",
-          "RR_BELOW_TWO_TO_ONE",
-          "BREAKOUT_STRUCTURE_NOT_CONFIRMED",
-          "TRADER_HTF_CONFLICT",
-          "TRADER_WAIT_1H_TRIGGER",
-          "TRADER_WAIT_VALID_LOCATION",
-          "TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS"
-        ],
-        "final_gate_primary_blocker": "SHORT_EDGE_NOT_PROVEN_PRODUCTION_QUARANTINE",
-        "product_direction": "SHORT",
-        "production_signal_qualified": false,
-        "score": 62.0,
-        "stale_pre_final_wait_bypassed": false,
-        "symbol": "BNBUSDT",
-        "threshold": 64.0
-      },
-      {
-        "analyst_decision": "WAIT",
-        "candidate_cost_validated": true,
-        "candidate_direction": "SHORT",
-        "canonical_geometry_ready": true,
-        "captured_at": "2026-09-30T06:51:38.270694+00:00",
-        "direction_alignment": "OPPOSED",
-        "entry_confirmation_direction": "SHORT",
-        "final_gate_blockers": [
-          "PRODUCTION_SIGNAL_NOT_QUALIFIED",
-          "HTF_4H_12H_NOT_ALIGNED",
-          "ENTRY_CONFIRMATION_NOT_ALIGNED",
-          "BREAKOUT_STRUCTURE_NOT_CONFIRMED",
-          "TRADER_HTF_CONFLICT",
-          "TRADER_WAIT_1H_TRIGGER",
-          "TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS"
-        ],
-        "final_gate_primary_blocker": "PRODUCTION_SIGNAL_NOT_QUALIFIED",
-        "product_direction": "LONG",
-        "production_signal_qualified": false,
-        "score": 54.0,
-        "stale_pre_final_wait_bypassed": false,
-        "symbol": "BTCUSDT",
-        "threshold": 64.0
-      },
       {
         "analyst_decision": "WAIT",
         "candidate_cost_validated": null,
@@ -11634,12 +11901,306 @@
         "stale_pre_final_wait_bypassed": false,
         "symbol": "ZECUSDT",
         "threshold": 64.0
+      },
+      {
+        "analyst_decision": "WAIT",
+        "candidate_cost_validated": true,
+        "candidate_direction": "SHORT",
+        "canonical_geometry_ready": false,
+        "captured_at": "2026-09-30T19:29:22.852484+00:00",
+        "direction_alignment": "OPPOSED",
+        "entry_confirmation_direction": "SHORT",
+        "final_gate_blockers": [
+          "PRODUCTION_SIGNAL_NOT_QUALIFIED",
+          "HTF_4H_12H_NOT_ALIGNED",
+          "ENTRY_CONFIRMATION_NOT_ALIGNED",
+          "RR_BELOW_TWO_TO_ONE",
+          "BREAKOUT_STRUCTURE_NOT_CONFIRMED",
+          "TRADER_HTF_CONFLICT",
+          "TRADER_WAIT_1H_TRIGGER",
+          "TRADER_WAIT_VALID_LOCATION",
+          "TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS"
+        ],
+        "final_gate_primary_blocker": "PRODUCTION_SIGNAL_NOT_QUALIFIED",
+        "product_direction": "LONG",
+        "production_signal_qualified": false,
+        "score": 60.0,
+        "stale_pre_final_wait_bypassed": false,
+        "symbol": "ADAUSDT",
+        "threshold": 64.0
+      },
+      {
+        "analyst_decision": "WAIT",
+        "candidate_cost_validated": true,
+        "candidate_direction": "SHORT",
+        "canonical_geometry_ready": true,
+        "captured_at": "2026-09-30T19:29:22.852484+00:00",
+        "direction_alignment": "OPPOSED",
+        "entry_confirmation_direction": "SHORT",
+        "final_gate_blockers": [
+          "PRODUCTION_SIGNAL_NOT_QUALIFIED",
+          "HTF_4H_12H_NOT_ALIGNED",
+          "ENTRY_CONFIRMATION_NOT_ALIGNED",
+          "BREAKOUT_STRUCTURE_NOT_CONFIRMED",
+          "TRADER_HTF_CONFLICT",
+          "TRADER_WAIT_1H_TRIGGER",
+          "TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS"
+        ],
+        "final_gate_primary_blocker": "PRODUCTION_SIGNAL_NOT_QUALIFIED",
+        "product_direction": "LONG",
+        "production_signal_qualified": false,
+        "score": 60.0,
+        "stale_pre_final_wait_bypassed": false,
+        "symbol": "AVAXUSDT",
+        "threshold": 64.0
+      },
+      {
+        "analyst_decision": "WAIT",
+        "candidate_cost_validated": true,
+        "candidate_direction": "LONG",
+        "canonical_geometry_ready": true,
+        "captured_at": "2026-09-30T19:29:22.852484+00:00",
+        "direction_alignment": "NO_PRODUCT_DIRECTION",
+        "entry_confirmation_direction": "LONG",
+        "final_gate_blockers": [
+          "HTF_PRODUCT_DIRECTION_UNRESOLVED",
+          "HTF_4H_12H_NOT_ALIGNED",
+          "TRADER_NO_DIRECTIONAL_THESIS",
+          "TRADER_WAIT_HTF_ALIGNMENT_EVIDENCE",
+          "TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS"
+        ],
+        "final_gate_primary_blocker": "HTF_PRODUCT_DIRECTION_UNRESOLVED",
+        "product_direction": null,
+        "production_signal_qualified": true,
+        "score": 64.0,
+        "stale_pre_final_wait_bypassed": false,
+        "symbol": "BNBUSDT",
+        "threshold": 64.0
+      },
+      {
+        "analyst_decision": "LONG",
+        "candidate_cost_validated": true,
+        "candidate_direction": "LONG",
+        "canonical_geometry_ready": true,
+        "captured_at": "2026-09-30T19:29:22.852484+00:00",
+        "direction_alignment": "ALIGNED",
+        "entry_confirmation_direction": "LONG",
+        "final_gate_blockers": [],
+        "final_gate_primary_blocker": null,
+        "product_direction": "LONG",
+        "production_signal_qualified": true,
+        "score": 65.0,
+        "stale_pre_final_wait_bypassed": false,
+        "symbol": "BTCUSDT",
+        "threshold": 64.0
+      },
+      {
+        "analyst_decision": "WAIT",
+        "candidate_cost_validated": null,
+        "candidate_direction": "NONE",
+        "canonical_geometry_ready": false,
+        "captured_at": "2026-09-30T19:29:22.852484+00:00",
+        "direction_alignment": "NO_ENTRY_CONFIRMATION_DIRECTION",
+        "entry_confirmation_direction": null,
+        "final_gate_blockers": [
+          "PRODUCTION_SIGNAL_NOT_QUALIFIED",
+          "HTF_4H_12H_NOT_ALIGNED",
+          "ENTRY_CONFIRMATION_NOT_ALIGNED",
+          "NO_DIRECTION",
+          "TRADER_RR_BELOW_2R",
+          "TRADER_WAIT_HTF_ALIGNMENT_EVIDENCE",
+          "TRADER_WAIT_1H_TRIGGER",
+          "TRADER_WAIT_VALID_LOCATION",
+          "TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS"
+        ],
+        "final_gate_primary_blocker": "PRODUCTION_SIGNAL_NOT_QUALIFIED",
+        "product_direction": "LONG",
+        "production_signal_qualified": false,
+        "score": null,
+        "stale_pre_final_wait_bypassed": false,
+        "symbol": "DOGEUSDT",
+        "threshold": 64.0
+      },
+      {
+        "analyst_decision": "WAIT",
+        "candidate_cost_validated": null,
+        "candidate_direction": "NONE",
+        "canonical_geometry_ready": false,
+        "captured_at": "2026-09-30T19:29:22.852484+00:00",
+        "direction_alignment": "NO_ENTRY_CONFIRMATION_DIRECTION",
+        "entry_confirmation_direction": null,
+        "final_gate_blockers": [
+          "PRODUCTION_SIGNAL_NOT_QUALIFIED",
+          "HTF_4H_12H_NOT_ALIGNED",
+          "ENTRY_CONFIRMATION_NOT_ALIGNED",
+          "NO_DIRECTION",
+          "TRADER_RR_BELOW_2R",
+          "TRADER_WAIT_HTF_ALIGNMENT_EVIDENCE",
+          "TRADER_WAIT_1H_TRIGGER",
+          "TRADER_WAIT_VALID_LOCATION",
+          "TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS"
+        ],
+        "final_gate_primary_blocker": "PRODUCTION_SIGNAL_NOT_QUALIFIED",
+        "product_direction": "LONG",
+        "production_signal_qualified": false,
+        "score": null,
+        "stale_pre_final_wait_bypassed": false,
+        "symbol": "ETHUSDT",
+        "threshold": 64.0
+      },
+      {
+        "analyst_decision": "WAIT",
+        "candidate_cost_validated": true,
+        "candidate_direction": "LONG",
+        "canonical_geometry_ready": false,
+        "captured_at": "2026-09-30T19:29:22.852484+00:00",
+        "direction_alignment": "NO_PRODUCT_DIRECTION",
+        "entry_confirmation_direction": "LONG",
+        "final_gate_blockers": [
+          "PRODUCTION_SIGNAL_NOT_QUALIFIED",
+          "HTF_PRODUCT_DIRECTION_UNRESOLVED",
+          "HTF_4H_12H_NOT_ALIGNED",
+          "RR_BELOW_TWO_TO_ONE",
+          "TRADER_NO_DIRECTIONAL_THESIS",
+          "TRADER_WAIT_HTF_ALIGNMENT_EVIDENCE",
+          "TRADER_WAIT_VALID_LOCATION",
+          "TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS"
+        ],
+        "final_gate_primary_blocker": "PRODUCTION_SIGNAL_NOT_QUALIFIED",
+        "product_direction": null,
+        "production_signal_qualified": false,
+        "score": 60.0,
+        "stale_pre_final_wait_bypassed": false,
+        "symbol": "HYPEUSDT",
+        "threshold": 64.0
+      },
+      {
+        "analyst_decision": "WAIT",
+        "candidate_cost_validated": true,
+        "candidate_direction": "SHORT",
+        "canonical_geometry_ready": true,
+        "captured_at": "2026-09-30T19:29:22.852484+00:00",
+        "direction_alignment": "OPPOSED",
+        "entry_confirmation_direction": "SHORT",
+        "final_gate_blockers": [
+          "HTF_4H_12H_NOT_ALIGNED",
+          "ENTRY_CONFIRMATION_NOT_ALIGNED",
+          "BREAKOUT_STRUCTURE_NOT_CONFIRMED",
+          "TRADER_HTF_CONFLICT",
+          "TRADER_WAIT_1H_TRIGGER",
+          "TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS"
+        ],
+        "final_gate_primary_blocker": "HTF_4H_12H_NOT_ALIGNED",
+        "product_direction": "LONG",
+        "production_signal_qualified": true,
+        "score": 68.0,
+        "stale_pre_final_wait_bypassed": false,
+        "symbol": "LINKUSDT",
+        "threshold": 64.0
+      },
+      {
+        "analyst_decision": "WAIT",
+        "candidate_cost_validated": true,
+        "candidate_direction": "SHORT",
+        "canonical_geometry_ready": false,
+        "captured_at": "2026-09-30T19:29:22.852484+00:00",
+        "direction_alignment": "NO_PRODUCT_DIRECTION",
+        "entry_confirmation_direction": "SHORT",
+        "final_gate_blockers": [
+          "HTF_PRODUCT_DIRECTION_UNRESOLVED",
+          "HTF_4H_12H_NOT_ALIGNED",
+          "RR_BELOW_TWO_TO_ONE",
+          "TRADER_NO_DIRECTIONAL_THESIS",
+          "TRADER_WAIT_HTF_ALIGNMENT_EVIDENCE",
+          "TRADER_WAIT_VALID_LOCATION",
+          "TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS"
+        ],
+        "final_gate_primary_blocker": "HTF_PRODUCT_DIRECTION_UNRESOLVED",
+        "product_direction": null,
+        "production_signal_qualified": true,
+        "score": 70.0,
+        "stale_pre_final_wait_bypassed": false,
+        "symbol": "LTCUSDT",
+        "threshold": 64.0
+      },
+      {
+        "analyst_decision": "WAIT",
+        "candidate_cost_validated": true,
+        "candidate_direction": "SHORT",
+        "canonical_geometry_ready": false,
+        "captured_at": "2026-09-30T19:29:22.852484+00:00",
+        "direction_alignment": "OPPOSED",
+        "entry_confirmation_direction": "SHORT",
+        "final_gate_blockers": [
+          "HTF_4H_12H_NOT_ALIGNED",
+          "ENTRY_CONFIRMATION_NOT_ALIGNED",
+          "RR_BELOW_TWO_TO_ONE",
+          "BREAKOUT_STRUCTURE_NOT_CONFIRMED",
+          "TRADER_HTF_CONFLICT",
+          "TRADER_WAIT_1H_TRIGGER",
+          "TRADER_WAIT_VALID_LOCATION",
+          "TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS"
+        ],
+        "final_gate_primary_blocker": "HTF_4H_12H_NOT_ALIGNED",
+        "product_direction": "LONG",
+        "production_signal_qualified": true,
+        "score": 69.0,
+        "stale_pre_final_wait_bypassed": false,
+        "symbol": "SOLUSDT",
+        "threshold": 64.0
+      },
+      {
+        "analyst_decision": "WAIT",
+        "candidate_cost_validated": true,
+        "candidate_direction": "SHORT",
+        "canonical_geometry_ready": true,
+        "captured_at": "2026-09-30T19:29:22.852484+00:00",
+        "direction_alignment": "OPPOSED",
+        "entry_confirmation_direction": "SHORT",
+        "final_gate_blockers": [
+          "PRODUCTION_SIGNAL_NOT_QUALIFIED",
+          "HTF_4H_12H_NOT_ALIGNED",
+          "ENTRY_CONFIRMATION_NOT_ALIGNED",
+          "BREAKOUT_STRUCTURE_NOT_CONFIRMED",
+          "TRADER_HTF_CONFLICT",
+          "TRADER_WAIT_1H_TRIGGER",
+          "TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS"
+        ],
+        "final_gate_primary_blocker": "PRODUCTION_SIGNAL_NOT_QUALIFIED",
+        "product_direction": "LONG",
+        "production_signal_qualified": false,
+        "score": 59.0,
+        "stale_pre_final_wait_bypassed": false,
+        "symbol": "XRPUSDT",
+        "threshold": 64.0
+      },
+      {
+        "analyst_decision": "WAIT",
+        "candidate_cost_validated": true,
+        "candidate_direction": "SHORT",
+        "canonical_geometry_ready": false,
+        "captured_at": "2026-09-30T19:29:22.852484+00:00",
+        "direction_alignment": "ALIGNED",
+        "entry_confirmation_direction": "SHORT",
+        "final_gate_blockers": [
+          "SHORT_EDGE_NOT_PROVEN_PRODUCTION_QUARANTINE",
+          "RR_BELOW_TWO_TO_ONE",
+          "TRADER_WAIT_VALID_LOCATION",
+          "TRADER_WAIT_SHORT_PULLBACK_RESUMPTION"
+        ],
+        "final_gate_primary_blocker": "SHORT_EDGE_NOT_PROVEN_PRODUCTION_QUARANTINE",
+        "product_direction": "SHORT",
+        "production_signal_qualified": true,
+        "score": 66.0,
+        "stale_pre_final_wait_bypassed": false,
+        "symbol": "ZECUSDT",
+        "threshold": 64.0
       }
     ],
-    "score_ge_64": 773,
+    "score_ge_64": 779,
     "score_max": 97.0,
-    "snapshot_rows": 133,
-    "symbol_observations": 1340,
+    "snapshot_rows": 134,
+    "symbol_observations": 1352,
     "top_scores": [
       {
         "candidate_direction": "LONG",
@@ -11789,11 +12350,11 @@
     "12h"
   ],
   "experimental_threshold": 64,
-  "generated_at": "2026-09-30T13:56:35.923860+00:00",
+  "generated_at": "2026-09-30T19:31:34.796848+00:00",
   "live_execution": false,
   "manifest_hash": "2d31a2147e6ff87426cd2b5ea7725ec57fbfa12314e5d32e24599d318ce529e1",
   "methodology": "Prospective canonical analyst_output LONG/SHORT transitions only; frozen Entry/SL/TP; 4h/8h/12h checkpoints; 12h terminal evaluation. Extended target is frozen at enrollment and measured evidence-only; it never changes canonical TP2 settlement. Experimental cohort is isolated and cannot override Production. Execution fee/spread/slippage is frozen at enrollment; missing cost evidence fails closed.",
-  "observed_through_at": "2026-09-30T13:54:29.283015+00:00",
+  "observed_through_at": "2026-09-30T19:29:22.852484+00:00",
   "paper_only": true,
   "portfolio": {
     "avg_r": -1.0914,
@@ -11818,7 +12379,7 @@
       "ALIGNED": {
         "12h": {
           "avg_r": -1.6736,
-          "episodes": 11,
+          "episodes": 12,
           "matured": 11,
           "positive_pct": 0.0,
           "sl_hits": 8,
@@ -11826,7 +12387,7 @@
         },
         "4h": {
           "avg_r": -1.6897,
-          "episodes": 11,
+          "episodes": 12,
           "matured": 11,
           "positive_pct": 0.0,
           "sl_hits": 7,
@@ -11834,7 +12395,7 @@
         },
         "8h": {
           "avg_r": -1.5706,
-          "episodes": 11,
+          "episodes": 12,
           "matured": 11,
           "positive_pct": 0.0,
           "sl_hits": 7,
@@ -11843,27 +12404,27 @@
       },
       "OPPOSED": {
         "12h": {
-          "avg_r": -0.6938,
-          "episodes": 34,
-          "matured": 32,
-          "positive_pct": 21.9,
-          "sl_hits": 23,
+          "avg_r": -0.7031,
+          "episodes": 36,
+          "matured": 33,
+          "positive_pct": 21.2,
+          "sl_hits": 24,
           "tp2_hits": 4
         },
         "4h": {
           "avg_r": -0.6535,
-          "episodes": 34,
+          "episodes": 36,
           "matured": 33,
           "positive_pct": 21.2,
           "sl_hits": 21,
           "tp2_hits": 3
         },
         "8h": {
-          "avg_r": -0.6434,
-          "episodes": 34,
-          "matured": 32,
-          "positive_pct": 18.8,
-          "sl_hits": 22,
+          "avg_r": -0.6542,
+          "episodes": 36,
+          "matured": 33,
+          "positive_pct": 18.2,
+          "sl_hits": 23,
           "tp2_hits": 4
         }
       },
@@ -11896,7 +12457,7 @@
       "UNRESOLVED": {
         "12h": {
           "avg_r": -0.5395,
-          "episodes": 70,
+          "episodes": 71,
           "matured": 63,
           "positive_pct": 20.6,
           "sl_hits": 43,
@@ -11904,7 +12465,7 @@
         },
         "4h": {
           "avg_r": -0.6971,
-          "episodes": 70,
+          "episodes": 71,
           "matured": 65,
           "positive_pct": 24.6,
           "sl_hits": 37,
@@ -11912,7 +12473,7 @@
         },
         "8h": {
           "avg_r": -0.5583,
-          "episodes": 70,
+          "episodes": 71,
           "matured": 63,
           "positive_pct": 19.0,
           "sl_hits": 40,
@@ -20845,9 +21406,11 @@
         "observations": 1,
         "outcomes": {
           "12h": {
-            "matured": false,
-            "r_multiple": null,
-            "status": "NOT_MATURED"
+            "market_source": "BINANCE_DATA_API_SPOT",
+            "matured": true,
+            "positive": false,
+            "r_multiple": -1.0,
+            "status": "SL"
           },
           "4h": {
             "market_source": "BINANCE_DATA_API_SPOT",
@@ -20857,14 +21420,333 @@
             "status": "SL"
           },
           "8h": {
-            "matured": false,
-            "r_multiple": null,
-            "status": "NOT_MATURED"
+            "market_source": "BINANCE_DATA_API_SPOT",
+            "matured": true,
+            "positive": false,
+            "r_multiple": -1.0,
+            "status": "SL"
           }
         },
         "started_at": "2026-09-30T06:51:38.270694+00:00",
         "started_at_ms": 1790751098270,
         "symbol": "LINKUSDT"
+      },
+      {
+        "accepted_at": null,
+        "accepted_delay_minutes": null,
+        "entry_cost_snapshot": {
+          "basis": "LIVE_OKX_SWAP_L2_PLUS_CONFIGURED_TAKER_FEE",
+          "best_ask": 14.265,
+          "best_bid": 14.264,
+          "blockers": [],
+          "buy_quote_filled": 1000.0,
+          "buy_vwap": 14.265,
+          "candidate_direction": "SHORT",
+          "captured_at": "2026-09-30T19:30:24.579740+00:00",
+          "contract_base_value": 1.0,
+          "contract_basis": "LINEAR_BASE_CTVAL",
+          "fee_bps": 5.0,
+          "freeze_role": "CANDIDATE_ENTRY_TIME_EVIDENCE_ONLY",
+          "full_spread_bps": 0.701041,
+          "instrument": "LINK-USDT-SWAP",
+          "live_execution": false,
+          "research_notional_usdt": 1000.0,
+          "research_only": true,
+          "round_trip_cost_bps": 10.701041,
+          "sell_quote_filled": 1000.0,
+          "sell_vwap": 14.264,
+          "slippage_bps": 0.0,
+          "spread_bps": 0.350521,
+          "symbol": "LINKUSDT",
+          "validated": true,
+          "venue": "OKX_USDT_SWAP",
+          "version": "EXECUTION_COST_MODEL_V2_NET_R"
+        },
+        "ever_accepted": false,
+        "geometry": {
+          "direction": "SHORT",
+          "entry": 14.0289142857,
+          "risk_abs": 0.33128571429999987,
+          "rr_tp2": 2.0,
+          "stop_loss": 14.3602,
+          "tp1": 13.6976285714,
+          "tp2": 13.3663428571
+        },
+        "initial_blockers": [
+          "HTF_4H_12H_NOT_ALIGNED",
+          "ENTRY_CONFIRMATION_NOT_ALIGNED",
+          "BREAKOUT_STRUCTURE_NOT_CONFIRMED",
+          "TRADER_HTF_CONFLICT",
+          "TRADER_WAIT_1H_TRIGGER",
+          "TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS"
+        ],
+        "initial_decision": "WAIT",
+        "initial_direction_alignment": "OPPOSED",
+        "initial_direction_state": "OPPOSED",
+        "initial_entry_confirmation_direction": "SHORT",
+        "initial_primary_blocker": "HTF_4H_12H_NOT_ALIGNED",
+        "initial_product_direction": "LONG",
+        "initial_score": 68.0,
+        "max_score": 68.0,
+        "observations": 1,
+        "outcomes": {
+          "12h": {
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          },
+          "4h": {
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          },
+          "8h": {
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          }
+        },
+        "started_at": "2026-09-30T19:29:22.852484+00:00",
+        "started_at_ms": 1790796562852,
+        "symbol": "LINKUSDT"
+      },
+      {
+        "accepted_at": null,
+        "accepted_delay_minutes": null,
+        "entry_cost_snapshot": {
+          "basis": "LIVE_OKX_SWAP_L2_PLUS_CONFIGURED_TAKER_FEE",
+          "best_ask": 66.18,
+          "best_bid": 66.17,
+          "blockers": [],
+          "buy_quote_filled": 1000.0,
+          "buy_vwap": 66.1823890252621,
+          "candidate_direction": "SHORT",
+          "captured_at": "2026-09-30T19:30:37.387006+00:00",
+          "contract_base_value": 1.0,
+          "contract_basis": "LINEAR_BASE_CTVAL",
+          "fee_bps": 5.0,
+          "freeze_role": "CANDIDATE_ENTRY_TIME_EVIDENCE_ONLY",
+          "full_spread_bps": 1.511145,
+          "instrument": "LTC-USDT-SWAP",
+          "live_execution": false,
+          "research_notional_usdt": 1000.0,
+          "research_only": true,
+          "round_trip_cost_bps": 11.872134,
+          "sell_quote_filled": 1000.0,
+          "sell_vwap": 66.17,
+          "slippage_bps": 0.180495,
+          "spread_bps": 0.755572,
+          "symbol": "LTCUSDT",
+          "validated": true,
+          "venue": "OKX_USDT_SWAP",
+          "version": "EXECUTION_COST_MODEL_V2_NET_R"
+        },
+        "ever_accepted": false,
+        "geometry": {
+          "direction": "SHORT",
+          "entry": 65.5499285714,
+          "risk_abs": 1.2010714286000024,
+          "rr_tp2": 2.0,
+          "stop_loss": 66.751,
+          "tp1": 64.3488571429,
+          "tp2": 63.1477857143
+        },
+        "initial_blockers": [
+          "HTF_PRODUCT_DIRECTION_UNRESOLVED",
+          "HTF_4H_12H_NOT_ALIGNED",
+          "RR_BELOW_TWO_TO_ONE",
+          "TRADER_NO_DIRECTIONAL_THESIS",
+          "TRADER_WAIT_HTF_ALIGNMENT_EVIDENCE",
+          "TRADER_WAIT_VALID_LOCATION",
+          "TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS"
+        ],
+        "initial_decision": "WAIT",
+        "initial_direction_alignment": "NO_PRODUCT_DIRECTION",
+        "initial_direction_state": "UNRESOLVED",
+        "initial_entry_confirmation_direction": "SHORT",
+        "initial_primary_blocker": "HTF_PRODUCT_DIRECTION_UNRESOLVED",
+        "initial_product_direction": null,
+        "initial_score": 70.0,
+        "max_score": 70.0,
+        "observations": 1,
+        "outcomes": {
+          "12h": {
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          },
+          "4h": {
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          },
+          "8h": {
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          }
+        },
+        "started_at": "2026-09-30T19:29:22.852484+00:00",
+        "started_at_ms": 1790796562852,
+        "symbol": "LTCUSDT"
+      },
+      {
+        "accepted_at": null,
+        "accepted_delay_minutes": null,
+        "entry_cost_snapshot": {
+          "basis": "LIVE_OKX_SWAP_L2_PLUS_CONFIGURED_TAKER_FEE",
+          "best_ask": 117.75,
+          "best_bid": 117.74,
+          "blockers": [],
+          "buy_quote_filled": 1000.0,
+          "buy_vwap": 117.75,
+          "candidate_direction": "SHORT",
+          "captured_at": "2026-09-30T19:29:38.935536+00:00",
+          "contract_base_value": 1.0,
+          "contract_basis": "LINEAR_BASE_CTVAL",
+          "fee_bps": 5.0,
+          "freeze_role": "CANDIDATE_ENTRY_TIME_EVIDENCE_ONLY",
+          "full_spread_bps": 0.849293,
+          "instrument": "SOL-USDT-SWAP",
+          "live_execution": false,
+          "research_notional_usdt": 1000.0,
+          "research_only": true,
+          "round_trip_cost_bps": 10.849293,
+          "sell_quote_filled": 1000.0,
+          "sell_vwap": 117.74000000000001,
+          "slippage_bps": 0.0,
+          "spread_bps": 0.424646,
+          "symbol": "SOLUSDT",
+          "validated": true,
+          "venue": "OKX_USDT_SWAP",
+          "version": "EXECUTION_COST_MODEL_V2_NET_R"
+        },
+        "ever_accepted": false,
+        "geometry": {
+          "direction": "SHORT",
+          "entry": 117.4244285714,
+          "risk_abs": 2.3335714285999956,
+          "rr_tp2": 2.0,
+          "stop_loss": 119.758,
+          "tp1": 115.0908571429,
+          "tp2": 112.7572857143
+        },
+        "initial_blockers": [
+          "HTF_4H_12H_NOT_ALIGNED",
+          "ENTRY_CONFIRMATION_NOT_ALIGNED",
+          "RR_BELOW_TWO_TO_ONE",
+          "BREAKOUT_STRUCTURE_NOT_CONFIRMED",
+          "TRADER_HTF_CONFLICT",
+          "TRADER_WAIT_1H_TRIGGER",
+          "TRADER_WAIT_VALID_LOCATION",
+          "TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS"
+        ],
+        "initial_decision": "WAIT",
+        "initial_direction_alignment": "OPPOSED",
+        "initial_direction_state": "OPPOSED",
+        "initial_entry_confirmation_direction": "SHORT",
+        "initial_primary_blocker": "HTF_4H_12H_NOT_ALIGNED",
+        "initial_product_direction": "LONG",
+        "initial_score": 69.0,
+        "max_score": 69.0,
+        "observations": 1,
+        "outcomes": {
+          "12h": {
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          },
+          "4h": {
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          },
+          "8h": {
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          }
+        },
+        "started_at": "2026-09-30T19:29:22.852484+00:00",
+        "started_at_ms": 1790796562852,
+        "symbol": "SOLUSDT"
+      },
+      {
+        "accepted_at": null,
+        "accepted_delay_minutes": null,
+        "entry_cost_snapshot": {
+          "basis": "LIVE_OKX_SWAP_L2_PLUS_CONFIGURED_TAKER_FEE",
+          "best_ask": 1416.81,
+          "best_bid": 1416.8,
+          "blockers": [],
+          "buy_quote_filled": 1000.0,
+          "buy_vwap": 1416.81,
+          "candidate_direction": "SHORT",
+          "captured_at": "2026-09-30T19:30:09.931019+00:00",
+          "contract_base_value": 0.01,
+          "contract_basis": "LINEAR_BASE_CTVAL",
+          "fee_bps": 5.0,
+          "freeze_role": "CANDIDATE_ENTRY_TIME_EVIDENCE_ONLY",
+          "full_spread_bps": 0.070581,
+          "instrument": "ZEC-USDT-SWAP",
+          "live_execution": false,
+          "research_notional_usdt": 1000.0,
+          "research_only": true,
+          "round_trip_cost_bps": 10.070581,
+          "sell_quote_filled": 1000.0,
+          "sell_vwap": 1416.8,
+          "slippage_bps": 0.0,
+          "spread_bps": 0.035291,
+          "symbol": "ZECUSDT",
+          "validated": true,
+          "venue": "OKX_USDT_SWAP",
+          "version": "EXECUTION_COST_MODEL_V2_NET_R"
+        },
+        "ever_accepted": false,
+        "geometry": {
+          "direction": "SHORT",
+          "entry": 1428.668,
+          "risk_abs": 48.03428571430004,
+          "rr_tp2": 2.0,
+          "stop_loss": 1476.7022857143,
+          "tp1": 1380.6337142857,
+          "tp2": 1332.5994285714
+        },
+        "initial_blockers": [
+          "SHORT_EDGE_NOT_PROVEN_PRODUCTION_QUARANTINE",
+          "RR_BELOW_TWO_TO_ONE",
+          "TRADER_WAIT_VALID_LOCATION",
+          "TRADER_WAIT_SHORT_PULLBACK_RESUMPTION"
+        ],
+        "initial_decision": "WAIT",
+        "initial_direction_alignment": "ALIGNED",
+        "initial_direction_state": "ALIGNED",
+        "initial_entry_confirmation_direction": "SHORT",
+        "initial_primary_blocker": "SHORT_EDGE_NOT_PROVEN_PRODUCTION_QUARANTINE",
+        "initial_product_direction": "SHORT",
+        "initial_score": 66.0,
+        "max_score": 66.0,
+        "observations": 1,
+        "outcomes": {
+          "12h": {
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          },
+          "4h": {
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          },
+          "8h": {
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          }
+        },
+        "started_at": "2026-09-30T19:29:22.852484+00:00",
+        "started_at_ms": 1790796562852,
+        "symbol": "ZECUSDT"
       }
     ],
     "included_in_paper_pnl": false,
@@ -20883,7 +21765,7 @@
     },
     "observational_only": true,
     "qualification_rule": "CANDIDATE_SHORT_AND_SCORE_GTE_64_AND_PRODUCTION_SIGNAL_QUALIFIED_AND_VALID_CANDIDATE_GEOMETRY",
-    "qualified_short_episodes": 115,
+    "qualified_short_episodes": 119,
     "schema": "ATLAS_T64_QUALIFIED_SHORT_TRANSITION_EVIDENCE_V2_SCORE_NET",
     "unresolved_score_bands": {
       "64_67": {
@@ -21178,7 +22060,7 @@
           },
           "gross": {
             "avg_r": 0.2,
-            "episodes": 8,
+            "episodes": 9,
             "matured": 5,
             "positive_pct": 40.0,
             "sl_hits": 3,
@@ -21220,7 +22102,7 @@
           },
           "gross": {
             "avg_r": 0.4902,
-            "episodes": 8,
+            "episodes": 9,
             "matured": 6,
             "positive_pct": 66.7,
             "sl_hits": 1,
@@ -21262,7 +22144,7 @@
           },
           "gross": {
             "avg_r": 0.3948,
-            "episodes": 8,
+            "episodes": 9,
             "matured": 5,
             "positive_pct": 40.0,
             "sl_hits": 2,
@@ -21436,7 +22318,7 @@
           },
           "gross": {
             "avg_r": -0.2201,
-            "episodes": 42,
+            "episodes": 43,
             "matured": 36,
             "positive_pct": 27.8,
             "sl_hits": 23,
@@ -21478,7 +22360,7 @@
           },
           "gross": {
             "avg_r": -0.4622,
-            "episodes": 42,
+            "episodes": 43,
             "matured": 37,
             "positive_pct": 35.1,
             "sl_hits": 19,
@@ -21520,7 +22402,7 @@
           },
           "gross": {
             "avg_r": -0.2529,
-            "episodes": 42,
+            "episodes": 43,
             "matured": 36,
             "positive_pct": 25.0,
             "sl_hits": 21,
@@ -21564,7 +22446,7 @@
           },
           "gross": {
             "avg_r": -0.0641,
-            "episodes": 35,
+            "episodes": 36,
             "matured": 30,
             "positive_pct": 33.3,
             "sl_hits": 17,
@@ -21606,7 +22488,7 @@
           },
           "gross": {
             "avg_r": -0.3971,
-            "episodes": 35,
+            "episodes": 36,
             "matured": 31,
             "positive_pct": 38.7,
             "sl_hits": 14,
@@ -21648,7 +22530,7 @@
           },
           "gross": {
             "avg_r": -0.1293,
-            "episodes": 35,
+            "episodes": 36,
             "matured": 30,
             "positive_pct": 30.0,
             "sl_hits": 16,
@@ -21692,7 +22574,7 @@
           },
           "gross": {
             "avg_r": -0.0641,
-            "episodes": 34,
+            "episodes": 35,
             "matured": 30,
             "positive_pct": 33.3,
             "sl_hits": 17,
@@ -21734,7 +22616,7 @@
           },
           "gross": {
             "avg_r": -0.3971,
-            "episodes": 34,
+            "episodes": 35,
             "matured": 31,
             "positive_pct": 38.7,
             "sl_hits": 14,
@@ -21776,7 +22658,7 @@
           },
           "gross": {
             "avg_r": -0.1293,
-            "episodes": 34,
+            "episodes": 35,
             "matured": 30,
             "positive_pct": 30.0,
             "sl_hits": 16,
@@ -24276,10 +25158,14 @@
       "product_window_checkpoints": [
         {
           "checkpoint_h": 4,
+          "extended_target": null,
           "extended_target_reached": null,
-          "matured": false,
-          "r_multiple": null,
-          "status": "NOT_MATURED"
+          "market_source": "BINANCE_DATA_API_SPOT",
+          "matured": true,
+          "r_multiple": -1.0,
+          "rr_extended": null,
+          "status": "LOSS_BY_CHECKPOINT",
+          "tp1_reached": false
         },
         {
           "checkpoint_h": 8,
