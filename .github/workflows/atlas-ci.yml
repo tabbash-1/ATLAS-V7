@@ -236,13 +236,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Run frozen ADP V3 untouched holdout
+      - name: Run frozen ADP V4 external replication
         run: |
           set -euo pipefail
-          python research/adp/v3_contrarian_holdout.py --days 365 | tee /tmp/adp-v3.log
-          grep '^ADP_V3_TEST=' /tmp/adp-v3.log | sed 's/^ADP_V3_TEST=//' > /tmp/adp-v3-result.json
-          test -s /tmp/adp-v3-result.json
+          python research/adp/v4_long_only_external_replication.py --days 730 | tee /tmp/adp-v4.log
+          grep '^ADP_V4_REPLICATION=' /tmp/adp-v4.log | sed 's/^ADP_V4_REPLICATION=//' > /tmp/adp-v4-result.json
+          test -s /tmp/adp-v4-result.json
       - uses: actions/upload-artifact@v4
         with:
-          name: adp-v3-untouched-result
-          path: /tmp/adp-v3-result.json
+          name: adp-v4-external-replication
+          path: /tmp/adp-v4-result.json
