@@ -236,13 +236,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Run ADP V5 sealed entry-exit development
+      - name: Run ADP V6 reversal-confirmation development
         run: |
           set -euo pipefail
-          python research/adp/v5_entry_exit_development.py --days 730 | tee /tmp/adp-v5.log
-          grep '^ADP_V5_DEV=' /tmp/adp-v5.log | sed 's/^ADP_V5_DEV=//' > /tmp/adp-v5-result.json
-          test -s /tmp/adp-v5-result.json
+          python research/adp/v6_reversal_confirmation_development.py --days 730 | tee /tmp/adp-v6.log
+          grep '^ADP_V6_DEV=' /tmp/adp-v6.log | sed 's/^ADP_V6_DEV=//' > /tmp/adp-v6-result.json
+          test -s /tmp/adp-v6-result.json
       - uses: actions/upload-artifact@v4
         with:
-          name: adp-v5-development
-          path: /tmp/adp-v5-result.json
+          name: adp-v6-development
+          path: /tmp/adp-v6-result.json
