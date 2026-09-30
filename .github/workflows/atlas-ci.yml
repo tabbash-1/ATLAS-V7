@@ -236,18 +236,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Run isolated ADP V1 research
+      - name: Run sealed ADP V2 validation scan
         run: |
           set -euo pipefail
-          python research/adp/ohlcv_direction_experiment_v1.py --days 365 | tee /tmp/adp.log
-          grep '^ADP_RESULT=' /tmp/adp.log | sed 's/^ADP_RESULT=//' > /tmp/adp-result.json
-          test -s /tmp/adp-result.json
           python research/adp/v2_candidate_scan.py --days 365 | tee /tmp/adp-v2.log
           grep '^ADP_V2_SCAN=' /tmp/adp-v2.log | sed 's/^ADP_V2_SCAN=//' > /tmp/adp-v2-result.json
           test -s /tmp/adp-v2-result.json
       - uses: actions/upload-artifact@v4
         with:
-          name: adp-direction-v1-result
-          path: |
-            /tmp/adp-result.json
-            /tmp/adp-v2-result.json
+          name: adp-v2-validation-result
+          path: /tmp/adp-v2-result.json
