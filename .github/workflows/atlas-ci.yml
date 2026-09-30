@@ -236,13 +236,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Run frozen ADP V4 external replication
+      - name: Run ADP V4 cost-adjusted tradability check
         run: |
           set -euo pipefail
-          python research/adp/v4_long_only_external_replication.py --days 730 | tee /tmp/adp-v4.log
-          grep '^ADP_V4_REPLICATION=' /tmp/adp-v4.log | sed 's/^ADP_V4_REPLICATION=//' > /tmp/adp-v4-result.json
-          test -s /tmp/adp-v4-result.json
+          python research/adp/v4_tradability_check.py --days 730 | tee /tmp/adp-v4-trade.log
+          grep '^ADP_V4_TRADABILITY=' /tmp/adp-v4-trade.log | sed 's/^ADP_V4_TRADABILITY=//' > /tmp/adp-v4-trade-result.json
+          test -s /tmp/adp-v4-trade-result.json
       - uses: actions/upload-artifact@v4
         with:
-          name: adp-v4-external-replication
-          path: /tmp/adp-v4-result.json
+          name: adp-v4-tradability
+          path: /tmp/adp-v4-trade-result.json
