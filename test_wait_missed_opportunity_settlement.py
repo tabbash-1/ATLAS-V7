@@ -102,3 +102,18 @@ def test_v3_reads_lane_oriented_production_timeframe_matrix():
     assert e['h1_aligned'] is True
     assert e['h4_aligned'] is True
     assert e['h12_explicit_opposition'] is False
+
+
+def test_summary_counts_only_proven_executable_misses():
+    rows=[
+      {'epoch_id':m.POST_V2_EPOCH_ID,'missed_opportunity':True,'executability_classification':'CORRECT_NO_CHASE','blocker_family':'HTF_CONFLICT','horizons':{}},
+      {'epoch_id':m.POST_V2_EPOCH_ID,'missed_opportunity':True,'executability_classification':'MISSED_TRADEABLE_OPPORTUNITY','blocker_family':'HTF_CONFLICT','horizons':{}},
+      {'epoch_id':m.POST_V2_EPOCH_ID,'missed_opportunity':False,'executability_classification':'GOOD_WAIT','blocker_family':'HTF_CONFLICT','horizons':{}},
+    ]
+    s=m.summarize(rows)
+    assert s['matured_classified']==3
+    assert s['descriptive_move_n']==2
+    assert s['missed_n']==1
+    assert s['missed_rate_pct']==33.33
+    assert s['by_blocker_family']['HTF_CONFLICT']['descriptive_move_n']==2
+    assert s['by_blocker_family']['HTF_CONFLICT']['missed_n']==1
