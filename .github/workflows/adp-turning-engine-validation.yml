@@ -1,0 +1,27 @@
+name: ADP Turning Engine Validation
+on:
+  push:
+    branches: [research/adp-v8-historical-backtest]
+    paths:
+      - research/adp/turning_engine_v1.py
+      - .github/workflows/adp-turning-engine-validation.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: research/adp-v8-historical-backtest, fetch-depth: 0}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+      - run: python research/adp/turning_engine_v1.py --days 730 --end-ms 1790796000000
+      - run: |
+          git config user.name "atlas-research-bot"
+          git config user.email "atlas-research-bot@users.noreply.github.com"
+          git add status/adp-turning-engine-v1.json
+          git diff --cached --quiet && exit 0
+          git commit -m "research: record turning engine validation [skip ci] [skip render]"
+          git pull --rebase origin research/adp-v8-historical-backtest
+          git push origin HEAD:research/adp-v8-historical-backtest
