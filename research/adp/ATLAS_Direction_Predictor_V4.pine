@@ -1,0 +1,19 @@
+//@version=6
+indicator("ATLAS Direction Predictor V4 [Research]", overlay=true)
+
+ema20 = ta.ema(close, 20)
+ema50 = ta.ema(close, 50)
+mom8h = close / close[8] - 1.0
+relVol = volume / ta.sma(volume[1], 24)
+
+downStructure = close < ema20 and ema20 < ema50
+buyRaw = downStructure and mom8h < 0 and relVol >= 1.0
+buy = barstate.isconfirmed and buyRaw
+
+plot(ema20, "EMA 20")
+plot(ema50, "EMA 50")
+plotshape(buy, title="ADP BUY", style=shape.labelup, location=location.belowbar, text="BUY")
+alertcondition(buy, title="ADP V4 BUY", message="ADP V4 BUY {{ticker}} {{interval}} close={{close}}")
+
+// V4 is intentionally BUY-only. SELL was rejected by untouched validation.
+// Closed-bar logic only; no lookahead/security calls; research-only until forward validation.
