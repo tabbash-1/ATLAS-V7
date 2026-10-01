@@ -111,3 +111,14 @@ if __name__ == '__main__':
     test_protective_broad_blocker_can_contain_eligible_narrow_segment()
     test_no_directional_consensus_is_never_auto_relaxed()
     print('wait diagnostics tests: ok')
+
+
+def test_correct_no_chase_is_not_counted_as_missed_executable_opportunity():
+    row={'direction':'LONG','executability_classification':'CORRECT_NO_CHASE',
+         'horizons':{'12h':{'directional_return_pct':5.0}}}
+    assert w.classify(row,12)=='MOVE_WITHOUT_PROVEN_EXECUTABILITY'
+
+def test_good_wait_remains_protective_even_if_close_later_recovers():
+    row={'direction':'LONG','executability_classification':'GOOD_WAIT',
+         'horizons':{'12h':{'directional_return_pct':2.0}}}
+    assert w.classify(row,12)=='WAIT_PROTECTED_CAPITAL'

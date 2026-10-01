@@ -127,3 +127,13 @@ def test_no_direction_does_not_invent_trade():
     assert x['status']=='WAIT' and x['entry_mode']=='NONE'
     assert x['product_horizon']=='4-12H'
     assert x['analysis_only'] is True and x['live_execution'] is False
+
+
+def test_score_is_never_exposed_as_calibrated_probability():
+    d={'ok':True,'candidate_direction':'LONG','entry':100.0,'signal_threshold':68,
+       'execution_ready':True,'indicators':{'atr14':2.0},
+       'structural_geometry':{'continuation_strong':True,'breakout':{'confirmed':True}}}
+    out=p.build(d)
+    assert out['score_is_authority'] is False
+    assert out['score_probability_calibrated'] is False
+    assert out['score_semantics']=='SETUP_QUALIFICATION_SCORE_NOT_CALIBRATED_WIN_PROBABILITY'
