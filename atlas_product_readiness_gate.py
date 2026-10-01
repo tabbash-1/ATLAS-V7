@@ -8,7 +8,6 @@ OUTCOMES=ROOT/'status/canonical-outcomes-latest.json'
 INTEGRITY=ROOT/'status/paper-portfolio-10k-integrity.json'
 VALIDATION=ROOT/'status/production-validation-latest.json'
 QUICK=ROOT/'status/quick-trade-outcomes.json'
-QUICK=ROOT/'status/quick-trade-outcomes.json'
 OUT=ROOT/'status/product-readiness-latest.json'
 SCHEMA='ATLAS_PRODUCT_READINESS_GATE_V2_FINAL_GATE_AUTHORITY'
 SOURCE='FINAL_TRADE_GATE'
@@ -26,7 +25,6 @@ def build(outcomes=None,integrity=None,attribution=None,validation=None,quick=No
     outcomes=outcomes if outcomes is not None else load(OUTCOMES)
     integrity=integrity if integrity is not None else load(INTEGRITY)
     validation=validation if validation is not None else load(VALIDATION)
-    quick=quick if quick is not None else load(QUICK)
     quick=quick if quick is not None else load(QUICK)
     safety=(outcomes or {}).get('safety') or {}
     rows=list(((outcomes or {}).get('signals') or {}).get('rows') or [])
