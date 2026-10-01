@@ -8,6 +8,7 @@ OUTCOMES=ROOT/'status/canonical-outcomes-latest.json'
 INTEGRITY=ROOT/'status/paper-portfolio-10k-integrity.json'
 VALIDATION=ROOT/'status/production-validation-latest.json'
 QUICK=ROOT/'status/quick-trade-outcomes.json'
+QUICK=ROOT/'status/quick-trade-outcomes.json'
 OUT=ROOT/'status/product-readiness-latest.json'
 SCHEMA='ATLAS_PRODUCT_READINESS_GATE_V2_FINAL_GATE_AUTHORITY'
 SOURCE='FINAL_TRADE_GATE'
@@ -25,6 +26,7 @@ def build(outcomes=None,integrity=None,attribution=None,validation=None,quick=No
     outcomes=outcomes if outcomes is not None else load(OUTCOMES)
     integrity=integrity if integrity is not None else load(INTEGRITY)
     validation=validation if validation is not None else load(VALIDATION)
+    quick=quick if quick is not None else load(QUICK)
     quick=quick if quick is not None else load(QUICK)
     safety=(outcomes or {}).get('safety') or {}
     rows=list(((outcomes or {}).get('signals') or {}).get('rows') or [])
@@ -61,6 +63,9 @@ def build(outcomes=None,integrity=None,attribution=None,validation=None,quick=No
     quick_n=int(qs.get('closed_or_expired') or 0)
     quick_ambiguous=sum(1 for r in ((quick or {}).get('records') or []) if r.get('status')=='AMBIGUOUS_PATH')
     checks.append(_check('QUICK_TRADE_EVIDENCE_DISCLOSED',True,{'closed_or_expired':quick_n,'ambiguous_path':quick_ambiguous},'Quick Trade is context/research only until separately validated','DISCLOSURE'))
+    quick_n=int(((quick or {}).get('summary') or {}).get('total_signals') or 0)
+    quick_closed=int(((quick or {}).get('summary') or {}).get('closed_or_expired') or 0)
+    quick_evidence={'status':'NO_EVIDENCE' if quick_n==0 else ('IMMATURE' if quick_closed<MIN_DIRECTIONAL_MATURED else 'OBSERVED'),'signals':quick_n,'closed_or_expired':quick_closed,'can_support_readiness':bool(quick_closed>=MIN_DIRECTIONAL_MATURED)}
     technical=all(c['passed'] for c in checks if c['severity']=='BLOCKER')
     evidence=all(c['passed'] for c in checks if c['severity']=='EVIDENCE_BLOCKER')
     state='BLOCKED_TECHNICAL' if not technical else ('FORWARD_EVIDENCE_GATE_PASSED' if evidence else 'TECHNICALLY_READY_EVIDENCE_PENDING')
@@ -73,7 +78,7 @@ def build(outcomes=None,integrity=None,attribution=None,validation=None,quick=No
       'claim_policy':{'may_claim_technically_operational':technical,'may_claim_forward_edge_validated':evidence,'may_claim_profitable':False,'note':'Readiness is evaluated only from prospective FINAL_TRADE_GATE execution-eligible paper evidence. Profitability still requires costs and larger independent forward evidence.'},
       'preregistered_evidence_requirements':{'minimum_matured_12h_entries':MIN_MATURED_12H,'minimum_matured_per_direction':MIN_DIRECTIONAL_MATURED,'average_r':'> 0','net_r':'> 0','cost_adjusted_average_r':'> 0','cost_adjusted_net_r':'> 0','cost_adjusted_profit_factor':'> 1.0'},
       'observed':{'entries':len(rows),'matured_12h_terminal':n,'matured_by_direction':dict(sorted(dirs.items())),'avg_r':avg_r,'net_r':net_r,'cost_adjusted_terminal':cost_n,'cost_adjusted_avg_r':cost_avg,'cost_adjusted_net_r':cost_net,'cost_adjusted_profit_factor':cost_pf,'append_only_verified':None if not integrity else integrity.get('append_only_verified'),'official_trade_authority':None if not outcomes else outcomes.get('official_trade_authority')},
-      'checks':checks,'blockers':[c for c in checks if not c['passed']],
+      'checks':checks,'blockers':[c for c in checks if not c['passed']],'quick_trade_evidence':quick_evidence,
       'research_lane_excluded_from_readiness':'analyst_output'
     }
 
