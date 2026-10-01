@@ -49,9 +49,9 @@ def test_epoch_boundary_is_explicit_and_immutable():
 
 
 def test_cohort_summary_never_mixes_legacy_and_post_v2():
-    def r(epoch, missed, regime=None):
-        return {'epoch_id':epoch,'missed_opportunity':missed,'blocker_family':'HTF_CONFLICT','v2_regime':regime,'horizons':{'4h':{'directional_return_pct':1.0},'8h':{'directional_return_pct':1.0},'12h':{'directional_return_pct':1.0}}}
-    rows=[r('LEGACY_BASELINE',True),r(m.POST_V2_EPOCH_ID,False),r(m.POST_V2_EPOCH_ID,True,'4H_DIRECTIONAL_12H_NEUTRAL')]
+    def r(epoch, missed, regime=None, executable=False):
+        return {'epoch_id':epoch,'missed_opportunity':missed,'executability_classification':'MISSED_TRADEABLE_OPPORTUNITY' if executable else ('CORRECT_NO_CHASE' if missed else 'GOOD_WAIT'),'blocker_family':'HTF_CONFLICT','v2_regime':regime,'horizons':{'4h':{'directional_return_pct':1.0},'8h':{'directional_return_pct':1.0},'12h':{'directional_return_pct':1.0}}}
+    rows=[r('LEGACY_BASELINE',True),r(m.POST_V2_EPOCH_ID,False),r(m.POST_V2_EPOCH_ID,True,'4H_DIRECTIONAL_12H_NEUTRAL',True)]
     c=m.cohort_summary(rows)
     assert c['legacy_baseline']['matured_classified']==1
     assert c['post_v2_forward']['matured_classified']==2
