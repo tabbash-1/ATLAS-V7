@@ -7,6 +7,7 @@ ROOT=pathlib.Path(__file__).resolve().parent
 OUTCOMES=ROOT/'status/canonical-outcomes-latest.json'
 INTEGRITY=ROOT/'status/paper-portfolio-10k-integrity.json'
 VALIDATION=ROOT/'status/production-validation-latest.json'
+QUICK=ROOT/'status/quick-trade-outcomes.json'
 OUT=ROOT/'status/product-readiness-latest.json'
 SCHEMA='ATLAS_PRODUCT_READINESS_GATE_V2_FINAL_GATE_AUTHORITY'
 SOURCE='FINAL_TRADE_GATE'
@@ -20,10 +21,11 @@ def load(path):
 def _check(name,passed,observed=None,required=None,severity='BLOCKER'):
     return {'name':name,'passed':bool(passed),'observed':observed,'required':required,'severity':severity}
 
-def build(outcomes=None,integrity=None,attribution=None,validation=None):
+def build(outcomes=None,integrity=None,attribution=None,validation=None,quick=None):
     outcomes=outcomes if outcomes is not None else load(OUTCOMES)
     integrity=integrity if integrity is not None else load(INTEGRITY)
     validation=validation if validation is not None else load(VALIDATION)
+    quick=quick if quick is not None else load(QUICK)
     safety=(outcomes or {}).get('safety') or {}
     rows=list(((outcomes or {}).get('signals') or {}).get('rows') or [])
     path=(outcomes or {}).get('path_summary') or {}
@@ -55,6 +57,10 @@ def build(outcomes=None,integrity=None,attribution=None,validation=None):
     checks.append(_check('POSITIVE_COST_ADJUSTED_AVERAGE_R',cost_n>=MIN_MATURED_12H and isinstance(cost_avg,(int,float)) and cost_avg>0,cost_avg,'> 0 after costs and minimum sample','EVIDENCE_BLOCKER'))
     checks.append(_check('POSITIVE_COST_ADJUSTED_NET_R',cost_n>=MIN_MATURED_12H and isinstance(cost_net,(int,float)) and cost_net>0,cost_net,'> 0 after costs and minimum sample','EVIDENCE_BLOCKER'))
     checks.append(_check('COST_ADJUSTED_PROFIT_FACTOR',cost_n>=MIN_MATURED_12H and isinstance(cost_pf,(int,float)) and cost_pf>1.0,cost_pf,'> 1.0 after costs and minimum sample','EVIDENCE_BLOCKER'))
+    qs=(quick or {}).get('summary') or {}
+    quick_n=int(qs.get('closed_or_expired') or 0)
+    quick_ambiguous=sum(1 for r in ((quick or {}).get('records') or []) if r.get('status')=='AMBIGUOUS_PATH')
+    checks.append(_check('QUICK_TRADE_EVIDENCE_DISCLOSED',True,{'closed_or_expired':quick_n,'ambiguous_path':quick_ambiguous},'Quick Trade is context/research only until separately validated','DISCLOSURE'))
     technical=all(c['passed'] for c in checks if c['severity']=='BLOCKER')
     evidence=all(c['passed'] for c in checks if c['severity']=='EVIDENCE_BLOCKER')
     state='BLOCKED_TECHNICAL' if not technical else ('FORWARD_EVIDENCE_GATE_PASSED' if evidence else 'TECHNICALLY_READY_EVIDENCE_PENDING')
