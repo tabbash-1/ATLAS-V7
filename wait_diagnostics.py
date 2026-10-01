@@ -81,6 +81,9 @@ def blocker_segment(row):
 
 
 def classify(row, hours=12):
+    explicit=str(row.get('executability_classification') or '').upper()
+    if explicit == 'GOOD_WAIT': return 'WAIT_PROTECTED_CAPITAL'
+    if explicit == 'CORRECT_NO_CHASE': return 'MOVE_WITHOUT_PROVEN_EXECUTABILITY'
     h = _horizon(row, hours)
     direction = str(row.get('direction') or row.get('candidate_direction') or 'NONE').upper()
     directional = _f(h.get('directional_return_pct'))
@@ -200,7 +203,8 @@ def diagnose(payload, hours=12):
         'by_symbol':{k:_stats(v,hours) for k,v in sorted(by_symbol.items())},
         'blocker_review':review,'calibration':calibration({'records':records}),
         'definitions':{
-            'missed_directional_opportunity':f'candidate direction gained >= {MATERIAL_DIRECTIONAL_MOVE_PCT}% by horizon',
+            'missed_directional_opportunity':f'candidate direction gained >= {MATERIAL_DIRECTIONAL_MOVE_PCT}% by horizon and no explicit executability classification disproves a missed executable trade',
+            'move_without_proven_executability':'market moved in candidate direction, but frozen T0 evidence did not prove an executable trade; excluded from missed-opportunity numerator',
             'wait_protected_capital':f'candidate direction lost >= {MATERIAL_DIRECTIONAL_MOVE_PCT}% by horizon',
             'material_move_without_consensus':f'no candidate direction and absolute market move >= {MATERIAL_UNSIGNED_MOVE_PCT}%; hindsight only, not a missed signal',
         },
