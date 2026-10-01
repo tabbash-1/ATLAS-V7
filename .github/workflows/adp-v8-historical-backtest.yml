@@ -22,12 +22,14 @@ jobs:
         run: python research/adp/v10_structural_redesign.py --days 730 --end-ms 1790796000000
       - name: Study direction-change precursors
         run: python research/adp/turning_point_event_study.py --days 730 --end-ms 1790796000000
+      - name: Validate causal turning engine
+        run: python research/adp/turning_engine_v1.py --days 730 --end-ms 1790796000000
       - name: Persist research results
         run: |
           set -euo pipefail
           git config user.name "atlas-research-bot"
           git config user.email "atlas-research-bot@users.noreply.github.com"
-          git add status/adp-v8-historical-backtest.json status/adp-v9-dev-validation.json status/adp-v10-dev-validation.json status/adp-turning-point-study.json
+          git add status/adp-v8-historical-backtest.json status/adp-v9-dev-validation.json status/adp-v10-dev-validation.json status/adp-turning-point-study.json status/adp-turning-engine-v1.json
           git diff --cached --quiet && exit 0
           git commit -m "research: record ADP historical evidence [skip ci] [skip render]"
           git pull --rebase origin research/adp-v8-historical-backtest
