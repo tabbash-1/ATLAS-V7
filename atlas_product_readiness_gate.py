@@ -40,6 +40,11 @@ def build(outcomes=None,integrity=None,attribution=None,validation=None):
     checks.append(_check('MINIMUM_MATURED_12H_SAMPLE',n>=MIN_MATURED_12H,n,MIN_MATURED_12H,'EVIDENCE_BLOCKER'))
     for d in ('LONG','SHORT'):
         checks.append(_check(f'MINIMUM_{d}_MATURED_SAMPLE',dirs.get(d,0)>=MIN_DIRECTIONAL_MATURED,dirs.get(d,0),MIN_DIRECTIONAL_MATURED,'EVIDENCE_BLOCKER'))
+        dr=[float((r.get('settlement') or {}).get('r_multiple')) for r in settled if str(r.get('direction') or '').upper()==d and isinstance((r.get('settlement') or {}).get('r_multiple'),(int,float))]
+        davg=(sum(dr)/len(dr)) if dr else None
+        dnet=sum(dr) if dr else None
+        checks.append(_check(f'POSITIVE_{d}_FORWARD_AVERAGE_R',len(dr)>=MIN_DIRECTIONAL_MATURED and davg is not None and davg>0,davg,f'> 0 with >= {MIN_DIRECTIONAL_MATURED} matured','EVIDENCE_BLOCKER'))
+        checks.append(_check(f'POSITIVE_{d}_FORWARD_NET_R',len(dr)>=MIN_DIRECTIONAL_MATURED and dnet is not None and dnet>0,dnet,f'> 0 with >= {MIN_DIRECTIONAL_MATURED} matured','EVIDENCE_BLOCKER'))
     avg_r=path.get('avg_r'); net_r=path.get('net_r')
     checks.append(_check('POSITIVE_FORWARD_AVERAGE_R',n>=MIN_MATURED_12H and isinstance(avg_r,(int,float)) and avg_r>0,avg_r,'> 0 after minimum sample','EVIDENCE_BLOCKER'))
     checks.append(_check('POSITIVE_FORWARD_NET_R',n>=MIN_MATURED_12H and isinstance(net_r,(int,float)) and net_r>0,net_r,'> 0 after minimum sample','EVIDENCE_BLOCKER'))
