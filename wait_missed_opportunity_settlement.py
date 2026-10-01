@@ -204,11 +204,15 @@ def summarize(records):
     for r in matured:groups[r.get("blocker_family") or "OTHER"].append(r)
     by={}
     for k,rs in groups.items():
-        by[k]={"n":len(rs),"missed_n":sum(bool(r.get("missed_opportunity")) for r in rs),"missed_rate_pct":round(100*sum(bool(r.get("missed_opportunity")) for r in rs)/len(rs),2)}
+        executable_missed=sum(r.get("executability_classification")=="MISSED_TRADEABLE_OPPORTUNITY" for r in rs)
+        descriptive_moves=sum(bool(r.get("missed_opportunity")) for r in rs)
+        by[k]={"n":len(rs),"missed_n":executable_missed,"missed_rate_pct":round(100*executable_missed/len(rs),2),"descriptive_move_n":descriptive_moves,"descriptive_move_rate_pct":round(100*descriptive_moves/len(rs),2)}
         for h in (4,8,12):
             vals=[r["horizons"][f"{h}h"]["directional_return_pct"] for r in rs if f"{h}h" in r.get("horizons",{})]
             by[k][f"mean_{h}h_directional_return_pct"]=round(sum(vals)/len(vals),4) if vals else None
-    return {"records":len(records),"matured_classified":len(matured),"missed_n":sum(bool(r.get("missed_opportunity")) for r in matured),"missed_rate_pct":round(100*sum(bool(r.get("missed_opportunity")) for r in matured)/len(matured),2) if matured else None,"by_blocker_family":dict(sorted(by.items()))}
+    executable_missed=sum(r.get("executability_classification")=="MISSED_TRADEABLE_OPPORTUNITY" for r in matured)
+    descriptive_moves=sum(bool(r.get("missed_opportunity")) for r in matured)
+    return {"records":len(records),"matured_classified":len(matured),"missed_n":executable_missed,"missed_rate_pct":round(100*executable_missed/len(matured),2) if matured else None,"descriptive_move_n":descriptive_moves,"descriptive_move_rate_pct":round(100*descriptive_moves/len(matured),2) if matured else None,"by_blocker_family":dict(sorted(by.items()))}
 
 
 def cohort_summary(records):

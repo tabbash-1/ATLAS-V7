@@ -49,9 +49,9 @@ def test_epoch_boundary_is_explicit_and_immutable():
 
 
 def test_cohort_summary_never_mixes_legacy_and_post_v2():
-    def r(epoch, missed, regime=None):
-        return {'epoch_id':epoch,'missed_opportunity':missed,'blocker_family':'HTF_CONFLICT','v2_regime':regime,'horizons':{'4h':{'directional_return_pct':1.0},'8h':{'directional_return_pct':1.0},'12h':{'directional_return_pct':1.0}}}
-    rows=[r('LEGACY_BASELINE',True),r(m.POST_V2_EPOCH_ID,False),r(m.POST_V2_EPOCH_ID,True,'4H_DIRECTIONAL_12H_NEUTRAL')]
+    def r(epoch, missed, regime=None, executable=False):
+        return {'epoch_id':epoch,'missed_opportunity':missed,'executability_classification':'MISSED_TRADEABLE_OPPORTUNITY' if executable else ('CORRECT_NO_CHASE' if missed else 'GOOD_WAIT'),'blocker_family':'HTF_CONFLICT','v2_regime':regime,'horizons':{'4h':{'directional_return_pct':1.0},'8h':{'directional_return_pct':1.0},'12h':{'directional_return_pct':1.0}}}
+    rows=[r('LEGACY_BASELINE',True),r(m.POST_V2_EPOCH_ID,False),r(m.POST_V2_EPOCH_ID,True,'4H_DIRECTIONAL_12H_NEUTRAL',True)]
     c=m.cohort_summary(rows)
     assert c['legacy_baseline']['matured_classified']==1
     assert c['post_v2_forward']['matured_classified']==2
@@ -102,3 +102,18 @@ def test_v3_reads_lane_oriented_production_timeframe_matrix():
     assert e['h1_aligned'] is True
     assert e['h4_aligned'] is True
     assert e['h12_explicit_opposition'] is False
+
+
+def test_summary_counts_only_proven_executable_misses():
+    rows=[
+      {'epoch_id':m.POST_V2_EPOCH_ID,'missed_opportunity':True,'executability_classification':'CORRECT_NO_CHASE','blocker_family':'HTF_CONFLICT','horizons':{}},
+      {'epoch_id':m.POST_V2_EPOCH_ID,'missed_opportunity':True,'executability_classification':'MISSED_TRADEABLE_OPPORTUNITY','blocker_family':'HTF_CONFLICT','horizons':{}},
+      {'epoch_id':m.POST_V2_EPOCH_ID,'missed_opportunity':False,'executability_classification':'GOOD_WAIT','blocker_family':'HTF_CONFLICT','horizons':{}},
+    ]
+    s=m.summarize(rows)
+    assert s['matured_classified']==3
+    assert s['descriptive_move_n']==2
+    assert s['missed_n']==1
+    assert s['missed_rate_pct']==33.33
+    assert s['by_blocker_family']['HTF_CONFLICT']['descriptive_move_n']==2
+    assert s['by_blocker_family']['HTF_CONFLICT']['missed_n']==1
