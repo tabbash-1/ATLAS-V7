@@ -1,0 +1,48 @@
+name: ADP V8 Forward Shadow
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 * * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: adp-v8-forward-shadow
+  cancel-in-progress: false
+
+jobs:
+  forward-shadow:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out frozen research branch
+        uses: actions/checkout@v4
+        with:
+          ref: research/adp-v2-validation
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run frozen forward shadow
+        run: python research/adp/v8_forward_shadow.py
+      - name: Commit forward evidence to research branch only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "atlas-research-bot"
+          git config user.email "atlas-research-bot@users.noreply.github.com"
+          git add status/adp-v8-forward-ledger.json status/adp-v8-forward-status.json
+          if git diff --cached --quiet; then
+            echo "No ADP V8 forward evidence changes."
+            exit 0
+          fi
+          git commit -m "research: update ADP V8 forward evidence [skip ci] [skip render]"
+          for attempt in 1 2 3 4 5; do
+            git pull --rebase origin research/adp-v2-validation
+            if git push origin HEAD:research/adp-v2-validation; then
+              exit 0
+            fi
+            sleep $((attempt * 2))
+          done
+          echo "ADP V8 forward evidence push failed after 5 attempts" >&2
+          exit 1
