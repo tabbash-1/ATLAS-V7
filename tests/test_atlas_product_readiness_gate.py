@@ -37,3 +37,15 @@ def test_positive_gross_edge_cannot_pass_when_cost_adjusted_edge_is_negative():
     assert 'POSITIVE_COST_ADJUSTED_AVERAGE_R' in names
     assert 'POSITIVE_COST_ADJUSTED_NET_R' in names
     assert 'COST_ADJUSTED_PROFIT_FACTOR' in names
+
+
+def test_short_lane_cannot_hide_behind_profitable_long_lane():
+    o,i=base()
+    o['signals']['rows']=[{'direction':'LONG','settlement':{'r_multiple':1.0}} for _ in range(25)]+[{'direction':'SHORT','settlement':{'r_multiple':-1.0}} for _ in range(5)]
+    o['path_summary']={'avg_r':20/30,'net_r':20.0}
+    v={'post_v2_cost_adjusted':{'terminal_costed':30,'avg_net_r':0.3,'net_r':9.0,'profit_factor_r':1.5}}
+    out=g.build(o,i,validation=v)
+    assert out['forward_evidence_ready'] is False
+    names={x['name'] for x in out['blockers']}
+    assert 'POSITIVE_SHORT_FORWARD_AVERAGE_R' in names
+    assert 'POSITIVE_SHORT_FORWARD_NET_R' in names
