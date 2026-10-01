@@ -49,3 +49,11 @@ def test_short_lane_cannot_hide_behind_profitable_long_lane():
     names={x['name'] for x in out['blockers']}
     assert 'POSITIVE_SHORT_FORWARD_AVERAGE_R' in names
     assert 'POSITIVE_SHORT_FORWARD_NET_R' in names
+
+
+def test_quick_trade_zero_signals_is_explicitly_no_evidence():
+    o,i=base()
+    q={'summary':{'total_signals':0,'closed_or_expired':0}}
+    out=g.build(o,i,quick=q)
+    assert out['quick_trade_evidence']['status']=='NO_EVIDENCE'
+    assert out['quick_trade_evidence']['can_support_readiness'] is False
