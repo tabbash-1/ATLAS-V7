@@ -43,7 +43,7 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
       BASE_URL: https://atlas-v7.onrender.com
       EXPECTED_GATE: PRODUCT_QUALITY_GATE_V2_CANONICAL_ANALYST_OUTPUT
@@ -120,6 +120,30 @@ jobs:
             echo "runtime wait attempt=$attempt http=$code canonical_geometry=$(jq -r '.canonical_geometry.version // "missing"' /tmp/web.json 2>/dev/null || echo invalid)"; sleep 10
           done
           test "$ok" = 1
+
+      - name: Wait for Render deployment stability
+        run: |
+          set -euo pipefail
+          streak=0
+          for attempt in $(seq 1 20); do
+            code=$(curl -L --connect-timeout 15 --max-time 60 -sS -w '%{http_code}' -o /tmp/stable-web.json "$BASE_URL/api/web-mode?t=$(date +%s%N)" || true)
+            if [[ "$code" =~ ^2 ]] && jq -e --arg g "$EXPECTED_GATE" --arg cg "$EXPECTED_CANONICAL_GEOMETRY" '
+              .ok == true and
+              .product_quality_gate.version == $g and
+              .canonical_geometry.version == $cg and
+              .product_quality_gate.analysis_only == true and
+              .product_quality_gate.live_execution == false
+            ' /tmp/stable-web.json >/dev/null 2>&1; then
+              streak=$((streak + 1))
+              echo "Render runtime healthy streak=$streak/5"
+              if [ "$streak" -eq 5 ]; then break; fi
+            else
+              echo "Render runtime settling attempt=$attempt http=$code; resetting health streak"
+              streak=0
+            fi
+            sleep 15
+          done
+          test "$streak" -eq 5
 
       - name: Verify all eight production analyzers
         run: |

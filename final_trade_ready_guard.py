@@ -118,19 +118,35 @@ def _net_rr_state(row):
     """
     plan=row.get("trade_plan") or {}
     entry=plan.get("entry"); stop=plan.get("stop_loss"); gross=plan.get("rr_tp2")
-    cost=row.get("execution_cost") or row.get("execution_cost_model") or {}
+    shadow=row.get("profit_engine_shadow") or {}
+    # The live cost estimator is owned by profit_engine_runtime and publishes
+    # its validated snapshot under shadow.execution. Accept that canonical
+    # source as well as the direct fields used by isolated callers/tests.
+    cost=(row.get("execution_cost") or row.get("execution_cost_model")
+          or shadow.get("execution_cost") or shadow.get("execution") or {})
+    cost_blockers=(row.get("execution_cost_blockers")
+                   or shadow.get("execution_cost_blockers")
+                   or cost.get("blockers") or [])
+    snapshot_attached=bool(cost)
+    evidence={
+        "cost_snapshot_status": "ATTACHED_VALIDATED" if cost.get("validated") is True else "ATTACHED_UNVALIDATED" if snapshot_attached else "NOT_ATTACHED_TO_PRODUCTION_DECISION",
+        "cost_source_version": cost.get("version") or shadow.get("execution_cost_source_version"),
+        "cost_basis": cost.get("basis"),
+        "cost_blockers": list(cost_blockers),
+        "configuration_required": "Attach validated venue fee, spread and slippage evidence to the Production decision." if not snapshot_attached else None,
+    }
     try:
         entry=float(entry); stop=float(stop); gross=float(gross)
     except (TypeError, ValueError):
-        return {"validated":False,"gross_rr":gross,"net_rr":None,"reason":"NET_RR_GEOMETRY_UNAVAILABLE"}
+        return {"validated":False,"gross_rr":gross,"net_rr":None,"reason":"NET_RR_GEOMETRY_UNAVAILABLE",**evidence}
     if cost.get("validated") is not True:
-        return {"validated":False,"gross_rr":gross,"net_rr":None,"reason":"EXECUTION_COST_EVIDENCE_UNAVAILABLE"}
+        return {"validated":False,"gross_rr":gross,"net_rr":None,"reason":"EXECUTION_COST_EVIDENCE_UNAVAILABLE",**evidence}
     try:
         from execution_cost_model import apply_cost_to_r
         out=apply_cost_to_r(gross,entry=entry,risk_abs=abs(entry-stop),fee_bps=cost.get("fee_bps"),spread_bps=cost.get("spread_bps"),slippage_bps=cost.get("slippage_bps"))
     except Exception as exc:
-        return {"validated":False,"gross_rr":gross,"net_rr":None,"reason":"EXECUTION_COST_EVIDENCE_INVALID","error":str(exc)}
-    return {"validated":bool(out and out.get("validated_cost_inputs")),"gross_rr":gross,"net_rr":None if not out else out.get("net_r"),"execution_cost_r":None if not out else out.get("execution_cost_r"),"round_trip_cost_bps":None if not out else out.get("round_trip_cost_bps"),"reason":"NET_RR_VALIDATED" if out and out.get("validated_cost_inputs") else "EXECUTION_COST_EVIDENCE_INVALID"}
+        return {"validated":False,"gross_rr":gross,"net_rr":None,"reason":"EXECUTION_COST_EVIDENCE_INVALID","error":str(exc),**evidence}
+    return {"validated":bool(out and out.get("validated_cost_inputs")),"gross_rr":gross,"net_rr":None if not out else out.get("net_r"),"execution_cost_r":None if not out else out.get("execution_cost_r"),"round_trip_cost_bps":None if not out else out.get("round_trip_cost_bps"),"reason":"NET_RR_VALIDATED" if out and out.get("validated_cost_inputs") else "EXECUTION_COST_EVIDENCE_INVALID",**evidence}
 
 def _candidate_plan_geometry(row, direction):
     """Return a complete, directionally valid candidate plan or a fail-closed reason."""
