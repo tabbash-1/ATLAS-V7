@@ -26,7 +26,7 @@ def base_row(**extra):
         'actionable_decision': 'SHORT',
         'execution_ready': True,
         'data_degraded': False,
-        # Test fixture only. Production must supply a live validated cost snapshot.
+        # Optional reporting evidence. It does not decide the analyst's view.
         'execution_cost': {'validated': True, 'fee_bps': 0.0, 'spread_bps': 0.0, 'slippage_bps': 0.0},
         'setup_quality_gate': {'status': 'PASS'},
         'htf_core_geometry': {'ready': True, 'reason': 'HTF_DIRECTION_AND_GEOMETRY_ALIGNED'},
@@ -329,9 +329,10 @@ def test_validated_execution_costs_must_leave_at_least_two_r():
     d['trade_plan']=dict(d['trade_plan']); d['trade_plan']['rr_tp2']=2.0
     d['execution_cost']={'validated':True,'fee_bps':5.0,'spread_bps':1.0,'slippage_bps':2.0}
     r=guard.apply(d)
-    assert r['trade_ready'] is False
-    assert 'NET_RR_AFTER_COSTS_BELOW_2R' in r['final_trade_gate']['blockers']
+    assert r['trade_ready'] is True
+    assert 'NET_RR_AFTER_COSTS_BELOW_2R' not in r['final_trade_gate']['blockers']
     assert r['final_trade_gate']['net_rr_after_costs']['net_rr'] < 2.0
+    assert r['final_trade_gate']['execution_costs_affect_analysis_decision'] is False
 
 def test_validated_execution_costs_can_pass_when_net_rr_stays_above_two_r():
     d=base_row()
@@ -349,12 +350,24 @@ def test_missing_cost_evidence_fails_closed_without_inventing_costs():
     assert n['validated'] is False
     assert n['reason']=='EXECUTION_COST_EVIDENCE_UNAVAILABLE'
     assert n['cost_snapshot_status']=='NOT_ATTACHED_TO_PRODUCTION_DECISION'
-    assert n['configuration_required']
+    assert n['configuration_required'] is None
+    assert n['report_note'] == 'Execution cost evidence is unavailable; net R:R is not reported.'
     assert r['final_trade_gate']['net_rr_cost_evidence_required_for_claim'] is True
-    assert r['final_trade_gate']['net_rr_cost_evidence_required_for_trade_ready'] is True
-    assert 'EXECUTION_COST_EVIDENCE_UNAVAILABLE' in r['final_trade_gate']['blockers']
-    assert r['trade_ready'] is False
-    assert paper_final.strict_trade_ready(r) is False
+    assert r['final_trade_gate']['net_rr_cost_evidence_required_for_trade_ready'] is False
+    assert r['final_trade_gate']['execution_costs_affect_analysis_decision'] is False
+    assert 'EXECUTION_COST_EVIDENCE_UNAVAILABLE' not in r['final_trade_gate']['blockers']
+    assert r['trade_ready'] is True
+    assert paper_final.strict_trade_ready(r) is True
+
+def test_long_analysis_does_not_wait_for_venue_cost_configuration():
+    d=long_row('PULLBACK')
+    d.pop('execution_cost')
+    r=guard.apply(d)
+    assert r['actionable_decision']=='LONG'
+    assert r['final_trade_gate']['direction']=='LONG'
+    assert r['trade_ready'] is True
+    assert r['final_trade_gate']['net_rr_after_costs']['validated'] is False
+    assert 'EXECUTION_COST_EVIDENCE_UNAVAILABLE' not in r['final_trade_gate']['blockers']
 
 def test_runtime_cost_snapshot_is_consumed_by_final_gate():
     d=base_row()
@@ -392,8 +405,9 @@ def test_runtime_cost_blockers_are_visible_when_configuration_is_missing():
 def test_invalid_cost_evidence_fails_closed():
     d=base_row(execution_cost={'validated':True,'fee_bps':-1.0,'spread_bps':1.0,'slippage_bps':1.0})
     r=guard.apply(d)
-    assert r['trade_ready'] is False
-    assert 'EXECUTION_COST_EVIDENCE_INVALID' in r['final_trade_gate']['blockers']
+    assert r['trade_ready'] is True
+    assert 'EXECUTION_COST_EVIDENCE_INVALID' not in r['final_trade_gate']['blockers']
+    assert r['final_trade_gate']['net_rr_after_costs']['reason']=='EXECUTION_COST_EVIDENCE_INVALID'
 
 
 if __name__ == '__main__':
