@@ -251,6 +251,18 @@ def test_legacy_score_direction_is_evidence_not_authority():
     assert r['final_trade_gate']['score_is_authority'] is False
 
 
+def test_entry_confirmation_opposition_is_not_mislabeled_as_htf_disagreement():
+    r = guard.apply(base_row(
+        product_direction='LONG',
+        entry_confirmation_direction='SHORT',
+        direction_alignment='OPPOSED',
+    ))
+    blockers = r['final_trade_gate']['blockers']
+    assert r['trade_ready'] is False
+    assert 'ENTRY_CONFIRMATION_NOT_ALIGNED' in blockers
+    assert 'HTF_4H_12H_NOT_ALIGNED' not in blockers
+
+
 def test_trader_brain_requires_two_r_geometry():
     d=base_row()
     d['trade_plan']=dict(d['trade_plan']); d['trade_plan']['rr_tp2']=1.5
