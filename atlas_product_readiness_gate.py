@@ -36,21 +36,26 @@ def build(outcomes=None,integrity=None,attribution=None,validation=None,quick=No
       _check('APPEND_ONLY_CANONICAL_LEDGER',bool(integrity) and integrity.get('append_only_verified') is True,None if not integrity else integrity.get('append_only_verified'),True),
       _check('STRICT_EXECUTION_ELIGIBILITY',bool(outcomes) and outcomes.get('legacy_backfill_allowed') is False and outcomes.get('legacy_score_path_research_included') is False,None if not outcomes else {'legacy_backfill_allowed':outcomes.get('legacy_backfill_allowed'),'legacy_score_path_research_included':outcomes.get('legacy_score_path_research_included')},{'legacy_backfill_allowed':False,'legacy_score_path_research_included':False}),
     ]
-    settled=[r for r in rows if isinstance((r.get('settlement') or {}).get('r_multiple'),(int,float))]
-    dirs=Counter(str(r.get('direction') or 'UNKNOWN').upper() for r in settled)
-    n=len(settled)
+    current=(validation or {}).get('current_geometry') or {}
+    current_summary=current.get('summary') or {}
+    current_cost=current.get('cost_adjusted') or {}
+    current_version=current.get('version')
+    expected_version='ATLAS_GEOMETRY_V6_MIN_1_5_ATR_INVALIDATION'
+    checks.append(_check('CURRENT_GEOMETRY_V6_EVIDENCE',current_version==expected_version,current_version,expected_version,'EVIDENCE_BLOCKER'))
+    dirs_summary=current_summary.get('by_direction') or {}
+    n=int(current_summary.get('terminal') or 0)
     checks.append(_check('MINIMUM_MATURED_12H_SAMPLE',n>=MIN_MATURED_12H,n,MIN_MATURED_12H,'EVIDENCE_BLOCKER'))
     for d in ('LONG','SHORT'):
-        checks.append(_check(f'MINIMUM_{d}_MATURED_SAMPLE',dirs.get(d,0)>=MIN_DIRECTIONAL_MATURED,dirs.get(d,0),MIN_DIRECTIONAL_MATURED,'EVIDENCE_BLOCKER'))
-        dr=[float((r.get('settlement') or {}).get('r_multiple')) for r in settled if str(r.get('direction') or '').upper()==d and isinstance((r.get('settlement') or {}).get('r_multiple'),(int,float))]
-        davg=(sum(dr)/len(dr)) if dr else None
-        dnet=sum(dr) if dr else None
-        checks.append(_check(f'POSITIVE_{d}_FORWARD_AVERAGE_R',len(dr)>=MIN_DIRECTIONAL_MATURED and davg is not None and davg>0,davg,f'> 0 with >= {MIN_DIRECTIONAL_MATURED} matured','EVIDENCE_BLOCKER'))
-        checks.append(_check(f'POSITIVE_{d}_FORWARD_NET_R',len(dr)>=MIN_DIRECTIONAL_MATURED and dnet is not None and dnet>0,dnet,f'> 0 with >= {MIN_DIRECTIONAL_MATURED} matured','EVIDENCE_BLOCKER'))
-    avg_r=path.get('avg_r'); net_r=path.get('net_r')
+        ds=dirs_summary.get(d.lower()) or {}
+        dn=int(ds.get('n') or 0)
+        davg=ds.get('avg_r'); dnet=ds.get('net_r')
+        checks.append(_check(f'MINIMUM_{d}_MATURED_SAMPLE',dn>=MIN_DIRECTIONAL_MATURED,dn,MIN_DIRECTIONAL_MATURED,'EVIDENCE_BLOCKER'))
+        checks.append(_check(f'POSITIVE_{d}_FORWARD_AVERAGE_R',dn>=MIN_DIRECTIONAL_MATURED and isinstance(davg,(int,float)) and davg>0,davg,f'> 0 with >= {MIN_DIRECTIONAL_MATURED} matured','EVIDENCE_BLOCKER'))
+        checks.append(_check(f'POSITIVE_{d}_FORWARD_NET_R',dn>=MIN_DIRECTIONAL_MATURED and isinstance(dnet,(int,float)) and dnet>0,dnet,f'> 0 with >= {MIN_DIRECTIONAL_MATURED} matured','EVIDENCE_BLOCKER'))
+    avg_r=current_summary.get('avg_r'); net_r=current_summary.get('net_r')
     checks.append(_check('POSITIVE_FORWARD_AVERAGE_R',n>=MIN_MATURED_12H and isinstance(avg_r,(int,float)) and avg_r>0,avg_r,'> 0 after minimum sample','EVIDENCE_BLOCKER'))
     checks.append(_check('POSITIVE_FORWARD_NET_R',n>=MIN_MATURED_12H and isinstance(net_r,(int,float)) and net_r>0,net_r,'> 0 after minimum sample','EVIDENCE_BLOCKER'))
-    cost=(validation or {}).get('post_v2_cost_adjusted') or {}
+    cost=current_cost
     cost_n=int(cost.get('terminal_costed') or 0)
     cost_avg=cost.get('avg_net_r'); cost_net=cost.get('net_r'); cost_pf=cost.get('profit_factor_r')
     checks.append(_check('MINIMUM_COST_ADJUSTED_SAMPLE',cost_n>=MIN_MATURED_12H,cost_n,MIN_MATURED_12H,'EVIDENCE_BLOCKER'))
@@ -75,9 +80,9 @@ def build(outcomes=None,integrity=None,attribution=None,validation=None,quick=No
       'technical_ready':technical,'forward_evidence_ready':evidence,
       'claim_policy':{'may_claim_technically_operational':technical,'may_claim_forward_edge_validated':evidence,'may_claim_profitable':False,'note':'Readiness is evaluated only from prospective FINAL_TRADE_GATE execution-eligible paper evidence. Profitability still requires costs and larger independent forward evidence.'},
       'preregistered_evidence_requirements':{'minimum_matured_12h_entries':MIN_MATURED_12H,'minimum_matured_per_direction':MIN_DIRECTIONAL_MATURED,'average_r':'> 0','net_r':'> 0','cost_adjusted_average_r':'> 0','cost_adjusted_net_r':'> 0','cost_adjusted_profit_factor':'> 1.0'},
-      'observed':{'entries':len(rows),'matured_12h_terminal':n,'matured_by_direction':dict(sorted(dirs.items())),'avg_r':avg_r,'net_r':net_r,'cost_adjusted_terminal':cost_n,'cost_adjusted_avg_r':cost_avg,'cost_adjusted_net_r':cost_net,'cost_adjusted_profit_factor':cost_pf,'append_only_verified':None if not integrity else integrity.get('append_only_verified'),'official_trade_authority':None if not outcomes else outcomes.get('official_trade_authority')},
+      'observed':{'entries':len(rows),'current_geometry_version':current_version,'current_geometry_entries':current_summary.get('entries'),'matured_12h_terminal':n,'matured_by_direction':dirs_summary,'avg_r':avg_r,'net_r':net_r,'cost_adjusted_terminal':cost_n,'cost_adjusted_avg_r':cost_avg,'cost_adjusted_net_r':cost_net,'cost_adjusted_profit_factor':cost_pf,'append_only_verified':None if not integrity else integrity.get('append_only_verified'),'official_trade_authority':None if not outcomes else outcomes.get('official_trade_authority')},
       'checks':checks,'blockers':[c for c in checks if not c['passed']],'quick_trade_evidence':quick_evidence,
-      'research_lane_excluded_from_readiness':'analyst_output'
+      'research_lane_excluded_from_readiness':'analyst_output','historical_post_v2_excluded_from_current_readiness':True
     }
 
 def main():
