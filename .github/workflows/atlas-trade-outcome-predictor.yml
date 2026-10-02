@@ -1,0 +1,16 @@
+name: ATLAS Trade Outcome Predictor Exam
+on:
+  pull_request:
+    paths: ['profitability_trade_outcome_predictor.py','profitability_trade_outcome_eval.py','tests/test_profitability_trade_outcome_predictor.py','.github/workflows/atlas-trade-outcome-predictor.yml']
+  workflow_dispatch:
+jobs:
+  exam:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: python -m py_compile profitability_trade_outcome_predictor.py profitability_trade_outcome_eval.py
+      - run: PYTHONPATH=. python -c "import tests.test_profitability_trade_outcome_predictor as t; t.test_ev_math_and_safety(); print('OUTCOME_CONTRACT_OK')"
+      - run: python profitability_trade_outcome_eval.py
