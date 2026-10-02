@@ -388,9 +388,9 @@ jobs:
           if not exists:
               with history.open('a') as f:
                   f.write(json.dumps(obj, separators=(',', ':')) + '\n')
-          # Keep the tracked rolling history safely below GitHub's 100 MB hard limit.
+          # Keep the tracked rolling history below GitHub's 50 MB recommended file size.
           # Preserve the newest complete JSONL rows only; research evidence remains chronological.
-          max_bytes = 80 * 1024 * 1024
+          max_bytes = 40 * 1024 * 1024
           if history.exists() and history.stat().st_size > max_bytes:
               lines = history.read_text().splitlines()
               kept = []

@@ -31,11 +31,17 @@ def test_snapshot_publish_preserves_remote_history_then_appends_new_capture():
     assert "history.open('a'" in src
 
 
+def test_snapshot_history_stays_below_github_recommended_file_size():
+    src = workflow_text()
+    assert 'max_bytes = 40 * 1024 * 1024' in src
+
+
 if __name__ == '__main__':
     tests = [
         test_snapshot_checkout_tracks_current_main,
         test_snapshot_publish_does_not_rebase_generated_commit,
         test_snapshot_publish_preserves_remote_history_then_appends_new_capture,
+        test_snapshot_history_stays_below_github_recommended_file_size,
     ]
     for test in tests:
         test()
