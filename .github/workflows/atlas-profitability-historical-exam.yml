@@ -1,0 +1,29 @@
+name: ATLAS Profitability Historical Exam
+on:
+  pull_request:
+    paths: ['profitability_pipeline_historical_exam.py','tests/test_profitability_pipeline_historical_exam.py','.github/workflows/atlas-profitability-historical-exam.yml']
+  push:
+    branches: [main]
+    paths: ['profitability_pipeline_historical_exam.py','.github/workflows/atlas-profitability-historical-exam.yml']
+  workflow_dispatch:
+jobs:
+  exam:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Regression without external test dependency
+        run: |
+          python -m py_compile profitability_pipeline_historical_exam.py profitability_ev_plan_replay.py profitability_market_radar.py
+          PYTHONPATH=. python - <<'PY'
+          import profitability_pipeline_historical_exam as m
+          rows=[{"settled":True,"r":2,"tradeable_opportunity":True,"atlas_captured":True,"detection_latency_min":0,"entry_efficiency":1},{"settled":True,"r":-1,"tradeable_opportunity":True,"atlas_captured":True,"detection_latency_min":0,"entry_efficiency":1}]
+          x=m.summarize(rows)
+          assert x["net_r"]==1 and x["avg_r"]==.5 and x["profit_factor_r"]==2 and x["max_drawdown_r"]==1
+          print("REGRESSION_OK")
+          PY
+      - name: Run frozen 180-day exam
+        run: python profitability_pipeline_historical_exam.py --days 180 --end-ms 1790485200000 | tee /tmp/exam.log
+      - run: grep -q 'ATLAS_PROFITABILITY_EXAM=' /tmp/exam.log
