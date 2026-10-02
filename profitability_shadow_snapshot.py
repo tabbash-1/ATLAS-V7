@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Build the web-readable profitability research snapshot from committed evidence."""
-import datetime as dt,json\nimport profitability_true_path_metrics as tm\nimport profitability_true_path_forward_shadow as fs
+import datetime as dt
+import json
+
+import profitability_true_path_forward_shadow as fs
+import profitability_true_path_metrics as tm
 from pathlib import Path
 ROOT=Path(__file__).resolve().parent
 def read(name):
