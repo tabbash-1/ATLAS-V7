@@ -348,11 +348,46 @@ def test_missing_cost_evidence_fails_closed_without_inventing_costs():
     n=r['final_trade_gate']['net_rr_after_costs']
     assert n['validated'] is False
     assert n['reason']=='EXECUTION_COST_EVIDENCE_UNAVAILABLE'
+    assert n['cost_snapshot_status']=='NOT_ATTACHED_TO_PRODUCTION_DECISION'
+    assert n['configuration_required']
     assert r['final_trade_gate']['net_rr_cost_evidence_required_for_claim'] is True
     assert r['final_trade_gate']['net_rr_cost_evidence_required_for_trade_ready'] is True
     assert 'EXECUTION_COST_EVIDENCE_UNAVAILABLE' in r['final_trade_gate']['blockers']
     assert r['trade_ready'] is False
     assert paper_final.strict_trade_ready(r) is False
+
+def test_runtime_cost_snapshot_is_consumed_by_final_gate():
+    d=base_row()
+    d.pop('execution_cost')
+    d['trade_plan']=dict(d['trade_plan']); d['trade_plan'].update({'rr_tp2':2.5,'tp2':95.0})
+    d['profit_engine_shadow']={
+        'execution': {
+            'validated': True, 'fee_bps': 5.0, 'spread_bps': 1.0,
+            'slippage_bps': 2.0, 'basis': 'LIVE_OKX_SWAP_L2_PLUS_CONFIGURED_TAKER_FEE',
+            'version': 'EXECUTION_COST_MODEL_TEST',
+        },
+    }
+    r=guard.apply(d)
+    net=r['final_trade_gate']['net_rr_after_costs']
+    assert net['validated'] is True
+    assert net['cost_source_version']=='EXECUTION_COST_MODEL_TEST'
+    assert net['cost_basis']=='LIVE_OKX_SWAP_L2_PLUS_CONFIGURED_TAKER_FEE'
+    assert net['net_rr'] >= 2.0
+
+def test_runtime_cost_blockers_are_visible_when_configuration_is_missing():
+    d=base_row()
+    d.pop('execution_cost')
+    d['profit_engine_shadow']={
+        'execution': {'validated': False, 'basis': 'LIVE_OKX_SWAP_L2_PLUS_CONFIGURED_TAKER_FEE'},
+        'execution_cost_source_version': 'EXECUTION_COST_MODEL_TEST',
+        'execution_cost_blockers': ['EXECUTION_VENUE_NOT_CONFIGURED','TAKER_FEE_NOT_CONFIGURED'],
+    }
+    r=guard.apply(d)
+    net=r['final_trade_gate']['net_rr_after_costs']
+    assert net['validated'] is False
+    assert net['reason']=='EXECUTION_COST_EVIDENCE_UNAVAILABLE'
+    assert net['cost_source_version']=='EXECUTION_COST_MODEL_TEST'
+    assert net['cost_blockers']==['EXECUTION_VENUE_NOT_CONFIGURED','TAKER_FEE_NOT_CONFIGURED']
 
 def test_invalid_cost_evidence_fails_closed():
     d=base_row(execution_cost={'validated':True,'fee_bps':-1.0,'spread_bps':1.0,'slippage_bps':1.0})
