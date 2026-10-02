@@ -116,6 +116,11 @@
       </nav>
       <div id="atlasWorkspacePanels" class="atlas-workspace-panels"></div>
 
+      <section class="card metrics-card" id="profitabilityShadowCard">
+        <div class="card-head"><div><strong>PROFITABILITY RESEARCH SHADOW</strong><div class="muted small">Prediction · true-path outcome EV · forward promotion evidence. Isolated from Production Final Gate.</div></div><span id="profitShadowBadge" class="pill neutral">LOADING</span></div>
+        <div id="profitShadowMetrics" class="trial-grid"><div><span>State</span><b>Loading</b></div><div><span>Production impact</span><b>NONE</b></div><div><span>Threshold</span><b>68 LOCKED</b></div><div><span>Outcome label</span><b>TP-before-SL path</b></div></div>
+        <div id="profitShadowNotes" class="comparison-box muted small">Research Shadow cannot override Production.</div>
+      </section>
       <section class="grid lower-grid">
         <article class="card">
           <div class="card-head"><strong>MARKET ENGINE</strong><span id="engineBadge" class="pill neutral">READY</span></div>
@@ -712,5 +717,8 @@
   <script src="atlas-unified-command-center.js?v=unified-v1"></script>
   <script src="transition-quality-ui.js?v=tq-v1"></script>
   <div id="atlasAlertToastHost" class="atlas-alert-toast-host" aria-live="polite"></div>
+<script>
+(async()=>{const badge=document.getElementById('profitShadowBadge'),box=document.getElementById('profitShadowMetrics'),notes=document.getElementById('profitShadowNotes');try{const r=await fetch('/api/research/profitability-shadow',{cache:'no-store'}),d=await r.json();const p=d.forward_promotion||{},o=p.observed||{},m=d.methodology||{};badge.textContent=d.state||'COLLECTING';box.innerHTML='<div><span>State</span><b>'+String(d.state||'COLLECTING')+'</b></div><div><span>Forward n</span><b>'+String(o.n??'—')+'</b></div><div><span>Avg R</span><b>'+String(o.avg_r??'—')+'</b></div><div><span>Profit factor</span><b>'+String(o.profit_factor_r??'—')+'</b></div><div><span>Max DD R</span><b>'+String(o.max_drawdown_r??'—')+'</b></div><div><span>Threshold</span><b>68 LOCKED</b></div><div><span>Outcome label</span><b>'+String(m.outcome_label||'COLLECTING')+'</b></div><div><span>Production impact</span><b>NONE</b></div>';notes.textContent=(m.note||'Research only')+' · can_override_production=false';}catch(e){badge.textContent='UNAVAILABLE';notes.textContent='Research snapshot unavailable; Production remains unaffected.'}})();
+</script>
 </body>
 </html>
