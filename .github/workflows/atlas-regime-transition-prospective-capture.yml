@@ -9,6 +9,9 @@ on:
       - 'regime_transition_frozen_evidence.py'
       - 'regime_transition_challenger.py'
       - 'transition_quality_research.py'
+      - 'direction_state_forward_shadow.py'
+      - 'market_breadth_exhaustion_research.py'
+      - 'breadth_reversal_caution_research.py'
   schedule:
     - cron: '17,37,57 * * * *'
   workflow_dispatch:
@@ -35,6 +38,7 @@ jobs:
           test -s status/atlas-production-latest.json
           python regime_transition_frozen_evidence.py
           python regime_transition_outcome_settlement.py
+          python direction_state_forward_shadow.py
           python - <<'PY'
           import json, pathlib
           p=pathlib.Path("status/regime-transition-frozen-latest.json")
@@ -52,14 +56,21 @@ jobs:
           assert y["can_override_production"] is False
           assert y["production_threshold_unchanged"] == 68
           assert y["intrabar_both_hit_rule"] == "STOP_FIRST_CONSERVATIVE"
-          print("REGIME_TRANSITION_FROZEN_EVIDENCE_OK", len(x["observations"]), "MATURED", y["summary"]["matured_n"])
+          z=json.loads(pathlib.Path("status/direction-state-forward-shadow-latest.json").read_text())
+          assert z["research_only"] is True
+          assert z["live_execution"] is False
+          assert z["can_override_production"] is False
+          assert z["production_threshold_unchanged"] == 68
+          assert z["observation"]["can_override_final_gate"] is False
+          assert z["observation"]["can_change_threshold"] is False
+          print("REGIME_TRANSITION_FROZEN_EVIDENCE_OK", len(x["observations"]), "MATURED", y["summary"]["matured_n"], "DIRECTION_STATE", z["observation"]["state"])
           PY
       - name: Publish research evidence only
         run: |
           set -euo pipefail
           git config user.name "atlas-research-monitor"
           git config user.email "atlas-research@users.noreply.github.com"
-          git add status/regime-transition-frozen-latest.json status/history/regime-transition-frozen-evidence.jsonl status/regime-transition-outcomes-latest.json
+          git add status/regime-transition-frozen-latest.json status/history/regime-transition-frozen-evidence.jsonl status/regime-transition-outcomes-latest.json status/direction-state-forward-shadow-latest.json status/history/direction-state-forward-shadow.jsonl
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "research: capture frozen regime transition evidence [skip render]"
           # Scheduled evidence writers can race with other status publishers on main.
