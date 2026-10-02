@@ -12,6 +12,8 @@ The canonical output is one visible decision only:
 
 A qualified LONG or SHORT analysis includes Entry, Stop Loss, Take Profit, R:R, reasons, invalidation, and what must change for the status to change. When qualification, evidence quality, or geometry is not sufficient, the visible decision remains `WAIT`.
 
+`TRADE READY` also requires validated execution-cost evidence for the configured venue and a net R:R of at least 1:2 after fees, spread, and slippage. Missing or invalid cost evidence keeps the canonical decision at `WAIT`; ATLAS does not fill it with assumed costs.
+
 ## Product status
 
 ATLAS is **READY FOR ANALYSIS** as a technical product.

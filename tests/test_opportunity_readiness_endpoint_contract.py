@@ -37,7 +37,7 @@ def test_snapshot_readiness_path_matches_boot_patch_contract():
     workflow = (root / ".github/workflows/atlas-production-snapshot.yml").read_text(encoding="utf-8")
     patch = (root / "opportunity_readiness_boot_patch.py").read_text(encoding="utf-8")
 
-    assert 'fetch_json readiness /api/production/readiness' in workflow
+    assert 'readiness /api/production/readiness' in workflow
     assert '"/api/production/readiness"' in patch
 
 

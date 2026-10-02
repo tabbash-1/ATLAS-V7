@@ -13,6 +13,7 @@ def _row():
         "direction_alignment": "ALIGNED",
         "actionable_decision": "LONG",
         "production_signal_qualified": True,
+        "execution_cost": {"validated": True, "fee_bps": 5.0, "spread_bps": 1.0, "slippage_bps": 1.0},
         "htf_core_geometry": {"ready": True, "reason": "HTF_GEOMETRY_READY"},
         "setup_quality_gate": {"status": "PASS"},
         "trade_plan": {"entry": 100.0, "stop_loss": 95.0, "tp1": 110.0, "tp2": 115.0, "rr_tp2": 3.0},

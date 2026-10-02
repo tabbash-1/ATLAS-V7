@@ -42,6 +42,8 @@ When engineering work competes with profitability work, prioritize in this order
 ## Canonical decision contract
 A visible `LONG` or `SHORT` is allowed only when the canonical Production contract says the trade is qualified, geometry is valid, and explicit trigger/permission is present. Otherwise the visible action is `WAIT`.
 
+`TRADE READY` also requires validated, decision-time execution-cost evidence and a net R:R of at least 1:2 after fees, spread, and slippage. Missing or invalid costs must fail closed to `WAIT`; estimated values must never be invented or silently treated as validated.
+
 `geometry_ready` means Entry/SL/TP geometry is valid. It is not an entry instruction.
 
 `TRADE READY` means the canonical plan is qualified and explicitly permitted for manual execution. It does not mean an order was sent to an exchange.

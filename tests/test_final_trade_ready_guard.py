@@ -26,6 +26,8 @@ def base_row(**extra):
         'actionable_decision': 'SHORT',
         'execution_ready': True,
         'data_degraded': False,
+        # Test fixture only. Production must supply a live validated cost snapshot.
+        'execution_cost': {'validated': True, 'fee_bps': 0.0, 'spread_bps': 0.0, 'slippage_bps': 0.0},
         'setup_quality_gate': {'status': 'PASS'},
         'htf_core_geometry': {'ready': True, 'reason': 'HTF_DIRECTION_AND_GEOMETRY_ALIGNED'},
         'trade_plan': {
@@ -48,6 +50,25 @@ def base_row(**extra):
         },
     }
     row.update(extra)
+    return row
+
+
+def long_row(entry_mode):
+    row = base_row(
+        candidate_direction='LONG', product_direction='LONG',
+        entry_confirmation_direction='LONG', actionable_decision='LONG',
+    )
+    plan = dict(row['trade_plan'])
+    plan.update({'direction':'LONG','entry':100.0,'stop_loss':98.0,'tp1':102.0,'tp2':104.0,'rr_tp2':2.0,'entry_mode':entry_mode})
+    plan['core_plan'] = dict(plan['core_plan'], direction='LONG', entry_mode=entry_mode)
+    row['trade_plan'] = plan
+    row['primary_analysis'] = {'decision':'LONG','analysis_ready':True}
+    row['timeframe_matrix'] = {'core_4_12h':{'decision':'LONG','analysis_ready':True}}
+    row['best_available_action'] = {'action':'LONG','status':'ACTIONABLE','can_execute':True}
+    analyst = dict(row['analyst_output'])
+    analyst.update({'decision':'LONG','entry':100.0,'stop_loss':98.0,'take_profit':104.0,'tp1':102.0,'risk_reward':2.0})
+    analyst['candidate_plan'] = {'direction':'LONG','entry':100.0,'stop_loss':98.0,'take_profit':104.0,'tp1':102.0,'risk_reward':2.0,'geometry_provenance':{'geometry_version':'TEST'}}
+    row['analyst_output'] = analyst
     return row
 
 
@@ -267,13 +288,6 @@ def test_quality_quarantine_and_degraded_data_fail_closed():
     assert d['trade_ready'] is False and 'DATA_DEGRADED' in d['final_trade_gate']['blockers']
 
 
-if __name__ == '__main__':
-    tests = [v for k, v in sorted(globals().items()) if k.startswith('test_') and callable(v)]
-    for t in tests:
-        t()
-    print(f'final trade ready guard tests: {len(tests)} passed')
-
-
 def test_conditional_neutral_alignment_is_paper_eligible_when_trader_ready():
     d=base_row(direction_alignment='CONDITIONAL_ALIGNED_12H_NEUTRAL')
     d['trade_plan']['rr_tp2']=2.0
@@ -291,8 +305,7 @@ def test_paper_rejects_sub_two_r_even_if_legacy_fields_look_ready():
 
 
 def test_blowoff_now_entry_waits_for_pullback_retest():
-    d=base_row()
-    d['trade_plan']=dict(d['trade_plan']); d['trade_plan']['entry_mode']='NOW'
+    d=long_row('NOW')
     d['score_attribution']={'extension_guard_reason':'BLOWOFF_RSI_LONG','extension_guard_adjustment':-4}
     r=guard.apply(d)
     assert r['trade_ready'] is False
@@ -305,8 +318,7 @@ def test_blowoff_now_entry_waits_for_pullback_retest():
 
 
 def test_blowoff_pullback_entry_can_pass_if_other_evidence_is_ready():
-    d=base_row()
-    d['trade_plan']=dict(d['trade_plan']); d['trade_plan']['entry_mode']='PULLBACK'
+    d=long_row('PULLBACK')
     d['score_attribution']={'extension_guard_reason':'BLOWOFF_RSI_LONG','extension_guard_adjustment':-4}
     r=guard.apply(d)
     assert r['trade_ready'] is False
@@ -321,9 +333,36 @@ def test_validated_execution_costs_must_leave_at_least_two_r():
     assert 'NET_RR_AFTER_COSTS_BELOW_2R' in r['final_trade_gate']['blockers']
     assert r['final_trade_gate']['net_rr_after_costs']['net_rr'] < 2.0
 
-def test_missing_cost_evidence_is_disclosed_not_invented():
-    r=guard.apply(base_row())
+def test_validated_execution_costs_can_pass_when_net_rr_stays_above_two_r():
+    d=base_row()
+    d['trade_plan']=dict(d['trade_plan']); d['trade_plan'].update({'rr_tp2':2.5,'tp2':95.0})
+    d['execution_cost']={'validated':True,'fee_bps':5.0,'spread_bps':1.0,'slippage_bps':2.0}
+    r=guard.apply(d)
+    assert r['trade_ready'] is True
+    assert r['final_trade_gate']['net_rr_after_costs']['validated'] is True
+    assert r['final_trade_gate']['net_rr_after_costs']['net_rr'] >= 2.0
+
+def test_missing_cost_evidence_fails_closed_without_inventing_costs():
+    d=base_row(); d.pop('execution_cost')
+    r=guard.apply(d)
     n=r['final_trade_gate']['net_rr_after_costs']
     assert n['validated'] is False
     assert n['reason']=='EXECUTION_COST_EVIDENCE_UNAVAILABLE'
     assert r['final_trade_gate']['net_rr_cost_evidence_required_for_claim'] is True
+    assert r['final_trade_gate']['net_rr_cost_evidence_required_for_trade_ready'] is True
+    assert 'EXECUTION_COST_EVIDENCE_UNAVAILABLE' in r['final_trade_gate']['blockers']
+    assert r['trade_ready'] is False
+    assert paper_final.strict_trade_ready(r) is False
+
+def test_invalid_cost_evidence_fails_closed():
+    d=base_row(execution_cost={'validated':True,'fee_bps':-1.0,'spread_bps':1.0,'slippage_bps':1.0})
+    r=guard.apply(d)
+    assert r['trade_ready'] is False
+    assert 'EXECUTION_COST_EVIDENCE_INVALID' in r['final_trade_gate']['blockers']
+
+
+if __name__ == '__main__':
+    tests = [v for k, v in sorted(globals().items()) if k.startswith('test_') and callable(v)]
+    for t in tests:
+        t()
+    print(f'final trade ready guard tests: {len(tests)} passed')
