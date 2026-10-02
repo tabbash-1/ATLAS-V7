@@ -16,7 +16,7 @@ def build():
   "can_override_production":False,"live_execution":False,
   "forward_promotion":promo,
   "multi_era":multi,
-  "methodology":{"outcome_label":"TP_BEFORE_SL_PATH","same_candle":"LOSS","purge_hours":12,
+  "methodology":{"current_true_path_state":"COLLECTING","legacy_multi_era_label":"12H_ENDPOINT_PROXY_NOT_TRUE_PATH","outcome_label":"TP_BEFORE_SL_PATH","same_candle":"LOSS","purge_hours":12,
     "note":"Live probabilities remain unavailable until a true-path prospective model snapshot is generated."}}
  out=ROOT/"status"/"profitability-shadow-latest.json"
  out.write_text(json.dumps(payload,indent=2,sort_keys=True)+"\n")
