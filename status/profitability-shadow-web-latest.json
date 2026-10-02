@@ -1,0 +1,48 @@
+{
+  "schema": "ATLAS_PROFITABILITY_SHADOW_WEB_V1",
+  "generated_from_commit": "fb73cc99c165eafa42adb90d8f991a0b23a2bd70",
+  "state": "RESEARCH_SHADOW",
+  "pipeline": [
+    "Market Radar",
+    "Direction Probability",
+    "Side Specialist",
+    "Trade Outcome EV",
+    "Forward Promotion Gate"
+  ],
+  "engines": {
+    "market_radar": "ATLAS_PROFITABILITY_PIPELINE_V2",
+    "direction": "ATLAS_PREDICTION_ENGINE_V1",
+    "side_specialist": "ATLAS_PREDICTION_SIDE_SPECIALIST_V1",
+    "trade_outcome": "ATLAS_TRADE_OUTCOME_PREDICTOR_V1",
+    "forward_promotion": "ATLAS_PROFITABILITY_FORWARD_PROMOTION_V1"
+  },
+  "evidence": {
+    "multi_era": {
+      "eras": 4,
+      "era_days": 14,
+      "baseline": {
+        "n": 146,
+        "net_r": 15.7809,
+        "weighted_avg_r": 0.1081,
+        "profitable_eras": 2
+      },
+      "positive_ev": {
+        "n": 98,
+        "net_r": 15.7319,
+        "weighted_avg_r": 0.1605,
+        "profitable_eras": 2
+      },
+      "note": "Historical research evidence; not forward proof. Outcome V1 evaluation still requires true path/cost/purge methodology before promotion."
+    }
+  },
+  "safety": {
+    "research_only": true,
+    "shadow_only": true,
+    "analysis_only": true,
+    "live_execution": false,
+    "can_override_production": false,
+    "production_source_of_truth": "FINAL_TRADE_GATE",
+    "production_threshold": 68,
+    "automatic_promotion": false
+  }
+}

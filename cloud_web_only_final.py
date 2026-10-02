@@ -41,6 +41,19 @@ def _whale_snapshot():
     return load_whale_snapshot(BASE)
 
 
+def _profitability_shadow_snapshot():
+    """Committed research evidence only; never computes or mutates Production."""
+    import json
+    p = BASE / "status" / "profitability-shadow-web-latest.json"
+    data = json.loads(p.read_text()) if p.exists() else {"state":"UNAVAILABLE","safety":{}}
+    promo = BASE / "status" / "profitability-forward-promotion-latest.json"
+    if promo.exists():
+        try: data["forward_promotion"] = json.loads(promo.read_text())
+        except Exception: data["forward_promotion"] = {"state":"UNREADABLE"}
+    data["ok"] = True
+    return data
+
+
 def _outcome_snapshot():
     # Web process is read-only: scheduled GitHub Actions own generation/settlement.
     return load_canonical_outcomes(BASE)
@@ -83,6 +96,11 @@ class FinalWebOnlyHandler(ns["WebOnlyHandler"]):
     """Web-only handler with explicit final-decision, outcome and whale contracts."""
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
+        if parsed.path == "/api/research/profitability-shadow":
+            try:
+                return self._json(_profitability_shadow_snapshot())
+            except Exception as exc:
+                return self._json({"ok":False,"error":"profitability shadow unavailable","detail":str(exc),"research_only":True,"shadow_only":True,"live_execution":False,"can_override_production":False}, 503)
         if parsed.path == "/api/evidence/control-center":
             try:
                 payload = build_evidence_control_center(BASE)
