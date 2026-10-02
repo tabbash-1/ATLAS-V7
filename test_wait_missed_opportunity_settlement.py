@@ -116,3 +116,16 @@ def test_summary_promotes_tradeable_missed_as_primary_metric():
     assert out['good_wait_n']==1
     assert out['descriptive_mfe_missed_n']==2
     assert out['legacy_missed_metric_deprecated'] is True
+
+
+def test_blocker_family_summary_uses_tradeable_metric_not_legacy_mfe():
+    base={'blocker_family':'HTF_CONFLICT','horizons':{'4h':{'directional_return_pct':1.0},'8h':{'directional_return_pct':1.0},'12h':{'directional_return_pct':1.0}}}
+    rows=[]
+    for cls,missed in [('MISSED_TRADEABLE_OPPORTUNITY',True),('CORRECT_NO_CHASE',True),('GOOD_WAIT',False)]:
+        r=dict(base); r['executability_classification']=cls; r['missed_opportunity']=missed; rows.append(r)
+    b=m.summarize(rows)['by_blocker_family']['HTF_CONFLICT']
+    assert b['tradeable_missed_n']==1
+    assert b['correct_no_chase_n']==1
+    assert b['good_wait_n']==1
+    assert b['descriptive_mfe_missed_n']==2
+    assert 'missed_n' not in b
