@@ -65,8 +65,10 @@ jobs:
           for d in (btc,hype):
               assert d.get('ok') is True, d
               assert float(d.get('signal_threshold')) == 68.0, d
-              assert 'PACED_VOLUME_V1' in str(d.get('source')), d
+              assert str(d.get('source', '')).startswith('PRODUCTION_DECISION_API_'), d
               vp=d.get('volume_pacing') or {}
+              assert vp.get('source') == 'SHARED_PRODUCTION_SIGNAL_SCORING_HELPERS', d
+              assert str(d.get('scoring_version', '')).startswith('PROD_SIGNAL_SCORING_'), d
               dprogress=float(vp['candle_progress'])
               draw=float(vp['raw_relative_volume'])
               dpaced=float(vp['paced_relative_volume'])
@@ -115,7 +117,8 @@ jobs:
           assert raw >= 0 and paced >= 0, vol
           expected=min(4.0, raw/progress)
           assert math.isclose(paced, expected, rel_tol=2e-5, abs_tol=2e-5), (vol, expected)
-          assert 'PARTIAL_VOLUME_TIME_FIX_V1' in str(vol.get('scoring_version')), vol
+          assert str(vol.get('scoring_version', '')).startswith('PROD_SIGNAL_SCORING_'), vol
+          assert vol.get('expected_formula') == 'min(4.0, raw_relative_volume / max(0.10, candle_progress))', vol
           assert float(vol.get('production_threshold')) == 68.0, vol
           assert vol.get('research_only') is True and vol.get('live_execution') is False, vol
           # Decision and diagnostic are separate live requests; values may move,
