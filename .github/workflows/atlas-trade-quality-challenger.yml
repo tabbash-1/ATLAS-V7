@@ -41,7 +41,9 @@ jobs:
           python -m py_compile trade_quality_challenger.py
           PYTHONPATH=. python - <<'PY'
           import importlib.util\nspec=importlib.util.spec_from_file_location('t','tests/test_trade_quality_challenger.py')\nt=importlib.util.module_from_spec(spec);spec.loader.exec_module(t)
-          t.test_challenger_is_evidence_only(__import__('pathlib').Path('/tmp/atlas-quality-test'))
+          import tempfile
+          with tempfile.TemporaryDirectory() as d:
+              t.test_challenger_is_evidence_only(__import__('pathlib').Path(d))
           print('PASS test_challenger_is_evidence_only')
           PY
       - name: Build evidence-only challenger
