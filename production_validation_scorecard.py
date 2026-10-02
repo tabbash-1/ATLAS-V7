@@ -16,6 +16,8 @@ SOURCE = "FINAL_TRADE_GATE"
 EPOCH_ID = "HTF_SR_V2_2026-09-14"
 EPOCH_START = dt.datetime(2026, 9, 14, 12, 31, 29, tzinfo=dt.timezone.utc)
 MIN_FORMAL_SAMPLE = 30
+CURRENT_GEOMETRY_VERSION = "ATLAS_GEOMETRY_V6_MIN_1_5_ATR_INVALIDATION"
+CURRENT_GEOMETRY_START = dt.datetime(2026, 9, 29, 6, 46, 27, tzinfo=dt.timezone.utc)
 FEE_BPS_PER_SIDE = 5.0
 SLIPPAGE_BPS_PER_SIDE = 3.0
 FUNDING_BPS_PER_12H = 1.0
@@ -186,6 +188,20 @@ def build(root: Path) -> dict[str, Any]:
     post.sort(key=lambda x: int(x.get("captured_at_ms") or 0))
     summary = _summarize(post)
     cost_summary = _cost_summary(post)
+    # Keep the immutable post-V2 baseline for historical diagnostics, but evaluate
+    # the current Production geometry in its own prospective cohort. Rows are
+    # admitted only when captured after the versioned V6 contract landed AND
+    # their frozen entry provenance identifies V6. Missing/legacy provenance
+    # fails closed and cannot be silently attributed to the current geometry.
+    current_geometry_rows = []
+    for row in post:
+        captured = _ts(row.get("captured_at"))
+        provenance = row.get("decision_provenance") or {}
+        geometry_version = provenance.get("geometry_version") or (row.get("geometry") or {}).get("geometry_version")
+        if captured and captured >= CURRENT_GEOMETRY_START and geometry_version == CURRENT_GEOMETRY_VERSION:
+            current_geometry_rows.append(row)
+    current_geometry_summary = _summarize(current_geometry_rows)
+    current_geometry_cost_summary = _cost_summary(current_geometry_rows)
     n = summary["terminal"]
     formal_ready = n >= MIN_FORMAL_SAMPLE
     state = "FORMAL_SAMPLE_READY" if formal_ready else "COLLECTING_FORWARD_EVIDENCE"
@@ -204,6 +220,19 @@ def build(root: Path) -> dict[str, Any]:
                        "funding_treatment":"CONSERVATIVE_ABSOLUTE_COST_ASSUMPTION","exchange_execution_evidence":False,
                        "production_impact":"NONE"},
         "post_v2_cost_adjusted": cost_summary,
+        "current_geometry": {
+            "version": CURRENT_GEOMETRY_VERSION,
+            "start": CURRENT_GEOMETRY_START.isoformat(),
+            "admission": "CAPTURED_AFTER_VERSION_START_AND_FROZEN_GEOMETRY_VERSION_MATCH",
+            "legacy_or_unversioned_rows_excluded": len(post) - len(current_geometry_rows),
+            "summary": current_geometry_summary,
+            "cost_adjusted": current_geometry_cost_summary,
+            "formal_min_terminal": MIN_FORMAL_SAMPLE,
+            "formal_sample_ready": current_geometry_summary["terminal"] >= MIN_FORMAL_SAMPLE,
+            "remaining": max(0, MIN_FORMAL_SAMPLE - current_geometry_summary["terminal"]),
+            "research_only": True,
+            "production_impact": "NONE"
+        },
         "rows": post,
         "interpretation": {
             "profitability_claim_allowed": False,
@@ -222,6 +251,8 @@ def validate(p: dict[str, Any]) -> None:
     assert p.get("safety", {}).get("production_threshold") == 68
     assert p.get("safety", {}).get("can_override_production") is False
     assert p.get("cost_model", {}).get("production_impact") == "NONE"
+    assert p.get("current_geometry", {}).get("version") == CURRENT_GEOMETRY_VERSION
+    assert p.get("current_geometry", {}).get("production_impact") == "NONE"
     assert p.get("diagnostic_cohorts", {}).get("production_impact") == "NONE"
     assert p.get("cost_model", {}).get("fee_bps_per_side") == 5.0
     assert p.get("cost_model", {}).get("slippage_bps_per_side") == 3.0
