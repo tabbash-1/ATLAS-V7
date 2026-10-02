@@ -1,0 +1,76 @@
+name: ATLAS Trade Quality Challenger
+on:
+  workflow_run:
+    workflows: ['ATLAS Production Failure Attribution']
+    types: [completed]
+  pull_request:
+    branches: [main]
+    paths:
+      - 'trade_quality_challenger.py'
+      - 'tests/test_trade_quality_challenger.py'
+      - '.github/workflows/atlas-trade-quality-challenger.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'trade_quality_challenger.py'
+      - 'status/production-failure-attribution-latest.json'
+      - '.github/workflows/atlas-trade-quality-challenger.yml'
+  schedule:
+    - cron: '27 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: atlas-trade-quality-challenger
+  cancel-in-progress: false
+jobs:
+  analyze:
+    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && 'main' || github.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Regression
+        run: |
+          python -m py_compile trade_quality_challenger.py
+          PYTHONPATH=. python - <<'PY'
+          import importlib.util
+          import pathlib
+          import tempfile
+          spec = importlib.util.spec_from_file_location("t", "tests/test_trade_quality_challenger.py")
+          t = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(t)
+          with tempfile.TemporaryDirectory() as d:
+              t.test_challenger_is_evidence_only(pathlib.Path(d))
+          print("PASS test_challenger_is_evidence_only")
+          PY
+      - name: Build evidence-only challenger
+        run: python trade_quality_challenger.py
+      - name: Verify safety
+        run: |
+          python - <<'PY'
+          import json
+          p=json.load(open('status/trade-quality-challenger-latest.json'))
+          assert p['decision_source_of_truth']=='FINAL_TRADE_GATE'
+          assert p['safety']['production_impact']=='NONE'
+          assert p['safety']['can_override_production'] is False
+          assert p['safety']['can_change_threshold'] is False
+          assert p['safety']['production_threshold']==68
+          assert p['promotion_policy']['required_validation']=='STRICT_FORWARD_OUT_OF_SAMPLE'
+          assert p['promotion_policy']['no_threshold_tuning'] is True
+          print('TRADE_QUALITY_CHALLENGER_OK',p['sample'],p['baseline'])
+          PY
+      - name: Commit research snapshot
+        if: github.event_name != 'pull_request'
+        run: |
+          bash scripts/commit_status_with_retry.sh \
+            'atlas-trade-quality' \
+            'atlas-quality@users.noreply.github.com' \
+            'research: update trade quality challenger [skip ci] [skip render]' \
+            'status/trade-quality-challenger-latest.json'
