@@ -20,6 +20,23 @@ def test_short_geometry_recomputes_rr_from_exact_levels():
     assert g['risk_reward'] == 2.0
 
 
+def test_exact_two_to_one_btc_levels_pass_float_precision_boundary():
+    # These live BTC levels mathematically equal 2R, but binary floats produce
+    # 1.9999999999999813 without a precision tolerance.
+    g = assess('LONG', 87272.0497857143, 86491.303, 88833.5433571429)
+    assert g['status'] == 'PASS'
+    assert g['qualified'] is True
+    assert g['risk_reward'] == 2.0
+    assert g['checks']['rr_meets_minimum'] is True
+
+
+def test_rr_materially_below_two_remains_blocked():
+    g = assess('LONG', 1.0, 0.0, 2.999999)
+    assert g['status'] == 'BLOCK'
+    assert g['qualified'] is False
+    assert g['checks']['rr_meets_minimum'] is False
+
+
 def test_geometry_blocks_rr_below_two_with_exact_code():
     g = assess('LONG', 100.0, 98.0, 101.0)
     assert g['status'] == 'BLOCK'

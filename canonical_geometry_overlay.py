@@ -86,7 +86,10 @@ def assess(direction, entry, stop, target):
         return _base("BLOCK", False, "ZERO_RISK_GEOMETRY", ["NON_POSITIVE_RISK"], checks=checks)
 
     rr = reward / risk
-    checks["rr_meets_minimum"] = rr >= MIN_RR
+    # Decimal market levels can represent an exact 2R plan a few ulps below
+    # 2.0 in binary floating point (for example the live BTC plan). Tolerate
+    # only that numerical noise; the reported R:R remains rounded as before.
+    checks["rr_meets_minimum"] = rr >= MIN_RR or abs(rr - MIN_RR) <= 1e-12
     qualified = checks["rr_meets_minimum"]
     return _base(
         "PASS" if qualified else "BLOCK",
