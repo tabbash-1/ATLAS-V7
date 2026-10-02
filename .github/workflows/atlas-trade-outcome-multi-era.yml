@@ -1,0 +1,16 @@
+name: ATLAS Trade Outcome Multi Era
+on:
+  pull_request:
+    paths: ['profitability_trade_outcome_multi_era.py','tests/test_profitability_trade_outcome_multi_era.py','.github/workflows/atlas-trade-outcome-multi-era.yml']
+  workflow_dispatch:
+jobs:
+  exam:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: python -m py_compile profitability_trade_outcome_multi_era.py
+      - run: PYTHONPATH=. python -c "import tests.test_profitability_trade_outcome_multi_era as t; t.test_eras_nonoverlap_and_rule(); print('MULTI_ERA_CONTRACT_OK')"
+      - run: python profitability_trade_outcome_multi_era.py
