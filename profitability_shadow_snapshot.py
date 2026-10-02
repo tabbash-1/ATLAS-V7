@@ -16,8 +16,8 @@ def build():
   "can_override_production":False,"live_execution":False,
   "forward_promotion":promo,
   "multi_era":multi,
-  "methodology":{"current_true_path_state":"COLLECTING","legacy_multi_era_label":"12H_ENDPOINT_PROXY_NOT_TRUE_PATH","outcome_label":"TP_BEFORE_SL_PATH","same_candle":"LOSS","purge_hours":tm.PURGE_HOURS,"embargo_hours":tm.EMBARGO_HOURS,"round_trip_cost_bps":tm.ROUND_TRIP_COST_BPS,"calibration_metrics":["BRIER","LOG_LOSS"],"forward_shadow_schema":fs.SCHEMA,
-    "note":"Live probabilities remain unavailable until a true-path prospective model snapshot is generated."}}
+  "methodology":{"current_true_path_state":"COLLECTING_FORWARD_ONLY","legacy_multi_era_label":"12H_ENDPOINT_PROXY_NOT_TRUE_PATH","outcome_label":"TP_BEFORE_SL_PATH","same_candle":"LOSS","purge_hours":tm.PURGE_HOURS,"embargo_hours":tm.EMBARGO_HOURS,"round_trip_cost_bps":tm.ROUND_TRIP_COST_BPS,"calibration_metrics":["BRIER","LOG_LOSS"],"forward_shadow_schema":fs.SCHEMA,
+    "note":"True-path V2 methodology locks costs, 12h purge + 12h embargo, and calibration metrics. Live probabilities remain unavailable until untouched forward-only samples mature."}}
  out=ROOT/"status"/"profitability-shadow-latest.json"
  out.write_text(json.dumps(payload,indent=2,sort_keys=True)+"\n")
  return payload
