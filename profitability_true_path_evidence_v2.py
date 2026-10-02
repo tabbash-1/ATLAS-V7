@@ -24,7 +24,23 @@ def temporal_split(rows,train_frac=.60,validation_frac=.20):
     rows=sorted(rows,key=lambda z:z["t"])
     if not rows:return {"train":[],"validation":[],"test":[]}
     a=rows[max(0,int(len(rows)*train_frac)-1)]["t"];b=rows[max(0,int(len(rows)*(train_frac+validation_frac))-1)]["t"]
-    gap=(PURGE_HOURS+EMBARGO_HOURS)*3600000
+    hour=3600000
+    gap=(PURGE_HOURS+EMBARGO_HOURS)*hour
+    # Count-based cut points can be closer than the locked temporal exclusion
+    # window (for example, 100 hourly rows with a 20% validation fold). Expand
+    # the two boundaries symmetrically so a valid validation observation can
+    # exist without weakening either the purge or embargo contract.
+    if b-a<gap:
+        shortfall=gap-(b-a)
+        left=shortfall//2
+        a-=left
+        b+=shortfall-left
+    min_a=rows[0]["t"]+PURGE_HOURS*hour
+    max_b=rows[-1]["t"]-EMBARGO_HOURS*hour
+    if a<min_a:
+        shift=min_a-a;a+=shift;b+=shift
+    if b>max_b:
+        shift=b-max_b;a-=shift;b-=shift
     return {"train":[z for z in rows if z["t"]<=a-PURGE_HOURS*3600000],
       "validation":[z for z in rows if z["t"]>=a+EMBARGO_HOURS*3600000 and z["t"]<=b-PURGE_HOURS*3600000],
       "test":[z for z in rows if z["t"]>=b+EMBARGO_HOURS*3600000],
