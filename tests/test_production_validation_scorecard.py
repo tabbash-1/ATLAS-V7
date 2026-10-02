@@ -78,3 +78,24 @@ def test_diagnostic_cohorts_are_evidence_only_and_split_frozen_provenance():
     assert z["cohorts"]["htf_v2_ineligible"]["net_r"]==-1.0
     assert z["cohorts"]["futures_aligned"]["n"]==1
     assert z["cohorts"]["futures_opposed"]["n"]==1
+
+
+def test_current_geometry_cohort_requires_version_and_start():
+    before=row("2026-09-28T00:00:00Z",2)
+    after_legacy=row("2026-09-30T00:00:00Z",2)
+    after_v6=row("2026-09-30T01:00:00Z",2)
+    after_v6["decision_provenance"]={"geometry_version":m.CURRENT_GEOMETRY_VERSION}
+    rows=[before,after_legacy,after_v6]
+    selected=[]
+    for x in rows:
+        captured=m._ts(x.get("captured_at"))
+        provenance=x.get("decision_provenance") or {}
+        geometry_version=provenance.get("geometry_version") or (x.get("geometry") or {}).get("geometry_version")
+        if captured and captured>=m.CURRENT_GEOMETRY_START and geometry_version==m.CURRENT_GEOMETRY_VERSION:
+            selected.append(x)
+    assert selected==[after_v6]
+
+
+def test_current_geometry_constants_are_locked():
+    assert m.CURRENT_GEOMETRY_VERSION=="ATLAS_GEOMETRY_V6_MIN_1_5_ATR_INVALIDATION"
+    assert m.CURRENT_GEOMETRY_START==dt.datetime(2026,9,29,6,46,27,tzinfo=dt.timezone.utc)
