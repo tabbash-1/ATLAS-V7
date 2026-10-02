@@ -24,3 +24,15 @@ def test_long_progression():
     b=transition(a["state"],long_confirmed=True)
     c=transition(b["state"],expansion=True)
     assert [a["state"],b["state"],c["state"]]==["EARLY_LONG","CONFIRMED_LONG","EXPANSION_LONG"]
+
+def test_reversal_enters_neutral_rebuild_not_long():
+    x=transition("REVERSAL_CAUTION",rebuild=True)
+    assert x["state"]=="NEUTRAL_REBUILD"
+    assert x["actionable_direction"]=="WAIT"
+    assert x["immediate_long_reentry_after_reversal_allowed"] is False
+
+def test_rebuild_requires_breadth_recovery_before_early_long():
+    hold=transition("NEUTRAL_REBUILD",early_long=True)
+    recover=transition("NEUTRAL_REBUILD",breadth_recovered=True)
+    assert hold["state"]=="NEUTRAL_REBUILD"
+    assert recover["state"]=="EARLY_LONG"
