@@ -1,0 +1,16 @@
+name: ATLAS Prediction Engine Historical Holdout
+on:
+  pull_request:
+    paths: ['profitability_prediction_engine.py','profitability_prediction_historical_eval.py','tests/test_profitability_prediction_engine.py','.github/workflows/atlas-prediction-engine-holdout.yml']
+  workflow_dispatch:
+jobs:
+  holdout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: python -m py_compile profitability_prediction_engine.py profitability_prediction_historical_eval.py
+      - run: PYTHONPATH=. python -c "import tests.test_profitability_prediction_engine as t; t.test_split_is_chronological_and_holdout_closed(); print('TEST_OK')"
+      - run: python profitability_prediction_historical_eval.py --days 180 --end-ms 1790485200000
