@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Build the web-readable profitability research snapshot from committed evidence."""
-import datetime as dt,json
+import datetime as dt,json\nimport profitability_true_path_ev as true_ev
 from pathlib import Path
 ROOT=Path(__file__).resolve().parent
 def read(name):
@@ -16,7 +16,7 @@ def build():
   "can_override_production":False,"live_execution":False,
   "forward_promotion":promo,
   "multi_era":multi,
-  "methodology":{"current_true_path_state":"COLLECTING","legacy_multi_era_label":"12H_ENDPOINT_PROXY_NOT_TRUE_PATH","outcome_label":"TP_BEFORE_SL_PATH","same_candle":"LOSS","purge_hours":12,
+  "methodology":{"current_true_path_state":"COLLECTING","legacy_multi_era_label":"12H_ENDPOINT_PROXY_NOT_TRUE_PATH","outcome_label":"TP_BEFORE_SL_PATH","same_candle":"LOSS","purge_hours":true_ev.PURGE_HOURS,"embargo_hours":true_ev.EMBARGO_HOURS,"round_trip_cost_r":true_ev.ROUND_TRIP_COST_R,"calibration_metrics":["BRIER","LOG_LOSS"],
     "note":"Live probabilities remain unavailable until a true-path prospective model snapshot is generated."}}
  out=ROOT/"status"/"profitability-shadow-latest.json"
  out.write_text(json.dumps(payload,indent=2,sort_keys=True)+"\n")
