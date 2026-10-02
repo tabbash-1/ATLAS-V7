@@ -1,6 +1,14 @@
 from pathlib import Path
 
 
+def test_unified_terminal_refreshes_after_canonical_truth_loads():
+    autoload = Path('production-web-autoload.js').read_text()
+    terminal = Path('atlas-unified-terminal.js').read_text()
+    assert "atlas:production-decision-ready" in autoload
+    assert "atlas:production-decision-ready" in terminal
+    assert "setTimeout(load,50)" in terminal
+
+
 def test_unified_polish_has_no_execution_language():
     js = Path('atlas-unified-terminal-polish.js').read_text()
     assert 'execution stays WAIT' not in js
