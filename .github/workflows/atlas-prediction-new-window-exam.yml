@@ -1,0 +1,17 @@
+name: ATLAS Prediction New Window Exam
+on:
+  pull_request:
+    paths: ['profitability_prediction_side_specialist.py','profitability_prediction_new_window_eval.py','tests/test_profitability_prediction_side_specialist.py','.github/workflows/atlas-prediction-new-window-exam.yml']
+  workflow_dispatch:
+jobs:
+  exam:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: python -m py_compile profitability_prediction_side_specialist.py profitability_prediction_new_window_eval.py
+      - run: PYTHONPATH=. python -c "import tests.test_profitability_prediction_side_specialist as t; t.test_rule_frozen(); print('RULE_FROZEN_OK')"
+      - name: New temporal window after prior frozen exam
+        run: python profitability_prediction_new_window_eval.py --train-days 180 --train-end-ms 1790485200000 --exam-end-ms 1790920800000
