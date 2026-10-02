@@ -1,0 +1,29 @@
+name: ATLAS Prediction Development Diagnostics
+on:
+  pull_request:
+    paths: ['profitability_prediction_drawdown_diagnostics.py','tests/test_profitability_prediction_drawdown_diagnostics.py','.github/workflows/atlas-prediction-development-diagnostics.yml']
+  workflow_dispatch:
+jobs:
+  diagnostics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: python -m py_compile profitability_prediction_drawdown_diagnostics.py
+      - name: Development-only 80 percent diagnostic
+        run: |
+          python - <<'PY'
+          import json
+          import profitability_prediction_engine as pe
+          import profitability_prediction_historical_eval as he
+          import profitability_prediction_drawdown_diagnostics as d
+          end=1790485200000; allx=[]
+          for s in ["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","DOGEUSDT","ZECUSDT"]: allx+=he.samples(s,180,end)
+          tr,va,holdout=pe.chronological_split(allx)
+          model=pe.fit(tr)
+          # hard contract: diagnostics receive train+validation only
+          print("ATLAS_DEV_DIAGNOSTICS="+json.dumps(d.report(model,tr+va),sort_keys=True))
+          print("WITHHELD_ROWS="+str(len(holdout)))
+          PY
