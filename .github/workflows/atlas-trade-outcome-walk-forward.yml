@@ -1,0 +1,16 @@
+name: ATLAS Trade Outcome Walk Forward
+on:
+  pull_request:
+    paths: ['profitability_trade_outcome_walk_forward.py','tests/test_profitability_trade_outcome_walk_forward.py','.github/workflows/atlas-trade-outcome-walk-forward.yml']
+  workflow_dispatch:
+jobs:
+  exam:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: python -m py_compile profitability_trade_outcome_walk_forward.py
+      - run: PYTHONPATH=. python -c "import tests.test_profitability_trade_outcome_walk_forward as t; t.test_frozen_contract(); print('EV_RULE_FROZEN_OK')"
+      - run: python profitability_trade_outcome_walk_forward.py
