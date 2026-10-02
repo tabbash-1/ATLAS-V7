@@ -295,7 +295,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 offline_production_path_settlement.py
-          jq -e '.schema == "ATLAS_OFFLINE_PRODUCTION_PATH_SETTLEMENT_V4_EXECUTION_ELIGIBLE" and .episode_semantics == "FIRST_CANONICAL_FINAL_TRADE_GATE_TRADE_READY_AND_EXECUTION_READY_OBSERVATION_PER_CONTIGUOUS_SYMBOL_DIRECTION_EPISODE" and .research_only == true and .live_execution == false and .can_override_production == false' status/production-path-settlement-latest.json >/dev/null
+          jq -e '.schema == "ATLAS_OFFLINE_PRODUCTION_PATH_SETTLEMENT_V5_SCOPED_NO_FAKE_REALIZED_R" and .upstream_schema == "ATLAS_OFFLINE_PRODUCTION_PATH_SETTLEMENT_V4_EXECUTION_ELIGIBLE" and .episode_semantics == "FIRST_CANONICAL_FINAL_TRADE_GATE_TRADE_READY_AND_EXECUTION_READY_OBSERVATION_PER_CONTIGUOUS_SYMBOL_DIRECTION_EPISODE" and .research_only == true and .live_execution == false and .can_override_production == false and .realized_r_available == false and .realized_r_scope == "ACTUAL_LIVE_FILL_LEDGER_ONLY" and .summary.available == false and .summary.reason == "LIVE_EXECUTION_DISABLED_NO_ACTUAL_FILL_LEDGER"' status/production-path-settlement-latest.json >/dev/null
 
       - name: Build prospective edge report
         shell: bash
