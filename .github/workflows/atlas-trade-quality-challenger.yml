@@ -40,7 +40,7 @@ jobs:
         run: |
           python -m py_compile trade_quality_challenger.py
           PYTHONPATH=. python - <<'PY'
-          import tests.test_trade_quality_challenger as t
+          import importlib.util\nspec=importlib.util.spec_from_file_location('t','tests/test_trade_quality_challenger.py')\nt=importlib.util.module_from_spec(spec);spec.loader.exec_module(t)
           for name in sorted(x for x in dir(t) if x.startswith('test_')):
               getattr(t,name)()
               print('PASS',name)
