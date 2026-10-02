@@ -116,6 +116,7 @@
       </nav>
       <div id="atlasWorkspacePanels" class="atlas-workspace-panels"></div>
 
+      <section class="card metrics-card" id="profitabilityShadowCard"><div class="card-head"><div><strong>PROFITABILITY RESEARCH SHADOW</strong><div class="muted small">Prediction · true-path outcome EV · forward evidence. Isolated from Production Final Gate.</div></div><span id="profitShadowBadge" class="pill neutral">LOADING</span></div><div id="profitShadowMetrics" class="trial-grid"><div><span>State</span><b>Loading</b></div><div><span>Production impact</span><b>NONE</b></div><div><span>Threshold</span><b>68 LOCKED</b></div><div><span>True-path model</span><b>COLLECTING</b></div></div><div id="profitShadowNotes" class="comparison-box muted small">Research Shadow cannot override Production.</div></section>
       <section class="grid lower-grid">
         <article class="card">
           <div class="card-head"><strong>MARKET ENGINE</strong><span id="engineBadge" class="pill neutral">READY</span></div>
@@ -720,5 +721,6 @@
   <script src="transition-quality-ui.js?v=tq-v1"></script>
   <script src="profitability-shadow-ui.js?v=shadow-v1"></script>
   <div id="atlasAlertToastHost" class="atlas-alert-toast-host" aria-live="polite"></div>
+<script id="profitShadowLoader">(async()=>{const b=document.getElementById('profitShadowBadge'),x=document.getElementById('profitShadowMetrics'),n=document.getElementById('profitShadowNotes');try{const d=await(await fetch('/api/research/profitability-shadow',{cache:'no-store'})).json(),p=d.forward_promotion||{},o=p.observed||{},m=d.methodology||{};b.textContent=d.state||'COLLECTING';x.innerHTML='<div><span>State</span><b>'+String(d.state||'COLLECTING')+'</b></div><div><span>Forward n</span><b>'+String(o.n??'—')+'</b></div><div><span>Avg R</span><b>'+String(o.avg_r??'—')+'</b></div><div><span>Profit factor</span><b>'+String(o.profit_factor_r??'—')+'</b></div><div><span>Max DD R</span><b>'+String(o.max_drawdown_r??'—')+'</b></div><div><span>Threshold</span><b>68 LOCKED</b></div><div><span>True-path model</span><b>'+String(m.current_true_path_state||'COLLECTING')+'</b></div><div><span>Production impact</span><b>NONE</b></div>';n.textContent=(m.note||'Research only')+' · legacy multi-era: '+String(m.legacy_multi_era_label||'—')+' · can_override_production=false'}catch(e){b.textContent='UNAVAILABLE';n.textContent='Research snapshot unavailable; Production remains unaffected.'}})();</script>
 </body>
 </html>
