@@ -37,6 +37,8 @@ jobs:
               if "const VERSION='ATLAS_PRODUCT_SHELL_V6_CANONICAL_FINAL_TRUTH';" in line:
                   line=line.replace("ATLAS_PRODUCT_SHELL_V6_CANONICAL_FINAL_TRUTH","ATLAS_PRODUCT_SHELL_V7_BOUND_ANALYST_GEOMETRY")
                   seen['version']+=1
+              elif "const VERSION='ATLAS_PRODUCT_SHELL_V7_BOUND_ANALYST_GEOMETRY';" in line:
+                  seen['version']+=1
               elif line.startswith('  function truth()'):
                   line="  function truth(){const d=production(),c=d?.canonical_decision,a=d?.analyst_output;if(!d||d.canonical_product_contract!=='analyst_output'||c?.schema!=='ATLAS_CANONICAL_DECISION_TRUTH_V1'||c?.canonical_source_present!==true||c?.source_of_truth!=='FINAL_TRADE_GATE'||c?.product_horizon!=='4-12H'||!Array.isArray(c?.evaluation_horizons_h)||c.evaluation_horizons_h.join(',')!=='4,8,12'||!a||a?.horizon!=='4-12H'||a?.analysis_only!==true||a?.live_execution!==false||a?.canonical_decision_id!==c.decision_id||a?.decision_source_of_truth!=='FINAL_TRADE_GATE'||a?.canonical_decision_schema!==c.schema||a?.geometry_bound_to_canonical_decision!==true||norm(a.decision||'WAIT')!==norm(c.decision||'WAIT'))return null;return {d,c,a};}"
                   seen['truth']+=1

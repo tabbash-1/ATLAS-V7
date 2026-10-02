@@ -54,7 +54,8 @@ jobs:
           ! grep -q "\['1d','12h','6h','4h','1h'\]" atlas-unified-terminal.js
           ! grep -q "p.product_direction||p.candidate_direction" atlas-unified-terminal.js
           ! grep -q "p.trade_plan" atlas-unified-terminal.js
-          grep -q "\$('auDir').textContent=actionable?decision:'—'" atlas-unified-terminal.js
+          grep -Fq "\$('auDirLabel').textContent=actionable?'Direction':'Candidate'" atlas-unified-terminal.js
+          grep -Fq "\$('auDir').textContent=actionable?decision:" atlas-unified-terminal.js
           grep -q "4H and 12H must align" atlas-unified-terminal.js
           grep -q "1H must confirm" atlas-unified-terminal.js
 
