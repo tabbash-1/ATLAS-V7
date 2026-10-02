@@ -98,6 +98,7 @@ def geometry(decision: dict[str, Any]):
     rr2 = fnum(p.get("rr_tp2")) or abs(tp2-entry)/risk
     return {"direction":direction,"entry":entry,"stop_loss":stop,"tp1":tp1,"tp2":tp2,
             "rr_tp2":rr2,"risk_abs":risk,"entry_mode":p.get("entry_mode"),"plan_version":p.get("version"),
+            "geometry_version":p.get("geometry_version"),
             "product_horizon":p.get("product_horizon") or PRODUCT_HORIZON,
             "canonical_lane":p.get("canonical_lane") or "CORE_4_12H"}
 
@@ -149,6 +150,8 @@ def freeze_decision_provenance(decision: dict[str, Any]) -> dict[str, Any]:
         "strategy_epoch_id": "HTF_SR_V2_2026-09-14",
         "product_horizon": "4-12H",
         "production_threshold_locked": 68,
+        "geometry_version": _path(decision, "trade_plan", "geometry_version"),
+        "trade_plan_version": _path(decision, "trade_plan", "version"),
         "candidate_direction": _path(decision, "candidate_direction", "direction"),
         "score": fnum(decision.get("score")),
         "threshold": fnum(_path(decision, "signal_threshold", "threshold")),
