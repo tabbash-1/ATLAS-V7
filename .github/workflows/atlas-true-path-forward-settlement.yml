@@ -1,0 +1,30 @@
+name: ATLAS True Path Forward Settlement
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '27 * * * *'
+permissions:
+  contents: write
+concurrency:
+  group: atlas-true-path-forward-settlement
+  cancel-in-progress: false
+jobs:
+  settle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: PYTHONPATH=. pytest -q tests/test_profitability_true_path_forward_settlement.py tests/test_profitability_true_path_methodology_v2.py tests/test_profitability_true_path_evidence_v2.py
+      - run: python profitability_true_path_forward_settlement.py
+      - name: Commit matured evidence
+        run: |
+          git config user.name atlas-true-path-shadow
+          git config user.email atlas-true-path-shadow@users.noreply.github.com
+          git add status/history/profitability-true-path-forward.jsonl || true
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "research: settle matured true-path forward evidence [skip render]"
+          git pull --rebase origin main
+          git push
