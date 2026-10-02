@@ -102,3 +102,17 @@ def test_v3_reads_lane_oriented_production_timeframe_matrix():
     assert e['h1_aligned'] is True
     assert e['h4_aligned'] is True
     assert e['h12_explicit_opposition'] is False
+
+
+def test_summary_promotes_tradeable_missed_as_primary_metric():
+    base={'blocker_family':'HTF_CONFLICT','horizons':{'4h':{'directional_return_pct':1.0},'8h':{'directional_return_pct':1.0},'12h':{'directional_return_pct':1.0}}}
+    rows=[]
+    for cls,missed in [('MISSED_TRADEABLE_OPPORTUNITY',True),('CORRECT_NO_CHASE',True),('GOOD_WAIT',False)]:
+        r=dict(base); r['executability_classification']=cls; r['missed_opportunity']=missed; rows.append(r)
+    out=m.summarize(rows)
+    assert out['tradeable_missed_n']==1
+    assert out['tradeable_missed_rate_pct']==33.33
+    assert out['correct_no_chase_n']==1
+    assert out['good_wait_n']==1
+    assert out['descriptive_mfe_missed_n']==2
+    assert out['legacy_missed_metric_deprecated'] is True
