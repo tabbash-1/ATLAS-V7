@@ -1,0 +1,22 @@
+name: ATLAS Profitability Shadow Web Snapshot
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 * * * *'
+permissions:
+  contents: write
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python profitability_shadow_snapshot.py
+      - name: Commit snapshot
+        run: |
+          git config user.name atlas-bot
+          git config user.email atlas-bot@users.noreply.github.com
+          git add status/profitability-shadow-latest.json
+          if ! git diff --cached --quiet; then git commit -m "status refresh profitability shadow"; git push; fi
