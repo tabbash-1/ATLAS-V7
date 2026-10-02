@@ -1,0 +1,46 @@
+name: ATLAS Profitability Forward Promotion
+on:
+  workflow_run:
+    workflows: ['ATLAS Trade Quality Challenger']
+    types: [completed]
+  schedule:
+    - cron: '37 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: atlas-profitability-forward-promotion
+  cancel-in-progress: false
+jobs:
+  evaluate:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Regression
+        run: |
+          python -m py_compile profitability_forward_promotion.py
+          PYTHONPATH=. pytest -q tests/test_profitability_forward_promotion.py
+      - name: Evaluate strict forward promotion evidence
+        run: python profitability_forward_promotion.py
+      - name: Verify no automatic Production mutation
+        run: |
+          python - <<'PY'
+          import json
+          x=json.load(open('status/profitability-forward-promotion-latest.json'))
+          assert x['promotion']['automatic'] is False
+          assert x['promotion']['production_change_allowed_by_this_module'] is False
+          assert x['safety']['strict_forward_only'] is True
+          assert x['safety']['historical_backfill_can_qualify'] is False
+          assert x['safety']['production_threshold']==68
+          print(x['state'],x['checks'],x['observed'])
+          PY
+      - name: Commit forward status
+        run: |
+          bash scripts/commit_status_with_retry.sh atlas-profit-forward atlas-forward@users.noreply.github.com 'research: update profitability forward gate [skip ci] [skip render]' status/profitability-forward-promotion-latest.json
