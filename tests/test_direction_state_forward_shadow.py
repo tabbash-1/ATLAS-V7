@@ -23,3 +23,13 @@ def test_same_t0_features_and_prior_capture_only(tmp_path):
     assert a["exhaustion"]["eligible"] is True
     assert b["previous_bullish_ratio"]==a["bullish_ratio"]
     assert b["reversal"]["eligible"] is True
+
+
+def test_reads_canonical_indicators_object(tmp_path):
+    s={"captured_at":"t","decisions":{"BTCUSDT":{"ok":True,"candidate_direction":"LONG","trend":"BULLISH","indicators":{"rsi14":79,"momentum_24h_pct":2.5}},"ETHUSDT":{"ok":True,"candidate_direction":"LONG"}}}
+    sp=tmp_path/"s.json";sp.write_text(json.dumps(s));hp=tmp_path/"h.jsonl"
+    x=capture(str(sp),str(hp))["observation"]
+    assert x["evidence_complete"] is True
+    assert x["btc"]["rsi14"]==79
+    assert x["btc"]["momentum_24h_pct"]==2.5
+    assert x["exhaustion"]["eligible"] is True
