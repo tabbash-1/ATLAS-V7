@@ -19,9 +19,9 @@ def _f(v):
 def _btc_features(snapshot):
     d=(snapshot.get("decisions") or {}).get("BTCUSDT") or {}
     # Accept only explicit point-in-time fields already frozen in canonical snapshot.
-    rsi=_f(d.get("rsi14") or (d.get("technical") or {}).get("rsi14"))
-    mom=_f(d.get("momentum_24h_pct") or (d.get("technical") or {}).get("momentum_24h_pct"))
-    trend=str(d.get("trend") or (d.get("technical") or {}).get("trend") or "").upper()
+    rsi=_f(d.get("rsi14") or (d.get("indicators") or {}).get("rsi14") or (d.get("technical") or {}).get("rsi14"))
+    mom=_f(d.get("momentum_24h_pct") or (d.get("indicators") or {}).get("momentum_24h_pct") or (d.get("technical") or {}).get("momentum_24h_pct"))
+    trend=str(d.get("trend") or (d.get("independent_market_regime") or {}).get("trend") or (d.get("technical") or {}).get("trend") or "").upper()
     return {"rsi14":rsi,"momentum_24h_pct":mom,"trend":trend or None}
 
 def _bullish_ratio(snapshot):
