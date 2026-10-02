@@ -19,7 +19,8 @@ from atlas_trader_brain import assess as assess_trader
 from canonical_decision_contract import from_decision
 from golden_thesis_engine import VERSION as GOLDEN_THESIS_VERSION, build as build_golden_thesis
 
-VERSION = "FINAL_TRADE_READY_GUARD_V10_NET_RR_DISCLOSURE"
+VERSION = "FINAL_TRADE_READY_GUARD_V11_NET_RR_FAIL_CLOSED"
+MIN_NET_RR = 2.0
 SHORT_PRODUCTION_ENV = "ATLAS_SHORT_PRODUCTION_ENABLED"
 PRODUCT_HORIZON = "4-12H"
 EXPERIMENTAL_PROMOTION_ENV = "ATLAS_EXPERIMENTAL_FINAL_EVIDENCE_PROMOTION"
@@ -112,8 +113,8 @@ def _breakout_structure_state(row):
 def _net_rr_state(row):
     """Evaluate RR after explicit execution costs when validated cost evidence exists.
 
-    Missing live cost evidence is disclosed, not fabricated. Gross 2R remains the
-    fail-closed geometry floor; a validated cost snapshot may only add a blocker.
+    Cost evidence must be validated before a trade can be certified. No fee,
+    spread, or slippage values are invented when the live estimate is unavailable.
     """
     plan=row.get("trade_plan") or {}
     entry=plan.get("entry"); stop=plan.get("stop_loss"); gross=plan.get("rr_tp2")
@@ -194,7 +195,14 @@ def assess(row):
             blockers.append("BREAKOUT_STRUCTURE_NOT_CONFIRMED")
     if quality_blocked: blockers.append("SETUP_QUALITY_GATE_BLOCKED")
     if degraded: blockers.append("DATA_DEGRADED")
-    if net_rr.get("validated") and (net_rr.get("net_rr") is None or net_rr.get("net_rr") < 2.0): blockers.append("NET_RR_AFTER_COSTS_BELOW_2R")
+    if geometry_ready:
+        if net_rr.get("validated") is not True:
+            cost_reason = net_rr.get("reason")
+            blockers.append("EXECUTION_COST_EVIDENCE_UNAVAILABLE" if cost_reason == "EXECUTION_COST_EVIDENCE_UNAVAILABLE" else "EXECUTION_COST_EVIDENCE_INVALID")
+        elif net_rr.get("net_rr") is None:
+            blockers.append("NET_RR_AFTER_COSTS_UNAVAILABLE")
+        elif net_rr.get("net_rr") < MIN_NET_RR:
+            blockers.append("NET_RR_AFTER_COSTS_BELOW_2R")
     trader = assess_trader(row)
     for blocker in trader.get("fatal_blockers") or []:
         blockers.append(blocker)
@@ -232,8 +240,10 @@ def assess(row):
         "setup_playbook": trader.get("setup_playbook"),
         "location_state": trader.get("location_state"),
         "minimum_rr_required": trader.get("minimum_rr_required"),
+        "minimum_net_rr_after_costs": MIN_NET_RR,
         "net_rr_after_costs": net_rr,
         "net_rr_cost_evidence_required_for_claim": True,
+        "net_rr_cost_evidence_required_for_trade_ready": True,
         "canonical_geometry_ready": geometry_ready,
         "structure_confirmation": structure_state,
         "blockers": blockers,
