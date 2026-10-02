@@ -106,6 +106,21 @@ class FinalWebOnlyHandler(ns["WebOnlyHandler"]):
                 "product_horizon":"4-12H",
                 "research_only":True,"analysis_only":True,"live_execution":False,
             })
+        if parsed.path == "/api/research/profitability-shadow":
+            # Read-only committed snapshot. Research never executes in the web process.
+            p = BASE / "status" / "profitability-shadow-latest.json"
+            if not p.exists():
+                return self._json({"ok":False,"state":"COLLECTING","research_only":True,
+                    "can_override_production":False,"production_threshold":68,"live_execution":False}, 200)
+            try:
+                payload=json.loads(p.read_text())
+            except Exception as exc:
+                return self._json({"ok":False,"state":"SNAPSHOT_INVALID","detail":str(exc),
+                    "research_only":True,"can_override_production":False,"production_threshold":68,
+                    "live_execution":False}, 503)
+            payload["research_only"]=True; payload["can_override_production"]=False
+            payload["production_threshold"]=68; payload["live_execution"]=False
+            return self._json(payload)
         if parsed.path == "/api/runtime/status":
             whale = _whale_snapshot()
             outcomes = _outcome_snapshot()
