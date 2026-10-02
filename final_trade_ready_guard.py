@@ -133,7 +133,8 @@ def _net_rr_state(row):
         "cost_source_version": cost.get("version") or shadow.get("execution_cost_source_version"),
         "cost_basis": cost.get("basis"),
         "cost_blockers": list(cost_blockers),
-        "configuration_required": "Attach validated venue fee, spread and slippage evidence to the Production decision." if not snapshot_attached else None,
+        "configuration_required": None,
+        "report_note": "Execution cost evidence is unavailable; net R:R is not reported." if not snapshot_attached else None,
     }
     try:
         entry=float(entry); stop=float(stop); gross=float(gross)
@@ -211,14 +212,9 @@ def assess(row):
             blockers.append("BREAKOUT_STRUCTURE_NOT_CONFIRMED")
     if quality_blocked: blockers.append("SETUP_QUALITY_GATE_BLOCKED")
     if degraded: blockers.append("DATA_DEGRADED")
-    if geometry_ready:
-        if net_rr.get("validated") is not True:
-            cost_reason = net_rr.get("reason")
-            blockers.append("EXECUTION_COST_EVIDENCE_UNAVAILABLE" if cost_reason == "EXECUTION_COST_EVIDENCE_UNAVAILABLE" else "EXECUTION_COST_EVIDENCE_INVALID")
-        elif net_rr.get("net_rr") is None:
-            blockers.append("NET_RR_AFTER_COSTS_UNAVAILABLE")
-        elif net_rr.get("net_rr") < MIN_NET_RR:
-            blockers.append("NET_RR_AFTER_COSTS_BELOW_2R")
+    # ATLAS is an analysis product. Execution costs are reported when evidence
+    # exists, but venue configuration and estimated fees must not decide LONG,
+    # SHORT, or WAIT. Analytical geometry and structure gates remain in force.
     trader = assess_trader(row)
     for blocker in trader.get("fatal_blockers") or []:
         blockers.append(blocker)
@@ -259,7 +255,9 @@ def assess(row):
         "minimum_net_rr_after_costs": MIN_NET_RR,
         "net_rr_after_costs": net_rr,
         "net_rr_cost_evidence_required_for_claim": True,
-        "net_rr_cost_evidence_required_for_trade_ready": True,
+        "net_rr_cost_evidence_required_for_trade_ready": False,
+        "execution_costs_affect_analysis_decision": False,
+        "execution_costs_role": "REPORT_ONLY",
         "canonical_geometry_ready": geometry_ready,
         "structure_confirmation": structure_state,
         "blockers": blockers,
