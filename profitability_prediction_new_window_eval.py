@@ -19,7 +19,7 @@ def main():
     for s in SYMS: train+=old.samples(s,args.train_days,args.train_end_ms)
     tr,va,prior_holdout=pe.chronological_split(train); model=pe.fit(tr) # exact frozen V1 fit; no new-window fit
     # new window begins strictly after prior exam end
-    days=max(1,int((args.exam_end_ms-args.train_end_ms)/(24*3600*1000)))
+    days=max(31,int((args.exam_end_ms-args.train_end_ms)/(24*3600*1000))+31)
     new=[]
     for s in SYMS:
         for z in old.samples(s,days,args.exam_end_ms):
