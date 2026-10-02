@@ -204,7 +204,9 @@ def summarize(records):
     for r in matured:groups[r.get("blocker_family") or "OTHER"].append(r)
     by={}
     for k,rs in groups.items():
-        by[k]={"n":len(rs),"missed_n":sum(bool(r.get("missed_opportunity")) for r in rs),"missed_rate_pct":round(100*sum(bool(r.get("missed_opportunity")) for r in rs)/len(rs),2)}
+        tradeable_n=sum(r.get("executability_classification")=="MISSED_TRADEABLE_OPPORTUNITY" for r in rs)
+        descriptive_n=sum(bool(r.get("missed_opportunity")) for r in rs)
+        by[k]={"n":len(rs),"tradeable_missed_n":tradeable_n,"tradeable_missed_rate_pct":round(100*tradeable_n/len(rs),2),"correct_no_chase_n":sum(r.get("executability_classification")=="CORRECT_NO_CHASE" for r in rs),"good_wait_n":sum(r.get("executability_classification")=="GOOD_WAIT" for r in rs),"descriptive_mfe_missed_n":descriptive_n,"descriptive_mfe_missed_rate_pct":round(100*descriptive_n/len(rs),2),"legacy_missed_metric_deprecated":True}
         for h in (4,8,12):
             vals=[r["horizons"][f"{h}h"]["directional_return_pct"] for r in rs if f"{h}h" in r.get("horizons",{})]
             by[k][f"mean_{h}h_directional_return_pct"]=round(sum(vals)/len(vals),4) if vals else None
