@@ -1,0 +1,16 @@
+name: ATLAS Prediction Walk Forward
+on:
+  pull_request:
+    paths: ['profitability_prediction_walk_forward.py','tests/test_profitability_prediction_walk_forward.py','.github/workflows/atlas-prediction-walk-forward.yml']
+  workflow_dispatch:
+jobs:
+  walk-forward:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: python -m py_compile profitability_prediction_walk_forward.py profitability_prediction_side_specialist.py
+      - run: PYTHONPATH=. python -c "import tests.test_profitability_prediction_walk_forward as t; t.test_contract_constants(); print('FROZEN_RULE_OK')"
+      - run: python profitability_prediction_walk_forward.py --train-end-ms 1790485200000 --exam-end-ms 1790920800000 --window-days 1
