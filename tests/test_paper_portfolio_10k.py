@@ -16,7 +16,7 @@ def ready(direction='LONG', entry=100.0, stop=99.0, tp2=102.0):
     if direction=='SHORT': stop=101.0; tp2=98.0
     return {'execution_ready':True,'actionable_decision':direction,'candidate_direction':direction,'score':75,'signal_threshold':68,
             'final_trade_gate':{'version':'FINAL_TRADE_READY_GUARD_V1_HTF_FAIL_CLOSED','status':'TRADE_READY','trade_ready':True,'direction':direction,'product_direction':direction,'primary_blocker':None},
-            'trade_plan':{'version':'PRODUCTION_TRADE_PLAN_V4_CORE_4_12H','can_execute':True,'direction':direction,'entry':entry,
+            'trade_plan':{'version':'PRODUCTION_TRADE_PLAN_V10_MIN_1_5ATR_INVALIDATION','geometry_version':'ATLAS_GEOMETRY_V6_MIN_1_5_ATR_INVALIDATION','can_execute':True,'direction':direction,'entry':entry,
                           'stop_loss':stop,'tp1':tp1,'tp2':tp2,'rr_tp2':2.0,'product_horizon':'4-12H','canonical_lane':'CORE_4_12H'}}
 
 
@@ -279,3 +279,13 @@ if __name__=='__main__':
     tests=[globals()[n] for n in sorted(globals()) if n.startswith('test_') and callable(globals()[n])]
     for fn in tests: fn()
     print(f'paper portfolio tests: {len(tests)} ok')
+
+
+def test_geometry_version_is_frozen_at_enrollment_for_prospective_cohorting():
+    m=manifest(); t0=dt.datetime.fromisoformat(m['cohort_start_at'])
+    cohort=[]
+    added,_=p.enroll_new(m,cohort,[(t0,{'decisions':{'BTCUSDT':ready()}})],t0-dt.timedelta(microseconds=1),10000.0)
+    assert len(added)==1
+    assert added[0]['geometry']['geometry_version']=='ATLAS_GEOMETRY_V6_MIN_1_5_ATR_INVALIDATION'
+    assert added[0]['decision_provenance']['geometry_version']=='ATLAS_GEOMETRY_V6_MIN_1_5_ATR_INVALIDATION'
+    assert added[0]['decision_provenance']['trade_plan_version']=='PRODUCTION_TRADE_PLAN_V10_MIN_1_5ATR_INVALIDATION'
