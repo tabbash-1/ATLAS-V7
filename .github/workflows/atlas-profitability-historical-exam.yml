@@ -1,0 +1,20 @@
+name: ATLAS Profitability Historical Exam
+on:
+  pull_request:
+    paths: ['profitability_pipeline_historical_exam.py','tests/test_profitability_pipeline_historical_exam.py','.github/workflows/atlas-profitability-historical-exam.yml']
+  push:
+    branches: [main]
+    paths: ['profitability_pipeline_historical_exam.py','.github/workflows/atlas-profitability-historical-exam.yml']
+  workflow_dispatch:
+jobs:
+  exam:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: PYTHONPATH=. pytest -q tests/test_profitability_pipeline_historical_exam.py tests/test_profitability_ev_plan_replay.py tests/test_profitability_market_radar.py
+      - name: Run frozen 180-day exam
+        run: python profitability_pipeline_historical_exam.py --days 180 --end-ms 1790485200000 | tee /tmp/exam.log
+      - run: grep -q 'ATLAS_PROFITABILITY_EXAM=' /tmp/exam.log
