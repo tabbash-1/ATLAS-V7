@@ -52,6 +52,32 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
+      - name: Wait for stable Production runtime
+        shell: bash
+        env:
+          BASE_URL: https://atlas-v7.onrender.com
+        run: |
+          set -euo pipefail
+          streak=0
+          for attempt in $(seq 1 20); do
+            code=$(curl -L --connect-timeout 15 --max-time 60 -sS -w '%{http_code}' -o /tmp/stable-web.json "$BASE_URL/api/web-mode?t=$(date +%s%N)" || true)
+            if [[ "$code" =~ ^2 ]] && jq -e '
+              .ok == true and
+              .product_quality_gate.version == "PRODUCT_QUALITY_GATE_V2_CANONICAL_ANALYST_OUTPUT" and
+              .canonical_geometry.version == "ATLAS_CANONICAL_GEOMETRY_TRUTH_V2_SCORE_INDEPENDENT" and
+              .product_quality_gate.analysis_only == true and
+              .product_quality_gate.live_execution == false
+            ' /tmp/stable-web.json >/dev/null 2>&1; then
+              streak=$((streak + 1))
+              echo "Production runtime healthy streak=$streak/5"
+              if [ "$streak" -eq 5 ]; then break; fi
+            else
+              echo "Production runtime settling attempt=$attempt http=$code; resetting health streak"
+              streak=0
+            fi
+            sleep 15
+          done
+          test "$streak" -eq 5
       - name: Collect Production state safely
         shell: bash
         env:
