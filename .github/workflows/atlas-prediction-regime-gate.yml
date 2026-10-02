@@ -1,0 +1,16 @@
+name: ATLAS Prediction Regime Gate Exam
+on:
+  pull_request:
+    paths: ['profitability_prediction_regime_gate.py','profitability_prediction_regime_eval.py','tests/test_profitability_prediction_regime_gate.py','.github/workflows/atlas-prediction-regime-gate.yml']
+  workflow_dispatch:
+jobs:
+  exam:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: python -m py_compile profitability_prediction_regime_gate.py profitability_prediction_regime_eval.py
+      - run: PYTHONPATH=. python -c "import tests.test_profitability_prediction_regime_gate as t; t.test_gate(); print('REGIME_RULE_FROZEN_OK')"
+      - run: python profitability_prediction_regime_eval.py
