@@ -208,7 +208,11 @@ def summarize(records):
         for h in (4,8,12):
             vals=[r["horizons"][f"{h}h"]["directional_return_pct"] for r in rs if f"{h}h" in r.get("horizons",{})]
             by[k][f"mean_{h}h_directional_return_pct"]=round(sum(vals)/len(vals),4) if vals else None
-    return {"records":len(records),"matured_classified":len(matured),"missed_n":sum(bool(r.get("missed_opportunity")) for r in matured),"missed_rate_pct":round(100*sum(bool(r.get("missed_opportunity")) for r in matured)/len(matured),2) if matured else None,"by_blocker_family":dict(sorted(by.items()))}
+    tradeable=[r for r in matured if r.get("executability_classification")=="MISSED_TRADEABLE_OPPORTUNITY"]
+    no_chase=[r for r in matured if r.get("executability_classification")=="CORRECT_NO_CHASE"]
+    good_wait=[r for r in matured if r.get("executability_classification")=="GOOD_WAIT"]
+    descriptive_missed=sum(bool(r.get("missed_opportunity")) for r in matured)
+    return {"records":len(records),"matured_classified":len(matured),"tradeable_missed_n":len(tradeable),"tradeable_missed_rate_pct":round(100*len(tradeable)/len(matured),2) if matured else None,"correct_no_chase_n":len(no_chase),"good_wait_n":len(good_wait),"descriptive_mfe_missed_n":descriptive_missed,"descriptive_mfe_missed_rate_pct":round(100*descriptive_missed/len(matured),2) if matured else None,"legacy_missed_metric_deprecated":True,"missed_n":descriptive_missed,"missed_rate_pct":round(100*descriptive_missed/len(matured),2) if matured else None,"by_blocker_family":dict(sorted(by.items()))}
 
 
 def cohort_summary(records):
