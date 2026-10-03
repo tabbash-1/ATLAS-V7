@@ -12,11 +12,11 @@ The only canonical product decision is:
 - `SHORT`
 - `WAIT`
 
-When a LONG or SHORT analysis is ready, ATLAS provides Entry, Stop Loss, Take Profit, R:R, reasons, invalidation, and status-change conditions. When the setup or geometry is insufficient, the canonical result remains WAIT.
+When a LONG or SHORT analysis is certified by the Final Trade Gate, ATLAS provides Entry, Stop Loss, Take Profit, R:R, reasons, invalidation, and status-change conditions. `analyst_output` may provide a pre-final analysis view, but it is not the canonical decision authority. When the final setup or geometry is insufficient, the canonical result remains WAIT.
 
 ## Non-negotiable safety contract
 
-- Canonical contract: `analyst_output`
+- Canonical decision source of truth: `FINAL_TRADE_GATE` (`ATLAS_CANONICAL_DECISION_TRUTH_V1`)
 - Canonical lane: `CORE_4_12H`
 - `analysis_only = true`
 - `live_execution = false`
@@ -52,7 +52,7 @@ The `ATLAS V1.0 Release Gate` verifies:
 1. committed technical readiness
 2. live Render canonical runtime
 3. all eight supported analyzers
-4. analyst_output / CORE_4_12H contract
+4. FINAL_TRADE_GATE / CORE_4_12H canonical decision contract
 5. LONG / SHORT / WAIT-only canonical semantics
 6. analysis-only and no-live-execution invariants
 7. unchanged Production threshold semantics
