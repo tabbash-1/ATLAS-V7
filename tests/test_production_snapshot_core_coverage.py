@@ -18,3 +18,10 @@ def test_production_snapshot_retries_and_requires_complete_core_coverage():
     # The contract step must reject an incomplete canonical-asset cycle instead of
     # committing a successful-looking snapshot containing an HTTP/JSON failure.
     assert '.canonical_coverage.canonical_snapshot_complete == true' in workflow
+
+
+def test_production_snapshot_cadence_does_not_cancel_entry_windows():
+    workflow = Path('.github/workflows/atlas-production-snapshot.yml').read_text(encoding='utf-8')
+    assert "cron: '7,27,47 * * * *'" in workflow
+    assert 'group: atlas-production-snapshot' in workflow
+    assert 'cancel-in-progress: false' in workflow
