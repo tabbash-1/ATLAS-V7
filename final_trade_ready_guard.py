@@ -199,9 +199,16 @@ def assess(row):
     blockers = []
     if product == "SHORT" and not _short_production_enabled(): blockers.append("SHORT_EDGE_NOT_PROVEN_PRODUCTION_QUARANTINE")
     if not qualified: blockers.append("PRODUCTION_SIGNAL_NOT_QUALIFIED")
-    if product not in {"LONG", "SHORT"}: blockers.append("HTF_PRODUCT_DIRECTION_UNRESOLVED")
-    if not alignment_accepted: blockers.append("HTF_4H_12H_NOT_ALIGNED")
-    if product in {"LONG", "SHORT"} and entry != product: blockers.append("ENTRY_CONFIRMATION_NOT_ALIGNED")
+    if product not in {"LONG", "SHORT"}:
+        blockers.append("HTF_PRODUCT_DIRECTION_UNRESOLVED")
+        blockers.append("HTF_4H_12H_NOT_ALIGNED")
+    elif entry != product:
+        # 4H/12H may already agree on the product direction while the separate
+        # entry confirmation still opposes it. Do not mislabel that state as an
+        # HTF disagreement; the decision remains WAIT under the precise cause.
+        blockers.append("ENTRY_CONFIRMATION_NOT_ALIGNED")
+    elif not alignment_accepted:
+        blockers.append("DIRECTION_ALIGNMENT_NOT_ACCEPTED")
     if action in {"LONG", "SHORT"}:
         if product in {"LONG", "SHORT"} and action != product: blockers.append("ACTION_NOT_HTF_DIRECTION")
     if not geometry_ready: blockers.append(geometry_reason or "CANONICAL_GEOMETRY_NOT_READY")
