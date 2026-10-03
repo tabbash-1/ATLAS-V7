@@ -64,8 +64,8 @@ def metrics(records):
     })
     return out
 
-def run(symbol,days,end_ms=None,step=4):
-    rows=fetch_1h(symbol,days,end_ms)
+def run(symbol,days,end_ms=None,step=4,rows=None):
+    rows=rows if rows is not None else fetch_1h(symbol,days,end_ms)
     warm=60*12
     engines={"legacy_1h":legacy_1h,"htf_consensus":htf_consensus}
     rec={name:{h:[] for h in HORIZONS} for name in engines}
@@ -84,7 +84,8 @@ def main():
     merged={e:{h:[] for h in HORIZONS} for e in ("legacy_1h","htf_consensus")}
     by_symbol={}
     for s in a.symbols:
-        r=run(s,a.days,a.end_ms,a.step);by_symbol[s]={}
+        rows=fetch_1h(s,a.days,a.end_ms)
+        r=run(s,a.days,a.end_ms,a.step,rows=rows);by_symbol[s]={}
         for e in merged:
             by_symbol[s][e]={}
             for h in HORIZONS:
