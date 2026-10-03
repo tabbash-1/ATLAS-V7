@@ -1,0 +1,39 @@
+name: ATLAS On-Demand Analysis Benchmark
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 3 * * 1'
+permissions:
+  contents: write
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: research/on-demand-analysis-benchmark-v1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Regression tests
+        run: python -m pytest -q tests/test_on_demand_analysis_benchmark.py
+      - name: Run frozen point-in-time benchmark
+        run: |
+          python research/on_demand_analysis_benchmark.py --days 180 > /tmp/bench.txt
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          line=next(x for x in Path('/tmp/bench.txt').read_text().splitlines() if x.startswith('ATLAS_ON_DEMAND_BENCHMARK='))
+          data=json.loads(line.split('=',1)[1])
+          Path('status/on-demand-analysis-benchmark-latest.json').write_text(json.dumps(data,indent=2,sort_keys=True)+'\n')
+          PY
+      - name: Contract check
+        run: |
+          jq -e '.schema=="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V1" and .research_only==true and .production_effect=="NONE" and .can_override_production==false and (.horizons_h==[4,8,12])' status/on-demand-analysis-benchmark-latest.json
+      - name: Commit evidence
+        run: |
+          git config user.name "atlas-research-bot"
+          git config user.email "atlas-research-bot@users.noreply.github.com"
+          git add status/on-demand-analysis-benchmark-latest.json
+          git diff --cached --quiet || git commit -m "research: refresh on-demand analysis benchmark"
+          git push origin HEAD:research/on-demand-analysis-benchmark-v1
