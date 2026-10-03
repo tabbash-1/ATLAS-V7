@@ -6,12 +6,12 @@
   "product_horizon": "4-12H",
   "product_lane": "CORE_4_12H",
   "entry_confirmation_horizon": "1H",
-  "generated_at": "2026-10-03T00:02:11.330403+00:00",
-  "entry": 88.796,
+  "generated_at": "2026-10-03T01:31:43.534958+00:00",
+  "entry": 89.394,
   "direction": "LONG",
-  "verdict": "WAIT",
-  "confidence": 51,
-  "reason": "CONFLICTING_EVIDENCE",
+  "verdict": "REJECT",
+  "confidence": 65,
+  "reason": "RISK_GEOMETRY_FAIL",
   "canonical_action": {
     "status": "WAIT",
     "action": "WAIT",
@@ -20,22 +20,24 @@
     "product_horizon": "4-12H"
   },
   "bull_analyst": {
-    "score": 0.027,
+    "score": 0.328,
     "best_case": [
-      "Price/EMA20/EMA50 structure 88.796/88.6206/88.6904",
-      "24h momentum 0.67%",
-      "RV 1.12x"
+      "Price/EMA20/EMA50 structure 89.394/88.746/88.7427",
+      "LONG 3 vs SHORT 1",
+      "24h momentum 1.25%"
     ]
   },
   "bear_analyst": {
-    "score": -0.027,
+    "score": -0.328,
     "best_case": [
-      "RSI14 36.8"
+      "RSI14 40.9",
+      "RV 0.84x",
+      "1H tactical RR 0.52 (entry context only)"
     ]
   },
   "judge": {
-    "net_strength": 0.027,
-    "tactical_rr": null,
+    "net_strength": 0.328,
+    "tactical_rr": 0.523,
     "canonical_trade_plan": {
       "status": "WAIT",
       "direction": null,
@@ -96,10 +98,10 @@
     {
       "scenario": "ENTER_NOW",
       "direction": "LONG",
-      "entry": 88.796,
-      "stop_loss": 88.0214321429,
-      "target": 90.2259714286,
-      "risk_reward": 1.846,
+      "entry": 89.394,
+      "stop_loss": 88.5643678571,
+      "target": 89.8275,
+      "risk_reward": 0.523,
       "trigger": "1H confirmation while 4-12H thesis remains valid",
       "thesis": "Shadow entry-timing comparison only.",
       "shadow_only": true,
@@ -109,10 +111,10 @@
     {
       "scenario": "WAIT_PULLBACK",
       "direction": "LONG",
-      "entry": 88.378925,
-      "stop_loss": 87.4851928571,
-      "target": 90.1663892857,
-      "risk_reward": 2.0,
+      "entry": 88.947275,
+      "stop_loss": 87.9900071429,
+      "target": 89.8275,
+      "risk_reward": 0.92,
       "trigger": "Price retraces ~0.35 ATR without 4H structure failure",
       "thesis": "Requalify entry timing; do not replace 4-12H thesis.",
       "shadow_only": true,
@@ -136,10 +138,10 @@
   "best_counterfactual": {
     "scenario": "WAIT_PULLBACK",
     "direction": "LONG",
-    "entry": 88.378925,
-    "stop_loss": 87.4851928571,
-    "target": 90.1663892857,
-    "risk_reward": 2.0,
+    "entry": 88.947275,
+    "stop_loss": 87.9900071429,
+    "target": 89.8275,
+    "risk_reward": 0.92,
     "trigger": "Price retraces ~0.35 ATR without 4H structure failure",
     "thesis": "Requalify entry timing; do not replace 4-12H thesis.",
     "shadow_only": true,
@@ -147,51 +149,58 @@
     "research_horizon": "1-3H_CONTEXT_ONLY"
   },
   "hybrid_judge": {
-    "decision": "WAIT",
+    "decision": "REJECT",
     "production_direction": null,
     "production_score": null,
     "production_qualified": false,
     "execution_ready": false,
     "ai_direction": "LONG",
-    "ai_verdict": "WAIT",
+    "ai_verdict": "REJECT",
     "agreement": false,
     "production_priority": false
   },
   "evidence": [
     {
       "name": "direction_votes",
-      "value": 0.0,
+      "value": 0.5,
       "weight": 2.1,
-      "detail": "LONG 2 vs SHORT 2",
+      "detail": "LONG 3 vs SHORT 1",
       "source": "production_decision"
     },
     {
       "name": "ema_structure",
-      "value": 0.175,
+      "value": 0.879,
       "weight": 1.2,
-      "detail": "Price/EMA20/EMA50 structure 88.796/88.6206/88.6904",
+      "detail": "Price/EMA20/EMA50 structure 89.394/88.746/88.7427",
       "source": "production_decision"
     },
     {
       "name": "rsi",
-      "value": -0.529,
+      "value": -0.362,
       "weight": 0.7,
-      "detail": "RSI14 36.8",
+      "detail": "RSI14 40.9",
       "source": "production_decision"
     },
     {
       "name": "momentum",
-      "value": 0.225,
+      "value": 0.417,
       "weight": 0.9,
-      "detail": "24h momentum 0.67%",
+      "detail": "24h momentum 1.25%",
       "source": "production_decision"
     },
     {
       "name": "relative_volume",
-      "value": 0.147,
+      "value": -0.187,
       "weight": 0.75,
-      "detail": "RV 1.12x",
+      "detail": "RV 0.84x",
       "source": "production_decision"
+    },
+    {
+      "name": "tactical_geometry",
+      "value": -0.185,
+      "weight": 0.45,
+      "detail": "1H tactical RR 0.52 (entry context only)",
+      "source": "entry_confirmation_context"
     }
   ],
   "production_decision": "WAIT",
