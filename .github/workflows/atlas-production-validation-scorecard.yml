@@ -8,14 +8,21 @@ on:
     branches: [main]
     paths:
       - 'production_validation_scorecard.py'
+      - 'atlas_product_readiness_gate.py'
       - 'tests/test_production_validation_scorecard.py'
+      - 'tests/test_atlas_product_readiness_gate.py'
+      - 'tests/test_product_readiness_workflow_chain.py'
       - '.github/workflows/atlas-production-validation-scorecard.yml'
   push:
     branches: [main]
     paths:
       - 'production_validation_scorecard.py'
+      - 'atlas_product_readiness_gate.py'
       - 'tests/test_production_validation_scorecard.py'
+      - 'tests/test_atlas_product_readiness_gate.py'
+      - 'tests/test_product_readiness_workflow_chain.py'
       - 'status/canonical-outcomes-latest.json'
+      - 'status/quick-trade-outcomes.json'
       - '.github/workflows/atlas-production-validation-scorecard.yml'
   schedule:
     - cron: '12 * * * *'
@@ -50,17 +57,21 @@ jobs:
           python-version: '3.12'
       - name: Regression
         run: |
-          python -m py_compile production_validation_scorecard.py
+          python -m py_compile production_validation_scorecard.py atlas_product_readiness_gate.py
           PYTHONPATH=. python - <<'PY'
           import tests.test_production_validation_scorecard as t
           import tests.test_evidence_pipeline_event_chain as e
-          for module in (t,e):
+          import tests.test_atlas_product_readiness_gate as r
+          import tests.test_product_readiness_workflow_chain as w
+          for module in (t,e,r,w):
               for name in sorted(x for x in dir(module) if x.startswith('test_')):
                   getattr(module,name)()
                   print('PASS', module.__name__, name)
           PY
       - name: Build post-V2 scorecard
         run: python production_validation_scorecard.py
+      - name: Build current product readiness
+        run: python atlas_product_readiness_gate.py
       - name: Verify isolation and truth contract
         run: |
           python - <<'PY'
@@ -83,13 +94,30 @@ jobs:
           assert p['safety']['production_threshold']==68
           assert p['safety']['can_override_production'] is False
           assert p['safety']['live_execution'] is False
+          r=json.loads(Path('status/product-readiness-latest.json').read_text())
+          assert r['schema']=='ATLAS_PRODUCT_READINESS_GATE_V2_FINAL_GATE_AUTHORITY'
+          assert r['technical_ready'] is True
+          assert r['canonical_contract']=='FINAL_TRADE_GATE'
+          assert r['decision_source_of_truth']=='FINAL_TRADE_GATE'
+          assert r['product_horizon']=='4-12H'
+          assert r['analysis_only'] is True and r['live_execution'] is False
+          assert r['production_score_threshold_changed'] is False
+          assert r['historical_post_v2_excluded_from_current_readiness'] is True
+          assert r['observed']['current_geometry_version']=='ATLAS_GEOMETRY_V6_MIN_1_5_ATR_INVALIDATION'
+          assert r['observed']['matured_12h_terminal']==p['current_geometry']['summary']['terminal']
+          assert r['observed']['cost_adjusted_terminal']==p['current_geometry']['cost_adjusted']['terminal_costed']
+          v6=[c for c in r['checks'] if c['name']=='CURRENT_GEOMETRY_V6_EVIDENCE']
+          assert len(v6)==1 and v6[0]['passed'] is True
           print('PRODUCTION_VALIDATION_OK', p['post_v2'])
+          print('PRODUCT_READINESS_OK', r['state'], r['observed'])
           PY
       - name: Upload scorecard artifact
         uses: actions/upload-artifact@v4
         with:
           name: atlas-production-validation-${{ github.run_id }}
-          path: status/production-validation-latest.json
+          path: |
+            status/production-validation-latest.json
+            status/product-readiness-latest.json
           retention-days: 30
       - name: Commit scorecard snapshot
         if: github.event_name != 'pull_request'
@@ -97,5 +125,6 @@ jobs:
           bash scripts/commit_status_with_retry.sh \
             'atlas-production-validation' \
             'atlas-validation@users.noreply.github.com' \
-            'validation: update post-V2 production scorecard [skip render]' \
-            'status/production-validation-latest.json'
+            'validation: update current V6 scorecard and product readiness [skip render]' \
+            'status/production-validation-latest.json' \
+            'status/product-readiness-latest.json'
