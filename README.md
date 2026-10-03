@@ -24,7 +24,7 @@ See `ATLAS_V1_RELEASE.md` for the release contract and `status/product-readiness
 
 ## Product contract
 
-The primary product lane is `CORE_4_12H` and the canonical contract is `analyst_output`.
+The primary product lane is `CORE_4_12H`. The canonical decision source of truth is `FINAL_TRADE_GATE` (`ATLAS_CANONICAL_DECISION_TRUTH_V1`). `analyst_output` remains a pre-final analysis view and cannot override the Final Trade Gate.
 
 Short 1–3H and extended 12–24H lanes may exist as research/context, but they are not allowed to override the canonical 4–12H Production decision.
 
@@ -72,7 +72,7 @@ ATLAS uses separate evidence layers so research cannot silently rewrite Producti
 4. Frozen attribution around each canonical observation
 5. Retrospective research and shadow diagnostics
 
-The paper portfolio is an **evaluation instrument**, not an auto-trading bot. It records canonical `analyst_output` LONG/SHORT transitions only and evaluates them prospectively using frozen Entry/SL/TP geometry.
+The official $10K paper portfolio is an **evaluation instrument**, not an auto-trading bot. It enrolls only canonical `FINAL_TRADE_GATE` `TRADE_READY` decisions that were execution-ready at capture, using frozen Entry/SL/TP geometry. Research/shadow `analyst_output` cohorts are kept separate and never count as official portfolio P&L.
 
 No profit, win rate, expectancy, or portfolio value should be treated as established unless it comes from a reproducible committed ledger/report with explicit methodology and sufficient independent forward evidence.
 
