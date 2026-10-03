@@ -1,15 +1,15 @@
 """ATLAS final fail-closed 4-12H TRADE READY guard.
 
-Installed after every Production decision overlay. By default it never promotes WAIT,
-changes scores/thresholds, or routes orders. It only certifies an already-actionable
-LONG/SHORT when HTF direction, entry confirmation, canonical geometry and raw
-Production qualification all agree. Breakout-family setups additionally require
-explicit canonical structure-break confirmation. Any contradiction is collapsed to
-WAIT across user-facing/nested plan fields so no stale actionable flag can escape.
+Installed after every Production decision overlay. It never changes scores/thresholds
+or routes orders. It certifies LONG/SHORT only when HTF direction, entry confirmation,
+canonical geometry, raw Production qualification and Trader Brain evidence all agree.
+Breakout-family setups additionally require explicit canonical structure-break
+confirmation. Any contradiction is collapsed to WAIT across user-facing/nested plan
+fields so no stale actionable flag can escape.
 
-An explicitly isolated evidence cohort may opt in to testing whether a stale legacy
-pre-final WAIT is redundant when every authoritative final condition already passes.
-That experiment is disabled by default and cannot change the Production threshold.
+Evidence-gated SHORT certification and removal of a stale pre-final WAIT veto are on by
+default. Both retain explicit kill switches, never lower the Production threshold, and
+cannot bypass any authoritative Final Gate blocker.
 """
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from atlas_trader_brain import assess as assess_trader
 from canonical_decision_contract import from_decision
 from golden_thesis_engine import VERSION as GOLDEN_THESIS_VERSION, build as build_golden_thesis
 
-VERSION = "FINAL_TRADE_READY_GUARD_V11_NET_RR_FAIL_CLOSED"
+VERSION = "FINAL_TRADE_READY_GUARD_V12_EVIDENCE_GATED_SHORTS"
 MIN_NET_RR = 2.0
 SHORT_PRODUCTION_ENV = "ATLAS_SHORT_PRODUCTION_ENABLED"
 PRODUCT_HORIZON = "4-12H"
@@ -31,12 +31,19 @@ def _norm(v):
 
 
 def _short_production_enabled():
-    """SHORT remains observable/researchable but cannot become TRADE_READY by default."""
-    return str(os.environ.get(SHORT_PRODUCTION_ENV, "")).strip().lower() in {"1", "true", "yes", "on"}
+    """Allow evidence-complete SHORT analysis unless an explicit kill switch disables it."""
+    raw = os.environ.get(SHORT_PRODUCTION_ENV)
+    if raw is None or not str(raw).strip():
+        return True
+    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _experimental_final_evidence_promotion():
-    return str(os.environ.get(EXPERIMENTAL_PROMOTION_ENV, "")).strip().lower() in {"1", "true", "yes", "on"}
+    """Remove only a stale pre-final WAIT veto after every Final Gate check passes."""
+    raw = os.environ.get(EXPERIMENTAL_PROMOTION_ENV)
+    if raw is None or not str(raw).strip():
+        return True
+    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _direction_state(row):
@@ -333,6 +340,14 @@ def apply(row):
     row["analysis_only"] = True
     row["live_execution"] = False
     if gate["trade_ready"]:
+        previous_action = row.get("actionable_decision")
+        if gate.get("stale_pre_final_wait_bypassed"):
+            row["pre_final_trade_gate_actionable_decision"] = previous_action
+        row["actionable_decision"] = gate["direction"]
+        row["actionable_reason"] = "FINAL_TRADE_GATE_APPROVED"
+        row["analysis_ready"] = True
+        row["setup_ready"] = True
+        row["can_execute"] = True
         row["canonical_product_decision"] = gate["direction"]
         analyst = row.get("analyst_output")
         if isinstance(analyst, dict):
@@ -354,10 +369,23 @@ def apply(row):
             row["analyst_output"] = analyst
         plan = row.get("trade_plan")
         if isinstance(plan, dict):
-            plan = dict(plan); plan["trade_ready"] = True
+            plan = dict(plan)
+            plan.update({
+                "status":"TRADE_READY", "action":gate["direction"],
+                "analysis_action":gate["direction"], "analysis_ready":True,
+                "can_execute":True, "trade_ready":True,
+                "final_trade_ready_reason":"FINAL_TRADE_GATE_APPROVED",
+            })
             core = plan.get("core_plan")
             if isinstance(core, dict):
-                core = dict(core); core["trade_ready"] = True; plan["core_plan"] = core
+                core = dict(core)
+                core.update({
+                    "status":"TRADE_READY", "action":gate["direction"],
+                    "analysis_action":gate["direction"], "analysis_ready":True,
+                    "can_execute":True, "trade_ready":True,
+                    "final_trade_ready_reason":"FINAL_TRADE_GATE_APPROVED",
+                })
+                plan["core_plan"] = core
             row["trade_plan"] = plan
         return _publish_truth(row)
 
@@ -413,7 +441,9 @@ def install(atlas):
         "breakout_structure_confirmation_required":True,
         "breakout_structure_confirmation_scope":"BREAKOUT_FAMILY_ONLY",
         "experimental_final_evidence_promotion_env":EXPERIMENTAL_PROMOTION_ENV,
-        "experimental_final_evidence_promotion_default":False,
+        "experimental_final_evidence_promotion_default":True,
+        "short_production_env":SHORT_PRODUCTION_ENV,
+        "short_production_default":"EVIDENCE_GATED",
         "score_is_authority":False,"trader_brain_authority":True,
         "legacy_pre_final_wait_veto_removed":True,
         "conditional_12h_neutral_alignment_supported":True,

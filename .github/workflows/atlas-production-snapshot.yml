@@ -31,9 +31,10 @@ on:
       - 'continuous-forward-ui.js'
       - 'forward-champion-ui.js'
       - 'opportunity-scanner-ui.js'
-  # Explicit 20-minute cadence. This workflow is the canonical Production monitor.
+  # Explicit 20-minute cadence, offset from the top of the hour to reduce
+  # GitHub schedule congestion. This workflow is the canonical Production monitor.
   schedule:
-    - cron: '*/20 * * * *'
+    - cron: '7,27,47 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -41,7 +42,9 @@ permissions:
 
 concurrency:
   group: atlas-production-snapshot
-  cancel-in-progress: true
+  # Never discard an in-flight canonical observation when the next scheduled
+  # tick arrives. Missing a completed run can hide a short-lived entry window.
+  cancel-in-progress: false
 
 jobs:
   snapshot:

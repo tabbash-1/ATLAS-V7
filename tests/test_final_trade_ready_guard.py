@@ -8,9 +8,9 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 import final_trade_ready_guard as guard
 import paper_portfolio_10k_final as paper_final
 
-# Most fixtures exercise downstream SHORT mechanics; opt them into the isolated
-# SHORT evidence cohort explicitly. A dedicated test below verifies Production
-# remains quarantined when the env flag is absent.
+# Most fixtures exercise downstream SHORT mechanics explicitly. Production now
+# defaults to the same evidence-gated path; the environment variable is retained
+# as an emergency kill switch.
 os.environ[guard.SHORT_PRODUCTION_ENV] = '1'
 
 
@@ -72,14 +72,29 @@ def long_row(entry_mode):
     return row
 
 
-def test_short_is_quarantined_by_default_without_explicit_env():
+def test_short_is_evidence_gated_by_default_without_explicit_env():
     old = os.environ.pop(guard.SHORT_PRODUCTION_ENV, None)
+    try:
+        r = guard.apply(base_row())
+        assert r['trade_ready'] is True
+        assert r['final_trade_gate']['direction'] == 'SHORT'
+        assert 'SHORT_EDGE_NOT_PROVEN_PRODUCTION_QUARANTINE' not in r['final_trade_gate']['blockers']
+    finally:
+        if old is not None:
+            os.environ[guard.SHORT_PRODUCTION_ENV] = old
+
+
+def test_short_emergency_kill_switch_still_fails_closed():
+    old = os.environ.get(guard.SHORT_PRODUCTION_ENV)
+    os.environ[guard.SHORT_PRODUCTION_ENV] = '0'
     try:
         r = guard.apply(base_row())
         assert r['trade_ready'] is False
         assert 'SHORT_EDGE_NOT_PROVEN_PRODUCTION_QUARANTINE' in r['final_trade_gate']['blockers']
     finally:
-        if old is not None:
+        if old is None:
+            os.environ.pop(guard.SHORT_PRODUCTION_ENV, None)
+        else:
             os.environ[guard.SHORT_PRODUCTION_ENV] = old
 
 
@@ -168,8 +183,9 @@ def test_short_pullback_missing_1h_evidence_fails_closed():
     assert 'TRADER_WAIT_SHORT_PULLBACK_RESUMPTION' in r['final_trade_gate']['blockers']
 
 
-def test_stale_pre_final_wait_fails_closed_without_explicit_experiment():
-    old=os.environ.pop(guard.EXPERIMENTAL_PROMOTION_ENV, None)
+def test_stale_pre_final_wait_fails_closed_when_kill_switch_disables_promotion():
+    old=os.environ.get(guard.EXPERIMENTAL_PROMOTION_ENV)
+    os.environ[guard.EXPERIMENTAL_PROMOTION_ENV]='0'
     try:
         r=guard.apply(base_row(actionable_decision='WAIT'))
         assert r['trade_ready'] is False
@@ -177,7 +193,70 @@ def test_stale_pre_final_wait_fails_closed_without_explicit_experiment():
         assert r['final_trade_gate']['legacy_pre_final_action_is_authority'] is False
         assert r['final_trade_gate']['score_is_authority'] is False
     finally:
+        if old is None: os.environ.pop(guard.EXPERIMENTAL_PROMOTION_ENV, None)
+        else: os.environ[guard.EXPERIMENTAL_PROMOTION_ENV]=old
+
+
+def test_evidence_complete_stale_wait_is_promoted_by_default():
+    old=os.environ.pop(guard.EXPERIMENTAL_PROMOTION_ENV, None)
+    try:
+        d=base_row(actionable_decision='WAIT')
+        d['analyst_output']=dict(d['analyst_output'])
+        d['analyst_output'].update({'decision':'WAIT','analysis_ready':False,'entry':None,'stop_loss':None,'take_profit':None,'tp1':None,'risk_reward':None})
+        r=guard.apply(d)
+        assert r['trade_ready'] is True
+        assert r['final_trade_gate']['direction'] == 'SHORT'
+        assert r['final_trade_gate']['stale_pre_final_wait_bypassed'] is True
+        assert r['final_trade_gate']['score_changed'] is False
+        assert r['final_trade_gate']['threshold_changed'] is False
+        assert r['actionable_decision'] == 'SHORT'
+        assert r['analysis_ready'] is True and r['can_execute'] is True
+        assert r['trade_plan']['status'] == 'TRADE_READY'
+        assert r['trade_plan']['action'] == 'SHORT'
+    finally:
         if old is not None: os.environ[guard.EXPERIMENTAL_PROMOTION_ENV]=old
+
+
+def test_night_correction_captures_only_evidence_complete_shorts():
+    """Regression for the 2026-10-03 correction: capture DOGE/ADA, not weak ZEC."""
+    old_short=os.environ.pop(guard.SHORT_PRODUCTION_ENV, None)
+    old_promotion=os.environ.pop(guard.EXPERIMENTAL_PROMOTION_ENV, None)
+    try:
+        doge=guard.apply(base_row(
+            symbol='DOGEUSDT', score=70,
+            playbook='TREND_PULLBACK_SHORT',
+            htf_thesis=_confirmed_short_pullback_thesis(),
+        ))
+        assert doge['trade_ready'] is True
+        assert doge['canonical_decision']['decision'] == 'SHORT'
+        assert doge['final_trade_gate']['threshold_changed'] is False
+
+        ada=base_row(
+            symbol='ADAUSDT', score=75, actionable_decision='WAIT',
+            playbook='TREND_PULLBACK_SHORT',
+            htf_thesis=_confirmed_short_pullback_thesis(),
+        )
+        ada['analyst_output']=dict(ada['analyst_output'])
+        ada['analyst_output'].update({'decision':'WAIT','analysis_ready':False,'entry':None,'stop_loss':None,'take_profit':None,'tp1':None,'risk_reward':None})
+        ada=guard.apply(ada)
+        assert ada['trade_ready'] is True
+        assert ada['canonical_decision']['decision'] == 'SHORT'
+        assert ada['final_trade_gate']['stale_pre_final_wait_bypassed'] is True
+        assert ada['actionable_decision'] == 'SHORT'
+        assert ada['trade_plan']['status'] == 'TRADE_READY'
+
+        zec=guard.apply(base_row(
+            symbol='ZECUSDT', score=79, actionable_decision='WAIT',
+            htf_core_geometry={'ready':False,'reason':'RR_BELOW_TWO_TO_ONE'},
+            playbook='TREND_PULLBACK_SHORT',
+            htf_thesis=_confirmed_short_pullback_thesis(),
+        ))
+        assert zec['trade_ready'] is False
+        assert zec['canonical_decision']['decision'] == 'WAIT'
+        assert 'RR_BELOW_TWO_TO_ONE' in zec['final_trade_gate']['blockers']
+    finally:
+        if old_short is not None: os.environ[guard.SHORT_PRODUCTION_ENV]=old_short
+        if old_promotion is not None: os.environ[guard.EXPERIMENTAL_PROMOTION_ENV]=old_promotion
 
 
 def test_isolated_evidence_can_bypass_only_stale_pre_final_wait_and_restore_geometry():
