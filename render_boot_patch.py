@@ -2,6 +2,9 @@
 """Render boot patch for ATLAS web mode."""
 from pathlib import Path
 import re
+import json
+import subprocess
+import sys
 
 BASE = Path(__file__).resolve().parent
 APP = BASE / "app.js"
@@ -135,7 +138,36 @@ def patch_product_quality_gate_htf_install():
     print("ATLAS Render boot patch: 4H/12H structural authority + 1D macro + 1H confirmation + scenarios + neutral/SR Decision V2 enabled", flush=True)
 
 
+def ensure_on_demand_benchmark_snapshot():
+    """Best-effort research evidence bootstrap; never blocks Production boot."""
+    out = BASE / "status" / "on-demand-analysis-benchmark-latest.json"
+    if out.exists():
+        return
+    script = BASE / "research" / "on_demand_analysis_benchmark.py"
+    if not script.exists():
+        print("ATLAS research benchmark bootstrap: script missing; Production unaffected", flush=True)
+        return
+    try:
+        # Keep boot bounded. A failure or upstream outage must never affect Production.
+        cp = subprocess.run(
+            [sys.executable, str(script), "--days", "180"],
+            cwd=str(BASE), capture_output=True, text=True, timeout=75, check=False,
+        )
+        line = next((x for x in cp.stdout.splitlines() if x.startswith("ATLAS_ON_DEMAND_BENCHMARK=")), None)
+        if cp.returncode != 0 or not line:
+            print("ATLAS research benchmark bootstrap: unavailable; Production unaffected", flush=True)
+            return
+        data = json.loads(line.split("=", 1)[1])
+        if not (data.get("research_only") is True and data.get("production_effect") == "NONE" and data.get("can_override_production") is False):
+            raise RuntimeError("research benchmark contract rejected")
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        print("ATLAS research benchmark bootstrap: evidence snapshot ready", flush=True)
+    except Exception as exc:
+        print(f"ATLAS research benchmark bootstrap: {type(exc).__name__}; Production unaffected", flush=True)
+
+
 def apply():
-    patch_hype_chart();patch_production_ui();patch_legacy_command_mirrors();patch_execution_semantics_install();patch_product_quality_gate_htf_install()
+    ensure_on_demand_benchmark_snapshot();patch_hype_chart();patch_production_ui();patch_legacy_command_mirrors();patch_execution_semantics_install();patch_product_quality_gate_htf_install()
 
 if __name__ == "__main__": apply()
