@@ -96,6 +96,21 @@ class FinalWebOnlyHandler(ns["WebOnlyHandler"]):
     """Web-only handler with explicit final-decision, outcome and whale contracts."""
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
+        if parsed.path == "/api/research/on-demand-analysis-benchmark":
+            try:
+                import json
+                p = BASE / "status" / "on-demand-analysis-benchmark-latest.json"
+                if not p.exists():
+                    return self._json({"ok":False,"state":"COLLECTING","research_only":True,"production_effect":"NONE","can_override_production":False}, 404)
+                data=json.loads(p.read_text())
+                data["ok"]=True
+                data["served_from"]="COMMITTED_RESEARCH_SNAPSHOT"
+                data["research_only"]=True
+                data["production_effect"]="NONE"
+                data["can_override_production"]=False
+                return self._json(data)
+            except Exception as exc:
+                return self._json({"ok":False,"error":str(exc),"research_only":True,"production_effect":"NONE","can_override_production":False}, 503)
         if parsed.path == "/api/research/profitability-shadow":
             try:
                 return self._json(_profitability_shadow_snapshot())
