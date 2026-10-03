@@ -123,6 +123,16 @@ def test_snapshot_guard_is_the_only_acceptance_surface():
     assert 'invalidate:invalidateSnapshot' in src
 
 
+def test_production_autoload_retries_transient_api_failure_without_changing_authority():
+    src = text('production-web-autoload.js')
+    assert 'const RETRY_DELAYS=[1500,4000,8000,15000]' in src
+    assert 'async function verifyWithRetry' in src
+    assert 'setTimeout(()=>verifyWithRetry(attempt+1,token)' in src
+    assert 'Production waking up — automatic retry' in src
+    assert "sourceOfTruth:'FINAL_TRADE_GATE'" in src
+    assert 'analysisOnly:true' in src
+
+
 if __name__ == '__main__':
     test_product_shell_does_not_fetch_or_publish_production_decision()
     test_product_shell_binds_geometry_to_canonical_final_gate_snapshot()
@@ -134,4 +144,5 @@ if __name__ == '__main__':
     test_paper_ui_consumes_only_canonical_outcome_summary()
     test_production_decision_rejects_stale_responses()
     test_snapshot_guard_is_the_only_acceptance_surface()
+    test_production_autoload_retries_transient_api_failure_without_changing_authority()
     print('production single snapshot authority tests: ok')
