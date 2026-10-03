@@ -24,7 +24,7 @@ def patch_hype_chart():
 def patch_production_ui():
     if not INDEX.exists(): return
     html = INDEX.read_text(encoding="utf-8")
-    names=("atlas-production-decision.js","atlas-product-shell.js","production-web-autoload.js","atlas-deep-analysis-ui.js","atlas-unified-terminal.js","atlas-unified-terminal-polish.js","atlas-research-validation-ui.js","atlas-paper-portfolio-ui.js")
+    names=("atlas-production-decision.js","atlas-product-shell.js","production-web-autoload.js","atlas-deep-analysis-ui.js","atlas-unified-terminal.js","atlas-unified-terminal-polish.js","atlas-research-validation-ui.js","atlas-paper-portfolio-ui.js","atlas-on-demand-evidence-ui.js")
     for name in names:
         html = re.sub(rf'<script[^>]+src=["\']{re.escape(name)}(?:\?[^"\']*)?["\'][^>]*></script>', '', html)
     scripts = "\n".join([
@@ -36,6 +36,7 @@ def patch_production_ui():
         '  <script src="atlas-unified-terminal-polish.js?v=unified-terminal-polish-v4-wait-cause"></script>',
         '  <script src="atlas-paper-portfolio-ui.js?v=paper-portfolio-v5-endpoint-fix"></script>',
         '  <script src="atlas-research-validation-ui.js?v=research-shadow-v3-target-status"></script>',
+        '  <script src="atlas-on-demand-evidence-ui.js?v=on-demand-evidence-v1"></script>',
     ])
     injection="\n"+scripts+"\n"
     html=html.replace("</body>",injection+"</body>",1) if "</body>" in html else html+injection
