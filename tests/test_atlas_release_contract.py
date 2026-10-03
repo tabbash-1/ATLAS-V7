@@ -13,7 +13,7 @@ def _write(tmp_path, payload):
 def test_technically_ready_can_ship_with_evidence_pending(tmp_path):
     _write(tmp_path, {
         'technical_ready': True,
-        'canonical_contract': 'analyst_output',
+        'canonical_contract': 'FINAL_TRADE_GATE',
         'product_horizon': '4-12H',
         'analysis_only': True,
         'live_execution': False,
@@ -38,7 +38,7 @@ def test_technically_ready_can_ship_with_evidence_pending(tmp_path):
 def test_release_fails_closed_if_technical_contract_breaks(tmp_path):
     _write(tmp_path, {
         'technical_ready': True,
-        'canonical_contract': 'trade_plan',
+        'canonical_contract': 'analyst_output',
         'product_horizon': '4-12H',
         'analysis_only': True,
         'live_execution': False,
