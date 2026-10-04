@@ -1,0 +1,70 @@
+name: ATLAS Raw Market Radar Shadow
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/atlas-raw-market-radar-shadow.yml"
+      - "profitability_raw_market_radar.py"
+      - "profitability_raw_market_radar_snapshot.py"
+      - "tests/test_profitability_raw_market_radar.py"
+  workflow_dispatch:
+  schedule:
+    - cron: '7 * * * *'
+permissions:
+  contents: read
+concurrency:
+  group: atlas-raw-market-radar-shadow
+  cancel-in-progress: false
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Run research-only radar tests
+        run: |
+          PYTHONPATH=. python tests/test_profitability_raw_market_radar.py
+          PYTHONPATH=. python - <<'PY'
+          import tests.test_profitability_market_radar as suite
+          tests = [getattr(suite, name) for name in dir(suite) if name.startswith("test_")]
+          if not tests:
+              raise SystemExit("no market radar tests discovered")
+          for test in tests:
+              test()
+          print(f"existing market radar tests: {len(tests)} passed")
+          PY
+
+  scan:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: test
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Run research-only radar tests
+        run: |
+          PYTHONPATH=. python tests/test_profitability_raw_market_radar.py
+          PYTHONPATH=. python - <<'PY'
+          import tests.test_profitability_market_radar as suite
+          tests = [getattr(suite, name) for name in dir(suite) if name.startswith("test_")]
+          if not tests:
+              raise SystemExit("no market radar tests discovered")
+          for test in tests:
+              test()
+          print(f"existing market radar tests: {len(tests)} passed")
+          PY
+      - run: python profitability_raw_market_radar_snapshot.py
+      - name: Commit research snapshot
+        run: |
+          git config user.name atlas-raw-market-radar
+          git config user.email atlas-raw-market-radar@users.noreply.github.com
+          git add status/profitability-raw-market-radar-latest.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "research: refresh independent raw market radar [skip render]"
+          git pull --rebase origin main
+          git push
