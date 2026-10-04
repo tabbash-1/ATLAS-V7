@@ -85,7 +85,7 @@ def test_hype_futures_fetch_paginates_when_api_caps_page_size():
     ):
         result = snapshot.fetch_hype_futures_1h(15, 799 * snapshot.HOUR_MS)
     assert len(result) == 660
-    assert result[0]["t"] == 139 * snapshot.HOUR_MS
+    assert result[0]["t"] == 140 * snapshot.HOUR_MS
     assert result[-1]["t"] == 799 * snapshot.HOUR_MS
     assert len(calls) == 3
 
