@@ -1,15 +1,34 @@
 name: ATLAS Raw Market Radar Shadow
 on:
+  pull_request:
+    paths:
+      - ".github/workflows/atlas-raw-market-radar-shadow.yml"
+      - "profitability_raw_market_radar.py"
+      - "profitability_raw_market_radar_snapshot.py"
+      - "tests/test_profitability_raw_market_radar.py"
   workflow_dispatch:
   schedule:
     - cron: '7 * * * *'
 permissions:
-  contents: write
+  contents: read
 concurrency:
   group: atlas-raw-market-radar-shadow
   cancel-in-progress: false
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: PYTHONPATH=. pytest -q tests/test_profitability_raw_market_radar.py tests/test_profitability_market_radar.py
+
   scan:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: test
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
