@@ -88,8 +88,12 @@ def fetch_universe(now_ms):
     for symbol in SYMBOLS:
         try:
             if symbol == "HYPEUSDT":
-                rows = fetch_hype_futures_1h(15, candle_end_ms)
-                data_sources[symbol] = "binance_usdm_perpetual"
+                try:
+                    rows = fetch_hype_hyperliquid_1h(15, candle_end_ms)
+                    data_sources[symbol] = "hyperliquid_perpetual"
+                except Exception:
+                    rows = fetch_hype_futures_1h(15, candle_end_ms)
+                    data_sources[symbol] = "binance_usdm_perpetual_fallback"
             else:
                 rows = fetch_1h(symbol, 15, candle_end_ms)
                 data_sources[symbol] = "binance_spot"
