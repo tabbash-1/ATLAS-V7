@@ -17,6 +17,7 @@ HOUR_MS = 60 * 60 * 1000
 MIN_1H_CANDLES = 55 * 12
 SNAPSHOT_PATH = Path("status/profitability-raw-market-radar-latest.json")
 BINANCE_USDM_KLINES_URL = "https://fapi.binance.com/fapi/v1/klines"
+HYPERLIQUID_INFO_URL = "https://api.hyperliquid.xyz/info"
 
 
 def last_closed_candle_open_ms(now_ms):
@@ -58,6 +59,19 @@ def fetch_hype_futures_1h(days, end_ms):
     return [rows_by_time[t] for t in sorted(rows_by_time)][-need:]
 
 
+def fetch_hype_hyperliquid_1h(days, end_ms):
+    """Fetch HYPE 1h perpetual candles from Hyperliquid candleSnapshot."""
+    need = days * 24 + 300
+    start_ms = int(end_ms) - (need + 24) * HOUR_MS
+    body = json.dumps({"type": "candleSnapshot", "req": {"coin": "HYPE", "interval": "1h", "startTime": start_ms, "endTime": int(end_ms) + HOUR_MS - 1}}).encode("utf-8")
+    request = urllib.request.Request(HYPERLIQUID_INFO_URL, data=body, headers={"Content-Type": "application/json"}, method="POST")
+    with urllib.request.urlopen(request, timeout=30) as response:
+        payload = json.load(response)
+    rows = [{"t": int(row["t"]), "o": float(row["o"]), "h": float(row["h"]), "l": float(row["l"]), "c": float(row["c"]), "v": float(row["v"])} for row in payload if int(row["t"]) <= int(end_ms)]
+    rows.sort(key=lambda row: row["t"])
+    return rows[-need:]
+
+
 def fetch_universe(now_ms):
     """Fetch every required asset; fail closed rather than publish partial data."""
     candle_end_ms = last_closed_candle_open_ms(now_ms)
@@ -67,8 +81,12 @@ def fetch_universe(now_ms):
     for symbol in SYMBOLS:
         try:
             if symbol == "HYPEUSDT":
-                rows = fetch_hype_futures_1h(15, candle_end_ms)
-                data_sources[symbol] = "binance_usdm_perpetual"
+                try:
+                    rows = fetch_hype_hyperliquid_1h(15, candle_end_ms)
+                    data_sources[symbol] = "hyperliquid_perpetual"
+                except Exception:
+                    rows = fetch_hype_futures_1h(15, candle_end_ms)
+                    data_sources[symbol] = "binance_usdm_perpetual_fallback"
             else:
                 rows = fetch_1h(symbol, 15, candle_end_ms)
                 data_sources[symbol] = "binance_spot"
