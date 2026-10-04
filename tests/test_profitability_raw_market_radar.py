@@ -42,23 +42,27 @@ def test_scanner_uses_closed_hour_and_marks_hype_futures_source():
     def spot_fetch(symbol, days, end_ms):
         calls.append(("spot", symbol, days, end_ms))
         return candles()
+    def hyperliquid_fetch(days, end_ms):
+        calls.append(("hyperliquid", "HYPEUSDT", days, end_ms))
+        return candles()
     def futures_fetch(days, end_ms):
         calls.append(("futures", "HYPEUSDT", days, end_ms))
         return candles()
     now_ms = 10 * snapshot.HOUR_MS + 7 * 60 * 1000
     with patch.object(snapshot, "SYMBOLS", symbols), patch.object(
         snapshot, "fetch_1h", spot_fetch
+    ), patch.object(snapshot, "fetch_hype_hyperliquid_1h", hyperliquid_fetch
     ), patch.object(snapshot, "fetch_hype_futures_1h", futures_fetch):
         data, candle_open_ms, sources = snapshot.fetch_universe(now_ms)
     assert set(data) == set(symbols)
     assert candle_open_ms == 9 * snapshot.HOUR_MS
     assert calls == [
         ("spot", "BTCUSDT", 15, 9 * snapshot.HOUR_MS),
-        ("futures", "HYPEUSDT", 15, 9 * snapshot.HOUR_MS),
+        ("hyperliquid", "HYPEUSDT", 15, 9 * snapshot.HOUR_MS),
     ]
     assert sources == {
         "BTCUSDT": "binance_spot",
-        "HYPEUSDT": "binance_usdm_perpetual",
+        "HYPEUSDT": "hyperliquid_perpetual",
     }
 
 
@@ -88,6 +92,28 @@ def test_hype_futures_fetch_paginates_when_api_caps_page_size():
     assert result[0]["t"] == 140 * snapshot.HOUR_MS
     assert result[-1]["t"] == 799 * snapshot.HOUR_MS
     assert len(calls) == 3
+
+
+
+def test_hype_primary_failure_falls_back_without_partial_publish():
+    with patch.object(snapshot, "SYMBOLS", ["HYPEUSDT"]), patch.object(
+        snapshot, "fetch_hype_hyperliquid_1h", side_effect=OSError("primary unavailable")
+    ), patch.object(snapshot, "fetch_hype_futures_1h", lambda days, end_ms: candles()):
+        data, _, sources = snapshot.fetch_universe(10 * snapshot.HOUR_MS)
+    assert len(data["HYPEUSDT"]) >= snapshot.MIN_1H_CANDLES
+    assert sources["HYPEUSDT"] == "binance_usdm_perpetual_fallback"
+
+
+def test_hype_both_sources_fail_closed():
+    with patch.object(snapshot, "SYMBOLS", ["HYPEUSDT"]), patch.object(
+        snapshot, "fetch_hype_hyperliquid_1h", side_effect=OSError("primary unavailable")
+    ), patch.object(snapshot, "fetch_hype_futures_1h", side_effect=OSError("fallback unavailable")):
+        try:
+            snapshot.fetch_universe(10 * snapshot.HOUR_MS)
+        except RuntimeError as exc:
+            assert "HYPEUSDT: OSError" in str(exc)
+        else:
+            raise AssertionError("dual provider failure was accepted")
 
 
 def test_fetch_rejects_history_too_short_for_55_twelve_hour_bars():
