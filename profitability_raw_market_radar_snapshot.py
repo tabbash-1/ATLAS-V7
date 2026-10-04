@@ -12,6 +12,7 @@ SYMBOLS = [
     "ZECUSDT", "ADAUSDT", "LINKUSDT", "AVAXUSDT", "LTCUSDT", "HYPEUSDT",
 ]
 HOUR_MS = 60 * 60 * 1000
+MIN_1H_CANDLES = 55 * 12
 SNAPSHOT_PATH = Path("status/profitability-raw-market-radar-latest.json")
 
 
@@ -27,8 +28,8 @@ def fetch_universe(now_ms):
     failures = []
     for symbol in SYMBOLS:
         try:
-            rows = fetch_1h(symbol, 14, candle_end_ms)
-            if len(rows) < 220:
+            rows = fetch_1h(symbol, 15, candle_end_ms)
+            if len(rows) < MIN_1H_CANDLES:
                 failures.append(f"{symbol}: insufficient candles ({len(rows)})")
             else:
                 data[symbol] = rows
