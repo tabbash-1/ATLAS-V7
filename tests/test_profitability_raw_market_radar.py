@@ -48,17 +48,17 @@ def test_scanner_uses_closed_hour_and_marks_hype_futures_source():
     now_ms = 10 * snapshot.HOUR_MS + 7 * 60 * 1000
     with patch.object(snapshot, "SYMBOLS", symbols), patch.object(
         snapshot, "fetch_1h", spot_fetch
-    ), patch.object(snapshot, "fetch_hype_futures_1h", futures_fetch):
+    ), patch.object(snapshot, "fetch_hype_hyperliquid_1h", hyperliquid_fetch\n    ), patch.object(snapshot, "fetch_hype_futures_1h", futures_fetch):
         data, candle_open_ms, sources = snapshot.fetch_universe(now_ms)
     assert set(data) == set(symbols)
     assert candle_open_ms == 9 * snapshot.HOUR_MS
     assert calls == [
         ("spot", "BTCUSDT", 15, 9 * snapshot.HOUR_MS),
-        ("futures", "HYPEUSDT", 15, 9 * snapshot.HOUR_MS),
+        ("hyperliquid", "HYPEUSDT", 15, 9 * snapshot.HOUR_MS),
     ]
     assert sources == {
         "BTCUSDT": "binance_spot",
-        "HYPEUSDT": "binance_usdm_perpetual",
+        "HYPEUSDT": "hyperliquid_perpetual",
     }
 
 
