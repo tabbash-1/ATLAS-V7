@@ -7,7 +7,7 @@ import profitability_raw_market_radar as radar
 import profitability_raw_market_radar_snapshot as snapshot
 
 
-def candles(up=True, n=300):
+def candles(up=True, n=700):
     out = []
     for i in range(n):
         close = 100 + i * 0.2 if up else 200 - i * 0.2
@@ -18,9 +18,10 @@ def candles(up=True, n=300):
     return out
 
 
-def test_raw_radar_does_not_need_production_decisions():
+def test_raw_radar_uses_available_12h_direction_and_stays_research_only():
     result = radar.build({"BTCUSDT": candles(True), "SOLUSDT": candles(True)})
     assert result["btc_context"]["side"] == "LONG"
+    assert result["ranked_universe"][0]["side"] == "LONG"
     assert result["ranked_universe"][0]["radar_score"] > 0
     assert result["safety"]["can_create_trade"] is False
     assert result["safety"]["can_override_production"] is False
@@ -44,7 +45,15 @@ def test_scanner_requests_only_the_last_closed_hour(monkeypatch):
 
     assert set(data) == set(symbols)
     assert candle_open_ms == 9 * snapshot.HOUR_MS
-    assert calls == [(symbol, 14, 9 * snapshot.HOUR_MS) for symbol in symbols]
+    assert calls == [(symbol, 15, 9 * snapshot.HOUR_MS) for symbol in symbols]
+
+
+def test_fetch_rejects_history_too_short_for_55_twelve_hour_bars(monkeypatch):
+    monkeypatch.setattr(snapshot, "SYMBOLS", ["BTCUSDT"])
+    monkeypatch.setattr(snapshot, "fetch_1h", lambda symbol, days, end_ms: candles(n=659))
+
+    with pytest.raises(RuntimeError, match="insufficient candles"):
+        snapshot.fetch_universe(10 * snapshot.HOUR_MS)
 
 
 def test_incomplete_fetch_fails_without_replacing_snapshot(monkeypatch, tmp_path):
