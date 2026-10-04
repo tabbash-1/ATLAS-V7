@@ -1,7 +1,10 @@
 import ast
+import io
+import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
+from urllib.parse import parse_qs, urlparse
 
 import profitability_raw_market_radar as radar
 import profitability_raw_market_radar_snapshot as snapshot
@@ -33,18 +36,58 @@ def test_btc_breakdown_blocks_alt_long():
     assert sol["state"] == "BLOCKED_BTC_BREAKDOWN"
 
 
-def test_scanner_requests_only_the_last_closed_hour():
-    symbols = ["BTCUSDT", "ETHUSDT"]
+def test_scanner_uses_closed_hour_and_marks_hype_futures_source():
+    symbols = ["BTCUSDT", "HYPEUSDT"]
     calls = []
-    def fetch(symbol, days, end_ms):
-        calls.append((symbol, days, end_ms))
+    def spot_fetch(symbol, days, end_ms):
+        calls.append(("spot", symbol, days, end_ms))
+        return candles()
+    def futures_fetch(days, end_ms):
+        calls.append(("futures", "HYPEUSDT", days, end_ms))
         return candles()
     now_ms = 10 * snapshot.HOUR_MS + 7 * 60 * 1000
-    with patch.object(snapshot, "SYMBOLS", symbols), patch.object(snapshot, "fetch_1h", fetch):
-        data, candle_open_ms = snapshot.fetch_universe(now_ms)
+    with patch.object(snapshot, "SYMBOLS", symbols), patch.object(
+        snapshot, "fetch_1h", spot_fetch
+    ), patch.object(snapshot, "fetch_hype_futures_1h", futures_fetch):
+        data, candle_open_ms, sources = snapshot.fetch_universe(now_ms)
     assert set(data) == set(symbols)
     assert candle_open_ms == 9 * snapshot.HOUR_MS
-    assert calls == [(symbol, 15, 9 * snapshot.HOUR_MS) for symbol in symbols]
+    assert calls == [
+        ("spot", "BTCUSDT", 15, 9 * snapshot.HOUR_MS),
+        ("futures", "HYPEUSDT", 15, 9 * snapshot.HOUR_MS),
+    ]
+    assert sources == {
+        "BTCUSDT": "binance_spot",
+        "HYPEUSDT": "binance_usdm_perpetual",
+    }
+
+
+def test_hype_futures_fetch_paginates_when_api_caps_page_size():
+    history = candles(n=800)
+    calls = []
+    def mock_urlopen(url, timeout):
+        query = parse_qs(urlparse(url).query)
+        limit = min(int(query["limit"][0]), 240)
+        end_ms = int(query["endTime"][0])
+        eligible = [row for row in history if row["t"] <= end_ms]
+        page = eligible[-limit:]
+        calls.append((limit, end_ms, len(page)))
+        payload = [
+            [
+                row["t"], str(row["o"]), str(row["h"]), str(row["l"]),
+                str(row["c"]), str(row["v"]),
+            ]
+            for row in page
+        ]
+        return io.BytesIO(json.dumps(payload).encode("utf-8"))
+    with patch.object(snapshot.urllib.request, "urlopen", side_effect=mock_urlopen), patch.object(
+        snapshot.time, "sleep"
+    ):
+        result = snapshot.fetch_hype_futures_1h(15, 799 * snapshot.HOUR_MS)
+    assert len(result) == 660
+    assert result[0]["t"] == 140 * snapshot.HOUR_MS
+    assert result[-1]["t"] == 799 * snapshot.HOUR_MS
+    assert len(calls) == 3
 
 
 def test_fetch_rejects_history_too_short_for_55_twelve_hour_bars():
