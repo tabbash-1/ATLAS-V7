@@ -1,7 +1,7 @@
 import ast
 from pathlib import Path
-
-import pytest
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 import profitability_raw_market_radar as radar
 import profitability_raw_market_radar_snapshot as snapshot
@@ -33,45 +33,52 @@ def test_btc_breakdown_blocks_alt_long():
     assert sol["state"] == "BLOCKED_BTC_BREAKDOWN"
 
 
-def test_scanner_requests_only_the_last_closed_hour(monkeypatch):
+def test_scanner_requests_only_the_last_closed_hour():
     symbols = ["BTCUSDT", "ETHUSDT"]
     calls = []
-    monkeypatch.setattr(snapshot, "SYMBOLS", symbols)
-    monkeypatch.setattr(snapshot, "fetch_1h", lambda symbol, days, end_ms:
-                        calls.append((symbol, days, end_ms)) or candles())
+    def fetch(symbol, days, end_ms):
+        calls.append((symbol, days, end_ms))
+        return candles()
     now_ms = 10 * snapshot.HOUR_MS + 7 * 60 * 1000
-
-    data, candle_open_ms = snapshot.fetch_universe(now_ms)
-
+    with patch.object(snapshot, "SYMBOLS", symbols), patch.object(snapshot, "fetch_1h", fetch):
+        data, candle_open_ms = snapshot.fetch_universe(now_ms)
     assert set(data) == set(symbols)
     assert candle_open_ms == 9 * snapshot.HOUR_MS
     assert calls == [(symbol, 15, 9 * snapshot.HOUR_MS) for symbol in symbols]
 
 
-def test_fetch_rejects_history_too_short_for_55_twelve_hour_bars(monkeypatch):
-    monkeypatch.setattr(snapshot, "SYMBOLS", ["BTCUSDT"])
-    monkeypatch.setattr(snapshot, "fetch_1h", lambda symbol, days, end_ms: candles(n=659))
+def test_fetch_rejects_history_too_short_for_55_twelve_hour_bars():
+    with patch.object(snapshot, "SYMBOLS", ["BTCUSDT"]), patch.object(
+        snapshot, "fetch_1h", lambda symbol, days, end_ms: candles(n=659)
+    ):
+        try:
+            snapshot.fetch_universe(10 * snapshot.HOUR_MS)
+        except RuntimeError as exc:
+            assert "insufficient candles" in str(exc)
+        else:
+            raise AssertionError("insufficient 12h history was accepted")
 
-    with pytest.raises(RuntimeError, match="insufficient candles"):
-        snapshot.fetch_universe(10 * snapshot.HOUR_MS)
 
-
-def test_incomplete_fetch_fails_without_replacing_snapshot(monkeypatch, tmp_path):
-    target = tmp_path / "snapshot.json"
-    target.write_text("previous-good-snapshot")
-    monkeypatch.setattr(snapshot, "SNAPSHOT_PATH", target)
-    monkeypatch.setattr(snapshot, "SYMBOLS", ["BTCUSDT", "ETHUSDT"])
-    monkeypatch.setattr(snapshot.time, "time", lambda: 10 * 3600)
-    def fetch(symbol, days, end_ms):
-        if symbol == "ETHUSDT":
-            raise OSError("temporary data source failure")
-        return candles()
-    monkeypatch.setattr(snapshot, "fetch_1h", fetch)
-
-    with pytest.raises(RuntimeError, match="snapshot incomplete"):
-        snapshot.main()
-
-    assert target.read_text() == "previous-good-snapshot"
+def test_incomplete_fetch_fails_without_replacing_snapshot():
+    with TemporaryDirectory() as temp_dir:
+        target = Path(temp_dir) / "snapshot.json"
+        target.write_text("previous-good-snapshot")
+        def fetch(symbol, days, end_ms):
+            if symbol == "ETHUSDT":
+                raise OSError("temporary data source failure")
+            return candles()
+        with patch.object(snapshot, "SNAPSHOT_PATH", target), patch.object(
+            snapshot, "SYMBOLS", ["BTCUSDT", "ETHUSDT"]
+        ), patch.object(snapshot.time, "time", lambda: 10 * 3600), patch.object(
+            snapshot, "fetch_1h", fetch
+        ):
+            try:
+                snapshot.main()
+            except RuntimeError as exc:
+                assert "snapshot incomplete" in str(exc)
+            else:
+                raise AssertionError("partial fetch was published")
+        assert target.read_text() == "previous-good-snapshot"
 
 
 def test_radar_modules_have_no_trade_or_production_write_dependencies():
@@ -93,3 +100,13 @@ def test_radar_modules_have_no_trade_or_production_write_dependencies():
                 for name in names
                 for forbidden in ("trade_outcome", "final_trade_gate", "order_execution", "supabase")
             )
+
+
+if __name__ == "__main__":
+    tests = [
+        value for name, value in globals().items()
+        if name.startswith("test_") and callable(value)
+    ]
+    for test in tests:
+        test()
+    print(f"raw-market-radar tests: {len(tests)} passed")
