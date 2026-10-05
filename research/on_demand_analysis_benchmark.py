@@ -23,7 +23,7 @@ if str(ROOT) not in sys.path:
 
 from historical_core_4_12h_replay import fetch_1h, direction, atr, ema, rsi
 
-VERSION="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V5_TEMPORAL_ROBUSTNESS"
+VERSION="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V6_REVERSAL4H_1H_TRIGGER"
 SYMBOLS=["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","BNBUSDT","DOGEUSDT","ZECUSDT","ADAUSDT","LINKUSDT","AVAXUSDT","LTCUSDT"]
 HORIZONS=(4,8,12)
 HOUR_MS=60*60*1000
@@ -167,6 +167,20 @@ def reversal_4h_probe(hist,decision_time_ms=None):
     return recent_move_probe(hist,4,True)
 
 
+def reversal_4h_1h_trigger_probe(hist,decision_time_ms=None):
+    """Diagnostic only: fade a meaningful 4H move only after 1H closes start reversing it."""
+    side=recent_move_probe(hist,4,True)
+    if side not in ("LONG","SHORT") or len(hist)<2:
+        return "WAIT"
+    last=float(hist[-1]["c"])
+    prev=float(hist[-2]["c"])
+    if side=="LONG" and last>prev:
+        return "LONG"
+    if side=="SHORT" and last<prev:
+        return "SHORT"
+    return "WAIT"
+
+
 def momentum_12h_probe(hist,decision_time_ms=None):
     return recent_move_probe(hist,12,False)
 
@@ -261,6 +275,7 @@ def run(symbol,days,end_ms=None,step=4,rows=None,btc_rows=None):
         "analyst_stack_v2":analyst_stack_v2,
         "momentum_4h_probe":momentum_4h_probe,
         "reversal_4h_probe":reversal_4h_probe,
+        "reversal_4h_1h_trigger_probe":reversal_4h_1h_trigger_probe,
         "momentum_12h_probe":momentum_12h_probe,
         "reversal_12h_probe":reversal_12h_probe,
         "thesis12_pullback4_probe":thesis12_pullback4_probe,
@@ -275,6 +290,7 @@ def run(symbol,days,end_ms=None,step=4,rows=None,btc_rows=None):
             "analyst_stack_v2":analyst_stack_v2(hist,decision_time_ms,btc_rows,symbol),
             "momentum_4h_probe":momentum_4h_probe(hist,decision_time_ms),
             "reversal_4h_probe":reversal_4h_probe(hist,decision_time_ms),
+            "reversal_4h_1h_trigger_probe":reversal_4h_1h_trigger_probe(hist,decision_time_ms),
             "momentum_12h_probe":momentum_12h_probe(hist,decision_time_ms),
             "reversal_12h_probe":reversal_12h_probe(hist,decision_time_ms),
             "thesis12_pullback4_probe":thesis12_pullback4_probe(hist,decision_time_ms),
@@ -288,7 +304,7 @@ def run(symbol,days,end_ms=None,step=4,rows=None,btc_rows=None):
 
 def main():
     ap=argparse.ArgumentParser();ap.add_argument("--days",type=int,default=180);ap.add_argument("--end-ms",type=int,default=None);ap.add_argument("--symbols",nargs="*",default=SYMBOLS);ap.add_argument("--step",type=int,default=4);a=ap.parse_args()
-    engine_names=("legacy_1h","htf_consensus","analyst_stack_v2","momentum_4h_probe","reversal_4h_probe","momentum_12h_probe","reversal_12h_probe","thesis12_pullback4_probe")
+    engine_names=("legacy_1h","htf_consensus","analyst_stack_v2","momentum_4h_probe","reversal_4h_probe","reversal_4h_1h_trigger_probe","momentum_12h_probe","reversal_12h_probe","thesis12_pullback4_probe")
     merged={e:{h:[] for h in HORIZONS} for e in engine_names}
     by_symbol={}
     btc_rows=fetch_1h("BTCUSDT",a.days,a.end_ms)
@@ -311,6 +327,7 @@ def main():
         "analyst_stack_v2":"4H primary thesis; 12H/1D opposition veto; 1H resumption trigger; BTC-first alt veto; 1.5ATR extension and RSI 80/20 blowoff veto",
         "momentum_4h_probe":"diagnostic only: continue the last 4H move when it exceeded 0.35 current 1H ATR",
         "reversal_4h_probe":"diagnostic only: fade the last 4H move when it exceeded 0.35 current 1H ATR",
+        "reversal_4h_1h_trigger_probe":"diagnostic only: fade a meaningful 4H move only after the latest completed 1H close starts moving in the reversal direction",
         "momentum_12h_probe":"diagnostic only: continue the last 12H move when it exceeded 0.35 current 1H ATR",
         "reversal_12h_probe":"diagnostic only: fade the last 12H move when it exceeded 0.35 current 1H ATR",
         "thesis12_pullback4_probe":"diagnostic only: use 12H realized direction as thesis and emit it only while the latest 4H realized move is an opposing pullback"
@@ -318,7 +335,7 @@ def main():
       "overall":{e:{str(h)+"h":metrics(merged[e][h]) for h in HORIZONS} for e in merged},
       "temporal_robustness":{
         e:{str(h)+"h":temporal_thirds(merged[e][h]) for h in HORIZONS}
-        for e in ("reversal_4h_probe","htf_consensus","legacy_1h")
+        for e in ("reversal_4h_probe","reversal_4h_1h_trigger_probe","htf_consensus","legacy_1h")
       },
       "by_symbol":by_symbol}
     print("ATLAS_ON_DEMAND_BENCHMARK="+json.dumps(result,sort_keys=True))
