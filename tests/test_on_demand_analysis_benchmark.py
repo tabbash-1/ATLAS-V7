@@ -7,7 +7,7 @@ P=Path(__file__).resolve().parents[1]/"research"/"on_demand_analysis_benchmark.p
 spec=importlib.util.spec_from_file_location("bench",P);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
 
 def test_product_contract_is_analysis_not_trade_discovery():
-    assert m.VERSION=="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V3_MARKET_BEHAVIOR_PROBES"
+    assert m.VERSION=="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V4_12H_THESIS_4H_PULLBACK"
     assert m.HORIZONS==(4,8,12)
 
 
@@ -43,6 +43,33 @@ def test_market_behavior_probe_waits_inside_atr_deadband(monkeypatch):
     monkeypatch.setattr(m,"atr",lambda *_:1000.0)
     assert m.momentum_4h_probe(rows)=="WAIT"
     assert m.reversal_12h_probe(rows)=="WAIT"
+
+
+def test_12h_thesis_4h_pullback_probe_emits_thesis_direction(monkeypatch):
+    rows=[]
+    px=100.0
+    for i in range(20):
+        if i < 16:
+            px += 1.0
+        else:
+            px -= 0.5
+        rows.append({"t":i*m.HOUR_MS,"o":px,"h":px+0.2,"l":px-0.2,"c":px,"v":100.0})
+    monkeypatch.setattr(m,"atr",lambda *_:1.0)
+    assert m._recent_move_side(rows,12)=="LONG"
+    assert m._recent_move_side(rows,4)=="SHORT"
+    assert m.thesis12_pullback4_probe(rows)=="LONG"
+
+
+def test_12h_thesis_4h_pullback_probe_avoids_chasing(monkeypatch):
+    rows=[]
+    px=100.0
+    for i in range(20):
+        px += 1.0
+        rows.append({"t":i*m.HOUR_MS,"o":px,"h":px+0.2,"l":px-0.2,"c":px,"v":100.0})
+    monkeypatch.setattr(m,"atr",lambda *_:1.0)
+    assert m._recent_move_side(rows,12)=="LONG"
+    assert m._recent_move_side(rows,4)=="LONG"
+    assert m.thesis12_pullback4_probe(rows)=="WAIT"
 
 
 def test_professional_challenger_accepts_aligned_top_down_long():
