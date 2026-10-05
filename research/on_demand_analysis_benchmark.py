@@ -15,20 +15,44 @@ an automatic failure.
 """
 from __future__ import annotations
 import argparse, json, statistics
-from historical_core_4_12h_replay import fetch_1h, resample, direction, atr
+from historical_core_4_12h_replay import fetch_1h, direction, atr
 
 VERSION="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V1"
 SYMBOLS=["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","BNBUSDT","DOGEUSDT","ZECUSDT","ADAUSDT","LINKUSDT","AVAXUSDT","LTCUSDT"]
 HORIZONS=(4,8,12)
+HOUR_MS=60*60*1000
 
-def legacy_1h(hist):
+def resample_closed(rows,hours,as_of_ms):
+    """Aggregate only complete UTC-aligned HTF bars made from contiguous 1H candles."""
+    width=hours*HOUR_MS
+    buckets={}
+    for row in rows:
+        start=(int(row["t"])//width)*width
+        if start+width>as_of_ms:
+            continue
+        buckets.setdefault(start,[]).append(row)
+    out=[]
+    for start,items in sorted(buckets.items()):
+        items=sorted(items,key=lambda x:int(x["t"]))
+        expected=[start+i*HOUR_MS for i in range(hours)]
+        if len(items)!=hours or [int(x["t"]) for x in items]!=expected:
+            continue
+        out.append({"t":start,"o":items[0]["o"],"h":max(x["h"] for x in items),
+                    "l":min(x["l"] for x in items),"c":items[-1]["c"],
+                    "v":sum(x["v"] for x in items)})
+    return out
+
+def legacy_1h(hist,decision_time_ms=None):
     d=direction(hist)
     return d if d in ("LONG","SHORT") else "WAIT"
 
-def htf_consensus(hist):
+def htf_consensus(hist,decision_time_ms=None):
+    if not hist:
+        return "WAIT"
+    as_of=int(decision_time_ms if decision_time_ms is not None else hist[-1]["t"]+HOUR_MS)
     d1=direction(hist)
-    d4=direction(resample(hist,4))
-    d12=direction(resample(hist,12))
+    d4=direction(resample_closed(hist,4,as_of))
+    d12=direction(resample_closed(hist,12,as_of))
     if d4 in ("LONG","SHORT") and d4==d12:
         return d4 if d1 in (None,d4) else "WAIT"
     return "WAIT"
@@ -71,12 +95,13 @@ def run(symbol,days,end_ms=None,step=4,rows=None):
     rec={name:{h:[] for h in HORIZONS} for name in engines}
     for i in range(warm,len(rows)-max(HORIZONS),step):
         hist=rows[:i+1]
-        preds={name:fn(hist) for name,fn in engines.items()}
+        decision_time_ms=int(rows[i]["t"])+HOUR_MS
+        preds={name:fn(hist,decision_time_ms) for name,fn in engines.items()}
         for h in HORIZONS:
             actual=future_label(rows,i,h)
             if actual is None:continue
             for name,pred in preds.items():
-                rec[name][h].append({"t":rows[i]["t"],"symbol":symbol,"prediction":pred,"actual":actual})
+                rec[name][h].append({"t":decision_time_ms,"symbol":symbol,"prediction":pred,"actual":actual})
     return rec
 
 def main():
@@ -95,6 +120,7 @@ def main():
       "purpose":"MEASURE_ON_DEMAND_LONG_SHORT_WAIT_ANALYSIS_NOT_TRADE_DISCOVERY",
       "days":a.days,"step_h":a.step,"horizons_h":list(HORIZONS),
       "label_policy":"future close move vs current close; WAIT when abs(move)<=0.35*current 1H ATR",
+      "decision_clock":"Closed 1H decisions; only complete contiguous UTC-aligned 4H and 12H candles are eligible.",
       "engines":{
         "legacy_1h":"fixed simple 1H state baseline",
         "htf_consensus":"fixed 4H/12H agreement with non-opposing 1H confirmation"
