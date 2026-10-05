@@ -11,6 +11,13 @@ def _row():
         "product_direction": "LONG",
         "entry_confirmation_direction": "LONG",
         "direction_alignment": "ALIGNED",
+        "htf_thesis": {
+            "status": "PASS",
+            "reason": "HTF_ALIGNED_CURRENT_PHASE_ACCEPTABLE",
+            "product_direction": "LONG",
+            "entry_confirmation_direction": "LONG",
+            "direction_alignment": "ALIGNED",
+        },
         "actionable_decision": "LONG",
         "production_signal_qualified": True,
         "execution_cost": {"validated": True, "fee_bps": 5.0, "spread_bps": 1.0, "slippage_bps": 1.0},
