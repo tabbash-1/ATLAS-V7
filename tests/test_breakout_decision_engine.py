@@ -29,19 +29,48 @@ def test_current_candle_high_is_not_resistance():
     assert source != 'CURRENT_CANDLE_HIGH'
 
 
-def test_confirmed_breakout_clears_false_obstacle_penalty():
+def test_initial_breakout_event_is_not_entry_ready_until_post_break_hold():
     rows=base_series()
-    prior_high=max(x['high'] for x in rows[-25:-1])
-    px=prior_high + 1.0
-    # Breakout confirmation is closed-candle only: make the penultimate candle
-    # the completed breakout and keep a separate live candle after it.
-    rows[-2]=candle(99, px, high=px+0.2, low=px-0.7, open_=px-0.8)
-    rows[-1]=candle(100, px+0.05, high=px+0.1, low=px-0.05, open_=px)
-    ctx=scoring.breakout_context(rows, px+0.05, 'LONG', 4, 2.0, 1.0, 1.0, closed_rv=1.0)
+    prior_high=max(x['high'] for x in rows[-26:-2])
+    px=prior_high+1.0
+    rows[-2]=candle(98,px,high=px+0.2,low=px-0.7,open_=px-0.8,volume=150)
+    rows[-1]=candle(99,px+0.05,high=px+0.1,low=px-0.05,open_=px)
+    ctx=scoring.breakout_context(rows,px+0.05,'LONG',4,2.0,1.0,1.0,closed_rv=1.5)
+    assert ctx['breakout_event_confirmed'] is True
+    assert ctx['confirmed'] is False
+    assert ctx['entry_ready'] is False
+    assert ctx['acceptance_mode']=='NONE'
+
+
+def test_accepted_breakout_retest_clears_false_obstacle_penalty():
+    rows=base_series()
+    level=max(x['high'] for x in rows[-27:-3])
+    breakout_close=level+1.0
+    rows[-3]=candle(97,breakout_close,high=breakout_close+0.2,low=level+0.2,open_=level+0.1,volume=160)
+    rows[-2]=candle(98,level+0.55,high=level+0.8,low=level-0.05,open_=level+0.35,volume=110)
+    rows[-1]=candle(99,level+0.60,high=level+0.75,low=level+0.4,open_=level+0.55)
+    ctx=scoring.breakout_context(rows,level+0.60,'LONG',4,2.0,1.0,1.0,closed_rv=1.1)
     assert ctx['confirmed'] is True
-    adj, reason=scoring.obstacle_adjustment(None, 'NO_PRIOR_RESISTANCE_AHEAD', True)
-    assert adj == 3
-    assert reason == 'CONFIRMED_BREAKOUT_CLEAR_SPACE'
+    assert ctx['entry_ready'] is True
+    assert ctx['accepted'] is True
+    assert ctx['acceptance_mode']=='RETEST_HOLD'
+    assert ctx['acceptance_level'] is not None
+    assert ctx['breakout_age_bars']==1
+    adj,reason=scoring.obstacle_adjustment(None,'NO_PRIOR_RESISTANCE_AHEAD',ctx['confirmed'])
+    assert adj==3
+    assert reason=='CONFIRMED_BREAKOUT_CLEAR_SPACE'
+
+
+def test_breakout_that_closes_back_inside_structure_is_not_accepted():
+    rows=base_series()
+    level=max(x['high'] for x in rows[-27:-3])
+    breakout_close=level+0.8
+    rows[-3]=candle(97,breakout_close,high=breakout_close+0.2,low=level+0.1,open_=level,volume=160)
+    rows[-2]=candle(98,level-0.2,high=level+0.2,low=level-0.4,open_=level+0.1,volume=120)
+    rows[-1]=candle(99,level-0.1,high=level+0.1,low=level-0.3,open_=level-0.2)
+    ctx=scoring.breakout_context(rows,level-0.1,'LONG',4,1.0,1.0,0.9,closed_rv=1.2)
+    assert ctx['accepted'] is False
+    assert ctx['confirmed'] is False
 
 
 def test_false_breakout_without_confirmation_gets_no_bonus():
@@ -64,7 +93,9 @@ def test_partial_hour_volume_is_paced_not_compared_as_full_hour():
 
 if __name__ == '__main__':
     test_current_candle_high_is_not_resistance()
-    test_confirmed_breakout_clears_false_obstacle_penalty()
+    test_initial_breakout_event_is_not_entry_ready_until_post_break_hold()
+    test_accepted_breakout_retest_clears_false_obstacle_penalty()
+    test_breakout_that_closes_back_inside_structure_is_not_accepted()
     test_false_breakout_without_confirmation_gets_no_bonus()
     test_partial_hour_volume_is_paced_not_compared_as_full_hour()
     print('breakout decision engine tests: ok')
