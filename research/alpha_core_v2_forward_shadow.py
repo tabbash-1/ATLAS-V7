@@ -126,11 +126,11 @@ def run(now_ms=None,fetcher=fetch_1h,
     rows_cache={}
     captured=[]
 
-    btc_rows=_closed_rows(fetcher("BTCUSDT",14,now_ms),now_ms)
+    btc_rows=_closed_rows(fetcher("BTCUSDT",35,now_ms),now_ms)
     rows_cache["BTCUSDT"]=btc_rows
 
     for symbol in SYMBOLS:
-        rows=btc_rows if symbol=="BTCUSDT" else _closed_rows(fetcher(symbol,14,now_ms),now_ms)
+        rows=btc_rows if symbol=="BTCUSDT" else _closed_rows(fetcher(symbol,35,now_ms),now_ms)
         if not rows:continue
         rows_cache[symbol]=rows
         by_t={int(x["t"]):x for x in rows}
