@@ -240,6 +240,49 @@ def metrics(records):
     })
     return out
 
+def compare_metrics(candidate, baseline):
+    """Descriptive same-population comparison; never a Production promotion decision."""
+    rows={}
+    better_precision=0
+    no_worse_opposite=0
+    sufficient_calls=0
+    for h in HORIZONS:
+        key=str(h)+"h"
+        cm=metrics(candidate[h]); bm=metrics(baseline[h])
+        cp=cm.get("directional_precision_pct")
+        bp=bm.get("directional_precision_pct")
+        co=cm.get("opposite_direction_pct_of_calls")
+        bo=bm.get("opposite_direction_pct_of_calls")
+        calls=int(cm.get("directional_calls") or 0)
+        if cp is not None and bp is not None and cp>bp:
+            better_precision+=1
+        if co is not None and bo is not None and co<=bo:
+            no_worse_opposite+=1
+        if calls>=100:
+            sufficient_calls+=1
+        rows[key]={
+            "candidate":cm,
+            "baseline":bm,
+            "directional_precision_delta_pct":round(cp-bp,3) if cp is not None and bp is not None else None,
+            "opposite_direction_delta_pct":round(co-bo,3) if co is not None and bo is not None else None,
+            "wait_rate_delta_pct":round((cm.get("wait_rate_pct") or 0)-(bm.get("wait_rate_pct") or 0),3),
+            "missed_directional_move_delta_pct":round((cm.get("missed_directional_move_pct") or 0)-(bm.get("missed_directional_move_pct") or 0),3),
+        }
+    descriptive_pass=better_precision>=2 and no_worse_opposite>=2 and sufficient_calls==len(HORIZONS)
+    return {
+        "historical_only":True,
+        "causal_proof":False,
+        "production_promotion_authority":False,
+        "minimum_directional_calls_per_horizon":100,
+        "better_precision_horizons":better_precision,
+        "no_worse_opposite_horizons":no_worse_opposite,
+        "sufficient_call_horizons":sufficient_calls,
+        "descriptive_historical_pass":descriptive_pass,
+        "interpretation":"DESCRIPTIVE_CHALLENGER_COMPARISON_ONLY_FORWARD_EVIDENCE_REQUIRED",
+        "horizons":rows,
+    }
+
+
 def temporal_thirds(records):
     """Chronological early/middle/late thirds without mixing the same timestamp across splits."""
     if not records:
@@ -324,6 +367,10 @@ def main():
         "thesis12_pullback4_probe":"diagnostic only: use 12H realized direction as thesis and emit it only while the latest 4H realized move is an opposing pullback"
       },
       "overall":{e:{str(h)+"h":metrics(merged[e][h]) for h in HORIZONS} for e in merged},
+      "alpha_core_v2_comparison":{
+        "vs_analyst_stack_v2":compare_metrics(merged["alpha_core_v2"],merged["analyst_stack_v2"]),
+        "vs_htf_consensus":compare_metrics(merged["alpha_core_v2"],merged["htf_consensus"]),
+      },
       "temporal_robustness":{
         e:{str(h)+"h":temporal_thirds(merged[e][h]) for h in HORIZONS}
         for e in ("alpha_core_v2","reversal_4h_probe","htf_consensus","legacy_1h")
