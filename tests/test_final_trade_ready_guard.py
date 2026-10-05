@@ -501,6 +501,80 @@ def test_invalid_cost_evidence_fails_closed():
     assert r['final_trade_gate']['net_rr_after_costs']['reason']=='EXECUTION_COST_EVIDENCE_INVALID'
 
 
+def test_final_gate_cannot_promote_explicit_macro_opposition_wait():
+    d = base_row(
+        symbol='LINKUSDT',
+        htf_thesis={
+            'status':'WAIT',
+            'reason':'1D_MACRO_STRONGLY_OPPOSES_HTF',
+            'product_direction':'SHORT',
+            'entry_confirmation_direction':'SHORT',
+            'direction_alignment':'ALIGNED',
+        },
+        market_direction_gate={'pass':True,'reason':'BTC_REGIME_NOT_OPPOSING'},
+    )
+    r = guard.apply(d)
+    assert r['trade_ready'] is False
+    assert r['actionable_decision'] == 'WAIT'
+    assert 'HTF_THESIS_1D_MACRO_STRONGLY_OPPOSES_HTF' in r['final_trade_gate']['blockers']
+    assert r['final_trade_gate']['authoritative_context']['htf_thesis_status'] == 'WAIT'
+
+
+def test_final_gate_cannot_promote_long_into_htf_resistance_wait():
+    d = long_row('PULLBACK')
+    d.update({
+        'symbol':'LTCUSDT',
+        'htf_thesis':{
+            'status':'WAIT',
+            'reason':'LONG_INTO_HTF_RESISTANCE',
+            'product_direction':'LONG',
+            'entry_confirmation_direction':'LONG',
+            'direction_alignment':'ALIGNED',
+        },
+        'market_direction_gate':{'pass':True,'reason':'BTC_REGIME_NOT_OPPOSING'},
+    })
+    r = guard.apply(d)
+    assert r['trade_ready'] is False
+    assert r['actionable_decision'] == 'WAIT'
+    assert 'HTF_THESIS_LONG_INTO_HTF_RESISTANCE' in r['final_trade_gate']['blockers']
+
+
+def test_final_gate_rechecks_btc_first_for_altcoins():
+    d = base_row(
+        symbol='ETHUSDT',
+        market_direction_gate={
+            'pass':False,
+            'reason':'BTC_REGIME_OPPOSES_ALT_DIRECTION',
+            'btc_regime':'TREND_UP',
+            'btc_confidence':81,
+        },
+    )
+    r = guard.apply(d)
+    assert r['trade_ready'] is False
+    assert r['actionable_decision'] == 'WAIT'
+    assert 'BTC_FIRST_BTC_REGIME_OPPOSES_ALT_DIRECTION' in r['final_trade_gate']['blockers']
+    assert r['final_trade_gate']['btc_first_rechecked_at_final_gate'] is True
+
+
+def test_resolved_conditional_neutral_htf_remains_eligible():
+    d = base_row(
+        symbol='ADAUSDT',
+        direction_alignment='CONDITIONAL_ALIGNED_12H_NEUTRAL',
+        htf_thesis={
+            'status':'PASS',
+            'reason':'HTF_CONDITIONAL_12H_NEUTRAL_ACCEPTED',
+            'product_direction':'SHORT',
+            'entry_confirmation_direction':'SHORT',
+            'direction_alignment':'CONDITIONAL_ALIGNED',
+        },
+        market_direction_gate={'pass':True,'reason':'BTC_REGIME_NOT_OPPOSING'},
+    )
+    r = guard.apply(d)
+    assert r['trade_ready'] is True
+    assert r['final_trade_gate']['authoritative_context']['htf_thesis_status'] == 'PASS'
+    assert r['final_trade_gate']['authoritative_context']['btc_first_pass'] is True
+
+
 if __name__ == '__main__':
     tests = [v for k, v in sorted(globals().items()) if k.startswith('test_') and callable(v)]
     for t in tests:
