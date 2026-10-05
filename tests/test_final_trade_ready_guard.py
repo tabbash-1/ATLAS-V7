@@ -22,6 +22,14 @@ def base_row(**extra):
         'product_direction': 'SHORT',
         'entry_confirmation_direction': 'SHORT',
         'direction_alignment': 'ALIGNED',
+        'htf_thesis': {
+            'status': 'PASS',
+            'reason': 'HTF_ALIGNED_CURRENT_PHASE_ACCEPTABLE',
+            'product_direction': 'SHORT',
+            'entry_confirmation_direction': 'SHORT',
+            'direction_alignment': 'ALIGNED',
+        },
+        'market_direction_gate': {'pass': True, 'reason': 'BTC_IS_MARKET_ANCHOR'},
         'production_signal_qualified': True,
         'actionable_decision': 'SHORT',
         'execution_ready': True,
@@ -143,6 +151,11 @@ def test_breakout_without_canonical_confirmation_evidence_fails_closed():
 
 def _confirmed_short_pullback_thesis():
     return {
+        'status': 'PASS',
+        'reason': 'HTF_ALIGNED_CURRENT_PHASE_ACCEPTABLE',
+        'product_direction': 'SHORT',
+        'entry_confirmation_direction': 'SHORT',
+        'direction_alignment': 'ALIGNED',
         'frames': {
             '1h': {
                 'bias': 'SHORT',
@@ -537,6 +550,22 @@ def test_final_gate_cannot_promote_long_into_htf_resistance_wait():
     assert r['trade_ready'] is False
     assert r['actionable_decision'] == 'WAIT'
     assert 'HTF_THESIS_LONG_INTO_HTF_RESISTANCE' in r['final_trade_gate']['blockers']
+
+
+def test_missing_htf_authority_fails_closed():
+    d = base_row()
+    d['htf_thesis'] = {}
+    r = guard.apply(d)
+    assert r['trade_ready'] is False
+    assert 'HTF_THESIS_STATUS_MISSING' in r['final_trade_gate']['blockers']
+
+
+def test_missing_btc_first_authority_fails_closed_for_altcoins():
+    d = base_row(symbol='SOLUSDT')
+    d.pop('market_direction_gate', None)
+    r = guard.apply(d)
+    assert r['trade_ready'] is False
+    assert 'BTC_FIRST_GATE_MISSING' in r['final_trade_gate']['blockers']
 
 
 def test_final_gate_rechecks_btc_first_for_altcoins():
