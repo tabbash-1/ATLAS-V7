@@ -103,6 +103,42 @@ def test_blowoff_rsi_blocks_momentum_bonus_and_continuation_relief():
     assert adjusted == -8 and relief == 0
 
 
+class PartialCandleShockAtlas(FakeAtlas):
+    @staticmethod
+    def _rsi(values, period):
+        # If the live shock leaks into continuation authority this returns blowoff.
+        return 86.0 if values and values[-1] > 200 else 70.0
+
+    @staticmethod
+    def _spot_klines(symbol):
+        rows = []
+        for i in range(60):
+            px = 100 + i * 0.25
+            rows.append({'open': px-0.1, 'high': px+0.2, 'low': px-0.2, 'close': px, 'volume': 100})
+        # Still-forming 1H candle: extreme spike that must be ignored by breadth/RSI authority.
+        rows.append({'open': 114.75, 'high': 320.0, 'low': 114.5, 'close': 300.0, 'volume': 5000})
+        return rows
+
+
+def test_market_breadth_ignores_still_forming_1h_candle():
+    atlas = PartialCandleShockAtlas()
+    breadth = continuation._compute_breadth(atlas)
+    assert breadth['available'] == len(atlas.ON_DEMAND_SYMBOLS)
+    assert breadth['long_count'] == len(atlas.ON_DEMAND_SYMBOLS)
+    assert breadth['long_fraction'] == 1.0
+
+
+def test_continuation_rsi_ignores_still_forming_1h_candle():
+    atlas = PartialCandleShockAtlas()
+    continuation.install(atlas)
+    row = atlas.cloud_score_symbol('BTCUSDT', atlas._spot_klines('BTCUSDT'))
+    assert row['score_attribution']['extension_guard_adjustment'] == 0
+    assert row['score_attribution']['extension_guard_reason'] == 'RSI_SANE'
+    assert row['continuation_context']['rsi_sane'] is True
+    assert atlas.PRODUCTION_CONTINUATION_SCORING_STATE['closed_candle_authority'] is True
+    assert atlas.PRODUCTION_CONTINUATION_SCORING_STATE['live_1h_can_change_continuation_state'] is False
+
+
 def test_momentum_tiers_are_monotonic_but_bounded():
     assert continuation.momentum_adjustment('LONG', 1.0, 60) == 0
     assert continuation.momentum_adjustment('LONG', 2.0, 60) == 2
@@ -115,5 +151,7 @@ if __name__ == '__main__':
     test_strong_broad_rally_is_evidence_only_and_cannot_clear_structure_penalty()
     test_weak_breadth_does_not_relieve_obstacle()
     test_blowoff_rsi_blocks_momentum_bonus_and_continuation_relief()
+    test_market_breadth_ignores_still_forming_1h_candle()
+    test_continuation_rsi_ignores_still_forming_1h_candle()
     test_momentum_tiers_are_monotonic_but_bounded()
     print('production continuation scoring tests: ok')
