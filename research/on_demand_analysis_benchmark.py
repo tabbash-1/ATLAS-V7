@@ -23,7 +23,7 @@ if str(ROOT) not in sys.path:
 
 from historical_core_4_12h_replay import fetch_1h, direction, atr, ema, rsi
 
-VERSION="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V3_MARKET_BEHAVIOR_PROBES"
+VERSION="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V4_PULLBACK_REGIME_CHALLENGER"
 SYMBOLS=["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","BNBUSDT","DOGEUSDT","ZECUSDT","ADAUSDT","LINKUSDT","AVAXUSDT","LTCUSDT"]
 HORIZONS=(4,8,12)
 HOUR_MS=60*60*1000
@@ -175,6 +175,42 @@ def reversal_12h_probe(hist,decision_time_ms=None):
     return recent_move_probe(hist,12,True)
 
 
+def pullback_regime_v4(hist,decision_time_ms=None,btc_hist=None,symbol=None):
+    """Research-only professional pullback plan.
+
+    12H defines the swing trend, the last 4H move must be a counter-trend
+    pullback, and the latest completed 1H close must resume in the 12H direction.
+    For alts, an explicit opposing BTC 12H move vetoes the call. Neutral BTC is
+    allowed; the goal is to block breakdown opposition without turning BTC into
+    an excessive abstention gate.
+    """
+    if len(hist)<20:
+        return "WAIT"
+    trend=momentum_12h_probe(hist,decision_time_ms)
+    if trend not in ("LONG","SHORT"):
+        return "WAIT"
+    resumption_side=reversal_4h_probe(hist,decision_time_ms)
+    if resumption_side!=trend:
+        return "WAIT"
+
+    if trend=="LONG" and not (float(hist[-1]["c"])>float(hist[-2]["c"])):
+        return "WAIT"
+    if trend=="SHORT" and not (float(hist[-1]["c"])<float(hist[-2]["c"])):
+        return "WAIT"
+
+    sym=str(symbol or "").upper()
+    if sym and sym!="BTCUSDT":
+        if not btc_hist:
+            return "WAIT"
+        cutoff=int(hist[-1]["t"])
+        btc_as_of=[x for x in btc_hist if int(x["t"])<=cutoff]
+        btc12=recent_move_probe(btc_as_of,12,False)
+        if btc12==_opposite(trend):
+            return "WAIT"
+
+    return trend
+
+
 def future_label(rows,i,h,deadband_atr=.35):
     a=atr(rows[:i+1],14)
     if not a or i+h>=len(rows): return None
@@ -225,6 +261,7 @@ def run(symbol,days,end_ms=None,step=4,rows=None,btc_rows=None):
         "reversal_4h_probe":reversal_4h_probe,
         "momentum_12h_probe":momentum_12h_probe,
         "reversal_12h_probe":reversal_12h_probe,
+        "pullback_regime_v4":pullback_regime_v4,
     }
     rec={name:{h:[] for h in HORIZONS} for name in engines}
     for i in range(warm,len(rows)-max(HORIZONS),step):
@@ -238,6 +275,7 @@ def run(symbol,days,end_ms=None,step=4,rows=None,btc_rows=None):
             "reversal_4h_probe":reversal_4h_probe(hist,decision_time_ms),
             "momentum_12h_probe":momentum_12h_probe(hist,decision_time_ms),
             "reversal_12h_probe":reversal_12h_probe(hist,decision_time_ms),
+            "pullback_regime_v4":pullback_regime_v4(hist,decision_time_ms,btc_rows,symbol),
         }
         for h in HORIZONS:
             actual=future_label(rows,i,h)
@@ -248,7 +286,7 @@ def run(symbol,days,end_ms=None,step=4,rows=None,btc_rows=None):
 
 def main():
     ap=argparse.ArgumentParser();ap.add_argument("--days",type=int,default=180);ap.add_argument("--end-ms",type=int,default=None);ap.add_argument("--symbols",nargs="*",default=SYMBOLS);ap.add_argument("--step",type=int,default=4);a=ap.parse_args()
-    engine_names=("legacy_1h","htf_consensus","analyst_stack_v2","momentum_4h_probe","reversal_4h_probe","momentum_12h_probe","reversal_12h_probe")
+    engine_names=("legacy_1h","htf_consensus","analyst_stack_v2","momentum_4h_probe","reversal_4h_probe","momentum_12h_probe","reversal_12h_probe","pullback_regime_v4")
     merged={e:{h:[] for h in HORIZONS} for e in engine_names}
     by_symbol={}
     btc_rows=fetch_1h("BTCUSDT",a.days,a.end_ms)
@@ -272,7 +310,8 @@ def main():
         "momentum_4h_probe":"diagnostic only: continue the last 4H move when it exceeded 0.35 current 1H ATR",
         "reversal_4h_probe":"diagnostic only: fade the last 4H move when it exceeded 0.35 current 1H ATR",
         "momentum_12h_probe":"diagnostic only: continue the last 12H move when it exceeded 0.35 current 1H ATR",
-        "reversal_12h_probe":"diagnostic only: fade the last 12H move when it exceeded 0.35 current 1H ATR"
+        "reversal_12h_probe":"diagnostic only: fade the last 12H move when it exceeded 0.35 current 1H ATR",
+        "pullback_regime_v4":"professional pullback plan: 12H continuation trend + opposing 4H pullback + 1H resumption + explicit BTC 12H opposition veto for alts"
       },
       "overall":{e:{str(h)+"h":metrics(merged[e][h]) for h in HORIZONS} for e in merged},
       "by_symbol":by_symbol}
