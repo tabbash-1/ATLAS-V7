@@ -87,6 +87,7 @@ def test_final_trade_gate_live_smoke_tracks_current_guard_contract():
     current_version = 'FINAL_TRADE_READY_GUARD_V15_ACCEPTED_BREAKOUT'
     current_brain = 'ATLAS_TRADER_BRAIN_V8_INDEPENDENT_EVIDENCE_FAMILIES'
     current_continuation = 'PROD_CONTINUATION_SCORING_V3_CLOSED_CANDLE_AUTHORITY'
+    current_scoring = 'PROD_SIGNAL_SCORING_V13_EVENT_TIME_BREAKOUT'
     stale_version = 'FINAL_TRADE_READY_GUARD_V1_HTF_FAIL_CLOSED'
     assert current_version in guard
     assert current_version in workflow
@@ -95,15 +96,20 @@ def test_final_trade_gate_live_smoke_tracks_current_guard_contract():
     assert current_brain in production_workflow
     assert current_continuation in text('production_continuation_scoring.py')
     assert current_continuation in production_workflow
+    assert current_scoring in text('production_signal_scoring.py')
+    assert current_scoring in production_workflow
     assert stale_version not in workflow
     assert 'EXPECTED_FINAL_GUARD' in workflow
     assert 'EXPECTED_TRADER_BRAIN' in workflow
     assert '.final_trade_gate.trader_brain.version == $tb' in workflow
     assert "'atlas_trader_brain.py'" in production_workflow
     assert "'production_continuation_scoring.py'" in production_workflow
+    assert "'production_signal_scoring.py'" in production_workflow
     assert '.final_trade_gate.trader_brain.version == $tb' in production_workflow
     assert '.continuation_scoring_version == $cs' in production_workflow
+    assert 'contains($ss)' in production_workflow
     assert 'EXPECTED_CONTINUATION' in production_workflow
+    assert 'EXPECTED_SCORING' in production_workflow
     assert 'ATLAS_CANONICAL_DECISION_TRUTH_V1' in workflow
     assert 'FINAL_TRADE_GATE' in workflow
     assert '4-12H' in workflow
@@ -121,6 +127,13 @@ def test_paper_ui_consumes_only_canonical_outcome_summary():
     assert "d.live_execution!==false" in src
     assert "d.can_override_production!==false" in src
     assert 'CANONICAL_TRADE_COUNT_MISMATCH' in src
+
+
+def test_production_api_preserves_continuation_provenance():
+    src = text('production_decision_api.py')
+    assert "'continuation_scoring_version':(row or {}).get('continuation_scoring_version')" in src
+    assert "'continuation_context':(row or {}).get('continuation_context')" in src
+    assert "'market_breadth':(row or {}).get('market_breadth')" in src
 
 
 def test_production_decision_rejects_stale_responses():
@@ -158,6 +171,7 @@ if __name__ == '__main__':
     test_final_production_gate_tracks_current_unified_terminal_contract()
     test_final_trade_gate_live_smoke_tracks_current_guard_contract()
     test_paper_ui_consumes_only_canonical_outcome_summary()
+    test_production_api_preserves_continuation_provenance()
     test_production_decision_rejects_stale_responses()
     test_snapshot_guard_is_the_only_acceptance_surface()
     test_production_autoload_retries_transient_api_failure_without_changing_authority()

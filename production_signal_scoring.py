@@ -9,7 +9,7 @@ rather than the current candle's own high/low.
 
 import time
 
-VERSION = "PROD_SIGNAL_SCORING_V12_ACCEPTED_BREAKOUT"
+VERSION = "PROD_SIGNAL_SCORING_V13_EVENT_TIME_BREAKOUT"
 LOOKBACK_BARS = 96
 RANGE_BARS = 24
 
@@ -19,6 +19,68 @@ def _f(v, default=None):
         return float(v)
     except Exception:
         return default
+
+
+def _ema(values, period):
+    vals=[float(x) for x in values if x is not None]
+    if not vals:
+        return None
+    k=2.0/(period+1.0)
+    out=vals[0]
+    for v in vals[1:]:
+        out=v*k+out*(1-k)
+    return out
+
+
+def _rsi(values, period=14):
+    vals=[float(x) for x in values if x is not None]
+    if len(vals)<=period:
+        return None
+    deltas=[vals[i]-vals[i-1] for i in range(len(vals)-period,len(vals))]
+    gains=sum(max(x,0) for x in deltas)/period
+    losses=sum(max(-x,0) for x in deltas)/period
+    if losses==0:
+        return 100.0
+    return 100-(100/(1+gains/losses))
+
+
+def _event_direction_context(rows, index, direction):
+    """Reconstruct only what was knowable at the completed breakout bar."""
+    seq=list(rows or [])
+    if index < 0:
+        index=len(seq)+index
+    if index < 0 or index >= len(seq):
+        return {"votes":0,"momentum_24h_pct":None,"rsi14":None,"ema20":None,"ema50":None,"aligned":False}
+    hist=seq[:index+1]
+    closes=[_f(x.get('close')) for x in hist]
+    closes=[x for x in closes if x is not None]
+    if len(closes)<50:
+        return {"votes":0,"momentum_24h_pct":None,"rsi14":None,"ema20":None,"ema50":None,"aligned":False}
+    px=closes[-1]
+    ema20=_ema(closes[-80:],20)
+    ema50=_ema(closes[-120:],50)
+    rsi=_rsi(closes,14)
+    mom24=((px/closes[-25])-1)*100 if len(closes)>=25 and closes[-25] else 0.0
+    if direction=='LONG':
+        votes=sum((px>=ema20 if ema20 is not None else False,
+                   ema20>=ema50 if None not in (ema20,ema50) else False,
+                   rsi>=50 if rsi is not None else False,
+                   mom24>=0))
+        aligned=bool(votes==4 and mom24>=0)
+    else:
+        votes=sum((px<=ema20 if ema20 is not None else False,
+                   ema20<=ema50 if None not in (ema20,ema50) else False,
+                   rsi<=50 if rsi is not None else False,
+                   mom24<=0))
+        aligned=bool(votes==4 and mom24<=0)
+    return {
+        "votes":int(votes),
+        "momentum_24h_pct":round(mom24,4),
+        "rsi14":round(rsi,2) if rsi is not None else None,
+        "ema20":round(ema20,10) if ema20 is not None else None,
+        "ema50":round(ema50,10) if ema50 is not None else None,
+        "aligned":aligned,
+    }
 
 
 def candle_progress(row, now_ms=None):
@@ -144,6 +206,9 @@ def breakout_context(ks, px, direction, votes, mom24, atr, paced_rv, closed_rv=N
     breakout_age_bars=None
     breakout_bar_relative_volume=None
     breakout_bar_body_atr=None
+    breakout_event_votes=None
+    breakout_event_momentum_24h_pct=None
+    breakout_event_rsi14=None
     retest_hold=False
     # Look back up to three completed 1H bars for the actual breakout event.
     # The current completed bar must be after that event and must preserve the
@@ -162,8 +227,14 @@ def breakout_context(ks, px, direction, votes, mom24, atr, paced_rv, closed_rv=N
         event_beyond=(event_close>level) if direction=='LONG' else (event_close<level)
         event_body=abs(event_close-event_open)/atr if atr else 0.0
         event_rv=_relative_volume_at(completed,event_idx)
+        event_ctx=_event_direction_context(completed,event_idx,direction)
+        # A historical breakout bar must have satisfied the directional regime
+        # at that bar's close. Current strength cannot retroactively upgrade a
+        # weak breakout event; current votes/momentum must ALSO remain aligned.
         event_quality=bool(
-            event_beyond and votes==4 and momentum_ok
+            event_beyond
+            and event_ctx.get('aligned') is True
+            and votes==4 and momentum_ok
             and ((event_rv is not None and event_rv>=0.80) or event_body>=0.35)
         )
         if not event_quality:
@@ -188,6 +259,9 @@ def breakout_context(ks, px, direction, votes, mom24, atr, paced_rv, closed_rv=N
         breakout_age_bars=len(completed)-1-event_idx
         breakout_bar_relative_volume=event_rv
         breakout_bar_body_atr=event_body
+        breakout_event_votes=event_ctx.get('votes')
+        breakout_event_momentum_24h_pct=event_ctx.get('momentum_24h_pct')
+        breakout_event_rsi14=event_ctx.get('rsi14')
 
     return {
         # Backward-compatible name now means ENTRY-READY confirmation, not the
@@ -209,8 +283,13 @@ def breakout_context(ks, px, direction, votes, mom24, atr, paced_rv, closed_rv=N
         'closed_breakout_relative_volume': round(volume_confirmation,3),
         'accepted_breakout_bar_relative_volume': round(breakout_bar_relative_volume,3) if breakout_bar_relative_volume is not None else None,
         'accepted_breakout_bar_body_atr': round(breakout_bar_body_atr,4) if breakout_bar_body_atr is not None else None,
-        'event_rule': 'LAST_FULLY_COMPLETED_1H_AND_4_VOTES_AND_RANGE_BREAK_AND_(CLOSED_RV>=0.8_OR_BODY>=0.35ATR)',
-        'confirmation_rule': 'PRIOR_COMPLETED_BREAKOUT_EVENT_PLUS_SUBSEQUENT_COMPLETED_1H_HOLD_OR_RETEST',
+        'accepted_breakout_event_votes': breakout_event_votes,
+        'accepted_breakout_event_momentum_24h_pct': breakout_event_momentum_24h_pct,
+        'accepted_breakout_event_rsi14': breakout_event_rsi14,
+        'event_time_directional_evidence_required': True,
+        'current_directional_evidence_required': True,
+        'event_rule': 'FULLY_COMPLETED_1H_RANGE_BREAK_WITH_EVENT_TIME_4_VOTES_AND_(RV>=0.8_OR_BODY>=0.35ATR)',
+        'confirmation_rule': 'EVENT_TIME_QUALITY_PLUS_CURRENT_ALIGNMENT_PLUS_SUBSEQUENT_COMPLETED_1H_HOLD_OR_RETEST',
     }
 
 
