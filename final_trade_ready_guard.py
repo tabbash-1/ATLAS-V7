@@ -19,7 +19,7 @@ from atlas_trader_brain import assess as assess_trader
 from canonical_decision_contract import from_decision
 from golden_thesis_engine import VERSION as GOLDEN_THESIS_VERSION, build as build_golden_thesis
 
-VERSION = "FINAL_TRADE_READY_GUARD_V13_ANALYST_AUTHORITY"
+VERSION = "FINAL_TRADE_READY_GUARD_V14_DIRECTION_CONSISTENCY"
 MIN_NET_RR = 2.0
 SHORT_PRODUCTION_ENV = "ATLAS_SHORT_PRODUCTION_ENABLED"
 PRODUCT_HORIZON = "4-12H"
@@ -67,6 +67,10 @@ def _authoritative_context_state(row):
     thesis = row.get("htf_thesis") or {}
     thesis_status = _norm(thesis.get("status"))
     thesis_reason = _norm(thesis.get("reason"))
+    thesis_product = _norm(thesis.get("product_direction") or thesis.get("direction"))
+    thesis_entry = _norm(thesis.get("entry_confirmation_direction"))
+    row_product = _norm(row.get("product_direction"))
+    row_entry = _norm(row.get("entry_confirmation_direction"))
 
     symbol = _norm(row.get("symbol")).replace("BINANCE:", "")
     btc_gate = row.get("market_direction_gate") or {}
@@ -79,6 +83,19 @@ def _authoritative_context_state(row):
     # explicitly PASS.  A missing status is not permission to trade.
     if thesis_status != "PASS":
         blockers.append("HTF_THESIS_" + (thesis_reason or ("STATUS_" + thesis_status if thesis_status else "STATUS_MISSING")))
+    else:
+        # PASS is authority only when its direction is internally coherent and
+        # later overlays have not rewritten the canonical 4-12H direction.
+        if thesis_product not in {"LONG", "SHORT"}:
+            blockers.append("HTF_THESIS_PRODUCT_DIRECTION_MISSING")
+        if thesis_entry not in {"LONG", "SHORT"}:
+            blockers.append("HTF_THESIS_ENTRY_CONFIRMATION_MISSING")
+        if thesis_product in {"LONG", "SHORT"} and thesis_entry in {"LONG", "SHORT"} and thesis_product != thesis_entry:
+            blockers.append("HTF_THESIS_INTERNAL_DIRECTION_MISMATCH")
+        if row_product in {"LONG", "SHORT"} and thesis_product in {"LONG", "SHORT"} and row_product != thesis_product:
+            blockers.append("HTF_THESIS_PRODUCT_DIRECTION_MISMATCH")
+        if row_entry in {"LONG", "SHORT"} and thesis_entry in {"LONG", "SHORT"} and row_entry != thesis_entry:
+            blockers.append("HTF_THESIS_ENTRY_DIRECTION_MISMATCH")
 
     # BTC is the market anchor. Every altcoin must carry an explicit, passing
     # BTC-first gate at Final Gate; missing evidence is a WAIT, never an implicit pass.
@@ -91,11 +108,16 @@ def _authoritative_context_state(row):
     return {
         "htf_thesis_status": thesis_status or None,
         "htf_thesis_reason": thesis_reason or None,
+        "htf_thesis_product_direction": thesis_product or None,
+        "htf_thesis_entry_confirmation_direction": thesis_entry or None,
+        "row_product_direction": row_product or None,
+        "row_entry_confirmation_direction": row_entry or None,
+        "direction_consistent": not any("DIRECTION_MISMATCH" in b or "DIRECTION_MISSING" in b or "ENTRY_CONFIRMATION_MISSING" in b for b in blockers),
         "btc_first_gate_present": btc_gate_present,
         "btc_first_pass": btc_pass,
         "btc_first_reason": btc_reason,
         "blockers": blockers,
-        "rule": "HTF_EXPLICIT_PASS_REQUIRED_AND_ALTCOIN_BTC_FIRST_EXPLICIT_PASS_REQUIRED",
+        "rule": "HTF_EXPLICIT_PASS_PLUS_DIRECTION_CONSISTENCY_AND_ALTCOIN_BTC_FIRST_PASS_REQUIRED",
     }
 
 

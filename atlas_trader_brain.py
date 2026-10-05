@@ -7,7 +7,7 @@ Legacy score is evidence only and cannot independently authorize or veto a trade
 """
 from __future__ import annotations
 
-VERSION = "ATLAS_TRADER_BRAIN_V6_THREE_CONFIRMATIONS"
+VERSION = "ATLAS_TRADER_BRAIN_V7_SYMMETRIC_PULLBACK_RESUMPTION"
 MIN_RR = 2.0
 ACCEPTED_ALIGNMENT = {"ALIGNED", "CONDITIONAL_ALIGNED", "CONDITIONAL_ALIGNED_12H_NEUTRAL"}
 EXPLICIT_CONFLICT_ALIGNMENTS = {"CONFLICT", "HTF_CONFLICT", "OPPOSED", "MISALIGNED", "DIVERGENT"}
@@ -61,8 +61,9 @@ def _playbook(row):
     return "STRUCTURAL_CONTINUATION"
 
 
-def _short_pullback_confirmed(row):
-    """Require fresh 1H bearish resumption before a TREND_PULLBACK SHORT is ready."""
+def _pullback_resumption_confirmed(row, direction):
+    """Require fresh 1H resumption in the HTF direction before a trend pullback is ready."""
+    direction = _norm(direction)
     thesis = row.get("htf_thesis") or {}
     frame = ((thesis.get("frames") or {}).get("1h") or {})
     impulse = _norm(frame.get("impulse"))
@@ -70,19 +71,33 @@ def _short_pullback_confirmed(row):
     candle = frame.get("candle") or {}
     candle_direction = _norm(candle.get("direction"))
     pattern = _norm(candle.get("pattern"))
-    bearish_pattern = pattern in {"BEARISH_ENGULFING", "SHOOTING_STAR_REJECTION", "BEARISH_DISPLACEMENT"}
+    if direction == "LONG":
+        expected_impulse = "BULLISH"
+        expected_candle = "BULLISH"
+        accepted_patterns = {"BULLISH_ENGULFING", "HAMMER_REJECTION", "BULLISH_DISPLACEMENT"}
+    elif direction == "SHORT":
+        expected_impulse = "BEARISH"
+        expected_candle = "BEARISH"
+        accepted_patterns = {"BEARISH_ENGULFING", "SHOOTING_STAR_REJECTION", "BEARISH_DISPLACEMENT"}
+    else:
+        expected_impulse = None
+        expected_candle = None
+        accepted_patterns = set()
     confirmed = bool(
-        impulse == "BEARISH"
-        and bias == "SHORT"
-        and (candle_direction == "BEARISH" or bearish_pattern)
+        direction in {"LONG", "SHORT"}
+        and impulse == expected_impulse
+        and bias == direction
+        and (candle_direction == expected_candle or pattern in accepted_patterns)
     )
     return confirmed, {
         "timeframe": "1h",
+        "direction": direction or None,
         "impulse": impulse or None,
         "bias": bias or None,
         "candle_direction": candle_direction or None,
         "candle_pattern": pattern or None,
-        "rule": "1H_SHORT_BIAS_PLUS_BEARISH_IMPULSE_PLUS_BEARISH_CANDLE",
+        "accepted_reversal_or_displacement_patterns": sorted(accepted_patterns),
+        "rule": "1H_DIRECTIONAL_BIAS_PLUS_IMPULSE_PLUS_CANDLE_RESUMPTION",
     }
 
 
@@ -104,10 +119,8 @@ def assess(row):
     mode = _norm(plan.get("entry_mode"))
     rr = _rr2(row)
     playbook = _playbook(row)
-    short_pullback_confirmed, short_pullback_evidence = _short_pullback_confirmed(row)
-    if product == "SHORT" and playbook == "TREND_PULLBACK" and not short_pullback_confirmed:
-        # Thesis may remain valid, but do not enter before fresh bearish resumption.
-        pass
+    pullback_resumption_confirmed, pullback_resumption_evidence = _pullback_resumption_confirmed(row, product)
+    pullback_requires_resumption = bool(product in {"LONG", "SHORT"} and playbook == "TREND_PULLBACK")
 
     fatal = []
     waits = []
@@ -131,8 +144,8 @@ def assess(row):
         waits.append("TRADER_WAIT_1H_TRIGGER")
     if not geometry_ready:
         waits.append("TRADER_WAIT_VALID_LOCATION")
-    if product == "SHORT" and playbook == "TREND_PULLBACK" and not short_pullback_confirmed:
-        waits.append("TRADER_WAIT_SHORT_PULLBACK_RESUMPTION")
+    if pullback_requires_resumption and not pullback_resumption_confirmed:
+        waits.append("TRADER_WAIT_LONG_PULLBACK_RESUMPTION" if product == "LONG" else "TRADER_WAIT_SHORT_PULLBACK_RESUMPTION")
 
     # Require at least three independent evidence families before TRADE_READY.
     # Score itself is deliberately excluded: it is a summary, not an independent confirmation.
@@ -174,7 +187,8 @@ def assess(row):
     if fatal:
         stage = "NO_TRADE"
     elif waits:
-        stage = "WAIT_TRIGGER" if "TRADER_WAIT_1H_TRIGGER" in waits else "WAIT_LOCATION"
+        trigger_waits = {"TRADER_WAIT_1H_TRIGGER", "TRADER_WAIT_LONG_PULLBACK_RESUMPTION", "TRADER_WAIT_SHORT_PULLBACK_RESUMPTION"}
+        stage = "WAIT_TRIGGER" if any(w in trigger_waits for w in waits) else "WAIT_LOCATION"
     else:
         stage = "TRADE_READY"
 
@@ -186,8 +200,14 @@ def assess(row):
         "alignment_class": alignment or None,
         "location_state": "OVEREXTENDED" if overextended else ("VALID" if geometry_ready else "WAIT"),
         "setup_playbook": playbook,
-        "short_pullback_resumption_confirmed": short_pullback_confirmed,
-        "short_pullback_resumption_evidence": short_pullback_evidence,
+        "pullback_resumption_required": pullback_requires_resumption,
+        "pullback_resumption_confirmed": pullback_resumption_confirmed,
+        "pullback_resumption_evidence": pullback_resumption_evidence,
+        # Backward-compatible fields for existing Production diagnostics.
+        "short_pullback_resumption_confirmed": pullback_resumption_confirmed if product == "SHORT" else None,
+        "short_pullback_resumption_evidence": pullback_resumption_evidence if product == "SHORT" else None,
+        "long_pullback_resumption_confirmed": pullback_resumption_confirmed if product == "LONG" else None,
+        "long_pullback_resumption_evidence": pullback_resumption_evidence if product == "LONG" else None,
         "entry_trigger_ready": entry == product and product in {"LONG", "SHORT"},
         "entry_mode": mode or None,
         "desired_entry_mode": "PULLBACK_RETEST" if overextended and mode == "NOW" else (mode or None),
