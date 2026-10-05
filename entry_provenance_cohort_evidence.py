@@ -25,7 +25,8 @@ MIN_ABS_DELTA_R=0.25
 
 DIMENSIONS=(
     "direction","score_margin_bucket","htf_alignment_class","htf_regime",
-    "breakout_confirmed","continuation_strong","futures_alignment",
+    "breakout_confirmed","breakout_acceptance_mode","breakout_retest_hold",
+    "independent_confirmation_count","continuation_strong","futures_alignment",
     "entry_mode","scenario_readiness","setup_quality_status","playbook","market_regime",
 )
 
@@ -83,6 +84,20 @@ def _feature_row(row: dict[str,Any], cost_map: dict[str,dict[str,Any]]) -> dict[
     def val(k, fallback=None):
         x=p.get(k)
         return fallback if x is None else x
+    breakout=p.get("breakout_acceptance") or {}
+    if not isinstance(breakout,dict): breakout={}
+    acceptance_required=breakout.get("final_gate_requires_acceptance")
+    if acceptance_required is True:
+        acceptance_mode=str(breakout.get("acceptance_mode") or "UNKNOWN")
+        breakout_retest_hold=str(breakout.get("retest_hold")) if breakout.get("retest_hold") is not None else "UNKNOWN"
+    elif acceptance_required is False:
+        acceptance_mode="NOT_APPLICABLE"
+        breakout_retest_hold="NOT_APPLICABLE"
+    else:
+        acceptance_mode="UNKNOWN"
+        breakout_retest_hold="UNKNOWN"
+    independent_count=p.get("independent_confirmation_count")
+    independent_count="UNKNOWN" if independent_count is None else str(independent_count)
     return {
         "decision_id":did,"symbol":row.get("symbol"),"direction":str(row.get("direction") or "UNKNOWN").upper(),
         "captured_at":row.get("captured_at"),"gross_r":gross,"net_r":net,
@@ -91,6 +106,11 @@ def _feature_row(row: dict[str,Any], cost_map: dict[str,dict[str,Any]]) -> dict[
         "htf_alignment_class":str(val("htf_alignment_class","UNKNOWN")),
         "htf_regime":str(val("htf_regime","UNKNOWN")),
         "breakout_confirmed":str(val("breakout_confirmed","UNKNOWN")),
+        "breakout_acceptance_mode":acceptance_mode,
+        "breakout_retest_hold":breakout_retest_hold,
+        "independent_confirmation_count":independent_count,
+        "final_trade_gate_version":str(val("final_trade_gate_version","UNKNOWN")),
+        "trader_brain_version":str(val("trader_brain_version","UNKNOWN")),
         "continuation_strong":str(val("continuation_strong","UNKNOWN")),
         "futures_alignment":str(val("futures_alignment","UNKNOWN")),
         "entry_mode":str(val("entry_mode","UNKNOWN")),
