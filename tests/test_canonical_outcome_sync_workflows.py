@@ -54,8 +54,13 @@ def test_canonical_outcome_summary_reports_drawdown_from_strict_settled_rows():
     assert '"max_drawdown_pct": round(max(drawdowns), 4) if drawdowns else None' in text
 
 
-def test_evidence_publishers_checkout_latest_main_before_generation():
-    for path in (PAPER, FORWARD, SNAPSHOT):
+def test_evidence_publishers_checkout_correct_revision_before_generation():
+    paper = PAPER.read_text(encoding="utf-8")
+    assert "ref: ${{ github.event_name == 'pull_request' && github.sha || 'main' }}" in paper
+    assert "fetch-depth: 0" in paper
+
+    # Scheduled/push evidence owners still generate from latest main.
+    for path in (FORWARD, SNAPSHOT):
         text = path.read_text(encoding="utf-8")
         assert "ref: main" in text
         assert "fetch-depth: 0" in text
