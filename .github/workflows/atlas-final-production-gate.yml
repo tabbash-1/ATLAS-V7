@@ -6,6 +6,7 @@ on:
     paths:
       - 'canonical_decision_contract.py'
       - 'final_trade_ready_guard.py'
+      - 'atlas_trader_brain.py'
       - 'cloud_web_only_final.py'
       - 'cloud_web_only.py'
       - 'product_quality_gate_overlay.py'
@@ -34,6 +35,7 @@ jobs:
     env:
       BASE_URL: https://atlas-v7.onrender.com
       EXPECTED_FINAL_GUARD: FINAL_TRADE_READY_GUARD_V14_DIRECTION_CONSISTENCY
+      EXPECTED_TRADER_BRAIN: ATLAS_TRADER_BRAIN_V8_INDEPENDENT_EVIDENCE_FAMILIES
       EXPECTED_CANONICAL: ATLAS_CANONICAL_DECISION_TRUTH_V1
       EXPECTED_GEOMETRY: ATLAS_CANONICAL_GEOMETRY_TRUTH_V1
     steps:
@@ -43,7 +45,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m py_compile canonical_decision_contract.py final_trade_ready_guard.py cloud_web_only_final.py
+          python3 -m py_compile canonical_decision_contract.py final_trade_ready_guard.py atlas_trader_brain.py cloud_web_only_final.py
+          grep -Fq 'ATLAS_TRADER_BRAIN_V8_INDEPENDENT_EVIDENCE_FAMILIES' atlas_trader_brain.py
           node --check production-web-autoload.js
           node --check atlas-product-shell.js
           node --check atlas-unified-terminal.js
@@ -92,7 +95,7 @@ jobs:
             s="$1"; out="/tmp/atlas-final-gate/$s.json"; success=0
             for attempt in $(seq 1 10); do
               code=$(curl -L --connect-timeout 20 --max-time 90 -sS -w '%{http_code}' -o "$out.tmp" "$BASE_URL/api/decision/current?symbol=$s&t=$(date +%s%N)" || true)
-              if [[ "$code" =~ ^2 ]] && jq -e '.ok == true' "$out.tmp" >/dev/null 2>&1; then mv "$out.tmp" "$out"; success=1; break; fi
+              if [[ "$code" =~ ^2 ]] && jq -e --arg tb "$EXPECTED_TRADER_BRAIN" '.ok == true and .final_trade_gate.trader_brain.version == $tb' "$out.tmp" >/dev/null 2>&1; then mv "$out.tmp" "$out"; success=1; break; fi
               echo "$s fetch attempt=$attempt http=$code"
               rm -f "$out.tmp"; sleep 6
             done
@@ -100,10 +103,11 @@ jobs:
           }
           for s in BTCUSDT ETHUSDT SOLUSDT XRPUSDT BNBUSDT DOGEUSDT ZECUSDT ADAUSDT LINKUSDT AVAXUSDT LTCUSDT HYPEUSDT; do
             fetch_decision "$s"
-            jq -e --arg s "$s" --arg cv "$EXPECTED_CANONICAL" --arg fg "$EXPECTED_FINAL_GUARD" '
+            jq -e --arg s "$s" --arg cv "$EXPECTED_CANONICAL" --arg fg "$EXPECTED_FINAL_GUARD" --arg tb "$EXPECTED_TRADER_BRAIN" '
               .ok == true and .symbol == $s and
               .analysis_only == true and .live_execution == false and
               .final_trade_gate.version == $fg and
+              .final_trade_gate.trader_brain.version == $tb and
               .canonical_decision.schema == $cv and
               .canonical_decision.canonical_source_present == true and
               .canonical_decision.source_of_truth == "FINAL_TRADE_GATE" and
@@ -157,6 +161,7 @@ jobs:
           set -euo pipefail
           grep -Fq 'ATLAS_CANONICAL_DECISION_TRUTH_V1' canonical_decision_contract.py
           grep -Fq 'FINAL_TRADE_READY_GUARD_V14_DIRECTION_CONSISTENCY' final_trade_ready_guard.py
+          grep -Fq 'ATLAS_TRADER_BRAIN_V8_INDEPENDENT_EVIDENCE_FAMILIES' atlas_trader_brain.py
           grep -Fq 'BREAKOUT_STRUCTURE_NOT_CONFIRMED' final_trade_ready_guard.py
           grep -Fq 'BREAKOUT_CONFIRMATION_EVIDENCE_MISSING' final_trade_ready_guard.py
           echo 'ATLAS FINAL PRODUCTION GATE: PASS · SOURCE_OF_TRUTH=FINAL_TRADE_GATE · STRUCTURE_CONFIRMATION=REQUIRED_FOR_BREAKOUT'
