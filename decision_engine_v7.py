@@ -4,7 +4,7 @@ import production_signal_scoring as scoring
 import futures_provider_chain
 import production_trade_plan
 
-VERSION = 'DECISION_ENGINE_V12_1_5ATR_QUALIFICATION_GEOMETRY'
+VERSION = 'DECISION_ENGINE_V13_ACCEPTED_BREAKOUT_GEOMETRY'
 
 
 def opportunity_state(direction, qualified, execution_ready, plan_status=None):
@@ -93,12 +93,18 @@ def install(atlas):
         continuation_strong=bool(votes==4 and momentum_adj>=4 and breadth_adj>=2 and guard_adj>=0)
         if direction in ('LONG','SHORT') and px and atr and atr>0:
             ks=atlas._spot_klines(sym); level,distance,source=scoring.structural_obstacle(ks,px,direction)
-            breakout=scoring.breakout_context(ks,px,direction,votes,mom24,atr,paced_rv); extension=1.6 if breakout.get('confirmed') else 1.4
+            closed=list(ks or [])[:-1]
+            closed_vols=[atlas.fnum(x.get('volume')) for x in closed]
+            closed_vols=[x for x in closed_vols if x is not None]
+            closed_vol_base=(sum(closed_vols[-21:-1])/20) if len(closed_vols)>=21 else (closed_vols[-1] if closed_vols else 0)
+            closed_rv=(closed_vols[-1]/closed_vol_base) if closed_vols and closed_vol_base else 1.0
+            breakout=scoring.breakout_context(ks,px,direction,votes,mom24,atr,paced_rv,closed_rv=closed_rv)
+            extension=1.6 if breakout.get('entry_ready') else 1.4
             target=level; target_source=source
             if continuation_strong and level is not None and distance is not None and distance<=1.5:
                 target=level+atr*1.4 if direction=='LONG' else level-atr*1.4; target_source='CONTINUATION_EXTENSION_BEYOND_PRIOR_STRUCTURE'
             elif target is None:
-                target=px+atr*extension if direction=='LONG' else px-atr*extension; target_source='ATR_EXTENSION_AFTER_CLEAR_STRUCTURE'
+                target=px+atr*extension if direction=='LONG' else px-atr*extension; target_source='ATR_EXTENSION_AFTER_ACCEPTED_STRUCTURE' if breakout.get('entry_ready') else 'ATR_EXTENSION_AFTER_CLEAR_STRUCTURE'
             stop=px-atr*1.5 if direction=='LONG' else px+atr*1.5; risk=abs(px-stop)
             reward=(target-px) if direction=='LONG' else (px-target); rr=reward/risk if risk>0 and reward>0 else None
             directional=bool(rr is not None and ((direction=='LONG' and stop<px<target) or (direction=='SHORT' and target<px<stop)))
@@ -109,7 +115,7 @@ def install(atlas):
             result['execution_ready']=bool(qualified and geometry_ok); result['actionable_decision']=direction if result['execution_ready'] else 'WAIT'
             result['actionable_reason']='EXECUTION_READY_CONTINUATION_AWARE' if result['execution_ready'] and continuation_strong else 'EXECUTION_READY_BREAKOUT_AWARE' if result['execution_ready'] else result['geometry_gate']['reason'] if qualified else result.get('wait_reason')
             result['trade_plan_status']='EXECUTION_READY' if result['execution_ready'] else 'SCORE_QUALIFIED_GEOMETRY_BLOCKED' if qualified else result.get('trade_plan_status')
-            matrix=result.get('timeframe_matrix') or {}; swing=matrix.get('swing') or {}; swing.update({'risk_reward':result['risk_reward'],'execution_ready':result['execution_ready'],'actionable_decision':result['actionable_decision'],'structural_target_source':target_source,'breakout_confirmed':bool(breakout.get('confirmed')),'continuation_strong':continuation_strong}); matrix['swing']=swing; result['timeframe_matrix']=matrix
+            matrix=result.get('timeframe_matrix') or {}; swing=matrix.get('swing') or {}; swing.update({'risk_reward':result['risk_reward'],'execution_ready':result['execution_ready'],'actionable_decision':result['actionable_decision'],'structural_target_source':target_source,'breakout_confirmed':bool(breakout.get('entry_ready')),'continuation_strong':continuation_strong}); matrix['swing']=swing; result['timeframe_matrix']=matrix
         result['trade_plan']=production_trade_plan.build(result)
         plan=result['trade_plan']
         qualified=bool(result.get('production_signal_qualified'))
