@@ -8,7 +8,7 @@ the canonical ATLAS product horizon. This module never routes orders.
 
 from swing_target_engine import build as build_swing_targets
 
-VERSION = 'PRODUCTION_TRADE_PLAN_V10_MIN_1_5ATR_INVALIDATION'
+VERSION = 'PRODUCTION_TRADE_PLAN_V11_ACCEPTED_BREAKOUT'
 GEOMETRY_VERSION = 'ATLAS_GEOMETRY_V6_MIN_1_5_ATR_INVALIDATION'
 PRODUCT_HORIZON = '4-12H'
 PRODUCT_EVALUATION_HORIZONS = ['4h', '8h', '12h']
@@ -54,10 +54,10 @@ def build(decision):
     px=_num(decision.get('entry')); atr=_num((decision.get('indicators') or {}).get('atr14'))
     geom=decision.get('structural_geometry') or {}; br=geom.get('breakout') or {}
     obstacle=_num(geom.get('obstacle_price'))
-    continuation=bool(geom.get('continuation_strong')); breakout=bool(br.get('confirmed'))
+    continuation=bool(geom.get('continuation_strong')); breakout=bool(br.get('entry_ready') is True)
     # Legacy execution_ready is score-derived upstream and remains evidence only.
     # Current-entry readiness is structural; score cannot authorize NOW entry.
-    # NOW entry requires a confirmed structure break plus a strong continuation
+    # NOW entry requires an accepted structure break (post-break hold/retest) plus a strong continuation
     # state. A bare breakout flag is insufficient and was a source of weak/late
     # breakout entries in the settled baseline.
     ready_raw=bool(breakout and continuation and geom and decision.get('candidate_direction') in ('LONG','SHORT'))
