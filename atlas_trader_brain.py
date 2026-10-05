@@ -7,7 +7,7 @@ Legacy score is evidence only and cannot independently authorize or veto a trade
 """
 from __future__ import annotations
 
-VERSION = "ATLAS_TRADER_BRAIN_V8_INDEPENDENT_EVIDENCE_FAMILIES"
+VERSION = "ATLAS_TRADER_BRAIN_V9_REAL_1H_MOMENTUM"
 MIN_RR = 2.0
 ACCEPTED_ALIGNMENT = {"ALIGNED", "CONDITIONAL_ALIGNED", "CONDITIONAL_ALIGNED_12H_NEUTRAL"}
 EXPLICIT_CONFLICT_ALIGNMENTS = {"CONFLICT", "HTF_CONFLICT", "OPPOSED", "MISALIGNED", "DIVERGENT"}
@@ -59,6 +59,49 @@ def _playbook(row):
     if "PULLBACK" in raw or mode == "PULLBACK":
         return "TREND_PULLBACK"
     return "STRUCTURAL_CONTINUATION"
+
+
+def _one_hour_momentum_confirmed(row, direction):
+    """Require actual completed 1H momentum evidence in the product direction.
+
+    Candidate/entry direction agreement is routing metadata, not an independent
+    momentum confirmation. MOMENTUM therefore comes only from the canonical 1H
+    frame impulse plus a directionally confirming candle/pattern.
+    """
+    direction = _norm(direction)
+    thesis = row.get("htf_thesis") or {}
+    frame = ((thesis.get("frames") or {}).get("1h") or {})
+    impulse = _norm(frame.get("impulse"))
+    candle = frame.get("candle") or {}
+    candle_direction = _norm(candle.get("direction"))
+    pattern = _norm(candle.get("pattern"))
+    if direction == "LONG":
+        expected_impulse = "BULLISH"
+        expected_candle = "BULLISH"
+        accepted_patterns = {"BULLISH_ENGULFING", "HAMMER_REJECTION", "BULLISH_DISPLACEMENT"}
+    elif direction == "SHORT":
+        expected_impulse = "BEARISH"
+        expected_candle = "BEARISH"
+        accepted_patterns = {"BEARISH_ENGULFING", "SHOOTING_STAR_REJECTION", "BEARISH_DISPLACEMENT"}
+    else:
+        expected_impulse = None
+        expected_candle = None
+        accepted_patterns = set()
+    confirmed = bool(
+        direction in {"LONG", "SHORT"}
+        and impulse == expected_impulse
+        and (candle_direction == expected_candle or pattern in accepted_patterns)
+    )
+    return confirmed, {
+        "timeframe": "1h",
+        "direction": direction or None,
+        "impulse": impulse or None,
+        "candle_direction": candle_direction or None,
+        "candle_pattern": pattern or None,
+        "accepted_patterns": sorted(accepted_patterns),
+        "rule": "1H_IMPULSE_PLUS_DIRECTIONAL_CANDLE_OR_PATTERN",
+        "candidate_direction_agreement_is_momentum": False,
+    }
 
 
 def _pullback_resumption_confirmed(row, direction):
@@ -119,6 +162,7 @@ def assess(row):
     mode = _norm(plan.get("entry_mode"))
     rr = _rr2(row)
     playbook = _playbook(row)
+    one_hour_momentum_confirmed, one_hour_momentum_evidence = _one_hour_momentum_confirmed(row, product)
     pullback_resumption_confirmed, pullback_resumption_evidence = _pullback_resumption_confirmed(row, product)
     pullback_requires_resumption = bool(product in {"LONG", "SHORT"} and playbook == "TREND_PULLBACK")
 
@@ -142,6 +186,8 @@ def assess(row):
 
     if entry != product and product in {"LONG", "SHORT"}:
         waits.append("TRADER_WAIT_1H_TRIGGER")
+    elif product in {"LONG", "SHORT"} and not one_hour_momentum_confirmed:
+        waits.append("TRADER_WAIT_1H_MOMENTUM_CONFIRMATION")
     if not geometry_ready:
         waits.append("TRADER_WAIT_VALID_LOCATION")
     if pullback_requires_resumption and not pullback_resumption_confirmed:
@@ -155,7 +201,11 @@ def assess(row):
     # and structural location are one STRUCTURE family and must never be double-counted.
     if product in {"LONG", "SHORT"} and alignment in ACCEPTED_ALIGNMENT and geometry_ready:
         confirmations.append("STRUCTURE")
-    momentum_ready = bool(entry == product and product in {"LONG", "SHORT"})
+    momentum_ready = bool(
+        entry == product
+        and product in {"LONG", "SHORT"}
+        and one_hour_momentum_confirmed
+    )
     if pullback_requires_resumption:
         momentum_ready = bool(momentum_ready and pullback_resumption_confirmed)
     if momentum_ready:
@@ -190,7 +240,7 @@ def assess(row):
     if fatal:
         stage = "NO_TRADE"
     elif waits:
-        trigger_waits = {"TRADER_WAIT_1H_TRIGGER", "TRADER_WAIT_LONG_PULLBACK_RESUMPTION", "TRADER_WAIT_SHORT_PULLBACK_RESUMPTION"}
+        trigger_waits = {"TRADER_WAIT_1H_TRIGGER", "TRADER_WAIT_1H_MOMENTUM_CONFIRMATION", "TRADER_WAIT_LONG_PULLBACK_RESUMPTION", "TRADER_WAIT_SHORT_PULLBACK_RESUMPTION"}
         stage = "WAIT_TRIGGER" if any(w in trigger_waits for w in waits) else "WAIT_LOCATION"
     else:
         stage = "TRADE_READY"
@@ -211,7 +261,10 @@ def assess(row):
         "short_pullback_resumption_evidence": pullback_resumption_evidence if product == "SHORT" else None,
         "long_pullback_resumption_confirmed": pullback_resumption_confirmed if product == "LONG" else None,
         "long_pullback_resumption_evidence": pullback_resumption_evidence if product == "LONG" else None,
-        "entry_trigger_ready": entry == product and product in {"LONG", "SHORT"},
+        "one_hour_momentum_confirmed": one_hour_momentum_confirmed,
+        "one_hour_momentum_evidence": one_hour_momentum_evidence,
+        "entry_direction_aligned": entry == product and product in {"LONG", "SHORT"},
+        "entry_trigger_ready": momentum_ready,
         "entry_mode": mode or None,
         "desired_entry_mode": "PULLBACK_RETEST" if overextended and mode == "NOW" else (mode or None),
         "extension_guard_reason": extension_reason or None,
