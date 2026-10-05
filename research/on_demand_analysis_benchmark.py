@@ -22,8 +22,9 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0,str(ROOT))
 
 from historical_core_4_12h_replay import fetch_1h, direction, atr, ema, rsi
+from research.alpha_core_v2 import decision as alpha_core_v2_decision
 
-VERSION="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V5_TEMPORAL_ROBUSTNESS"
+VERSION="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V6_ALPHA_CORE_V2"
 SYMBOLS=["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","BNBUSDT","DOGEUSDT","ZECUSDT","ADAUSDT","LINKUSDT","AVAXUSDT","LTCUSDT"]
 HORIZONS=(4,8,12)
 HOUR_MS=60*60*1000
@@ -144,6 +145,10 @@ def analyst_stack_v2(hist,decision_time_ms=None,btc_hist=None,symbol=None):
     return side
 
 
+def alpha_core_v2_engine(hist,decision_time_ms=None,btc_hist=None,symbol=None):
+    return alpha_core_v2_decision(hist,decision_time_ms,btc_hist,symbol)
+
+
 def recent_move_probe(hist,bars,invert=False,deadband_atr=.35):
     """Diagnostic only: asks whether recent realized move tends to persist or reverse."""
     if len(hist)<=bars:
@@ -259,6 +264,7 @@ def run(symbol,days,end_ms=None,step=4,rows=None,btc_rows=None):
         "legacy_1h":legacy_1h,
         "htf_consensus":htf_consensus,
         "analyst_stack_v2":analyst_stack_v2,
+        "alpha_core_v2":alpha_core_v2_engine,
         "momentum_4h_probe":momentum_4h_probe,
         "reversal_4h_probe":reversal_4h_probe,
         "momentum_12h_probe":momentum_12h_probe,
@@ -273,6 +279,7 @@ def run(symbol,days,end_ms=None,step=4,rows=None,btc_rows=None):
             "legacy_1h":legacy_1h(hist,decision_time_ms),
             "htf_consensus":htf_consensus(hist,decision_time_ms),
             "analyst_stack_v2":analyst_stack_v2(hist,decision_time_ms,btc_rows,symbol),
+            "alpha_core_v2":alpha_core_v2_engine(hist,decision_time_ms,btc_rows,symbol),
             "momentum_4h_probe":momentum_4h_probe(hist,decision_time_ms),
             "reversal_4h_probe":reversal_4h_probe(hist,decision_time_ms),
             "momentum_12h_probe":momentum_12h_probe(hist,decision_time_ms),
@@ -288,7 +295,7 @@ def run(symbol,days,end_ms=None,step=4,rows=None,btc_rows=None):
 
 def main():
     ap=argparse.ArgumentParser();ap.add_argument("--days",type=int,default=180);ap.add_argument("--end-ms",type=int,default=None);ap.add_argument("--symbols",nargs="*",default=SYMBOLS);ap.add_argument("--step",type=int,default=4);a=ap.parse_args()
-    engine_names=("legacy_1h","htf_consensus","analyst_stack_v2","momentum_4h_probe","reversal_4h_probe","momentum_12h_probe","reversal_12h_probe","thesis12_pullback4_probe")
+    engine_names=("legacy_1h","htf_consensus","analyst_stack_v2","alpha_core_v2","momentum_4h_probe","reversal_4h_probe","momentum_12h_probe","reversal_12h_probe","thesis12_pullback4_probe")
     merged={e:{h:[] for h in HORIZONS} for e in engine_names}
     by_symbol={}
     btc_rows=fetch_1h("BTCUSDT",a.days,a.end_ms)
@@ -309,6 +316,7 @@ def main():
         "legacy_1h":"fixed simple 1H state baseline",
         "htf_consensus":"fixed 4H/12H agreement with non-opposing 1H confirmation",
         "analyst_stack_v2":"4H primary thesis; 12H/1D opposition veto; 1H resumption trigger; BTC-first alt veto; 1.5ATR extension and RSI 80/20 blowoff veto",
+        "alpha_core_v2":"regime-adaptive 4-12H challenger: 12H thesis/4H pullback, confirmed breakout/trend continuation, range mean-reversion, 1H timing, BTC-first",
         "momentum_4h_probe":"diagnostic only: continue the last 4H move when it exceeded 0.35 current 1H ATR",
         "reversal_4h_probe":"diagnostic only: fade the last 4H move when it exceeded 0.35 current 1H ATR",
         "momentum_12h_probe":"diagnostic only: continue the last 12H move when it exceeded 0.35 current 1H ATR",
@@ -318,7 +326,7 @@ def main():
       "overall":{e:{str(h)+"h":metrics(merged[e][h]) for h in HORIZONS} for e in merged},
       "temporal_robustness":{
         e:{str(h)+"h":temporal_thirds(merged[e][h]) for h in HORIZONS}
-        for e in ("reversal_4h_probe","htf_consensus","legacy_1h")
+        for e in ("alpha_core_v2","reversal_4h_probe","htf_consensus","legacy_1h")
       },
       "by_symbol":by_symbol}
     print("ATLAS_ON_DEMAND_BENCHMARK="+json.dumps(result,sort_keys=True))
