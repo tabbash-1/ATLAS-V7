@@ -5,7 +5,14 @@ def base_row(i=1, net=.5, direction="LONG", score=75, feature=None):
     p={"schema":m.PROVENANCE_SCHEMA,"frozen_before_outcome":True,"strategy_epoch_id":m.EPOCH_ID,
        "product_horizon":"4-12H","production_threshold_locked":68,"score":score,"threshold":68,
        "htf_alignment_class":"ALIGNED","htf_regime":"4H_DIRECTIONAL_12H_NEUTRAL",
-       "breakout_confirmed":True,"continuation_strong":True,"futures_alignment":"ALIGNED",
+       "breakout_confirmed":True,
+       "breakout_acceptance":{
+           "final_gate_requires_acceptance":True,"acceptance_mode":"RETEST_HOLD","retest_hold":True,
+       },
+       "independent_confirmation_count":3,
+       "final_trade_gate_version":"FINAL_TRADE_READY_GUARD_V15_ACCEPTED_BREAKOUT",
+       "trader_brain_version":"ATLAS_TRADER_BRAIN_V8_INDEPENDENT_EVIDENCE_FAMILIES",
+       "continuation_strong":True,"futures_alignment":"ALIGNED",
        "entry_mode":"NOW","scenario_readiness":"READY","setup_quality_status":"PASS",
        "playbook":"TREND_PULLBACK_LONG","market_regime":"TREND_UP"}
     if feature: p.update(feature)
@@ -34,6 +41,37 @@ def test_feature_row_uses_frozen_preoutcome_fields():
     assert z["score_margin_bucket"]=="MARGIN_LE_0"
     assert z["futures_alignment"]=="OPPOSED"
     assert z["breakout_confirmed"]=="False"
+
+
+def test_feature_row_exposes_v15_breakout_acceptance_dimensions():
+    r=base_row()
+    z=m._feature_row(r,cost_map([r]))
+    assert z["breakout_acceptance_mode"]=="RETEST_HOLD"
+    assert z["breakout_retest_hold"]=="True"
+    assert z["independent_confirmation_count"]=="3"
+    assert z["final_trade_gate_version"]=="FINAL_TRADE_READY_GUARD_V15_ACCEPTED_BREAKOUT"
+    assert z["trader_brain_version"]=="ATLAS_TRADER_BRAIN_V8_INDEPENDENT_EVIDENCE_FAMILIES"
+
+
+def test_non_breakout_v15_row_is_not_mislabeled_unknown():
+    r=base_row(feature={"breakout_acceptance":{
+        "final_gate_requires_acceptance":False,
+        "acceptance_mode":"NONE",
+        "retest_hold":False,
+    }})
+    z=m._feature_row(r,cost_map([r]))
+    assert z["breakout_acceptance_mode"]=="NOT_APPLICABLE"
+    assert z["breakout_retest_hold"]=="NOT_APPLICABLE"
+
+
+def test_legacy_row_without_acceptance_provenance_stays_unknown_not_backfilled():
+    r=base_row()
+    r["decision_provenance"].pop("breakout_acceptance",None)
+    r["decision_provenance"].pop("independent_confirmation_count",None)
+    z=m._feature_row(r,cost_map([r]))
+    assert z["breakout_acceptance_mode"]=="UNKNOWN"
+    assert z["breakout_retest_hold"]=="UNKNOWN"
+    assert z["independent_confirmation_count"]=="UNKNOWN"
 
 
 def test_score_margin_buckets_locked():
