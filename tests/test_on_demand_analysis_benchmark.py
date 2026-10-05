@@ -32,3 +32,19 @@ def test_future_label_has_real_wait_deadband(monkeypatch):
     assert m.future_label(rows,14,4)=="LONG"
     rows[18]["c"]=99.0
     assert m.future_label(rows,14,4)=="SHORT"
+
+
+def _candles(timestamps):
+    return [{"t":t,"o":float(i+1),"h":float(i+2),"l":float(i),"c":float(i+1.5),"v":1.0}
+            for i,t in enumerate(timestamps)]
+
+def test_resample_closed_excludes_open_htf_bar():
+    rows=_candles([i*m.HOUR_MS for i in range(12)])
+    assert len(m.resample_closed(rows,4,4*m.HOUR_MS))==1
+    assert len(m.resample_closed(rows,12,11*m.HOUR_MS))==0
+    assert len(m.resample_closed(rows,12,12*m.HOUR_MS))==1
+
+def test_resample_closed_rejects_gaps_in_htf_bar():
+    rows=_candles([i*m.HOUR_MS for i in range(12) if i!=5])
+    bars=m.resample_closed(rows,12,12*m.HOUR_MS)
+    assert bars==[]
