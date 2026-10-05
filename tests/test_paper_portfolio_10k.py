@@ -328,6 +328,41 @@ def test_excursion_evidence_is_nonnegative_by_definition():
         p.market_klines=old_market
 
 
+def test_breakout_acceptance_forward_summary_is_prospective_only():
+    cohort=[
+        {'id':'a','decision_provenance':{'breakout_acceptance':{'final_gate_requires_acceptance':True,'acceptance_mode':'RETEST_HOLD'}}},
+        {'id':'b','decision_provenance':{'breakout_acceptance':{'final_gate_requires_acceptance':True,'acceptance_mode':'MULTI_CLOSE_HOLD'}}},
+        {'id':'old','decision_provenance':{'breakout_confirmed':True}},
+    ]
+    settlements=[
+        {'id':'a','terminal':True,'r_multiple':2.0},
+        {'id':'b','terminal':True,'r_multiple':-1.0},
+        {'id':'old','terminal':True,'r_multiple':2.0},
+    ]
+    s=p.breakout_acceptance_forward_summary(cohort,settlements,min_closed_per_mode=2)
+    assert s['entries']==2
+    assert s['closed']==2
+    assert s['modes']['RETEST_HOLD']['avg_r']==2.0
+    assert s['modes']['MULTI_CLOSE_HOLD']['avg_r']==-1.0
+    assert s['ready_for_mode_comparison'] is False
+    assert s['research_only'] is True
+    assert s['can_override_production'] is False
+
+
+def test_breakout_acceptance_comparison_needs_both_modes_mature():
+    cohort=[
+        {'id':'a','decision_provenance':{'breakout_acceptance':{'final_gate_requires_acceptance':True,'acceptance_mode':'RETEST_HOLD'}}},
+        {'id':'b','decision_provenance':{'breakout_acceptance':{'final_gate_requires_acceptance':True,'acceptance_mode':'MULTI_CLOSE_HOLD'}}},
+    ]
+    settlements=[
+        {'id':'a','terminal':True,'r_multiple':1.0},
+        {'id':'b','terminal':True,'r_multiple':1.0},
+    ]
+    s=p.breakout_acceptance_forward_summary(cohort,settlements,min_closed_per_mode=1)
+    assert s['ready_for_mode_comparison'] is True
+    assert set(s['comparison_ready_modes'])=={'RETEST_HOLD','MULTI_CLOSE_HOLD'}
+
+
 if __name__=='__main__':
     tests=[globals()[n] for n in sorted(globals()) if n.startswith('test_') and callable(globals()[n])]
     for fn in tests: fn()
