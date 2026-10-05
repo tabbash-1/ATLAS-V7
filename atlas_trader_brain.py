@@ -7,7 +7,7 @@ Legacy score is evidence only and cannot independently authorize or veto a trade
 """
 from __future__ import annotations
 
-VERSION = "ATLAS_TRADER_BRAIN_V7_SYMMETRIC_PULLBACK_RESUMPTION"
+VERSION = "ATLAS_TRADER_BRAIN_V8_INDEPENDENT_EVIDENCE_FAMILIES"
 MIN_RR = 2.0
 ACCEPTED_ALIGNMENT = {"ALIGNED", "CONDITIONAL_ALIGNED", "CONDITIONAL_ALIGNED_12H_NEUTRAL"}
 EXPLICIT_CONFLICT_ALIGNMENTS = {"CONFLICT", "HTF_CONFLICT", "OPPOSED", "MISALIGNED", "DIVERGENT"}
@@ -151,10 +151,15 @@ def assess(row):
     # Score itself is deliberately excluded: it is a summary, not an independent confirmation.
     score_attr = row.get("score_attribution") or ((row.get("decision_provenance") or {}).get("score_attribution") or {})
     confirmations = []
-    if product in {"LONG", "SHORT"} and alignment in ACCEPTED_ALIGNMENT:
-        confirmations.append("HTF_STRUCTURE")
-    if entry == product and product in {"LONG", "SHORT"}:
-        confirmations.append("MOMENTUM_1H_TRIGGER")
+    # Evidence is counted by independent FAMILY, not by raw checks. HTF direction
+    # and structural location are one STRUCTURE family and must never be double-counted.
+    if product in {"LONG", "SHORT"} and alignment in ACCEPTED_ALIGNMENT and geometry_ready:
+        confirmations.append("STRUCTURE")
+    momentum_ready = bool(entry == product and product in {"LONG", "SHORT"})
+    if pullback_requires_resumption:
+        momentum_ready = bool(momentum_ready and pullback_resumption_confirmed)
+    if momentum_ready:
+        confirmations.append("MOMENTUM")
     try:
         rv = float(row.get("relative_volume"))
     except (TypeError, ValueError):
@@ -165,8 +170,6 @@ def assess(row):
     futures_reason = _norm(score_attr.get("futures_reason"))
     if futures_available and futures_reason == "ALIGNED":
         confirmations.append("DERIVATIVES")
-    if geometry_ready:
-        confirmations.append("STRUCTURE_LOCATION")
     confirmations = list(dict.fromkeys(confirmations))
     if len(confirmations) < 3:
         waits.append("TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS")
@@ -219,6 +222,8 @@ def assess(row):
         "independent_confirmations": confirmations,
         "independent_confirmation_count": len(confirmations),
         "minimum_independent_confirmations_required": 3,
+        "independent_confirmation_families": ["STRUCTURE", "MOMENTUM", "VOLUME", "DERIVATIVES"],
+        "structure_double_counting_allowed": False,
         "fatal_blockers": list(dict.fromkeys(fatal)),
         "wait_blockers": list(dict.fromkeys(waits)),
         "legacy_score": _num(row.get("score") or (row.get("analyst_output") or {}).get("confidence")),
