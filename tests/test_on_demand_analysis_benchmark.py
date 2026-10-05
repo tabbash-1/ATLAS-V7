@@ -172,3 +172,16 @@ def test_benchmark_cli_imports_repository_module_from_script_path():
 def test_alpha_core_v2_is_in_same_benchmark_and_research_only():
     assert "alpha_core_v2" in m.run.__code__.co_consts or hasattr(m,"alpha_core_v2_engine")
     assert m.alpha_core_v2_engine([],0,[],"BTCUSDT")=="WAIT"
+
+
+def test_compare_metrics_requires_consistent_improvement_and_sample():
+    cand={h:[{"prediction":"LONG","actual":"LONG"} for _ in range(120)] for h in m.HORIZONS}
+    base={h:([{"prediction":"LONG","actual":"LONG"} for _ in range(80)] +
+             [{"prediction":"LONG","actual":"SHORT"} for _ in range(40)]) for h in m.HORIZONS}
+    x=m.compare_metrics(cand,base)
+    assert x["historical_only"] is True
+    assert x["production_promotion_authority"] is False
+    assert x["descriptive_historical_pass"] is True
+    assert x["better_precision_horizons"]==3
+    assert x["no_worse_opposite_horizons"]==3
+    assert x["sufficient_call_horizons"]==3
