@@ -56,5 +56,5 @@ def test_benchmark_is_scheduled_by_actions_not_render_boot():
     workflow=(root/".github"/"workflows"/"on-demand-analysis-benchmark.yml").read_text()
     assert "subprocess.run(" not in boot
     assert "on_demand_analysis_benchmark.py" not in boot
-    assert "push:" in workflow and "branches: [main]" in workflow
+    assert "push:" in workflow and "pull_request:" in workflow and "branches: [main]" in workflow
     assert "python -m pip install pytest" in workflow
