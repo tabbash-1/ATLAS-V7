@@ -129,6 +129,13 @@ def test_paper_ui_consumes_only_canonical_outcome_summary():
     assert 'CANONICAL_TRADE_COUNT_MISMATCH' in src
 
 
+def test_production_api_preserves_continuation_provenance():
+    src = text('production_decision_api.py')
+    assert "'continuation_scoring_version':(row or {}).get('continuation_scoring_version')" in src
+    assert "'continuation_context':(row or {}).get('continuation_context')" in src
+    assert "'market_breadth':(row or {}).get('market_breadth')" in src
+
+
 def test_production_decision_rejects_stale_responses():
     src = text('atlas-production-decision.js')
     assert 'let verifyEpoch=0' in src
@@ -164,6 +171,7 @@ if __name__ == '__main__':
     test_final_production_gate_tracks_current_unified_terminal_contract()
     test_final_trade_gate_live_smoke_tracks_current_guard_contract()
     test_paper_ui_consumes_only_canonical_outcome_summary()
+    test_production_api_preserves_continuation_provenance()
     test_production_decision_rejects_stale_responses()
     test_snapshot_guard_is_the_only_acceptance_surface()
     test_production_autoload_retries_transient_api_failure_without_changing_authority()
