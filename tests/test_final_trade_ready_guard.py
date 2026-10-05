@@ -28,6 +28,13 @@ def base_row(**extra):
             'product_direction': 'SHORT',
             'entry_confirmation_direction': 'SHORT',
             'direction_alignment': 'ALIGNED',
+            'frames': {
+                '1h': {
+                    'bias':'SHORT',
+                    'impulse':'BEARISH',
+                    'candle': {'direction':'BEARISH','pattern':'BEARISH_ENGULFING'},
+                }
+            },
         },
         'market_direction_gate': {'pass': True, 'reason': 'BTC_IS_MARKET_ANCHOR'},
         'production_signal_qualified': True,
@@ -127,6 +134,53 @@ def test_aligned_actionable_is_certified_trade_ready():
     assert r['final_trade_gate']['status'] == 'TRADE_READY'
     assert r['final_trade_gate']['direction'] == 'SHORT'
     assert paper_final.strict_trade_ready(r) is True
+
+
+def test_entry_direction_match_without_real_1h_momentum_fails_closed():
+    d=base_row()
+    d['htf_thesis']['frames']['1h']={
+        'bias':'SHORT',
+        'impulse':'NEUTRAL',
+        'candle': {'direction':'NEUTRAL','pattern':'DOJI'},
+    }
+    r=guard.apply(d)
+    assert r['trade_ready'] is False
+    assert 'TRADER_WAIT_1H_MOMENTUM_CONFIRMATION' in r['final_trade_gate']['blockers']
+    tb=r['final_trade_gate']['trader_brain']
+    assert tb['entry_direction_aligned'] is True
+    assert tb['one_hour_momentum_confirmed'] is False
+    assert tb['entry_trigger_ready'] is False
+    assert 'MOMENTUM' not in tb['independent_confirmations']
+
+
+def test_real_1h_impulse_and_directional_candle_count_as_momentum_family():
+    d=base_row()
+    r=guard.apply(d)
+    tb=r['final_trade_gate']['trader_brain']
+    assert r['trade_ready'] is True
+    assert tb['one_hour_momentum_confirmed'] is True
+    assert tb['one_hour_momentum_evidence']['candidate_direction_agreement_is_momentum'] is False
+    assert 'MOMENTUM' in tb['independent_confirmations']
+    assert tb['entry_trigger_ready'] is True
+
+
+def test_breakout_acceptance_does_not_replace_independent_1h_momentum():
+    d=base_row(
+        playbook='BREAKOUT_CONFIRMED_SHORT',
+        structural_geometry={'breakout':{
+            'breakout_event_confirmed':True,'entry_ready':True,'accepted':True,
+            'acceptance_mode':'RETEST_HOLD',
+        }},
+    )
+    d['htf_thesis']['frames']['1h']={
+        'bias':'SHORT',
+        'impulse':'NEUTRAL',
+        'candle': {'direction':'NEUTRAL','pattern':'DOJI'},
+    }
+    r=guard.apply(d)
+    assert r['final_trade_gate']['structure_confirmation']['confirmed'] is True
+    assert r['trade_ready'] is False
+    assert 'TRADER_WAIT_1H_MOMENTUM_CONFIRMATION' in r['final_trade_gate']['blockers']
 
 
 def test_unconfirmed_breakout_continuation_fails_closed():
