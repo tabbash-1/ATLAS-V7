@@ -46,6 +46,10 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           jq -e '.schema=="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V2_PRO_ANALYST_CHALLENGER" and .research_only==true and .production_effect=="NONE" and .can_override_production==false and (.horizons_h==[4,8,12])' status/on-demand-analysis-benchmark-latest.json
+      - name: Print benchmark summary
+        if: github.event_name != 'pull_request'
+        run: |
+          jq '{schema,overall:{legacy_1h:.overall.legacy_1h,htf_consensus:.overall.htf_consensus,analyst_stack_v2:.overall.analyst_stack_v2}}' status/on-demand-analysis-benchmark-latest.json
       - name: Commit evidence
         if: github.event_name != 'pull_request'
         run: |
@@ -53,4 +57,13 @@ jobs:
           git config user.email "atlas-research-bot@users.noreply.github.com"
           git add status/on-demand-analysis-benchmark-latest.json
           git diff --cached --quiet || git commit -m "research: refresh on-demand analysis benchmark"
-          git push origin HEAD:main
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main
+            git rebase origin/main
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            sleep $((attempt * 2))
+          done
+          echo "benchmark evidence push failed after retry/rebase loop" >&2
+          exit 1
