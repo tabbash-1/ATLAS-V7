@@ -5,8 +5,10 @@ on:
     paths:
       - '.github/workflows/on-demand-analysis-benchmark.yml'
       - 'research/on_demand_analysis_benchmark.py'
+      - 'research/alpha_core_v2.py'
       - 'historical_core_4_12h_replay.py'
       - 'tests/test_on_demand_analysis_benchmark.py'
+      - 'tests/test_alpha_core_v2.py'
   pull_request:
     branches: [main]
     paths:
@@ -30,7 +32,7 @@ jobs:
       - name: Install test dependency
         run: python -m pip install pytest
       - name: Regression tests
-        run: python -m pytest -q tests/test_on_demand_analysis_benchmark.py
+        run: python -m pytest -q tests/test_on_demand_analysis_benchmark.py tests/test_alpha_core_v2.py
       - name: Run frozen point-in-time benchmark
         if: github.event_name != 'pull_request'
         run: |
@@ -45,11 +47,11 @@ jobs:
       - name: Contract check
         if: github.event_name != 'pull_request'
         run: |
-          jq -e '.schema=="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V5_TEMPORAL_ROBUSTNESS" and .research_only==true and .production_effect=="NONE" and .can_override_production==false and (.horizons_h==[4,8,12])' status/on-demand-analysis-benchmark-latest.json
+          jq -e '.schema=="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V6_ALPHA_CORE_V2" and .research_only==true and .production_effect=="NONE" and .can_override_production==false and (.horizons_h==[4,8,12])' status/on-demand-analysis-benchmark-latest.json
       - name: Print benchmark summary
         if: github.event_name != 'pull_request'
         run: |
-          jq '{schema,overall:{legacy_1h:.overall.legacy_1h,htf_consensus:.overall.htf_consensus,analyst_stack_v2:.overall.analyst_stack_v2}}' status/on-demand-analysis-benchmark-latest.json
+          jq '{schema,overall:{legacy_1h:.overall.legacy_1h,htf_consensus:.overall.htf_consensus,analyst_stack_v2:.overall.analyst_stack_v2,alpha_core_v2:.overall.alpha_core_v2}}' status/on-demand-analysis-benchmark-latest.json
       - name: Commit evidence
         if: github.event_name != 'pull_request'
         run: |
