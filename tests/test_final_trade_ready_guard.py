@@ -31,6 +31,7 @@ def base_row(**extra):
         },
         'market_direction_gate': {'pass': True, 'reason': 'BTC_IS_MARKET_ANCHOR'},
         'production_signal_qualified': True,
+        'relative_volume': 1.25,
         'actionable_decision': 'SHORT',
         'execution_ready': True,
         'data_degraded': False,
@@ -425,6 +426,37 @@ def test_entry_confirmation_opposition_is_not_mislabeled_as_htf_disagreement():
     assert r['trade_ready'] is False
     assert 'ENTRY_CONFIRMATION_NOT_ALIGNED' in blockers
     assert 'HTF_4H_12H_NOT_ALIGNED' not in blockers
+
+
+def test_independent_confirmation_families_do_not_double_count_structure():
+    d = base_row(relative_volume=0.7)
+    d['futures_available'] = False
+    r = guard.apply(d)
+    tb = r['final_trade_gate']['trader_brain']
+    assert r['trade_ready'] is False
+    assert tb['independent_confirmations'] == ['STRUCTURE', 'MOMENTUM']
+    assert tb['independent_confirmation_count'] == 2
+    assert tb['structure_double_counting_allowed'] is False
+    assert 'TRADER_WAIT_MIN_3_INDEPENDENT_CONFIRMATIONS' in r['final_trade_gate']['blockers']
+
+
+def test_aligned_derivatives_can_supply_third_independent_family():
+    d = base_row(relative_volume=0.7, futures_available=True)
+    d['score_attribution'] = {'futures_reason':'ALIGNED'}
+    r = guard.apply(d)
+    tb = r['final_trade_gate']['trader_brain']
+    assert r['trade_ready'] is True
+    assert tb['independent_confirmations'] == ['STRUCTURE', 'MOMENTUM', 'DERIVATIVES']
+    assert tb['independent_confirmation_count'] == 3
+
+
+def test_volume_can_supply_third_independent_family_without_derivatives():
+    d = base_row(relative_volume=1.15, futures_available=False)
+    r = guard.apply(d)
+    tb = r['final_trade_gate']['trader_brain']
+    assert r['trade_ready'] is True
+    assert tb['independent_confirmations'] == ['STRUCTURE', 'MOMENTUM', 'VOLUME']
+    assert tb['independent_confirmation_count'] == 3
 
 
 def test_trader_brain_requires_two_r_geometry():
