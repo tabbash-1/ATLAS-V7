@@ -15,9 +15,27 @@ def ready(direction='LONG', entry=100.0, stop=99.0, tp2=102.0):
     tp1=101.0 if direction=='LONG' else 99.0
     if direction=='SHORT': stop=101.0; tp2=98.0
     return {'execution_ready':True,'actionable_decision':direction,'candidate_direction':direction,'score':75,'signal_threshold':68,
-            'final_trade_gate':{'version':'FINAL_TRADE_READY_GUARD_V1_HTF_FAIL_CLOSED','status':'TRADE_READY','trade_ready':True,'direction':direction,'product_direction':direction,'primary_blocker':None},
-            'trade_plan':{'version':'PRODUCTION_TRADE_PLAN_V10_MIN_1_5ATR_INVALIDATION','geometry_version':'ATLAS_GEOMETRY_V6_MIN_1_5_ATR_INVALIDATION','can_execute':True,'direction':direction,'entry':entry,
-                          'stop_loss':stop,'tp1':tp1,'tp2':tp2,'rr_tp2':2.0,'product_horizon':'4-12H','canonical_lane':'CORE_4_12H'}}
+            'final_trade_gate':{
+                'version':'FINAL_TRADE_READY_GUARD_V15_ACCEPTED_BREAKOUT','status':'TRADE_READY','trade_ready':True,
+                'direction':direction,'product_direction':direction,'primary_blocker':None,
+                'trader_brain':{
+                    'version':'ATLAS_TRADER_BRAIN_V8_INDEPENDENT_EVIDENCE_FAMILIES',
+                    'independent_confirmations':['STRUCTURE','MOMENTUM','VOLUME'],
+                    'independent_confirmation_count':3,
+                },
+                'structure_confirmation':{
+                    'acceptance_required':True,'acceptance_mode':'RETEST_HOLD',
+                    'evidence_source':'STRUCTURAL_GEOMETRY_ENTRY_READY',
+                },
+            },
+            'structural_geometry':{'breakout':{
+                'breakout_event_confirmed':True,'entry_ready':True,'accepted':True,
+                'acceptance_mode':'RETEST_HOLD','acceptance_level':100.5,'breakout_age_bars':1,
+                'retest_hold':True,'accepted_breakout_bar_relative_volume':1.6,
+                'accepted_breakout_bar_body_atr':0.72,
+            }},
+            'trade_plan':{'version':'PRODUCTION_TRADE_PLAN_V11_ACCEPTED_BREAKOUT','geometry_version':'ATLAS_GEOMETRY_V6_MIN_1_5_ATR_INVALIDATION','can_execute':True,'direction':direction,'entry':entry,
+                          'stop_loss':stop,'tp1':tp1,'tp2':tp2,'rr_tp2':2.0,'product_horizon':'4-12H','canonical_lane':'CORE_4_12H','breakout_confirmed':True}}
 
 
 def test_trade_ready_requires_final_gate_authority():
@@ -49,6 +67,41 @@ def test_enrollment_is_prospective_transition_only_and_risk_frozen():
     assert cohort[0]['decision_source']=='FINAL_TRADE_GATE'
     assert cohort[0]['decision_id']
     assert newest==t0+dt.timedelta(minutes=20)
+
+
+def test_prospective_enrollment_freezes_breakout_acceptance_evidence():
+    m=manifest(); t0=dt.datetime.fromisoformat(m['cohort_start_at'])
+    cohort=[]
+    added,_=p.enroll_new(m,cohort,[(t0,{'decisions':{'BTCUSDT':ready()}})],t0-dt.timedelta(microseconds=1),10000.0)
+    assert len(added)==1
+    prov=added[0]['decision_provenance']
+    assert prov['final_trade_gate_version']=='FINAL_TRADE_READY_GUARD_V15_ACCEPTED_BREAKOUT'
+    assert prov['trader_brain_version']=='ATLAS_TRADER_BRAIN_V8_INDEPENDENT_EVIDENCE_FAMILIES'
+    assert prov['independent_confirmations']==['STRUCTURE','MOMENTUM','VOLUME']
+    assert prov['independent_confirmation_count']==3
+    br=prov['breakout_acceptance']
+    assert br['breakout_event_confirmed'] is True
+    assert br['entry_ready'] is True and br['accepted'] is True
+    assert br['acceptance_mode']=='RETEST_HOLD'
+    assert br['retest_hold'] is True
+    assert br['acceptance_level']==100.5
+    assert br['breakout_age_bars']==1
+    assert br['breakout_bar_relative_volume']==1.6
+    assert br['breakout_bar_body_atr']==0.72
+    assert br['final_gate_requires_acceptance'] is True
+    assert br['evidence_source']=='STRUCTURAL_GEOMETRY_ENTRY_READY'
+
+
+def test_breakout_acceptance_provenance_is_evidence_only_and_does_not_change_geometry():
+    d=ready()
+    before=p.geometry(d)
+    prov=p.freeze_decision_provenance(d)
+    after=p.geometry(d)
+    assert before==after
+    assert prov['breakout_acceptance']['accepted'] is True
+    assert d['trade_plan']['entry']==100.0
+    assert d['trade_plan']['stop_loss']==99.0
+    assert d['trade_plan']['tp2']==102.0
 
 
 def test_concurrent_cap_blocks_fourth_trade():
@@ -288,4 +341,4 @@ def test_geometry_version_is_frozen_at_enrollment_for_prospective_cohorting():
     assert len(added)==1
     assert added[0]['geometry']['geometry_version']=='ATLAS_GEOMETRY_V6_MIN_1_5_ATR_INVALIDATION'
     assert added[0]['decision_provenance']['geometry_version']=='ATLAS_GEOMETRY_V6_MIN_1_5_ATR_INVALIDATION'
-    assert added[0]['decision_provenance']['trade_plan_version']=='PRODUCTION_TRADE_PLAN_V10_MIN_1_5ATR_INVALIDATION'
+    assert added[0]['decision_provenance']['trade_plan_version']=='PRODUCTION_TRADE_PLAN_V11_ACCEPTED_BREAKOUT'
