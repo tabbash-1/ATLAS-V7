@@ -65,6 +65,20 @@ def long_row(entry_mode):
     row = base_row(
         candidate_direction='LONG', product_direction='LONG',
         entry_confirmation_direction='LONG', actionable_decision='LONG',
+        htf_thesis={
+            'status':'PASS',
+            'reason':'HTF_ALIGNED_CURRENT_PHASE_ACCEPTABLE',
+            'product_direction':'LONG',
+            'entry_confirmation_direction':'LONG',
+            'direction_alignment':'ALIGNED',
+            'frames': {
+                '1h': {
+                    'bias':'LONG',
+                    'impulse':'BULLISH',
+                    'candle': {'direction':'BULLISH','pattern':'BULLISH_ENGULFING'},
+                }
+            },
+        },
     )
     plan = dict(row['trade_plan'])
     plan.update({'direction':'LONG','entry':100.0,'stop_loss':98.0,'tp1':102.0,'tp2':104.0,'rr_tp2':2.0,'entry_mode':entry_mode})
@@ -164,6 +178,55 @@ def _confirmed_short_pullback_thesis():
             }
         }
     }
+
+
+def test_htf_pass_cannot_be_rewritten_to_opposite_product_direction():
+    d = base_row(
+        product_direction='LONG',
+        entry_confirmation_direction='LONG',
+        candidate_direction='LONG',
+        actionable_decision='LONG',
+    )
+    r = guard.apply(d)
+    assert r['trade_ready'] is False
+    assert 'HTF_THESIS_PRODUCT_DIRECTION_MISMATCH' in r['final_trade_gate']['blockers']
+    assert 'HTF_THESIS_ENTRY_DIRECTION_MISMATCH' in r['final_trade_gate']['blockers']
+    assert r['final_trade_gate']['authoritative_context']['direction_consistent'] is False
+
+
+def test_long_pullback_requires_fresh_bullish_resumption():
+    d = long_row('PULLBACK')
+    d['playbook'] = 'TREND_PULLBACK_LONG'
+    r = guard.apply(d)
+    assert r['trade_ready'] is True
+    tb = r['final_trade_gate']['trader_brain']
+    assert tb['pullback_resumption_required'] is True
+    assert tb['long_pullback_resumption_confirmed'] is True
+    assert tb['pullback_resumption_evidence']['rule'] == '1H_DIRECTIONAL_BIAS_PLUS_IMPULSE_PLUS_CANDLE_RESUMPTION'
+
+
+def test_long_pullback_without_bullish_resumption_fails_closed():
+    d = long_row('PULLBACK')
+    d['playbook'] = 'TREND_PULLBACK_LONG'
+    d['htf_thesis']['frames']['1h'] = {
+        'bias':'LONG',
+        'impulse':'BEARISH',
+        'candle': {'direction':'BEARISH','pattern':'NORMAL'},
+    }
+    r = guard.apply(d)
+    assert r['trade_ready'] is False
+    assert 'TRADER_WAIT_LONG_PULLBACK_RESUMPTION' in r['final_trade_gate']['blockers']
+    assert r['final_trade_gate']['trader_brain']['stage'] == 'WAIT_TRIGGER'
+    assert r['final_trade_gate']['trader_brain']['long_pullback_resumption_confirmed'] is False
+
+
+def test_long_pullback_missing_1h_resumption_evidence_fails_closed():
+    d = long_row('PULLBACK')
+    d['playbook'] = 'TREND_PULLBACK_LONG'
+    d['htf_thesis']['frames'] = {}
+    r = guard.apply(d)
+    assert r['trade_ready'] is False
+    assert 'TRADER_WAIT_LONG_PULLBACK_RESUMPTION' in r['final_trade_gate']['blockers']
 
 
 def test_non_breakout_pullback_requires_fresh_bearish_resumption():
