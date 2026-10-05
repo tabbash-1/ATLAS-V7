@@ -29,8 +29,9 @@ def _trend_rows(side="LONG", n=801):
     return rows
 
 
-def test_market_behavior_probes_distinguish_continuation_from_reversal():
+def test_market_behavior_probes_distinguish_continuation_from_reversal(monkeypatch):
     rows=_trend_rows("LONG",n=100)
+    monkeypatch.setattr(m,"atr",lambda *_:0.5)
     assert m.momentum_4h_probe(rows)=="LONG"
     assert m.reversal_4h_probe(rows)=="SHORT"
     assert m.momentum_12h_probe(rows)=="LONG"
