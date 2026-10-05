@@ -85,7 +85,7 @@ def test_final_trade_gate_live_smoke_tracks_current_guard_contract():
     workflow = text('.github/workflows/atlas-final-trade-gate-live-smoke.yml')
     production_workflow = text('.github/workflows/atlas-final-production-gate.yml')
     current_version = 'FINAL_TRADE_READY_GUARD_V15_ACCEPTED_BREAKOUT'
-    current_brain = 'ATLAS_TRADER_BRAIN_V8_INDEPENDENT_EVIDENCE_FAMILIES'
+    current_brain = 'ATLAS_TRADER_BRAIN_V9_REAL_1H_MOMENTUM'
     stale_version = 'FINAL_TRADE_READY_GUARD_V1_HTF_FAIL_CLOSED'
     assert current_version in guard
     assert current_version in workflow
