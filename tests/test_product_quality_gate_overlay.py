@@ -200,3 +200,38 @@ def test_current_audit_revalidates_market_continuation_long():
     assert r['actionable_decision']=='LONG'
     assert r['analyst_output']['decision']=='LONG'
     assert r['score']==75.0 and r['signal_threshold']==68.0
+
+def test_validated_derivatives_opposition_fails_closed_without_changing_score():
+    row=base_row(
+        playbook='BREAKOUT_CONFIRMED_LONG',
+        futures_available=True,
+        score_attribution={'futures_reason':'OPPOSED','futures_adjustment':-3.0},
+    )
+    a=atlas_with(row)
+    state=qg.install(a)
+    r=a.production_decision('BTCUSDT')
+    gate=r['setup_quality_gate']
+    assert gate['status']=='BLOCK'
+    assert gate['reason']=='VALIDATED_DERIVATIVES_OPPOSE_DIRECTION_EVIDENCE_QUARANTINE'
+    assert gate['evidence']['evidence_n12']==9
+    assert gate['evidence']['positive_pct']==0.0
+    assert r['actionable_decision']=='WAIT'
+    assert r['analyst_output']['decision']=='WAIT'
+    assert r['score']==75.0 and r['signal_threshold']==68.0
+    assert r['production_signal_qualified'] is True
+    assert r['production_threshold_changed_by_quality_gate'] is False
+    assert state['opposed_derivatives_quarantine_enabled'] is True
+
+
+def test_unvalidated_or_unavailable_derivatives_opposition_is_context_only():
+    row=base_row(
+        playbook='BREAKOUT_CONFIRMED_LONG',
+        futures_available=False,
+        score_attribution={'futures_reason':'OPPOSED','futures_adjustment':-3.0},
+    )
+    a=atlas_with(row)
+    qg.install(a)
+    r=a.production_decision('BTCUSDT')
+    assert r['setup_quality_gate']['status']=='PASS'
+    assert r['analyst_output']['decision']=='LONG'
+
