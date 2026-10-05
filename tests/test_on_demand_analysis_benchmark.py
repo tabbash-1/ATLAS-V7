@@ -7,7 +7,7 @@ P=Path(__file__).resolve().parents[1]/"research"/"on_demand_analysis_benchmark.p
 spec=importlib.util.spec_from_file_location("bench",P);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
 
 def test_product_contract_is_analysis_not_trade_discovery():
-    assert m.VERSION=="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V2_PRO_ANALYST_CHALLENGER"
+    assert m.VERSION=="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V3_MARKET_BEHAVIOR_PROBES"
     assert m.HORIZONS==(4,8,12)
 
 
@@ -27,6 +27,21 @@ def _trend_rows(side="LONG", n=801):
             "v":100.0,
         })
     return rows
+
+
+def test_market_behavior_probes_distinguish_continuation_from_reversal():
+    rows=_trend_rows("LONG",n=100)
+    assert m.momentum_4h_probe(rows)=="LONG"
+    assert m.reversal_4h_probe(rows)=="SHORT"
+    assert m.momentum_12h_probe(rows)=="LONG"
+    assert m.reversal_12h_probe(rows)=="SHORT"
+
+
+def test_market_behavior_probe_waits_inside_atr_deadband(monkeypatch):
+    rows=_trend_rows("LONG",n=100)
+    monkeypatch.setattr(m,"atr",lambda *_:1000.0)
+    assert m.momentum_4h_probe(rows)=="WAIT"
+    assert m.reversal_12h_probe(rows)=="WAIT"
 
 
 def test_professional_challenger_accepts_aligned_top_down_long():
