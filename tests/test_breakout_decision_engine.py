@@ -73,6 +73,44 @@ def test_breakout_that_closes_back_inside_structure_is_not_accepted():
     assert ctx['confirmed'] is False
 
 
+def test_historical_breakout_cannot_be_retroactively_upgraded_by_current_votes():
+    rows=[]
+    # Persistent downtrend: a single range break can close above the recent
+    # 24H high, but the breakout bar itself still lacks 4/4 trend votes.
+    for i in range(100):
+        px=200-i*0.5
+        rows.append(candle(i,px,high=px+0.2,low=px-0.2,open_=px+0.1,volume=100))
+    level=max(x['high'] for x in rows[-27:-3])
+    event_close=level+0.6
+    rows[-3]=candle(97,event_close,high=event_close+0.2,low=level+0.1,open_=level-0.1,volume=180)
+    rows[-2]=candle(98,event_close+0.2,high=event_close+0.35,low=level+0.05,open_=event_close+0.05,volume=120)
+    rows[-1]=candle(99,event_close+0.25,high=event_close+0.4,low=event_close+0.1,open_=event_close+0.15,volume=110)
+
+    event_ctx=scoring._event_direction_context(rows[:-1],len(rows[:-1])-2,'LONG')
+    assert event_ctx['votes'] < 4
+
+    # Simulate a caller whose CURRENT state later reports perfect votes/momentum.
+    ctx=scoring.breakout_context(rows,event_close+0.25,'LONG',4,5.0,1.0,1.0,closed_rv=1.1)
+    assert ctx['accepted'] is False
+    assert ctx['entry_ready'] is False
+    assert ctx['event_time_directional_evidence_required'] is True
+
+
+def test_accepted_breakout_freezes_event_time_evidence():
+    rows=base_series()
+    level=max(x['high'] for x in rows[-27:-3])
+    breakout_close=level+1.0
+    rows[-3]=candle(97,breakout_close,high=breakout_close+0.2,low=level+0.2,open_=level+0.1,volume=160)
+    rows[-2]=candle(98,level+0.55,high=level+0.8,low=level-0.05,open_=level+0.35,volume=110)
+    rows[-1]=candle(99,level+0.60,high=level+0.75,low=level+0.4,open_=level+0.55)
+    ctx=scoring.breakout_context(rows,level+0.60,'LONG',4,2.0,1.0,1.0,closed_rv=1.1)
+    assert ctx['accepted'] is True
+    assert ctx['accepted_breakout_event_votes'] == 4
+    assert ctx['accepted_breakout_event_momentum_24h_pct'] is not None
+    assert ctx['accepted_breakout_event_rsi14'] is not None
+    assert ctx['current_directional_evidence_required'] is True
+
+
 def test_false_breakout_without_confirmation_gets_no_bonus():
     rows=base_series()
     prior_high=max(x['high'] for x in rows[-25:-1])
@@ -96,6 +134,8 @@ if __name__ == '__main__':
     test_initial_breakout_event_is_not_entry_ready_until_post_break_hold()
     test_accepted_breakout_retest_clears_false_obstacle_penalty()
     test_breakout_that_closes_back_inside_structure_is_not_accepted()
+    test_historical_breakout_cannot_be_retroactively_upgraded_by_current_votes()
+    test_accepted_breakout_freezes_event_time_evidence()
     test_false_breakout_without_confirmation_gets_no_bonus()
     test_partial_hour_volume_is_paced_not_compared_as_full_hour()
     print('breakout decision engine tests: ok')
