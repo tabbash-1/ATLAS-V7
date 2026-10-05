@@ -131,6 +131,13 @@ def freeze_decision_provenance(decision: dict[str, Any]) -> dict[str, Any]:
     quality = _path(decision, "setup_quality_gate") or {}
     futures = _path(decision, "futures", "futures_context", "validated_futures") or {}
     attribution = _path(decision, "score_attribution") or {}
+    final_gate = _path(decision, "final_trade_gate") or {}
+    trader_brain = final_gate.get("trader_brain") if isinstance(final_gate, dict) else {}
+    if not isinstance(trader_brain, dict): trader_brain = {}
+    structure_confirmation = final_gate.get("structure_confirmation") if isinstance(final_gate, dict) else {}
+    if not isinstance(structure_confirmation, dict): structure_confirmation = {}
+    breakout = _path(decision, "structural_geometry.breakout") or {}
+    if not isinstance(breakout, dict): breakout = {}
     if isinstance(attribution, dict):
         attribution = {str(k): v for k, v in attribution.items() if isinstance(v, (int, float, str, bool)) or v is None}
     else:
@@ -164,7 +171,25 @@ def freeze_decision_provenance(decision: dict[str, Any]) -> dict[str, Any]:
         "scenario_reason": _path(decision, "trade_plan.scenario_reason", "scenario_reason"),
         "scenario_readiness": _path(decision, "trade_plan.scenario_readiness", "scenario_readiness"),
         "entry_mode": _path(decision, "trade_plan.entry_mode"),
+        "final_trade_gate_version": final_gate.get("version") if isinstance(final_gate, dict) else None,
+        "trader_brain_version": trader_brain.get("version"),
+        "independent_confirmations": [str(x) for x in (trader_brain.get("independent_confirmations") or [])[:8]],
+        "independent_confirmation_count": trader_brain.get("independent_confirmation_count"),
         "breakout_confirmed": _path(decision, "trade_plan.breakout_confirmed", "breakout_confirmed"),
+        "breakout_acceptance": {
+            "breakout_event_confirmed": breakout.get("breakout_event_confirmed"),
+            "entry_ready": breakout.get("entry_ready"),
+            "accepted": breakout.get("accepted"),
+            "acceptance_mode": breakout.get("acceptance_mode"),
+            "acceptance_level": fnum(breakout.get("acceptance_level")),
+            "breakout_age_bars": breakout.get("breakout_age_bars"),
+            "retest_hold": breakout.get("retest_hold"),
+            "breakout_bar_relative_volume": fnum(breakout.get("accepted_breakout_bar_relative_volume")),
+            "breakout_bar_body_atr": fnum(breakout.get("accepted_breakout_bar_body_atr")),
+            "final_gate_requires_acceptance": structure_confirmation.get("acceptance_required"),
+            "final_gate_acceptance_mode": structure_confirmation.get("acceptance_mode"),
+            "evidence_source": structure_confirmation.get("evidence_source"),
+        },
         "continuation_strong": _path(decision, "trade_plan.continuation_strong", "continuation_strong"),
         "playbook": _path(decision, "playbook", "setup_family", "trade_plan.playbook"),
         "market_regime": _path(decision, "market_regime", "regime"),
