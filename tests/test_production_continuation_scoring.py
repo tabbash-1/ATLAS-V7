@@ -139,6 +139,31 @@ def test_continuation_rsi_ignores_still_forming_1h_candle():
     assert atlas.PRODUCTION_CONTINUATION_SCORING_STATE['live_1h_can_change_continuation_state'] is False
 
 
+class NoDirectionAtlas(FakeAtlas):
+    @staticmethod
+    def _base_score(symbol, btc_ks):
+        return {
+            'symbol': symbol,
+            'direction': None,
+            'final_score': 61,
+            'production_signal_qualified': False,
+            'scoring_version': 'PROD_SIGNAL_SCORING_V13_EVENT_TIME_BREAKOUT',
+        }
+
+
+def test_no_direction_wait_still_publishes_continuation_provenance():
+    atlas = NoDirectionAtlas()
+    continuation.install(atlas)
+    row = atlas.cloud_score_symbol('SOLUSDT', atlas._spot_klines('SOLUSDT'))
+    assert row['direction'] is None
+    assert row['production_signal_qualified'] is False
+    assert row['continuation_scoring_version'] == continuation.VERSION
+    assert row['continuation_context']['status'] == 'NOT_APPLICABLE'
+    assert row['continuation_context']['strong'] is False
+    assert row['continuation_context']['can_promote_trade'] is False
+    assert row['market_breadth'] is None
+
+
 def test_momentum_tiers_are_monotonic_but_bounded():
     assert continuation.momentum_adjustment('LONG', 1.0, 60) == 0
     assert continuation.momentum_adjustment('LONG', 2.0, 60) == 2
@@ -153,5 +178,6 @@ if __name__ == '__main__':
     test_blowoff_rsi_blocks_momentum_bonus_and_continuation_relief()
     test_market_breadth_ignores_still_forming_1h_candle()
     test_continuation_rsi_ignores_still_forming_1h_candle()
+    test_no_direction_wait_still_publishes_continuation_provenance()
     test_momentum_tiers_are_monotonic_but_bounded()
     print('production continuation scoring tests: ok')
