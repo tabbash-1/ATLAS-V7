@@ -323,7 +323,16 @@ def test_experimental_bypass_does_not_override_real_safety_blocker():
 
 
 def test_unresolved_product_direction_fails_closed_and_collapses_nested_plan():
-    r = guard.apply(base_row(product_direction=None, direction_alignment='4H_12H_NOT_ALIGNED'))
+    d = base_row(product_direction=None, direction_alignment='4H_12H_NOT_ALIGNED')
+    d['htf_thesis'] = {
+        'status':'WAIT',
+        'reason':'4H_12H_NOT_ALIGNED',
+        'product_direction':None,
+        'direction':None,
+        'entry_confirmation_direction':'SHORT',
+        'direction_alignment':'4H_12H_NOT_ALIGNED',
+    }
+    r = guard.apply(d)
     assert r['trade_ready'] is False
     assert r['actionable_decision'] == 'WAIT'
     assert 'HTF_PRODUCT_DIRECTION_UNRESOLVED' in r['final_trade_gate']['blockers']
