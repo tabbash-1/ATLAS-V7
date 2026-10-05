@@ -23,7 +23,7 @@ if str(ROOT) not in sys.path:
 
 from historical_core_4_12h_replay import fetch_1h, direction, atr, ema, rsi
 
-VERSION="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V2_PRO_ANALYST_CHALLENGER"
+VERSION="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V3_MARKET_BEHAVIOR_PROBES"
 SYMBOLS=["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","BNBUSDT","DOGEUSDT","ZECUSDT","ADAUSDT","LINKUSDT","AVAXUSDT","LTCUSDT"]
 HORIZONS=(4,8,12)
 HOUR_MS=60*60*1000
@@ -144,6 +144,37 @@ def analyst_stack_v2(hist,decision_time_ms=None,btc_hist=None,symbol=None):
     return side
 
 
+def recent_move_probe(hist,bars,invert=False,deadband_atr=.35):
+    """Diagnostic only: asks whether recent realized move tends to persist or reverse."""
+    if len(hist)<=bars:
+        return "WAIT"
+    a=atr(hist,14)
+    if not a:
+        return "WAIT"
+    move=float(hist[-1]["c"])-float(hist[-1-bars]["c"])
+    band=float(deadband_atr)*a
+    if abs(move)<=band:
+        return "WAIT"
+    side="LONG" if move>0 else "SHORT"
+    return _opposite(side) if invert else side
+
+
+def momentum_4h_probe(hist,decision_time_ms=None):
+    return recent_move_probe(hist,4,False)
+
+
+def reversal_4h_probe(hist,decision_time_ms=None):
+    return recent_move_probe(hist,4,True)
+
+
+def momentum_12h_probe(hist,decision_time_ms=None):
+    return recent_move_probe(hist,12,False)
+
+
+def reversal_12h_probe(hist,decision_time_ms=None):
+    return recent_move_probe(hist,12,True)
+
+
 def future_label(rows,i,h,deadband_atr=.35):
     a=atr(rows[:i+1],14)
     if not a or i+h>=len(rows): return None
@@ -186,7 +217,15 @@ def run(symbol,days,end_ms=None,step=4,rows=None,btc_rows=None):
     rows=rows if rows is not None else fetch_1h(symbol,days,end_ms)
     btc_rows=btc_rows if btc_rows is not None else (rows if symbol=="BTCUSDT" else fetch_1h("BTCUSDT",days,end_ms))
     warm=60*12
-    engines={"legacy_1h":legacy_1h,"htf_consensus":htf_consensus,"analyst_stack_v2":analyst_stack_v2}
+    engines={
+        "legacy_1h":legacy_1h,
+        "htf_consensus":htf_consensus,
+        "analyst_stack_v2":analyst_stack_v2,
+        "momentum_4h_probe":momentum_4h_probe,
+        "reversal_4h_probe":reversal_4h_probe,
+        "momentum_12h_probe":momentum_12h_probe,
+        "reversal_12h_probe":reversal_12h_probe,
+    }
     rec={name:{h:[] for h in HORIZONS} for name in engines}
     for i in range(warm,len(rows)-max(HORIZONS),step):
         hist=rows[:i+1]
@@ -195,6 +234,10 @@ def run(symbol,days,end_ms=None,step=4,rows=None,btc_rows=None):
             "legacy_1h":legacy_1h(hist,decision_time_ms),
             "htf_consensus":htf_consensus(hist,decision_time_ms),
             "analyst_stack_v2":analyst_stack_v2(hist,decision_time_ms,btc_rows,symbol),
+            "momentum_4h_probe":momentum_4h_probe(hist,decision_time_ms),
+            "reversal_4h_probe":reversal_4h_probe(hist,decision_time_ms),
+            "momentum_12h_probe":momentum_12h_probe(hist,decision_time_ms),
+            "reversal_12h_probe":reversal_12h_probe(hist,decision_time_ms),
         }
         for h in HORIZONS:
             actual=future_label(rows,i,h)
@@ -205,7 +248,7 @@ def run(symbol,days,end_ms=None,step=4,rows=None,btc_rows=None):
 
 def main():
     ap=argparse.ArgumentParser();ap.add_argument("--days",type=int,default=180);ap.add_argument("--end-ms",type=int,default=None);ap.add_argument("--symbols",nargs="*",default=SYMBOLS);ap.add_argument("--step",type=int,default=4);a=ap.parse_args()
-    engine_names=("legacy_1h","htf_consensus","analyst_stack_v2")
+    engine_names=("legacy_1h","htf_consensus","analyst_stack_v2","momentum_4h_probe","reversal_4h_probe","momentum_12h_probe","reversal_12h_probe")
     merged={e:{h:[] for h in HORIZONS} for e in engine_names}
     by_symbol={}
     btc_rows=fetch_1h("BTCUSDT",a.days,a.end_ms)
@@ -225,7 +268,11 @@ def main():
       "engines":{
         "legacy_1h":"fixed simple 1H state baseline",
         "htf_consensus":"fixed 4H/12H agreement with non-opposing 1H confirmation",
-        "analyst_stack_v2":"4H primary thesis; 12H/1D opposition veto; 1H resumption trigger; BTC-first alt veto; 1.5ATR extension and RSI 80/20 blowoff veto"
+        "analyst_stack_v2":"4H primary thesis; 12H/1D opposition veto; 1H resumption trigger; BTC-first alt veto; 1.5ATR extension and RSI 80/20 blowoff veto",
+        "momentum_4h_probe":"diagnostic only: continue the last 4H move when it exceeded 0.35 current 1H ATR",
+        "reversal_4h_probe":"diagnostic only: fade the last 4H move when it exceeded 0.35 current 1H ATR",
+        "momentum_12h_probe":"diagnostic only: continue the last 12H move when it exceeded 0.35 current 1H ATR",
+        "reversal_12h_probe":"diagnostic only: fade the last 12H move when it exceeded 0.35 current 1H ATR"
       },
       "overall":{e:{str(h)+"h":metrics(merged[e][h]) for h in HORIZONS} for e in merged},
       "by_symbol":by_symbol}
