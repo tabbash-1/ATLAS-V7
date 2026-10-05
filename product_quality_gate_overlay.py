@@ -12,7 +12,7 @@ from decision_intelligence import VERSION as DECISION_INTELLIGENCE_VERSION, buil
 # Keep the public contract identifier stable for existing API/CI consumers while
 # exposing feature revisions separately.
 VERSION = 'PRODUCT_QUALITY_GATE_V2_CANONICAL_ANALYST_OUTPUT'
-FEATURE_VERSION = 'PRODUCT_QUALITY_GATE_FEATURE_V7_STALE_QUARANTINE_REMOVAL'
+FEATURE_VERSION = 'PRODUCT_QUALITY_GATE_FEATURE_V8_OPPOSED_DERIVATIVES_QUARANTINE'
 PROFILE_VERSION = 'ATLAS_ANALYSIS_EVIDENCE_PROFILE_V1'
 PRODUCT_HORIZON = '4-12H'
 PRODUCT_LANE = 'CORE_4_12H'
@@ -21,6 +21,19 @@ PRODUCT_LANE = 'CORE_4_12H'
 # A future quarantine must be promoted from current independent evidence and
 # committed together with its current evidence timestamp and regression proof.
 QUARANTINE = {}
+
+# Prospective pre-entry evidence showed that validated derivatives opposition was
+# associated with 0 positive outcomes across 9 matured 12H cases.  This is a
+# narrow, reversible quality veto: it does not change the score or threshold and
+# it only applies when the derivatives provider is validated/available.
+OPPOSED_DERIVATIVES_QUARANTINE = {
+    'evidence_n12': 9,
+    'avg_r': -0.8141,
+    'positive_pct': 0.0,
+    'source': 'status/analyst-forward-attribution-latest.json',
+    'evidence_status': 'PROSPECTIVE_FROZEN_PREENTRY_CONTEXT',
+    'minimum_revalidation_n': 20,
+}
 
 REVALIDATED_SETUP_FAMILIES = {
     ('LONG', 'TREND_UP', 'MARKET_CONTINUATION_LONG'): {
@@ -50,6 +63,25 @@ def assess(row):
     direction = _norm(row.get('candidate_direction'))
     regime = _norm(row.get('regime'))
     playbook = _norm(row.get('playbook'))
+    attr = row.get('score_attribution') or {}
+    futures_available = bool(row.get('futures_available'))
+    futures_reason = _norm(attr.get('futures_reason'))
+    if direction in ('LONG', 'SHORT') and futures_available and futures_reason == 'OPPOSED':
+        return {
+            'status': 'BLOCK',
+            'reason': 'VALIDATED_DERIVATIVES_OPPOSE_DIRECTION_EVIDENCE_QUARANTINE',
+            'product_horizon': PRODUCT_HORIZON,
+            'quarantine_key': {'risk_signature': 'VALIDATED_DERIVATIVES_OPPOSE_DIRECTION'},
+            'evidence': dict(OPPOSED_DERIVATIVES_QUARANTINE),
+            'status_change_conditions': [
+                'DERIVATIVES_REALIGN_WITH_DIRECTION',
+                'DERIVATIVES_EVIDENCE_BECOMES_UNAVAILABLE_AND_DECISION_REASSESSES',
+                'INDEPENDENT_FORWARD_EVIDENCE_REVALIDATES_OPPOSED_DERIVATIVES_SETUPS',
+            ],
+            'can_change_score': False,
+            'can_change_threshold': False,
+            'live_execution': False,
+        }
     evidence = QUARANTINE.get((direction, regime, playbook))
     if not evidence:
         return {
@@ -394,6 +426,7 @@ def install(atlas):
         'direction_authority': 'HTF_12H_4H','entry_confirmation_timeframe': '1h',
         'geometry_authority': 'HTF_4H_12H_WHEN_AVAILABLE',
         'canonical_contract': 'analyst_output','quarantined_setup_families': len(QUARANTINE),
+        'opposed_derivatives_quarantine_enabled': True,
         'score_threshold_unchanged': True,'raw_production_qualification_preserved': True,
         'score_never_relabelled_to_opposite_htf_direction': True,
         'legacy_geometry_cannot_override_htf_geometry': True,
