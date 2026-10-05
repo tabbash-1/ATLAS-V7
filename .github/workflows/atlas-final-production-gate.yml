@@ -35,7 +35,7 @@ jobs:
     env:
       BASE_URL: https://atlas-v7.onrender.com
       EXPECTED_FINAL_GUARD: FINAL_TRADE_READY_GUARD_V15_ACCEPTED_BREAKOUT
-      EXPECTED_TRADER_BRAIN: ATLAS_TRADER_BRAIN_V8_INDEPENDENT_EVIDENCE_FAMILIES
+      EXPECTED_TRADER_BRAIN: ATLAS_TRADER_BRAIN_V9_REAL_1H_MOMENTUM
       EXPECTED_CANONICAL: ATLAS_CANONICAL_DECISION_TRUTH_V1
       EXPECTED_GEOMETRY: ATLAS_CANONICAL_GEOMETRY_TRUTH_V1
     steps:
@@ -46,7 +46,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m py_compile canonical_decision_contract.py final_trade_ready_guard.py atlas_trader_brain.py cloud_web_only_final.py
-          grep -Fq 'ATLAS_TRADER_BRAIN_V8_INDEPENDENT_EVIDENCE_FAMILIES' atlas_trader_brain.py
+          grep -Fq 'ATLAS_TRADER_BRAIN_V9_REAL_1H_MOMENTUM' atlas_trader_brain.py
           node --check production-web-autoload.js
           node --check atlas-product-shell.js
           node --check atlas-unified-terminal.js
@@ -161,7 +161,7 @@ jobs:
           set -euo pipefail
           grep -Fq 'ATLAS_CANONICAL_DECISION_TRUTH_V1' canonical_decision_contract.py
           grep -Fq 'FINAL_TRADE_READY_GUARD_V15_ACCEPTED_BREAKOUT' final_trade_ready_guard.py
-          grep -Fq 'ATLAS_TRADER_BRAIN_V8_INDEPENDENT_EVIDENCE_FAMILIES' atlas_trader_brain.py
+          grep -Fq 'ATLAS_TRADER_BRAIN_V9_REAL_1H_MOMENTUM' atlas_trader_brain.py
           grep -Fq 'BREAKOUT_STRUCTURE_NOT_CONFIRMED' final_trade_ready_guard.py
           grep -Fq 'BREAKOUT_CONFIRMATION_EVIDENCE_MISSING' final_trade_ready_guard.py
           echo 'ATLAS FINAL PRODUCTION GATE: PASS · SOURCE_OF_TRUTH=FINAL_TRADE_GATE · STRUCTURE_CONFIRMATION=REQUIRED_FOR_BREAKOUT'
