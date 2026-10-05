@@ -19,7 +19,7 @@ from atlas_trader_brain import assess as assess_trader
 from canonical_decision_contract import from_decision
 from golden_thesis_engine import VERSION as GOLDEN_THESIS_VERSION, build as build_golden_thesis
 
-VERSION = "FINAL_TRADE_READY_GUARD_V12_EVIDENCE_GATED_SHORTS"
+VERSION = "FINAL_TRADE_READY_GUARD_V13_ANALYST_AUTHORITY"
 MIN_NET_RR = 2.0
 SHORT_PRODUCTION_ENV = "ATLAS_SHORT_PRODUCTION_ENABLED"
 PRODUCT_HORIZON = "4-12H"
@@ -53,6 +53,50 @@ def _direction_state(row):
     alignment = _norm(row.get("direction_alignment") or thesis.get("direction_alignment"))
     candidate = _norm(row.get("candidate_direction"))
     return product, entry, alignment, candidate
+
+
+def _authoritative_context_state(row):
+    """Final read of top-down analyst authority before TRADE_READY.
+
+    Earlier overlays may preserve a candidate direction for diagnostics even when the
+    canonical HTF thesis has already said WAIT (for example: macro opposition or an
+    entry into HTF resistance/support).  Final Gate must never re-promote those rows.
+    BTC-first is also rechecked here so later geometry/quality overlays cannot bypass
+    the market-anchor decision for altcoins.
+    """
+    thesis = row.get("htf_thesis") or {}
+    thesis_status = _norm(thesis.get("status"))
+    thesis_reason = _norm(thesis.get("reason"))
+
+    symbol = _norm(row.get("symbol")).replace("BINANCE:", "")
+    btc_gate = row.get("market_direction_gate") or {}
+    btc_gate_present = isinstance(btc_gate, dict) and bool(btc_gate)
+    btc_pass = btc_gate.get("pass") is True if btc_gate_present else None
+    btc_reason = _norm(btc_gate.get("reason")) if btc_gate_present else None
+
+    blockers = []
+    # Final Gate is deliberately fail-closed: the canonical HTF thesis must
+    # explicitly PASS.  A missing status is not permission to trade.
+    if thesis_status != "PASS":
+        blockers.append("HTF_THESIS_" + (thesis_reason or ("STATUS_" + thesis_status if thesis_status else "STATUS_MISSING")))
+
+    # BTC is the market anchor. Every altcoin must carry an explicit, passing
+    # BTC-first gate at Final Gate; missing evidence is a WAIT, never an implicit pass.
+    if symbol and symbol != "BTCUSDT":
+        if not btc_gate_present:
+            blockers.append("BTC_FIRST_GATE_MISSING")
+        elif not btc_pass:
+            blockers.append("BTC_FIRST_" + (btc_reason or "GATE_NOT_CONFIRMED"))
+
+    return {
+        "htf_thesis_status": thesis_status or None,
+        "htf_thesis_reason": thesis_reason or None,
+        "btc_first_gate_present": btc_gate_present,
+        "btc_first_pass": btc_pass,
+        "btc_first_reason": btc_reason,
+        "blockers": blockers,
+        "rule": "HTF_EXPLICIT_PASS_REQUIRED_AND_ALTCOIN_BTC_FIRST_EXPLICIT_PASS_REQUIRED",
+    }
 
 
 def _geometry_ready(row):
@@ -202,8 +246,9 @@ def assess(row):
     degraded = bool(row.get("data_degraded", False))
     experimental_promotion = _experimental_final_evidence_promotion()
     net_rr = _net_rr_state(row)
+    authoritative_context = _authoritative_context_state(row)
     alignment_accepted = alignment in {"ALIGNED", "CONDITIONAL_ALIGNED", "CONDITIONAL_ALIGNED_12H_NEUTRAL"}
-    blockers = []
+    blockers = list(authoritative_context.get("blockers") or [])
     if product == "SHORT" and not _short_production_enabled(): blockers.append("SHORT_EDGE_NOT_PROVEN_PRODUCTION_QUARANTINE")
     if not qualified: blockers.append("PRODUCTION_SIGNAL_NOT_QUALIFIED")
     if product not in {"LONG", "SHORT"}:
@@ -274,6 +319,9 @@ def assess(row):
         "execution_costs_role": "REPORT_ONLY",
         "canonical_geometry_ready": geometry_ready,
         "structure_confirmation": structure_state,
+        "authoritative_context": authoritative_context,
+        "htf_thesis_status_required_when_explicit": True,
+        "btc_first_rechecked_at_final_gate": True,
         "blockers": blockers,
         "primary_blocker": blockers[0] if blockers else None,
         "authority": "FINAL_EVIDENCE_4_12H_THESIS_PLUS_1H_TRIGGER_PLUS_STRUCTURE",
