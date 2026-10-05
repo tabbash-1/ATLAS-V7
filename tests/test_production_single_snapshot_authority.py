@@ -81,13 +81,23 @@ def test_final_production_gate_tracks_current_unified_terminal_contract():
 
 def test_final_trade_gate_live_smoke_tracks_current_guard_contract():
     guard = text('final_trade_ready_guard.py')
+    brain = text('atlas_trader_brain.py')
     workflow = text('.github/workflows/atlas-final-trade-gate-live-smoke.yml')
+    production_workflow = text('.github/workflows/atlas-final-production-gate.yml')
     current_version = 'FINAL_TRADE_READY_GUARD_V14_DIRECTION_CONSISTENCY'
+    current_brain = 'ATLAS_TRADER_BRAIN_V8_INDEPENDENT_EVIDENCE_FAMILIES'
     stale_version = 'FINAL_TRADE_READY_GUARD_V1_HTF_FAIL_CLOSED'
     assert current_version in guard
     assert current_version in workflow
+    assert current_brain in brain
+    assert current_brain in workflow
+    assert current_brain in production_workflow
     assert stale_version not in workflow
     assert 'EXPECTED_FINAL_GUARD' in workflow
+    assert 'EXPECTED_TRADER_BRAIN' in workflow
+    assert '.final_trade_gate.trader_brain.version == $tb' in workflow
+    assert "'atlas_trader_brain.py'" in production_workflow
+    assert '.final_trade_gate.trader_brain.version == $tb' in production_workflow
     assert 'ATLAS_CANONICAL_DECISION_TRUTH_V1' in workflow
     assert 'FINAL_TRADE_GATE' in workflow
     assert '4-12H' in workflow
