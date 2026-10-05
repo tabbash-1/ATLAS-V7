@@ -397,6 +397,53 @@ def settle_entry(row: dict[str, Any], horizon_h: float, now_ms: int):
         return {"id":row["id"],"status":"MARKET_DATA_ERROR","terminal":False,"r_multiple":None,"exit_at_ms":None,"error":str(e)[:700]}
 
 
+def breakout_acceptance_forward_summary(cohort, settlements, min_closed_per_mode=30):
+    """Summarize only prospectively frozen accepted-breakout entries.
+
+    Historical rows without V15 acceptance provenance are intentionally excluded.
+    This report is evidence-only and cannot alter Production or portfolio history.
+    """
+    by_id={s.get("id"):s for s in (settlements or []) if isinstance(s,dict)}
+    modes={}
+    eligible=[]
+    for row in cohort or []:
+        prov=(row.get("decision_provenance") or {}) if isinstance(row,dict) else {}
+        br=prov.get("breakout_acceptance") or {}
+        if not isinstance(br,dict) or br.get("final_gate_requires_acceptance") is not True:
+            continue
+        mode=str(br.get("acceptance_mode") or "UNKNOWN").upper()
+        eligible.append(row)
+        g=modes.setdefault(mode,{"entries":0,"closed":0,"open_or_unresolved":0,"wins":0,"losses":0,"net_r":0.0})
+        g["entries"]+=1
+        s=by_id.get(row.get("id")) or {}
+        r=fnum(s.get("r_multiple"))
+        if s.get("terminal") is True and r is not None:
+            g["closed"]+=1
+            g["net_r"]+=float(r)
+            if r>0:g["wins"]+=1
+            elif r<0:g["losses"]+=1
+        else:
+            g["open_or_unresolved"]+=1
+    for g in modes.values():
+        g["net_r"]=round(g["net_r"],4)
+        g["avg_r"]=round(g["net_r"]/g["closed"],4) if g["closed"] else None
+        g["win_rate_pct"]=round(100*g["wins"]/g["closed"],2) if g["closed"] else None
+        g["sample_ready"]=bool(g["closed"]>=min_closed_per_mode)
+    comparable=[k for k,v in modes.items() if v.get("sample_ready")]
+    return {
+        "scope":"PROSPECTIVE_ONLY_NO_RETROSPECTIVE_BACKFILL",
+        "authority_epoch":"FINAL_TRADE_READY_GUARD_V15_ACCEPTED_BREAKOUT",
+        "entries":len(eligible),
+        "closed":sum(v["closed"] for v in modes.values()),
+        "modes":modes,
+        "minimum_closed_per_mode_for_comparison":min_closed_per_mode,
+        "ready_for_mode_comparison":len(comparable)>=2,
+        "comparison_ready_modes":comparable,
+        "research_only":True,
+        "can_override_production":False,
+    }
+
+
 def portfolio_report(manifest, cohort, settlements, generated_at, observed_through, checkpoints=None):
     checkpoints=checkpoints or {}
     by_id={s["id"]:s for s in settlements}; start=float(manifest["starting_equity_usd"]); equity=start; peak=start; max_dd=0.0
@@ -447,6 +494,7 @@ def portfolio_report(manifest, cohort, settlements, generated_at, observed_throu
         "methodology":"Prospective canonical Final Trade Guard TRADE READY entries only; frozen Entry/SL/TP2; SL/TP2 settle immediately on first observed touch using 5m candles with 1m ambiguity refinement; 4h/8h/12h product-window checkpoints; 12h mark-to-market expiry only when no terminal barrier was hit; gross paper P&L before fees/slippage.",
         "cost_note":"Gross paper performance. Exchange fees, funding and slippage are not deducted and results must not be described as live-account P&L.",
         "checkpoint_summary":checkpoint_summary,
+        "breakout_acceptance_forward":breakout_acceptance_forward_summary(cohort,settlements),
         "asset_universe":{"epoch":ASSET_UNIVERSE_EPOCH,"cohorts_separate":True,
                           "base":cohort_stats("BASE_V1"),"expansion":cohort_stats("ASSET_EXPANSION_V1")},
         "portfolio":{"starting_equity_usd":start,"equity_usd":round(equity,2),"net_pnl_usd":round(equity-start,2),"return_pct":round((equity/start-1)*100,4),
