@@ -48,3 +48,13 @@ def test_resample_closed_rejects_gaps_in_htf_bar():
     rows=_candles([i*m.HOUR_MS for i in range(12) if i!=5])
     bars=m.resample_closed(rows,12,12*m.HOUR_MS)
     assert bars==[]
+
+
+def test_benchmark_is_scheduled_by_actions_not_render_boot():
+    root=Path(__file__).resolve().parents[1]
+    boot=(root/"render_boot_patch.py").read_text()
+    workflow=(root/".github"/"workflows"/"on-demand-analysis-benchmark.yml").read_text()
+    assert "subprocess.run(" not in boot
+    assert "on_demand_analysis_benchmark.py" not in boot
+    assert "push:" in workflow and "branches: [main]" in workflow
+    assert "python -m pip install pytest" in workflow
