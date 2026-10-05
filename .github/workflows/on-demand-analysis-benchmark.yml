@@ -1,5 +1,12 @@
 name: ATLAS On-Demand Analysis Benchmark
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/on-demand-analysis-benchmark.yml'
+      - 'research/on_demand_analysis_benchmark.py'
+      - 'historical_core_4_12h_replay.py'
+      - 'tests/test_on_demand_analysis_benchmark.py'
   workflow_dispatch:
   schedule:
     - cron: '23 3 * * 1'
@@ -13,6 +20,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Install test dependency
+        run: python -m pip install pytest
       - name: Regression tests
         run: python -m pytest -q tests/test_on_demand_analysis_benchmark.py
       - name: Run frozen point-in-time benchmark
