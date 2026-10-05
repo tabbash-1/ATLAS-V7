@@ -10,8 +10,13 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import json
+import sys
 import time
 from pathlib import Path
+
+ROOT=Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0,str(ROOT))
 
 from historical_core_4_12h_replay import fetch_1h, atr
 
