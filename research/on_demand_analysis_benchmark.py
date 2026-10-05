@@ -23,7 +23,7 @@ if str(ROOT) not in sys.path:
 
 from historical_core_4_12h_replay import fetch_1h, direction, atr, ema, rsi
 
-VERSION="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V3_MARKET_BEHAVIOR_PROBES"
+VERSION="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V4_12H_THESIS_4H_PULLBACK"
 SYMBOLS=["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","BNBUSDT","DOGEUSDT","ZECUSDT","ADAUSDT","LINKUSDT","AVAXUSDT","LTCUSDT"]
 HORIZONS=(4,8,12)
 HOUR_MS=60*60*1000
@@ -175,6 +175,28 @@ def reversal_12h_probe(hist,decision_time_ms=None):
     return recent_move_probe(hist,12,True)
 
 
+def _recent_move_side(hist,bars,deadband_atr=.35):
+    if len(hist)<=bars:
+        return None
+    a=atr(hist,14)
+    if not a:
+        return None
+    move=float(hist[-1]["c"])-float(hist[-1-bars]["c"])
+    band=float(deadband_atr)*a
+    if abs(move)<=band:
+        return None
+    return "LONG" if move>0 else "SHORT"
+
+
+def thesis12_pullback4_probe(hist,decision_time_ms=None):
+    """Diagnostic only: 12H defines thesis; opposing 4H move is treated as a pullback."""
+    thesis=_recent_move_side(hist,12)
+    pullback=_recent_move_side(hist,4)
+    if thesis not in ("LONG","SHORT") or pullback not in ("LONG","SHORT"):
+        return "WAIT"
+    return thesis if pullback==_opposite(thesis) else "WAIT"
+
+
 def future_label(rows,i,h,deadband_atr=.35):
     a=atr(rows[:i+1],14)
     if not a or i+h>=len(rows): return None
@@ -225,6 +247,7 @@ def run(symbol,days,end_ms=None,step=4,rows=None,btc_rows=None):
         "reversal_4h_probe":reversal_4h_probe,
         "momentum_12h_probe":momentum_12h_probe,
         "reversal_12h_probe":reversal_12h_probe,
+        "thesis12_pullback4_probe":thesis12_pullback4_probe,
     }
     rec={name:{h:[] for h in HORIZONS} for name in engines}
     for i in range(warm,len(rows)-max(HORIZONS),step):
@@ -238,6 +261,7 @@ def run(symbol,days,end_ms=None,step=4,rows=None,btc_rows=None):
             "reversal_4h_probe":reversal_4h_probe(hist,decision_time_ms),
             "momentum_12h_probe":momentum_12h_probe(hist,decision_time_ms),
             "reversal_12h_probe":reversal_12h_probe(hist,decision_time_ms),
+            "thesis12_pullback4_probe":thesis12_pullback4_probe(hist,decision_time_ms),
         }
         for h in HORIZONS:
             actual=future_label(rows,i,h)
@@ -248,7 +272,7 @@ def run(symbol,days,end_ms=None,step=4,rows=None,btc_rows=None):
 
 def main():
     ap=argparse.ArgumentParser();ap.add_argument("--days",type=int,default=180);ap.add_argument("--end-ms",type=int,default=None);ap.add_argument("--symbols",nargs="*",default=SYMBOLS);ap.add_argument("--step",type=int,default=4);a=ap.parse_args()
-    engine_names=("legacy_1h","htf_consensus","analyst_stack_v2","momentum_4h_probe","reversal_4h_probe","momentum_12h_probe","reversal_12h_probe")
+    engine_names=("legacy_1h","htf_consensus","analyst_stack_v2","momentum_4h_probe","reversal_4h_probe","momentum_12h_probe","reversal_12h_probe","thesis12_pullback4_probe")
     merged={e:{h:[] for h in HORIZONS} for e in engine_names}
     by_symbol={}
     btc_rows=fetch_1h("BTCUSDT",a.days,a.end_ms)
@@ -272,7 +296,8 @@ def main():
         "momentum_4h_probe":"diagnostic only: continue the last 4H move when it exceeded 0.35 current 1H ATR",
         "reversal_4h_probe":"diagnostic only: fade the last 4H move when it exceeded 0.35 current 1H ATR",
         "momentum_12h_probe":"diagnostic only: continue the last 12H move when it exceeded 0.35 current 1H ATR",
-        "reversal_12h_probe":"diagnostic only: fade the last 12H move when it exceeded 0.35 current 1H ATR"
+        "reversal_12h_probe":"diagnostic only: fade the last 12H move when it exceeded 0.35 current 1H ATR",
+        "thesis12_pullback4_probe":"diagnostic only: use 12H realized direction as thesis and emit it only while the latest 4H realized move is an opposing pullback"
       },
       "overall":{e:{str(h)+"h":metrics(merged[e][h]) for h in HORIZONS} for e in merged},
       "by_symbol":by_symbol}
