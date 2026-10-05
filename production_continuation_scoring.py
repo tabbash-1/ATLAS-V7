@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import time
 
-VERSION = "PROD_CONTINUATION_SCORING_V2_EVIDENCE_ONLY"
+VERSION = "PROD_CONTINUATION_SCORING_V3_CLOSED_CANDLE_AUTHORITY"
 BREADTH_TTL_SECONDS = 45
 MIN_BREADTH_ASSETS = 5
 
@@ -100,10 +100,13 @@ def _compute_breadth(atlas):
     details = {}
     for symbol in tuple(getattr(atlas, "ON_DEMAND_SYMBOLS", ())):
         try:
-            ks = atlas._spot_klines(symbol)
-            if len(ks) < 50:
+            ks = list(atlas._spot_klines(symbol) or [])
+            # Breadth is decision authority, so the still-forming 1H candle must
+            # never make the market look stronger/weaker than the last completed bar.
+            closed = ks[:-1] if len(ks) > 1 else ks
+            if len(closed) < 50:
                 continue
-            closes = [float(x["close"]) for x in ks]
+            closes = [float(x["close"]) for x in closed]
             px = closes[-1]
             ema20 = atlas._ema(closes[-80:], 20)
             ema50 = atlas._ema(closes[-120:], 50)
@@ -145,8 +148,12 @@ def install(atlas):
         if direction not in ("LONG", "SHORT"):
             return row
 
-        ks = atlas._spot_klines(symbol)
-        closes = [float(x["close"]) for x in ks]
+        ks = list(atlas._spot_klines(symbol) or [])
+        # Keep continuation/extension authority on the same completed-1H basis
+        # as the canonical Production direction. The live candle is not allowed
+        # to manufacture a temporary RSI/breadth continuation state.
+        closed = ks[:-1] if len(ks) > 1 else ks
+        closes = [float(x["close"]) for x in closed]
         rsi = atlas._rsi(closes, 14) if closes else None
         mom24 = _f(row.get("momentum_24h_pct"), 0.0) or 0.0
         votes = int(row.get("direction_votes") or 0)
@@ -206,6 +213,10 @@ def install(atlas):
         "version": VERSION,
         "threshold_unchanged": True,
         "continuation_evidence_only": True,
+        "closed_candle_authority": True,
+        "breadth_uses_completed_1h_only": True,
+        "rsi_uses_completed_1h_only": True,
+        "live_1h_can_change_continuation_state": False,
         "can_relieve_structure_penalty": False,
         "can_extend_structural_target": False,
         "breadth_assets": list(getattr(atlas, "ON_DEMAND_SYMBOLS", ())),
