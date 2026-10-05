@@ -21,9 +21,9 @@ ROOT=Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0,str(ROOT))
 
-from historical_core_4_12h_replay import fetch_1h, direction, atr
+from historical_core_4_12h_replay import fetch_1h, direction, atr, ema, rsi
 
-VERSION="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V1"
+VERSION="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V2_PRO_ANALYST_CHALLENGER"
 SYMBOLS=["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","BNBUSDT","DOGEUSDT","ZECUSDT","ADAUSDT","LINKUSDT","AVAXUSDT","LTCUSDT"]
 HORIZONS=(4,8,12)
 HOUR_MS=60*60*1000
@@ -63,6 +63,87 @@ def htf_consensus(hist,decision_time_ms=None):
         return d4 if d1 in (None,d4) else "WAIT"
     return "WAIT"
 
+def _opposite(side):
+    return "SHORT" if side=="LONG" else "LONG" if side=="SHORT" else None
+
+
+def analyst_stack_v2(hist,decision_time_ms=None,btc_hist=None,symbol=None):
+    """Research-only professional top-down analyst challenger.
+
+    The 4H state is the primary swing direction. 12H and completed 1D are veto
+    context, 1H is the trigger, BTC is the market anchor for alts, and extreme
+    extension/blowoff conditions force WAIT. No outcome-derived thresholds,
+    score tuning, or Production mutation is allowed here.
+    """
+    if not hist:
+        return "WAIT"
+    as_of=int(decision_time_ms if decision_time_ms is not None else hist[-1]["t"]+HOUR_MS)
+    h4=resample_closed(hist,4,as_of)
+    h12=resample_closed(hist,12,as_of)
+    h24=resample_closed(hist,24,as_of)
+
+    d1=direction(hist)
+    d4=direction(h4)
+    d12=direction(h12)
+    d24=direction(h24)
+
+    if d4 not in ("LONG","SHORT"):
+        return "WAIT"
+    side=d4
+    opp=_opposite(side)
+
+    # Higher timeframes can be aligned or neutral, but may not oppose the 4H thesis.
+    if d12==opp or d24==opp:
+        return "WAIT"
+
+    # 1H is a trigger, not a competing swing thesis.
+    if d1!=side:
+        return "WAIT"
+
+    closes=[float(x["c"]) for x in hist]
+    a=atr(hist,14)
+    e20=ema(closes[-80:],20) if len(closes)>=20 else None
+    rs=rsi(closes,14)
+    if not a or a<=0 or e20 is None:
+        return "WAIT"
+
+    # Do not chase a move that is already >1.5 ATR from its 1H mean.
+    extension=abs(closes[-1]-e20)/a
+    if extension>1.5:
+        return "WAIT"
+
+    # Blowoff/exhaustion veto only; this is intentionally broad, not a tuned RSI band.
+    if rs is not None and ((side=="LONG" and rs>=80) or (side=="SHORT" and rs<=20)):
+        return "WAIT"
+
+    # Require the most recent completed 1H bar to resume in the thesis direction.
+    if len(hist)<2:
+        return "WAIT"
+    if side=="LONG" and not (hist[-1]["c"]>hist[-2]["c"]):
+        return "WAIT"
+    if side=="SHORT" and not (hist[-1]["c"]<hist[-2]["c"]):
+        return "WAIT"
+
+    # BTC-first for alts: 4H BTC must be directional and non-opposing; 12H/1H BTC
+    # may be aligned or neutral, but explicit opposition blocks the alt call.
+    sym=str(symbol or "").upper()
+    if sym and sym!="BTCUSDT":
+        if not btc_hist:
+            return "WAIT"
+        btc_as_of=[x for x in btc_hist if int(x["t"])<=int(hist[-1]["t"])]
+        if len(btc_as_of)<55:
+            return "WAIT"
+        b1=direction(btc_as_of)
+        b4=direction(resample_closed(btc_as_of,4,as_of))
+        b12=direction(resample_closed(btc_as_of,12,as_of))
+        if b4 not in ("LONG","SHORT"):
+            return "WAIT"
+        if b4==opp or b12==opp or b1==opp:
+            return "WAIT"
+
+    return side
+
+
 def future_label(rows,i,h,deadband_atr=.35):
     a=atr(rows[:i+1],14)
     if not a or i+h>=len(rows): return None
@@ -83,10 +164,17 @@ def metrics(records):
     dcorrect=sum(r["prediction"]==r["actual"] for r in directional)
     missed=sum(r["prediction"]=="WAIT" and r["actual"]!="WAIT" for r in records)
     false_action=sum(r["prediction"]!="WAIT" and r["actual"]=="WAIT" for r in records)
+    opposite=sum(
+        r["prediction"] in ("LONG","SHORT")
+        and r["actual"] in ("LONG","SHORT")
+        and r["prediction"]!=r["actual"]
+        for r in records
+    )
     out.update({
       "accuracy_pct":round(100*correct/len(records),3),
       "directional_calls":len(directional),
       "directional_precision_pct":round(100*dcorrect/len(directional),3) if directional else None,
+      "opposite_direction_pct_of_calls":round(100*opposite/len(directional),3) if directional else None,
       "wait_rate_pct":round(100*sum(r["prediction"]=="WAIT" for r in records)/len(records),3),
       "missed_directional_move_pct":round(100*missed/len(records),3),
       "false_directional_call_pct":round(100*false_action/len(records),3),
@@ -94,15 +182,20 @@ def metrics(records):
     })
     return out
 
-def run(symbol,days,end_ms=None,step=4,rows=None):
+def run(symbol,days,end_ms=None,step=4,rows=None,btc_rows=None):
     rows=rows if rows is not None else fetch_1h(symbol,days,end_ms)
+    btc_rows=btc_rows if btc_rows is not None else (rows if symbol=="BTCUSDT" else fetch_1h("BTCUSDT",days,end_ms))
     warm=60*12
-    engines={"legacy_1h":legacy_1h,"htf_consensus":htf_consensus}
+    engines={"legacy_1h":legacy_1h,"htf_consensus":htf_consensus,"analyst_stack_v2":analyst_stack_v2}
     rec={name:{h:[] for h in HORIZONS} for name in engines}
     for i in range(warm,len(rows)-max(HORIZONS),step):
         hist=rows[:i+1]
         decision_time_ms=int(rows[i]["t"])+HOUR_MS
-        preds={name:fn(hist,decision_time_ms) for name,fn in engines.items()}
+        preds={
+            "legacy_1h":legacy_1h(hist,decision_time_ms),
+            "htf_consensus":htf_consensus(hist,decision_time_ms),
+            "analyst_stack_v2":analyst_stack_v2(hist,decision_time_ms,btc_rows,symbol),
+        }
         for h in HORIZONS:
             actual=future_label(rows,i,h)
             if actual is None:continue
@@ -112,11 +205,13 @@ def run(symbol,days,end_ms=None,step=4,rows=None):
 
 def main():
     ap=argparse.ArgumentParser();ap.add_argument("--days",type=int,default=180);ap.add_argument("--end-ms",type=int,default=None);ap.add_argument("--symbols",nargs="*",default=SYMBOLS);ap.add_argument("--step",type=int,default=4);a=ap.parse_args()
-    merged={e:{h:[] for h in HORIZONS} for e in ("legacy_1h","htf_consensus")}
+    engine_names=("legacy_1h","htf_consensus","analyst_stack_v2")
+    merged={e:{h:[] for h in HORIZONS} for e in engine_names}
     by_symbol={}
+    btc_rows=fetch_1h("BTCUSDT",a.days,a.end_ms)
     for s in a.symbols:
-        rows=fetch_1h(s,a.days,a.end_ms)
-        r=run(s,a.days,a.end_ms,a.step,rows=rows);by_symbol[s]={}
+        rows=btc_rows if s=="BTCUSDT" else fetch_1h(s,a.days,a.end_ms)
+        r=run(s,a.days,a.end_ms,a.step,rows=rows,btc_rows=btc_rows);by_symbol[s]={}
         for e in merged:
             by_symbol[s][e]={}
             for h in HORIZONS:
@@ -129,7 +224,8 @@ def main():
       "decision_clock":"Closed 1H decisions; only complete contiguous UTC-aligned 4H and 12H candles are eligible.",
       "engines":{
         "legacy_1h":"fixed simple 1H state baseline",
-        "htf_consensus":"fixed 4H/12H agreement with non-opposing 1H confirmation"
+        "htf_consensus":"fixed 4H/12H agreement with non-opposing 1H confirmation",
+        "analyst_stack_v2":"4H primary thesis; 12H/1D opposition veto; 1H resumption trigger; BTC-first alt veto; 1.5ATR extension and RSI 80/20 blowoff veto"
       },
       "overall":{e:{str(h)+"h":metrics(merged[e][h]) for h in HORIZONS} for e in merged},
       "by_symbol":by_symbol}
