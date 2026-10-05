@@ -144,8 +144,22 @@ def install(atlas):
         row = original(symbol, btc_ks)
         if not isinstance(row, dict):
             return row
+
+        # Provenance is part of the Production contract even when this overlay is
+        # not applicable. A WAIT/no-direction row must still prove which
+        # continuation authority was installed; NOT_APPLICABLE never means PASS.
+        row["continuation_scoring_version"] = VERSION
         direction = row.get("direction")
         if direction not in ("LONG", "SHORT"):
+            row["continuation_context"] = {
+                "strong": False,
+                "direction": None,
+                "status": "NOT_APPLICABLE",
+                "reason": "NO_DIRECTIONAL_CANDIDATE",
+                "closed_candle_authority": True,
+                "can_promote_trade": False,
+            }
+            row["market_breadth"] = None
             return row
 
         ks = list(atlas._spot_klines(symbol) or [])
