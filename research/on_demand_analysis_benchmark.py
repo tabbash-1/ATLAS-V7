@@ -14,7 +14,13 @@ volatility-scaled deadband. WAIT is therefore measurable rather than treated as
 an automatic failure.
 """
 from __future__ import annotations
-import argparse, json, statistics
+import argparse, json, statistics, sys
+from pathlib import Path
+
+ROOT=Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0,str(ROOT))
+
 from historical_core_4_12h_replay import fetch_1h, direction, atr
 
 VERSION="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V1"
