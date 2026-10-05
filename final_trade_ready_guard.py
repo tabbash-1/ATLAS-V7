@@ -75,14 +75,18 @@ def _authoritative_context_state(row):
     btc_reason = _norm(btc_gate.get("reason")) if btc_gate_present else None
 
     blockers = []
-    # Explicit canonical HTF WAIT/BLOCK is authoritative. Missing status remains
-    # backward-compatible for isolated fixtures/legacy evidence, but live Production
-    # always publishes the HTF thesis status before Final Gate.
-    if thesis_status in {"WAIT", "BLOCK"}:
-        blockers.append("HTF_THESIS_" + (thesis_reason or "NOT_PASS"))
+    # Final Gate is deliberately fail-closed: the canonical HTF thesis must
+    # explicitly PASS.  A missing status is not permission to trade.
+    if thesis_status != "PASS":
+        blockers.append("HTF_THESIS_" + (thesis_reason or ("STATUS_" + thesis_status if thesis_status else "STATUS_MISSING")))
 
-    if symbol and symbol != "BTCUSDT" and btc_gate_present and not btc_pass:
-        blockers.append("BTC_FIRST_" + (btc_reason or "GATE_NOT_CONFIRMED"))
+    # BTC is the market anchor. Every altcoin must carry an explicit, passing
+    # BTC-first gate at Final Gate; missing evidence is a WAIT, never an implicit pass.
+    if symbol and symbol != "BTCUSDT":
+        if not btc_gate_present:
+            blockers.append("BTC_FIRST_GATE_MISSING")
+        elif not btc_pass:
+            blockers.append("BTC_FIRST_" + (btc_reason or "GATE_NOT_CONFIRMED"))
 
     return {
         "htf_thesis_status": thesis_status or None,
@@ -91,7 +95,7 @@ def _authoritative_context_state(row):
         "btc_first_pass": btc_pass,
         "btc_first_reason": btc_reason,
         "blockers": blockers,
-        "rule": "EXPLICIT_HTF_WAIT_OR_BLOCK_AND_EXPLICIT_BTC_FIRST_FAILURE_CANNOT_BE_PROMOTED",
+        "rule": "HTF_EXPLICIT_PASS_REQUIRED_AND_ALTCOIN_BTC_FIRST_EXPLICIT_PASS_REQUIRED",
     }
 
 
