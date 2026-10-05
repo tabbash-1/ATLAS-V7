@@ -132,7 +132,7 @@ def test_aligned_actionable_is_certified_trade_ready():
 def test_unconfirmed_breakout_continuation_fails_closed():
     d = base_row(
         playbook='BREAKOUT_CONTINUATION_SHORT',
-        structural_geometry={'breakout': {'confirmed': False}},
+        structural_geometry={'breakout': {'breakout_event_confirmed': True, 'entry_ready': False, 'accepted': False, 'acceptance_mode':'NONE'}},
     )
     r = guard.apply(d)
     assert r['trade_ready'] is False
@@ -143,10 +143,30 @@ def test_unconfirmed_breakout_continuation_fails_closed():
     assert paper_final.strict_trade_ready(r) is False
 
 
+def test_fresh_breakout_event_without_post_break_acceptance_fails_closed():
+    d = base_row(
+        playbook='BREAKOUT_CONFIRMED_SHORT',
+        structural_geometry={'breakout': {
+            'breakout_event_confirmed': True,
+            'entry_ready': False,
+            'accepted': False,
+            'acceptance_mode': 'NONE',
+        }},
+    )
+    r = guard.apply(d)
+    assert r['trade_ready'] is False
+    assert 'BREAKOUT_STRUCTURE_NOT_CONFIRMED' in r['final_trade_gate']['blockers']
+    s=r['final_trade_gate']['structure_confirmation']
+    assert s['breakout_event_confirmed'] is True
+    assert s['confirmed'] is False
+    assert s['acceptance_required'] is True
+    assert s['rule']=='BREAKOUT_FAMILY_REQUIRES_POST_BREAK_COMPLETED_1H_ACCEPTANCE'
+
+
 def test_confirmed_breakout_still_can_pass_final_gate():
     d = base_row(
         playbook='BREAKOUT_CONFIRMED_SHORT',
-        structural_geometry={'breakout': {'confirmed': True}},
+        structural_geometry={'breakout': {'breakout_event_confirmed': True, 'entry_ready': True, 'accepted': True, 'acceptance_mode':'RETEST_HOLD'}},
     )
     r = guard.apply(d)
     assert r['trade_ready'] is True

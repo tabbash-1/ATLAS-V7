@@ -2,7 +2,7 @@ import production_trade_plan as p
 
 
 def base(**kw):
-    d={'ok':True,'candidate_direction':'LONG','entry':100.0,'indicators':{'atr14':2.0},'production_signal_qualified':True,'signal_threshold':68.0,'execution_ready':True,'structural_geometry':{'obstacle_price':104.0,'obstacle_distance_pct':4.0,'continuation_strong':True,'breakout':{'confirmed':True}}}
+    d={'ok':True,'candidate_direction':'LONG','entry':100.0,'indicators':{'atr14':2.0},'production_signal_qualified':True,'signal_threshold':68.0,'execution_ready':True,'structural_geometry':{'obstacle_price':104.0,'obstacle_distance_pct':4.0,'continuation_strong':True,'breakout':{'confirmed':True,'entry_ready':True,'accepted':True,'acceptance_mode':'RETEST_HOLD'}}}
     d.update(kw); return d
 
 
@@ -115,7 +115,7 @@ def test_clear_room_wait_uses_pullback():
 
 
 def test_short_ordering():
-    d=base(candidate_direction='SHORT',entry=100.0,structural_geometry={'obstacle_price':94.0,'obstacle_distance_pct':6.0,'continuation_strong':True,'breakout':{'confirmed':True}})
+    d=base(candidate_direction='SHORT',entry=100.0,structural_geometry={'obstacle_price':94.0,'obstacle_distance_pct':6.0,'continuation_strong':True,'breakout':{'confirmed':True,'entry_ready':True,'accepted':True,'acceptance_mode':'RETEST_HOLD'}})
     x=p.build(d)
     assert x['stop_loss']>x['entry']>x['tp1']>x['tp2']
     assert x['rr_tp1']>=1 and x['rr_tp2']>=2
@@ -132,7 +132,7 @@ def test_no_direction_does_not_invent_trade():
 def test_score_is_never_exposed_as_calibrated_probability():
     d={'ok':True,'candidate_direction':'LONG','entry':100.0,'signal_threshold':68,
        'execution_ready':True,'indicators':{'atr14':2.0},
-       'structural_geometry':{'continuation_strong':True,'breakout':{'confirmed':True}}}
+       'structural_geometry':{'continuation_strong':True,'breakout':{'confirmed':True,'entry_ready':True,'accepted':True,'acceptance_mode':'RETEST_HOLD'}}}
     out=p.build(d)
     assert out['score_is_authority'] is False
     assert out['score_probability_calibrated'] is False

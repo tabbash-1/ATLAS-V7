@@ -9,7 +9,7 @@ rather than the current candle's own high/low.
 
 import time
 
-VERSION = "PROD_SIGNAL_SCORING_V11_1_5ATR_RISK_CONSISTENCY"
+VERSION = "PROD_SIGNAL_SCORING_V12_ACCEPTED_BREAKOUT"
 LOOKBACK_BARS = 96
 RANGE_BARS = 24
 
@@ -91,39 +91,126 @@ def structural_obstacle(ks, px, direction):
     return None, None, 'NO_PRIOR_SUPPORT_AHEAD'
 
 
-def breakout_context(ks, px, direction, votes, mom24, atr, paced_rv, closed_rv=None):
-    # The breakout bar is the last completed candle, so its comparison range
-    # must end one candle earlier. Including the breakout bar itself would make
-    # a true close above/below the range mathematically impossible.
-    completed = list(ks or [])[:-1]
-    high24, low24 = prior_range(completed)
+def _relative_volume_at(rows, index, lookback=20):
+    rows=list(rows or [])
+    if not rows:
+        return None
+    if index < 0:
+        index=len(rows)+index
+    if index < 0 or index >= len(rows):
+        return None
+    vol=_f(rows[index].get('volume'))
+    start=max(0,index-lookback)
+    base=[_f(x.get('volume')) for x in rows[start:index]]
+    base=[x for x in base if x is not None]
+    if vol is None or not base:
+        return None
+    avg=sum(base)/len(base)
+    return (vol/avg) if avg>0 else None
 
-    # Breakout confirmation must use the last fully completed 1H candle.
-    # A 98%-complete live candle can still reverse before close and must never
-    # authorize a production breakout.
-    current = (completed or [{}])[-1]
-    close_px = _f(current.get('close'), px)
-    op = _f(current.get('open'), close_px)
-    body_atr = abs(close_px - op) / atr if atr else 0.0
-    closed_1h = bool(completed)
-    if direction == 'LONG':
-        beyond = high24 is not None and close_px > high24
-        momentum_ok = mom24 > 0
+
+def breakout_context(ks, px, direction, votes, mom24, atr, paced_rv, closed_rv=None):
+    """Separate a fresh range break from an accepted, entry-ready breakout.
+
+    A fresh 1H close outside the prior 24H range is an EVENT, not permission to
+    enter.  Production confirmation requires that a prior breakout bar was
+    followed by at least one additional fully completed 1H candle that remained
+    on the correct side of the broken level.  A touch of the old level that
+    closes back on the breakout side is labelled RETEST_HOLD; otherwise the
+    accepted path is MULTI_CLOSE_HOLD.
+    """
+    completed=list(ks or [])[:-1]
+    high24,low24=prior_range(completed)
+    current=(completed or [{}])[-1]
+    close_px=_f(current.get('close'),px)
+    op=_f(current.get('open'),close_px)
+    body_atr=abs(close_px-op)/atr if atr else 0.0
+    closed_1h=bool(completed)
+    if direction=='LONG':
+        beyond=high24 is not None and close_px>high24
+        momentum_ok=mom24>0
     else:
-        beyond = low24 is not None and close_px < low24
-        momentum_ok = mom24 < 0
-    volume_confirmation = closed_rv if closed_rv is not None else 0.0
-    confirmed = bool(closed_1h and beyond and votes == 4 and momentum_ok and (volume_confirmation >= 0.80 or body_atr >= 0.35))
+        beyond=low24 is not None and close_px<low24
+        momentum_ok=mom24<0
+    volume_confirmation=closed_rv if closed_rv is not None else (_relative_volume_at(completed,-1) or 0.0)
+    breakout_event_confirmed=bool(
+        closed_1h and beyond and votes==4 and momentum_ok
+        and (volume_confirmation>=0.80 or body_atr>=0.35)
+    )
+
+    accepted=False
+    acceptance_mode='NONE'
+    acceptance_level=None
+    breakout_age_bars=None
+    breakout_bar_relative_volume=None
+    breakout_bar_body_atr=None
+    retest_hold=False
+    # Look back up to three completed 1H bars for the actual breakout event.
+    # The current completed bar must be after that event and must preserve the
+    # new support/resistance role of the broken level.
+    for event_idx in range(max(0,len(completed)-4), max(0,len(completed)-1)):
+        history=completed[:event_idx+1]
+        base_high,base_low=prior_range(history)
+        event=completed[event_idx]
+        event_close=_f(event.get('close'))
+        event_open=_f(event.get('open'),event_close)
+        if event_close is None:
+            continue
+        level=base_high if direction=='LONG' else base_low
+        if level is None:
+            continue
+        event_beyond=(event_close>level) if direction=='LONG' else (event_close<level)
+        event_body=abs(event_close-event_open)/atr if atr else 0.0
+        event_rv=_relative_volume_at(completed,event_idx)
+        event_quality=bool(
+            event_beyond and votes==4 and momentum_ok
+            and ((event_rv is not None and event_rv>=0.80) or event_body>=0.35)
+        )
+        if not event_quality:
+            continue
+        subsequent=completed[event_idx+1:]
+        if not subsequent:
+            continue
+        if direction=='LONG':
+            held=all((_f(x.get('close')) is not None and _f(x.get('close'))>level) for x in subsequent)
+        else:
+            held=all((_f(x.get('close')) is not None and _f(x.get('close'))<level) for x in subsequent)
+        if not held:
+            continue
+        tol=max((atr or 0)*0.15,abs(level)*0.0005)
+        if direction=='LONG':
+            retest_hold=any((_f(x.get('low')) is not None and _f(x.get('low'))<=level+tol) for x in subsequent)
+        else:
+            retest_hold=any((_f(x.get('high')) is not None and _f(x.get('high'))>=level-tol) for x in subsequent)
+        accepted=True
+        acceptance_mode='RETEST_HOLD' if retest_hold else 'MULTI_CLOSE_HOLD'
+        acceptance_level=level
+        breakout_age_bars=len(completed)-1-event_idx
+        breakout_bar_relative_volume=event_rv
+        breakout_bar_body_atr=event_body
+
     return {
-        'confirmed': confirmed,
+        # Backward-compatible name now means ENTRY-READY confirmation, not the
+        # first breakout print.
+        'confirmed': accepted,
+        'entry_ready': accepted,
+        'accepted': accepted,
+        'acceptance_mode': acceptance_mode,
+        'acceptance_level': round(acceptance_level,10) if acceptance_level is not None else None,
+        'breakout_age_bars': breakout_age_bars,
+        'retest_hold': bool(retest_hold),
+        'breakout_event_confirmed': breakout_event_confirmed,
         'closed_1h_confirmation': closed_1h,
         'beyond_prior_24h_range': bool(beyond),
         'prior_24h_high': high24,
         'prior_24h_low': low24,
-        'current_body_atr': round(body_atr, 4),
-        'paced_relative_volume': round(paced_rv, 3),
-        'closed_breakout_relative_volume': round(volume_confirmation, 3),
-        'confirmation_rule': 'LAST_FULLY_COMPLETED_1H_AND_4_VOTES_AND_RANGE_BREAK_AND_(CLOSED_RV>=0.8_OR_BODY>=0.35ATR)',
+        'current_body_atr': round(body_atr,4),
+        'paced_relative_volume': round(paced_rv,3),
+        'closed_breakout_relative_volume': round(volume_confirmation,3),
+        'accepted_breakout_bar_relative_volume': round(breakout_bar_relative_volume,3) if breakout_bar_relative_volume is not None else None,
+        'accepted_breakout_bar_body_atr': round(breakout_bar_body_atr,4) if breakout_bar_body_atr is not None else None,
+        'event_rule': 'LAST_FULLY_COMPLETED_1H_AND_4_VOTES_AND_RANGE_BREAK_AND_(CLOSED_RV>=0.8_OR_BODY>=0.35ATR)',
+        'confirmation_rule': 'PRIOR_COMPLETED_BREAKOUT_EVENT_PLUS_SUBSEQUENT_COMPLETED_1H_HOLD_OR_RETEST',
     }
 
 

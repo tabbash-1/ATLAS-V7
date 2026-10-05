@@ -20,6 +20,7 @@ def _row():
         },
         "actionable_decision": "LONG",
         "production_signal_qualified": True,
+        "relative_volume": 1.25,
         "execution_cost": {"validated": True, "fee_bps": 5.0, "spread_bps": 1.0, "slippage_bps": 1.0},
         "htf_core_geometry": {"ready": True, "reason": "HTF_GEOMETRY_READY"},
         "setup_quality_gate": {"status": "PASS"},

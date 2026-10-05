@@ -3,8 +3,8 @@
 Installed after every Production decision overlay. It never changes scores/thresholds
 or routes orders. It certifies LONG/SHORT only when HTF direction, entry confirmation,
 canonical geometry, raw Production qualification and Trader Brain evidence all agree.
-Breakout-family setups additionally require explicit canonical structure-break
-confirmation. Any contradiction is collapsed to WAIT across user-facing/nested plan
+Breakout-family setups additionally require an accepted post-break 1H hold/retest,
+not merely the first candle that prints outside structure. Any contradiction is collapsed to WAIT across user-facing/nested plan
 fields so no stale actionable flag can escape.
 
 Evidence-gated SHORT certification and removal of a stale pre-final WAIT veto are on by
@@ -19,7 +19,7 @@ from atlas_trader_brain import assess as assess_trader
 from canonical_decision_contract import from_decision
 from golden_thesis_engine import VERSION as GOLDEN_THESIS_VERSION, build as build_golden_thesis
 
-VERSION = "FINAL_TRADE_READY_GUARD_V14_DIRECTION_CONSISTENCY"
+VERSION = "FINAL_TRADE_READY_GUARD_V15_ACCEPTED_BREAKOUT"
 MIN_NET_RR = 2.0
 SHORT_PRODUCTION_ENV = "ATLAS_SHORT_PRODUCTION_ENABLED"
 PRODUCT_HORIZON = "4-12H"
@@ -161,7 +161,8 @@ def _breakout_structure_state(row):
     confirmed = False
     evidence_source = None
     candidates = (
-        ("STRUCTURAL_GEOMETRY", breakout, "confirmed"),
+        ("STRUCTURAL_GEOMETRY_ENTRY_READY", breakout, "entry_ready"),
+        ("STRUCTURAL_GEOMETRY_ACCEPTED", breakout, "accepted"),
         ("TRADE_PLAN", trade_plan, "breakout_confirmed"),
         ("CORE_PLAN", core_plan, "breakout_confirmed"),
         ("GEOMETRY_PROVENANCE", provenance, "breakout_confirmed"),
@@ -180,6 +181,10 @@ def _breakout_structure_state(row):
         "evidence_source": evidence_source,
         "playbook": playbook or None,
         "entry_mode": entry_mode or None,
+        "acceptance_required": requires_confirmation,
+        "acceptance_mode": breakout.get("acceptance_mode") if isinstance(breakout, dict) else None,
+        "breakout_event_confirmed": breakout.get("breakout_event_confirmed") if isinstance(breakout, dict) else None,
+        "rule": "BREAKOUT_FAMILY_REQUIRES_POST_BREAK_COMPLETED_1H_ACCEPTANCE",
     }
 
 
