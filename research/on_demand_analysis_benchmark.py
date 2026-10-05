@@ -23,7 +23,7 @@ if str(ROOT) not in sys.path:
 
 from historical_core_4_12h_replay import fetch_1h, direction, atr, ema, rsi
 
-VERSION="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V4_12H_THESIS_4H_PULLBACK"
+VERSION="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V5_TEMPORAL_ROBUSTNESS"
 SYMBOLS=["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","BNBUSDT","DOGEUSDT","ZECUSDT","ADAUSDT","LINKUSDT","AVAXUSDT","LTCUSDT"]
 HORIZONS=(4,8,12)
 HOUR_MS=60*60*1000
@@ -235,6 +235,22 @@ def metrics(records):
     })
     return out
 
+def temporal_thirds(records):
+    """Chronological early/middle/late thirds without mixing the same timestamp across splits."""
+    if not records:
+        return {"early":metrics([]),"middle":metrics([]),"late":metrics([])}
+    times=sorted(set(int(r["t"]) for r in records))
+    if len(times)<3:
+        return {"early":metrics(records),"middle":metrics([]),"late":metrics([])}
+    cut1=times[len(times)//3]
+    cut2=times[(2*len(times))//3]
+    return {
+        "early":metrics([r for r in records if int(r["t"]) < cut1]),
+        "middle":metrics([r for r in records if cut1 <= int(r["t"]) < cut2]),
+        "late":metrics([r for r in records if int(r["t"]) >= cut2]),
+    }
+
+
 def run(symbol,days,end_ms=None,step=4,rows=None,btc_rows=None):
     rows=rows if rows is not None else fetch_1h(symbol,days,end_ms)
     btc_rows=btc_rows if btc_rows is not None else (rows if symbol=="BTCUSDT" else fetch_1h("BTCUSDT",days,end_ms))
@@ -300,6 +316,10 @@ def main():
         "thesis12_pullback4_probe":"diagnostic only: use 12H realized direction as thesis and emit it only while the latest 4H realized move is an opposing pullback"
       },
       "overall":{e:{str(h)+"h":metrics(merged[e][h]) for h in HORIZONS} for e in merged},
+      "temporal_robustness":{
+        e:{str(h)+"h":temporal_thirds(merged[e][h]) for h in HORIZONS}
+        for e in ("reversal_4h_probe","htf_consensus","legacy_1h")
+      },
       "by_symbol":by_symbol}
     print("ATLAS_ON_DEMAND_BENCHMARK="+json.dumps(result,sort_keys=True))
 if __name__=="__main__":main()

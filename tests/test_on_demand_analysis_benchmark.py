@@ -7,7 +7,7 @@ P=Path(__file__).resolve().parents[1]/"research"/"on_demand_analysis_benchmark.p
 spec=importlib.util.spec_from_file_location("bench",P);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
 
 def test_product_contract_is_analysis_not_trade_discovery():
-    assert m.VERSION=="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V4_12H_THESIS_4H_PULLBACK"
+    assert m.VERSION=="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V5_TEMPORAL_ROBUSTNESS"
     assert m.HORIZONS==(4,8,12)
 
 
@@ -111,6 +111,19 @@ def test_metrics_distinguish_wait_from_wrong_direction():
     assert x["false_directional_call_pct"]==25.0
     assert x["directional_precision_pct"]==50.0
     assert x["opposite_direction_pct_of_calls"]==0.0
+
+def test_temporal_thirds_keep_timestamp_groups_intact():
+    records=[]
+    for t in range(9):
+        for symbol in ("BTCUSDT","ETHUSDT"):
+            records.append({"t":t,"symbol":symbol,"prediction":"LONG","actual":"LONG"})
+    x=m.temporal_thirds(records)
+    assert x["early"]["n"]==6
+    assert x["middle"]["n"]==6
+    assert x["late"]["n"]==6
+    assert x["early"]["directional_precision_pct"]==100.0
+    assert x["late"]["directional_precision_pct"]==100.0
+
 
 def test_future_label_has_real_wait_deadband(monkeypatch):
     rows=[{"c":100.0,"h":101.0,"l":99.0} for _ in range(20)]
