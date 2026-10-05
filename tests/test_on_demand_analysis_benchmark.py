@@ -7,7 +7,7 @@ P=Path(__file__).resolve().parents[1]/"research"/"on_demand_analysis_benchmark.p
 spec=importlib.util.spec_from_file_location("bench",P);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
 
 def test_product_contract_is_analysis_not_trade_discovery():
-    assert m.VERSION=="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V5_TEMPORAL_ROBUSTNESS"
+    assert m.VERSION=="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V6_ALPHA_CORE_V2"
     assert m.HORIZONS==(4,8,12)
 
 
@@ -167,3 +167,8 @@ def test_benchmark_cli_imports_repository_module_from_script_path():
     result=subprocess.run([sys.executable,str(P),"--help"],cwd=root,capture_output=True,text=True)
     assert result.returncode==0, result.stderr
     assert "--days" in result.stdout
+
+
+def test_alpha_core_v2_is_in_same_benchmark_and_research_only():
+    assert "alpha_core_v2" in m.run.__code__.co_consts or hasattr(m,"alpha_core_v2_engine")
+    assert m.alpha_core_v2_engine([],0,[],"BTCUSDT")=="WAIT"
