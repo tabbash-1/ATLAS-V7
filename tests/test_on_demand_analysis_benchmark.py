@@ -1,5 +1,7 @@
 import importlib.util
 from pathlib import Path
+import subprocess
+import sys
 
 P=Path(__file__).resolve().parents[1]/"research"/"on_demand_analysis_benchmark.py"
 spec=importlib.util.spec_from_file_location("bench",P);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
@@ -58,3 +60,10 @@ def test_benchmark_is_scheduled_by_actions_not_render_boot():
     assert "on_demand_analysis_benchmark.py" not in boot
     assert "push:" in workflow and "pull_request:" in workflow and "branches: [main]" in workflow
     assert "python -m pip install pytest" in workflow
+
+
+def test_benchmark_cli_imports_repository_module_from_script_path():
+    root=P.parents[1]
+    result=subprocess.run([sys.executable,str(P),"--help"],cwd=root,capture_output=True,text=True)
+    assert result.returncode==0, result.stderr
+    assert "--days" in result.stdout
