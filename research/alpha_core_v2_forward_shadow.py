@@ -24,10 +24,10 @@ if str(ROOT) not in sys.path:
 from historical_core_4_12h_replay import fetch_1h
 from research.alpha_core_v2 import VERSION as ALPHA_VERSION, analyze as alpha_analyze
 
-VERSION="ATLAS_ALPHA_CORE_V2_FORWARD_SHADOW_V1"
+VERSION="ATLAS_ALPHA_CORE_V2_FORWARD_SHADOW_V2_FRESH_RUNTIME_CAPTURE"
 LEDGER_SCHEMA="ATLAS_ALPHA_CORE_V2_FORWARD_LEDGER_V1"
 HOUR_MS=60*60*1000
-SLOT_MS=4*HOUR_MS
+MIN_CAPTURE_SPACING_MS=4*HOUR_MS
 HORIZONS=(4,8,12)
 DEADBAND_ATR=0.35
 SYMBOLS=("BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","BNBUSDT","DOGEUSDT","ZECUSDT","ADAUSDT","LINKUSDT","AVAXUSDT","LTCUSDT")
@@ -39,6 +39,11 @@ def _iso(ms):
 
 def _closed_rows(rows,now_ms):
     return [x for x in sorted(rows or [],key=lambda z:int(z["t"])) if int(x["t"])+HOUR_MS<=int(now_ms)]
+
+
+def _last_decision_at(entries,symbol):
+    xs=[int(x.get("decision_at_ms") or 0) for x in entries if x.get("symbol")==symbol]
+    return max(xs) if xs else None
 
 
 def _actual(entry_close,future_close,atr_at_entry):
@@ -140,7 +145,8 @@ def run(now_ms=None,fetcher=fetch_1h,
 
         last=rows[-1]
         decision_at_ms=int(last["t"])+HOUR_MS
-        if decision_at_ms % SLOT_MS != 0:
+        previous_decision_at=_last_decision_at(entries,symbol)
+        if previous_decision_at is not None and decision_at_ms-previous_decision_at < MIN_CAPTURE_SPACING_MS:
             continue
 
         result=alpha_analyze(rows,decision_at_ms,btc_rows,symbol)
@@ -162,6 +168,8 @@ def run(now_ms=None,fetcher=fetch_1h,
             "decision_at_ms":decision_at_ms,
             "decision_bar_t":int(last["t"]),
             "decision_close":float(last["c"]),
+            "capture_lag_minutes":round(max(0,now_ms-decision_at_ms)/60000.0,3),
+            "minimum_capture_spacing_minutes":round(MIN_CAPTURE_SPACING_MS/60000.0,3),
             "prediction":result.get("decision","WAIT"),
             "candidate_direction":result.get("candidate_direction"),
             "regime":result.get("regime"),
