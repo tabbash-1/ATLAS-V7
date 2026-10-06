@@ -18,7 +18,7 @@ on:
       - '.github/workflows/alpha-core-v2-forward-shadow.yml'
   workflow_dispatch:
   schedule:
-    - cron: '29 */4 * * *'
+    - cron: '29 * * * *'
 
 permissions:
   contents: write
@@ -44,7 +44,7 @@ jobs:
           grep -Fq 'ATLAS_ALPHA_CORE_V2_REGIME_ADAPTIVE' research/alpha_core_v2.py
           grep -Fq '"can_override_production": False' research/alpha_core_v2.py
           grep -Fq '"live_execution": False' research/alpha_core_v2.py
-          grep -Fq 'ATLAS_ALPHA_CORE_V2_FORWARD_SHADOW_V1' research/alpha_core_v2_forward_shadow.py
+          grep -Fq 'ATLAS_ALPHA_CORE_V2_FORWARD_SHADOW_V2_FRESH_RUNTIME_CAPTURE' research/alpha_core_v2_forward_shadow.py
           grep -Fq '"can_override_production":False' research/alpha_core_v2_forward_shadow.py
           grep -Fq '"can_create_trade":False' research/alpha_core_v2_forward_shadow.py
 
@@ -64,7 +64,7 @@ jobs:
         run: python research/alpha_core_v2_forward_shadow.py
       - name: Contract check
         run: |
-          jq -e '.schema=="ATLAS_ALPHA_CORE_V2_FORWARD_SHADOW_V1_LATEST" and .alpha_version=="ATLAS_ALPHA_CORE_V2_REGIME_ADAPTIVE" and .research_only==true and .shadow_only==true and .live_execution==false and .production_effect=="NONE" and .can_override_production==false and .can_override_final_gate==false and .can_change_threshold==false and .can_create_trade==false' status/alpha-core-v2-forward-shadow-latest.json
+          jq -e '.schema=="ATLAS_ALPHA_CORE_V2_FORWARD_SHADOW_V2_FRESH_RUNTIME_CAPTURE_LATEST" and .alpha_version=="ATLAS_ALPHA_CORE_V2_REGIME_ADAPTIVE" and .research_only==true and .shadow_only==true and .live_execution==false and .production_effect=="NONE" and .can_override_production==false and .can_override_final_gate==false and .can_change_threshold==false and .can_create_trade==false' status/alpha-core-v2-forward-shadow-latest.json
       - name: Commit research evidence
         shell: bash
         run: |
