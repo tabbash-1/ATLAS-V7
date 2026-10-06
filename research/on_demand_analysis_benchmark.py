@@ -22,7 +22,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0,str(ROOT))
 
 from historical_core_4_12h_replay import fetch_1h, direction, atr, ema, rsi
-from research.alpha_core_v2 import decision as alpha_core_v2_decision, build_context as alpha_core_v2_context, classify_regime as alpha_core_v2_regime
+from research.alpha_core_v2 import decision as alpha_core_v2_decision, analyze as alpha_core_v2_analyze, classify_regime as alpha_core_v2_regime
 
 VERSION="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V7_REVERSAL4H_ATTRIBUTION"
 SYMBOLS=["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","BNBUSDT","DOGEUSDT","ZECUSDT","ADAUSDT","LINKUSDT","AVAXUSDT","LTCUSDT"]
@@ -299,8 +299,7 @@ def temporal_thirds(records):
     }
 
 
-def _reversal_features(hist,decision_time_ms,btc_hist,symbol,prediction):
-    ctx=alpha_core_v2_context(hist,decision_time_ms,btc_hist,symbol)
+def _reversal_features(ctx,symbol,prediction):
     if not ctx:
         return {}
     mag=abs(float(ctx.get("move4_atr") or 0.0))
@@ -397,18 +396,19 @@ def run(symbol,days,end_ms=None,step=4,rows=None,btc_rows=None):
     for i in range(warm,len(rows)-max(HORIZONS),step):
         hist=rows[:i+1]
         decision_time_ms=int(rows[i]["t"])+HOUR_MS
+        alpha_analysis=alpha_core_v2_analyze(hist,decision_time_ms,btc_rows,symbol)
         preds={
             "legacy_1h":legacy_1h(hist,decision_time_ms),
             "htf_consensus":htf_consensus(hist,decision_time_ms),
             "analyst_stack_v2":analyst_stack_v2(hist,decision_time_ms,btc_rows,symbol),
-            "alpha_core_v2":alpha_core_v2_engine(hist,decision_time_ms,btc_rows,symbol),
+            "alpha_core_v2":alpha_analysis.get("decision","WAIT"),
             "momentum_4h_probe":momentum_4h_probe(hist,decision_time_ms),
             "reversal_4h_probe":reversal_4h_probe(hist,decision_time_ms),
             "momentum_12h_probe":momentum_12h_probe(hist,decision_time_ms),
             "reversal_12h_probe":reversal_12h_probe(hist,decision_time_ms),
             "thesis12_pullback4_probe":thesis12_pullback4_probe(hist,decision_time_ms),
         }
-        reversal_features=_reversal_features(hist,decision_time_ms,btc_rows,symbol,preds["reversal_4h_probe"])
+        reversal_features=_reversal_features(alpha_analysis.get("context"),symbol,preds["reversal_4h_probe"])
         for h in HORIZONS:
             actual=future_label(rows,i,h)
             if actual is None:continue
