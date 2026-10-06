@@ -20,12 +20,13 @@ if str(ROOT) not in sys.path:
 
 from historical_core_4_12h_replay import fetch_1h, atr
 
-VERSION="ATLAS_REVERSAL4H_FORWARD_SHADOW_V1"
+VERSION="ATLAS_REVERSAL4H_FORWARD_SHADOW_V2_SLOT_RECOVERY"
 LEDGER_SCHEMA="ATLAS_REVERSAL4H_FORWARD_LEDGER_V1"
 HOUR_MS=60*60*1000
 SLOT_MS=4*HOUR_MS
 HORIZONS=(4,8,12)
 DEADBAND_ATR=0.35
+MAX_CAPTURE_LAG_MS=2*HOUR_MS
 SYMBOLS=("BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","BNBUSDT","DOGEUSDT","ZECUSDT","ADAUSDT","LINKUSDT","AVAXUSDT","LTCUSDT")
 
 
@@ -35,6 +36,19 @@ def _iso(ms):
 
 def _closed_rows(rows,now_ms):
     return [x for x in sorted(rows or [],key=lambda z:int(z["t"])) if int(x["t"])+HOUR_MS<=int(now_ms)]
+
+
+def _latest_aligned_decision(rows,now_ms):
+    """Return the latest eligible 4H decision slice, bounded against stale reconstruction."""
+    for idx in range(len(rows)-1,-1,-1):
+        decision_at_ms=int(rows[idx]["t"])+HOUR_MS
+        if decision_at_ms % SLOT_MS != 0:
+            continue
+        lag_ms=max(0,int(now_ms)-decision_at_ms)
+        if lag_ms > MAX_CAPTURE_LAG_MS:
+            return None
+        return rows[:idx+1],decision_at_ms,lag_ms
+    return None
 
 
 def reversal4h_prediction(hist):
@@ -134,12 +148,12 @@ def run(now_ms=None,fetcher=fetch_1h,ledger_path="status/reversal4h-forward-ledg
             if entry.get("symbol")==symbol:
                 _settle(entry,by_t)
 
-        last=rows[-1]
-        decision_at_ms=int(last["t"])+HOUR_MS
-        # Match the 4-hour decision cadence used by the retrospective benchmark.
-        if decision_at_ms % SLOT_MS != 0:
+        slot=_latest_aligned_decision(rows,now_ms)
+        if slot is None:
             continue
-        pred,ev=reversal4h_prediction(rows)
+        decision_hist,decision_at_ms,capture_lag_ms=slot
+        last=decision_hist[-1]
+        pred,ev=reversal4h_prediction(decision_hist)
         a=ev.get("atr14")
         if a is None:
             # WAIT without an ATR cannot be labeled prospectively with the same policy.
@@ -156,6 +170,8 @@ def run(now_ms=None,fetcher=fetch_1h,ledger_path="status/reversal4h-forward-ledg
             "decision_at_ms":decision_at_ms,
             "decision_bar_t":int(last["t"]),
             "decision_close":float(last["c"]),
+            "capture_lag_minutes":round(capture_lag_ms/60000.0,3),
+            "capture_lag_limit_minutes":round(MAX_CAPTURE_LAG_MS/60000.0,3),
             "prediction":pred,
             "atr14":float(a),
             "evidence":ev,

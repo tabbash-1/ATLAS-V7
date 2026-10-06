@@ -37,7 +37,7 @@ jobs:
         run: python -m pytest -q tests/test_reversal4h_forward_shadow.py
       - name: Research-only invariants
         run: |
-          grep -Fq 'ATLAS_REVERSAL4H_FORWARD_SHADOW_V1' research/reversal4h_forward_shadow.py
+          grep -Fq 'ATLAS_REVERSAL4H_FORWARD_SHADOW_V2_SLOT_RECOVERY' research/reversal4h_forward_shadow.py
           grep -Fq 'can_override_production":False' research/reversal4h_forward_shadow.py
           grep -Fq 'live_execution":False' research/reversal4h_forward_shadow.py
 
@@ -57,7 +57,7 @@ jobs:
         run: python research/reversal4h_forward_shadow.py
       - name: Contract check
         run: |
-          jq -e '.schema=="ATLAS_REVERSAL4H_FORWARD_SHADOW_V1_LATEST" and .research_only==true and .shadow_only==true and .live_execution==false and .production_effect=="NONE" and .can_override_production==false and .can_override_final_gate==false and .can_change_threshold==false' status/reversal4h-forward-shadow-latest.json
+          jq -e '.schema=="ATLAS_REVERSAL4H_FORWARD_SHADOW_V2_SLOT_RECOVERY_LATEST" and .research_only==true and .shadow_only==true and .live_execution==false and .production_effect=="NONE" and .can_override_production==false and .can_override_final_gate==false and .can_change_threshold==false' status/reversal4h-forward-shadow-latest.json
       - name: Commit research evidence
         shell: bash
         run: |

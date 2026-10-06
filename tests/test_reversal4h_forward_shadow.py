@@ -52,10 +52,25 @@ def test_forward_shadow_captures_and_settles_without_production_authority(tmp_pa
     assert btc["can_override_final_gate"] is False
 
 
-def test_off_cycle_run_does_not_create_observation(tmp_path):
+def test_delayed_job_recovers_latest_aligned_slot_without_future_leakage(tmp_path):
     rows=_rows()
     def fetcher(symbol,days,end_ms=None):
         return rows
-    x=s.run(now_ms=21*s.HOUR_MS,fetcher=fetcher,ledger_path=str(tmp_path/"l.json"),latest_path=str(tmp_path/"s.json"))
+    ledger=tmp_path/"l.json"
+    x=s.run(now_ms=21*s.HOUR_MS,fetcher=fetcher,ledger_path=str(ledger),latest_path=str(tmp_path/"s.json"))
+    assert x["entry_count"]==len(s.SYMBOLS)
+    data=json.loads(ledger.read_text())
+    btc=next(e for e in data["entries"] if e["symbol"]=="BTCUSDT")
+    assert btc["decision_at_ms"]==20*s.HOUR_MS
+    assert btc["decision_bar_t"]==19*s.HOUR_MS
+    assert btc["capture_lag_minutes"]==60.0
+    assert btc["capture_lag_limit_minutes"]==120.0
+
+
+def test_stale_slot_fails_closed_instead_of_retrospective_backfill(tmp_path):
+    rows=_rows()
+    def fetcher(symbol,days,end_ms=None):
+        return rows
+    x=s.run(now_ms=23*s.HOUR_MS,fetcher=fetcher,ledger_path=str(tmp_path/"l.json"),latest_path=str(tmp_path/"s.json"))
     assert x["entry_count"]==0
     assert x["new_observation_ids"]==[]
