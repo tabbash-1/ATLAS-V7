@@ -7,7 +7,7 @@ P=Path(__file__).resolve().parents[1]/"research"/"on_demand_analysis_benchmark.p
 spec=importlib.util.spec_from_file_location("bench",P);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
 
 def test_product_contract_is_analysis_not_trade_discovery():
-    assert m.VERSION=="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V6_ALPHA_CORE_V2"
+    assert m.VERSION=="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V7_ALPHA_BOUNDED_HISTORY"
     assert m.HORIZONS==(4,8,12)
 
 
@@ -172,6 +172,26 @@ def test_benchmark_cli_imports_repository_module_from_script_path():
 def test_alpha_core_v2_is_in_same_benchmark_and_research_only():
     assert "alpha_core_v2" in m.run.__code__.co_consts or hasattr(m,"alpha_core_v2_engine")
     assert m.alpha_core_v2_engine([],0,[],"BTCUSDT")=="WAIT"
+
+
+def test_bounded_alpha_inputs_match_full_history_decision():
+    rows=_trend_rows("LONG",n=1800)
+    btc=_trend_rows("LONG",n=1800)
+    as_of=rows[-1]["t"]+m.HOUR_MS
+    full=m.alpha_core_v2_decision(rows,as_of,btc,"ETHUSDT")
+    bounded=m.alpha_core_v2_engine(rows,as_of,btc,"ETHUSDT")
+    assert bounded==full
+    sh,bh=m._bounded_alpha_inputs(rows,as_of,btc)
+    assert len(sh)==m.ALPHA_SYMBOL_HISTORY_HOURS
+    assert len(bh)==m.ALPHA_BTC_HISTORY_HOURS
+
+
+def test_bounded_alpha_keeps_enough_history_for_daily_and_btc_12h():
+    rows=_trend_rows("LONG",n=1800)
+    as_of=rows[-1]["t"]+m.HOUR_MS
+    sh,bh=m._bounded_alpha_inputs(rows,as_of,rows)
+    assert len(sh)>=56*24
+    assert len(bh)>=56*12
 
 
 def test_compare_metrics_requires_consistent_improvement_and_sample():
