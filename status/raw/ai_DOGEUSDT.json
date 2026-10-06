@@ -6,11 +6,11 @@
   "product_horizon": "4-12H",
   "product_lane": "CORE_4_12H",
   "entry_confirmation_horizon": "1H",
-  "generated_at": "2026-10-06T06:36:50.273444+00:00",
-  "entry": 0.09441,
-  "direction": "SHORT",
+  "generated_at": "2026-10-06T13:40:44.880791+00:00",
+  "entry": 0.09602,
+  "direction": "LONG",
   "verdict": "TAKE_SHADOW",
-  "confidence": 69,
+  "confidence": 74,
   "reason": "EVIDENCE_CONVERGENCE",
   "canonical_action": {
     "status": "WAIT",
@@ -20,24 +20,24 @@
     "product_horizon": "4-12H"
   },
   "bull_analyst": {
-    "score": -0.429,
+    "score": 0.543,
     "best_case": [
-      "RV 1.00x"
+      "Price/EMA20/EMA50 structure 0.09602/0.0952456/0.0950437",
+      "LONG 3 vs SHORT 1",
+      "RV 2.03x",
+      "RSI14 58.5",
+      "1H tactical RR 1.14 (entry context only)"
     ]
   },
   "bear_analyst": {
-    "score": 0.429,
+    "score": -0.543,
     "best_case": [
-      "LONG 1 vs SHORT 3",
-      "Price/EMA20/EMA50 structure 0.09441/0.0950736/0.0949426",
-      "24h momentum -1.73%",
-      "1H tactical RR 1.23 (entry context only)",
-      "RSI14 48.4"
+      "24h momentum -0.10%"
     ]
   },
   "judge": {
-    "net_strength": 0.429,
-    "tactical_rr": 1.226,
+    "net_strength": 0.543,
+    "tactical_rr": 1.144,
     "canonical_trade_plan": {
       "status": "WAIT",
       "direction": null,
@@ -51,57 +51,69 @@
       "htf_price_action_context": {
         "version": "HTF_PRICE_ACTION_V2_ATR_GEOMETRY_INPUT",
         "status": "NO_STRONG_PRICE_ACTION_CONFLUENCE",
-        "4h_scenario": "BEARISH_REVERSAL_WATCH",
+        "4h_scenario": "BULLISH_REVERSAL_WATCH",
         "12h_scenario": "RANGE_OR_TRANSITION",
         "analysis_only": true,
         "live_execution": false
       },
-      "conditional_scenario": null,
-      "bull_case": {
+      "conditional_scenario": {
         "direction": "LONG",
         "trigger_type": "BREAKOUT_RETEST_HOLD",
-        "trigger_level": 0.09548,
+        "trigger_level": 0.09638,
         "trigger_condition": "4H close above resistance, then retest holds while 12H thesis does not turn bearish",
         "confirmation": [
           "4H_BOS_UP_OR_BULLISH_RETEST",
           "12H_NOT_BEARISH",
           "NO_HIGH_SWEEP_REJECTION"
         ],
-        "invalidation_level": 0.09316,
+        "invalidation_level": 0.09526,
+        "invalidation_condition": "4H closes back below structural support or 4H+12H thesis loses bullish alignment"
+      },
+      "bull_case": {
+        "direction": "LONG",
+        "trigger_type": "BREAKOUT_RETEST_HOLD",
+        "trigger_level": 0.09638,
+        "trigger_condition": "4H close above resistance, then retest holds while 12H thesis does not turn bearish",
+        "confirmation": [
+          "4H_BOS_UP_OR_BULLISH_RETEST",
+          "12H_NOT_BEARISH",
+          "NO_HIGH_SWEEP_REJECTION"
+        ],
+        "invalidation_level": 0.09526,
         "invalidation_condition": "4H closes back below structural support or 4H+12H thesis loses bullish alignment"
       },
       "bear_case": {
         "direction": "SHORT",
         "trigger_type": "BREAKDOWN_RETEST_FAIL",
-        "trigger_level": 0.09316,
+        "trigger_level": 0.09526,
         "trigger_condition": "4H close below support, then failed retest while 12H thesis does not turn bullish",
         "confirmation": [
           "4H_BOS_DOWN_OR_BEARISH_RETEST",
           "12H_NOT_BULLISH",
           "NO_LOW_SWEEP_RECLAIM"
         ],
-        "invalidation_level": 0.09548,
+        "invalidation_level": 0.09638,
         "invalidation_condition": "4H closes back above structural resistance or 4H+12H thesis loses bearish alignment"
       },
-      "scenario_readiness": "WAIT_FOR_HTF_ALIGNMENT",
-      "scenario_reason": "4H_12H_BOTH_NEUTRAL",
+      "scenario_readiness": "CONDITIONAL_SCENARIO_READY",
+      "scenario_reason": "HTF_THESIS_AND_PRICE_ACTION_COMPATIBLE",
       "action": "WAIT",
       "analysis_action": "WAIT",
       "analysis_ready": false,
       "can_execute": false,
       "trade_ready": false,
-      "final_trade_ready_reason": "HTF_THESIS_4H_12H_BOTH_NEUTRAL"
+      "final_trade_ready_reason": "HTF_THESIS_ENTRY_CONFIRMATION_MISSING"
     },
     "invalidation": "4-12H Production trade_plan is canonical; 1H is confirmation/context only."
   },
   "counterfactuals": [
     {
       "scenario": "ENTER_NOW",
-      "direction": "SHORT",
-      "entry": 0.09441,
-      "stop_loss": 0.0947289643,
-      "target": 0.094019,
-      "risk_reward": 1.226,
+      "direction": "LONG",
+      "entry": 0.09602,
+      "stop_loss": 0.095656,
+      "target": 0.0964365,
+      "risk_reward": 1.144,
       "trigger": "1H confirmation while 4-12H thesis remains valid",
       "thesis": "Shadow entry-timing comparison only.",
       "shadow_only": true,
@@ -110,11 +122,11 @@
     },
     {
       "scenario": "WAIT_PULLBACK",
-      "direction": "SHORT",
-      "entry": 0.09458175,
-      "stop_loss": 0.0949497857,
-      "target": 0.094019,
-      "risk_reward": 1.529,
+      "direction": "LONG",
+      "entry": 0.095824,
+      "stop_loss": 0.095404,
+      "target": 0.0964365,
+      "risk_reward": 1.458,
       "trigger": "Price retraces ~0.35 ATR without 4H structure failure",
       "thesis": "Requalify entry timing; do not replace 4-12H thesis.",
       "shadow_only": true,
@@ -137,11 +149,11 @@
   ],
   "best_counterfactual": {
     "scenario": "WAIT_PULLBACK",
-    "direction": "SHORT",
-    "entry": 0.09458175,
-    "stop_loss": 0.0949497857,
-    "target": 0.094019,
-    "risk_reward": 1.529,
+    "direction": "LONG",
+    "entry": 0.095824,
+    "stop_loss": 0.095404,
+    "target": 0.0964365,
+    "risk_reward": 1.458,
     "trigger": "Price retraces ~0.35 ATR without 4H structure failure",
     "thesis": "Requalify entry timing; do not replace 4-12H thesis.",
     "shadow_only": true,
@@ -154,7 +166,7 @@
     "production_score": null,
     "production_qualified": false,
     "execution_ready": false,
-    "ai_direction": "SHORT",
+    "ai_direction": "LONG",
     "ai_verdict": "TAKE_SHADOW",
     "agreement": false,
     "production_priority": false
@@ -162,44 +174,44 @@
   "evidence": [
     {
       "name": "direction_votes",
-      "value": -0.5,
+      "value": 0.5,
       "weight": 2.1,
-      "detail": "LONG 1 vs SHORT 3",
+      "detail": "LONG 3 vs SHORT 1",
       "source": "production_decision"
     },
     {
       "name": "ema_structure",
-      "value": -0.727,
+      "value": 1.0,
       "weight": 1.2,
-      "detail": "Price/EMA20/EMA50 structure 0.09441/0.0950736/0.0949426",
+      "detail": "Price/EMA20/EMA50 structure 0.09602/0.0952456/0.0950437",
       "source": "production_decision"
     },
     {
       "name": "rsi",
-      "value": -0.066,
+      "value": 0.341,
       "weight": 0.7,
-      "detail": "RSI14 48.4",
+      "detail": "RSI14 58.5",
       "source": "production_decision"
     },
     {
       "name": "momentum",
-      "value": -0.576,
+      "value": -0.035,
       "weight": 0.9,
-      "detail": "24h momentum -1.73%",
+      "detail": "24h momentum -0.10%",
       "source": "production_decision"
     },
     {
       "name": "relative_volume",
-      "value": 0.001,
+      "value": 1.0,
       "weight": 0.75,
-      "detail": "RV 1.00x",
+      "detail": "RV 2.03x",
       "source": "production_decision"
     },
     {
       "name": "tactical_geometry",
-      "value": -0.284,
+      "value": 0.229,
       "weight": 0.45,
-      "detail": "1H tactical RR 1.23 (entry context only)",
+      "detail": "1H tactical RR 1.14 (entry context only)",
       "source": "entry_confirmation_context"
     }
   ],
