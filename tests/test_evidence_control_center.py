@@ -39,8 +39,12 @@ def test_terminal_links_and_renders_evidence_center():
     from pathlib import Path
     root=Path(__file__).resolve().parents[1]
     index=(root/"index.html").read_text(encoding="utf-8")
+    terminal=(root/"advanced-terminal.html").read_text(encoding="utf-8")
     page=(root/"evidence-control-center.html").read_text(encoding="utf-8")
-    assert "/evidence-control-center.html" in index
+    # The simplified landing page links to the advanced terminal, which owns
+    # the Evidence Center navigation. Do not require a direct landing-page link.
+    assert 'href="/advanced-terminal.html"' in index
+    assert "location.href='/evidence-control-center.html'" in terminal
     assert "/api/evidence/control-center" in page
     assert "Opportunity Replay Shadow" in page
 
