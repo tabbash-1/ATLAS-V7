@@ -39,8 +39,12 @@ def test_terminal_links_and_renders_evidence_center():
     from pathlib import Path
     root=Path(__file__).resolve().parents[1]
     index=(root/"index.html").read_text(encoding="utf-8")
+    advanced=(root/"advanced-terminal.html").read_text(encoding="utf-8")
     page=(root/"evidence-control-center.html").read_text(encoding="utf-8")
-    assert "/evidence-control-center.html" in index
+    # Navigation contract: homepage -> Advanced Terminal -> Evidence Center.
+    # The homepage intentionally does not link directly to the research page.
+    assert 'href="/advanced-terminal.html"' in index
+    assert "location.href='/evidence-control-center.html'" in advanced
     assert "/api/evidence/control-center" in page
     assert "Opportunity Replay Shadow" in page
 
