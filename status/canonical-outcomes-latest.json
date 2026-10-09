@@ -6,11 +6,11 @@
     12
   ],
   "execution_eligibility_policy": "EXPLICIT_READY_OR_PROVEN_LEGACY_PROSPECTIVE_CANONICAL_ENROLLMENT",
-  "generated_at": "2026-10-08T21:48:10.350862+00:00",
+  "generated_at": "2026-10-09T01:34:29.514315+00:00",
   "geometry_status": {
-    "canonical_trade_rows": 28,
+    "canonical_trade_rows": 29,
     "coverage_pct": 100.0,
-    "rows_with_frozen_geometry": 28,
+    "rows_with_frozen_geometry": 29,
     "source": "FINAL_TRADE_GATE"
   },
   "legacy_backfill_allowed": false,
@@ -19,11 +19,11 @@
   "path_summary": {
     "avg_r": 0.0429,
     "closed": 28,
-    "entries": 28,
+    "entries": 29,
     "losses": 14,
     "max_drawdown_pct": 3.9497,
     "net_r": 1.2001,
-    "open_or_unresolved": 0,
+    "open_or_unresolved": 1,
     "profit_factor": 1.0857,
     "win_rate_pct": 35.71,
     "wins": 10
@@ -38,14 +38,14 @@
   },
   "schema": "ATLAS_CANONICAL_OUTCOME_SNAPSHOT_V4_SETTLEMENT_AWARE",
   "settlement_status": {
-    "forward_generated_at": "2026-10-08T20:57:06.988520+00:00",
-    "observed_through_at": "2026-10-08T14:45:23.569024+00:00",
+    "forward_generated_at": "2026-10-09T01:15:16.231980+00:00",
+    "observed_through_at": "2026-10-08T20:12:50.397484+00:00",
     "outcome_read_triggered_by_request": false,
-    "paper_generated_at": "2026-10-08T19:24:06.293058+00:00",
+    "paper_generated_at": "2026-10-08T23:54:00.608719+00:00",
     "web_process_background_worker": false
   },
   "signals": {
-    "count": 28,
+    "count": 29,
     "rows": [
       {
         "can_override_production": false,
@@ -5017,9 +5017,11 @@
           {
             "checkpoint_h": 8,
             "id": "357a9126d3d311146f04bf6d",
-            "matured": false,
-            "r_multiple": null,
-            "status": "NOT_MATURED"
+            "market_source": "BINANCE_DATA_API_SPOT",
+            "matured": true,
+            "r_multiple": -1.0,
+            "status": "LOSS_BY_CHECKPOINT",
+            "tp1_reached": false
           },
           {
             "checkpoint_h": 12,
@@ -5197,9 +5199,11 @@
           {
             "checkpoint_h": 8,
             "id": "daa6ed5004c15f01617e3296",
-            "matured": false,
-            "r_multiple": null,
-            "status": "NOT_MATURED"
+            "market_source": "BINANCE_DATA_API_SPOT",
+            "matured": true,
+            "r_multiple": 2.0,
+            "status": "TP2_BY_CHECKPOINT",
+            "tp1_reached": true
           },
           {
             "checkpoint_h": 12,
@@ -5234,6 +5238,183 @@
         "sizing_equity_usd": 10007.26,
         "symbol": "SOLUSDT",
         "threshold": 68.0
+      },
+      {
+        "asset_cohort": "BASE_V1",
+        "asset_universe_epoch": "ASSET_EXPANSION_V1_2026-09-18",
+        "can_override_production": false,
+        "canonical_lane": "CORE_4_12H",
+        "canonical_truth_schema": "ATLAS_CANONICAL_DECISION_TRUTH_V1",
+        "captured_at": "2026-10-08T20:12:50.397484+00:00",
+        "captured_at_ms": 1791490370397,
+        "decision_action": "TRADE_READY",
+        "decision_id": "a062ee0849b4f344f6b1e175",
+        "decision_provenance": {
+          "breakout_acceptance": {
+            "acceptance_level": 730.92,
+            "acceptance_mode": "RETEST_HOLD",
+            "accepted": true,
+            "breakout_age_bars": 3,
+            "breakout_bar_body_atr": 0.9662,
+            "breakout_bar_relative_volume": 3.78,
+            "breakout_event_confirmed": false,
+            "entry_ready": true,
+            "evidence_source": "STRUCTURAL_GEOMETRY_ENTRY_READY",
+            "final_gate_acceptance_mode": "RETEST_HOLD",
+            "final_gate_requires_acceptance": false,
+            "retest_hold": true
+          },
+          "breakout_confirmed": true,
+          "candidate_direction": "SHORT",
+          "continuation_strong": true,
+          "entry_mode": "NOW",
+          "final_trade_gate_version": "FINAL_TRADE_READY_GUARD_V15_ACCEPTED_BREAKOUT",
+          "final_trade_ready_reason": "FINAL_TRADE_GATE_APPROVED",
+          "frozen_before_outcome": true,
+          "futures_adjustment": 0.9,
+          "futures_alignment": "ALIGNED",
+          "futures_alignment_source": "FROZEN_SCORE_ATTRIBUTION",
+          "futures_score": null,
+          "geometry_version": "ATLAS_GEOMETRY_V6_MIN_1_5_ATR_INVALIDATION",
+          "htf_alignment_class": "CONDITIONAL_ALIGNED_12H_NEUTRAL",
+          "htf_regime": "4H_DIRECTIONAL_12H_NEUTRAL",
+          "htf_v2_blockers": [],
+          "htf_v2_eligible": true,
+          "independent_confirmation_count": 3,
+          "independent_confirmations": [
+            "STRUCTURE",
+            "MOMENTUM",
+            "DERIVATIVES"
+          ],
+          "market_regime": "BREAKDOWN_DOWN",
+          "playbook": "BREAKDOWN_CONFIRMED_SHORT",
+          "product_horizon": "4-12H",
+          "production_signal_qualified": true,
+          "production_threshold_locked": 68,
+          "relative_volume": 0.433,
+          "scenario_readiness": "WAIT_FOR_HTF_ALIGNMENT",
+          "scenario_reason": "SHORT_INTO_HTF_SUPPORT",
+          "schema": "ATLAS_ENTRY_DECISION_PROVENANCE_V1",
+          "score": 78.0,
+          "score_attribution": {
+            "continuation_obstacle_reason": "EVIDENCE_ONLY_NO_STRUCTURE_RELIEF",
+            "continuation_obstacle_relief": 0,
+            "extension_guard_adjustment": 0,
+            "extension_guard_reason": "RSI_SANE",
+            "final_score": 78,
+            "formula": "trend_base + paced_volume_bonus + relative_strength_adjustment + futures_adjustment + continuation_aware_obstacle_adjustment + momentum_adjustment + market_breadth_adjustment + extension_guard_adjustment",
+            "futures_adjustment": 0.9,
+            "futures_reason": "ALIGNED",
+            "market_breadth_adjustment": 3,
+            "momentum_adjustment": 6,
+            "obstacle_adjustment": 0.0,
+            "obstacle_adjustment_before_continuation": 0.0,
+            "obstacle_distance_pct": 2.12,
+            "obstacle_reason": "ACCEPTABLE_PRIOR_STRUCTURE",
+            "obstacle_source": "PRIOR_SWING_LOW",
+            "raw_score": 77.9,
+            "relative_strength_adjustment": 0,
+            "relative_strength_reason": "NEUTRAL",
+            "trend_base": 68,
+            "volume_bonus": 0
+          },
+          "setup_quality_status": "PASS",
+          "source_of_truth": "FINAL_TRADE_GATE",
+          "strategy_epoch_id": "HTF_SR_V2_2026-09-14",
+          "threshold": 68.0,
+          "trade_plan_version": "PRODUCTION_TRADE_PLAN_V11_ACCEPTED_BREAKOUT",
+          "trader_brain_version": "ATLAS_TRADER_BRAIN_V8_INDEPENDENT_EVIDENCE_FAMILIES"
+        },
+        "decision_source": "FINAL_TRADE_GATE",
+        "decision_source_of_truth": "FINAL_TRADE_GATE",
+        "direction": "SHORT",
+        "drawdown_after_pct": null,
+        "equity_after_usd": null,
+        "evaluation_horizons": [
+          "4h",
+          "8h",
+          "12h"
+        ],
+        "evaluation_horizons_h": [
+          4,
+          8,
+          12
+        ],
+        "execution_eligibility_provenance": "EXPLICIT_CAPTURE_FLAG",
+        "execution_ready_at_capture": true,
+        "geometry": {
+          "canonical_lane": "CORE_4_12H",
+          "direction": "SHORT",
+          "entry": 732.27,
+          "entry_mode": "NOW",
+          "geometry_version": "ATLAS_GEOMETRY_V6_MIN_1_5_ATR_INVALIDATION",
+          "plan_version": "PRODUCTION_TRADE_PLAN_V11_ACCEPTED_BREAKOUT",
+          "product_horizon": "4-12H",
+          "risk_abs": 10.432500000000005,
+          "rr_tp2": 2.0,
+          "stop_loss": 742.7025,
+          "tp1": 717.07,
+          "tp2": 711.405
+        },
+        "id": "a062ee0849b4f344f6b1e175",
+        "legacy_backfill_allowed": false,
+        "live_execution": false,
+        "manifest_hash": "d6ccdae80214e3d664acbf03f155bd0bd699e1439896f7880270d1f7610e5abb",
+        "outcome_known_at_entry": false,
+        "paper_notional_usd": 7094.23,
+        "paper_only": true,
+        "paper_quantity": 9.687994248742,
+        "pnl_usd": null,
+        "portfolio_id": "ATLAS_10K_PAPER_V1",
+        "product_horizon": "4-12H",
+        "product_window_checkpoints": [
+          {
+            "checkpoint_h": 4,
+            "id": "a062ee0849b4f344f6b1e175",
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          },
+          {
+            "checkpoint_h": 8,
+            "id": "a062ee0849b4f344f6b1e175",
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          },
+          {
+            "checkpoint_h": 12,
+            "id": "a062ee0849b4f344f6b1e175",
+            "matured": false,
+            "r_multiple": null,
+            "status": "NOT_MATURED"
+          }
+        ],
+        "risk_pct": 1.0,
+        "risk_usd": 101.07,
+        "schema": "ATLAS_PAPER_PORTFOLIO_10K_ENTRY_V3_CANONICAL_TRUTH",
+        "score": 78.0,
+        "settlement": {
+          "excursion_scope": "OBSERVED_TO_NOW",
+          "exit_at_ms": null,
+          "id": "a062ee0849b4f344f6b1e175",
+          "mae_r": 0.625,
+          "market_source": "BINANCE_DATA_API_SPOT",
+          "mfe_r": 0.0489,
+          "r_multiple": null,
+          "status": "OPEN",
+          "terminal": false,
+          "terminal_refined_to_1m": false,
+          "time_to_mae_peak_h": 3.3693,
+          "time_to_mfe_peak_h": 0.1193,
+          "time_to_tp1_h": null,
+          "timing_semantics": "BAR_OPEN_TIME_APPROX_NO_INTRABAR_ORDER_INFERENCE",
+          "tp1_first_hit_at_ms": null,
+          "tp1_reached": false
+        },
+        "sizing_equity_usd": 10107.33,
+        "symbol": "BNBUSDT",
+        "threshold": 68.0
       }
     ]
   },
@@ -5250,21 +5431,21 @@
         "positive_pct": 42.86
       },
       "8h": {
-        "avg_r": 0.01,
-        "matured": 26,
-        "positive_pct": 34.62
+        "avg_r": 0.045,
+        "matured": 28,
+        "positive_pct": 35.71
       }
     },
     "forward_trade_ready_count": 9,
-    "forward_wait_directional_count": 382,
+    "forward_wait_directional_count": 371,
     "portfolio": {
       "avg_r": 0.0429,
       "closed": 28,
-      "entries": 28,
+      "entries": 29,
       "losses": 14,
       "max_drawdown_pct": 3.9497,
       "net_r": 1.2001,
-      "open_or_unresolved": 0,
+      "open_or_unresolved": 1,
       "profit_factor": 1.0857,
       "win_rate_pct": 35.71,
       "wins": 10
