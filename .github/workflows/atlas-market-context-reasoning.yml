@@ -20,11 +20,12 @@ on:
       - 'tests/test_market_context_cycle.py'
       - 'market_context_settlement.py'
       - 'market_context_cost_evaluation.py'
-      - 'tests/test_market_context_settlement_cost.py tests/test_market_context_status.py tests/test_market_context_hourly_runner.py tests/test_market_context_enrichment.py'
+      - 'tests/test_market_context_settlement_cost.py'
       - 'market_context_status.py'
       - 'tests/test_market_context_status.py'
       - 'market_context_hourly_runner.py'
       - 'tests/test_market_context_hourly_runner.py'
+      - 'tests/test_market_context_workflow_contract.py'
       - '.github/workflows/atlas-market-context-reasoning.yml'
 
 permissions:
@@ -38,7 +39,7 @@ jobs:
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
       - run: python -m pip install --disable-pip-version-check -q pytest
-      - run: PYTHONPATH=. python -m pytest -q tests/test_market_context_reasoning.py tests/test_market_context_adapter.py tests/test_market_context_forward_evidence.py tests/test_market_context_cycle.py tests/test_market_context_settlement_cost.py
+      - run: PYTHONPATH=. python -m pytest -q tests/test_market_context_reasoning.py tests/test_market_context_adapter.py tests/test_market_context_forward_evidence.py tests/test_market_context_cycle.py tests/test_market_context_settlement_cost.py tests/test_market_context_workflow_contract.py
       - name: Verify Production firewall
         run: |
           python - <<'PY'
