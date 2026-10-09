@@ -22,9 +22,9 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0,str(ROOT))
 
 from historical_core_4_12h_replay import fetch_1h, direction, atr, ema, rsi
-from research.alpha_core_v2 import decision as alpha_core_v2_decision
+from research.alpha_core_v2 import decision as alpha_core_v2_decision, analyze as alpha_core_v2_analyze, classify_regime as alpha_core_v2_regime
 
-VERSION="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V6_ALPHA_CORE_V2"
+VERSION="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V7_REVERSAL4H_ATTRIBUTION"
 SYMBOLS=["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","BNBUSDT","DOGEUSDT","ZECUSDT","ADAUSDT","LINKUSDT","AVAXUSDT","LTCUSDT"]
 HORIZONS=(4,8,12)
 HOUR_MS=60*60*1000
@@ -299,6 +299,84 @@ def temporal_thirds(records):
     }
 
 
+def _reversal_features(ctx,symbol,prediction):
+    if not ctx:
+        return {}
+    mag=abs(float(ctx.get("move4_atr") or 0.0))
+    if mag < 0.75:
+        move_bucket="0.35_TO_0.75_ATR"
+    elif mag < 1.25:
+        move_bucket="0.75_TO_1.25_ATR"
+    else:
+        move_bucket="GE_1.25_ATR"
+
+    d12=ctx.get("d12")
+    if prediction not in ("LONG","SHORT"):
+        htf_relation="NO_DIRECTIONAL_CALL"
+    elif d12==prediction:
+        htf_relation="WITH_12H"
+    elif d12==_opposite(prediction):
+        htf_relation="AGAINST_12H"
+    else:
+        htf_relation="12H_NEUTRAL"
+
+    symbol=str(symbol or "").upper()
+    if symbol=="BTCUSDT":
+        btc_relation="BTC_SELF"
+    else:
+        b4=ctx.get("btc_d4")
+        if prediction in ("LONG","SHORT") and b4==prediction:
+            btc_relation="BTC_4H_ALIGNED"
+        elif prediction in ("LONG","SHORT") and b4==_opposite(prediction):
+            btc_relation="BTC_4H_OPPOSED"
+        else:
+            btc_relation="BTC_4H_NEUTRAL"
+
+    eff=float(ctx.get("efficiency12") or 0.0)
+    efficiency_bucket="RANGE_LIKE_LE_0.35" if eff<=0.35 else "DIRECTIONAL_GT_0.35"
+    return {
+        "move4_atr_bucket":move_bucket,
+        "htf_relation":htf_relation,
+        "btc_relation":btc_relation,
+        "efficiency12_bucket":efficiency_bucket,
+        "alpha_regime":alpha_core_v2_regime(ctx),
+    }
+
+
+def _feature_groups(records,feature):
+    groups={}
+    for r in records:
+        if r.get("prediction")=="WAIT":
+            continue
+        key=((r.get("features") or {}).get(feature)) or "MISSING"
+        groups.setdefault(key,[]).append(r)
+    return {k:metrics(v) for k,v in sorted(groups.items())}
+
+
+def _late_third(records):
+    if not records:
+        return []
+    times=sorted(set(int(r["t"]) for r in records))
+    if len(times)<3:
+        return list(records)
+    cut=times[(2*len(times))//3]
+    return [r for r in records if int(r["t"])>=cut]
+
+
+def reversal_attribution(records_by_horizon):
+    dimensions=("move4_atr_bucket","htf_relation","btc_relation","efficiency12_bucket","alpha_regime")
+    out={"historical_only":True,"production_effect":"NONE","dimensions":{},"late_third":{}}
+    for feature in dimensions:
+        out["dimensions"][feature]={}
+        out["late_third"][feature]={}
+        for h in HORIZONS:
+            key=str(h)+"h"
+            rows=records_by_horizon[h]
+            out["dimensions"][feature][key]=_feature_groups(rows,feature)
+            out["late_third"][feature][key]=_feature_groups(_late_third(rows),feature)
+    return out
+
+
 def run(symbol,days,end_ms=None,step=4,rows=None,btc_rows=None):
     rows=rows if rows is not None else fetch_1h(symbol,days,end_ms)
     btc_rows=btc_rows if btc_rows is not None else (rows if symbol=="BTCUSDT" else fetch_1h("BTCUSDT",days,end_ms))
@@ -318,22 +396,27 @@ def run(symbol,days,end_ms=None,step=4,rows=None,btc_rows=None):
     for i in range(warm,len(rows)-max(HORIZONS),step):
         hist=rows[:i+1]
         decision_time_ms=int(rows[i]["t"])+HOUR_MS
+        alpha_analysis=alpha_core_v2_analyze(hist,decision_time_ms,btc_rows,symbol)
         preds={
             "legacy_1h":legacy_1h(hist,decision_time_ms),
             "htf_consensus":htf_consensus(hist,decision_time_ms),
             "analyst_stack_v2":analyst_stack_v2(hist,decision_time_ms,btc_rows,symbol),
-            "alpha_core_v2":alpha_core_v2_engine(hist,decision_time_ms,btc_rows,symbol),
+            "alpha_core_v2":alpha_analysis.get("decision","WAIT"),
             "momentum_4h_probe":momentum_4h_probe(hist,decision_time_ms),
             "reversal_4h_probe":reversal_4h_probe(hist,decision_time_ms),
             "momentum_12h_probe":momentum_12h_probe(hist,decision_time_ms),
             "reversal_12h_probe":reversal_12h_probe(hist,decision_time_ms),
             "thesis12_pullback4_probe":thesis12_pullback4_probe(hist,decision_time_ms),
         }
+        reversal_features=_reversal_features(alpha_analysis.get("context"),symbol,preds["reversal_4h_probe"])
         for h in HORIZONS:
             actual=future_label(rows,i,h)
             if actual is None:continue
             for name,pred in preds.items():
-                rec[name][h].append({"t":decision_time_ms,"symbol":symbol,"prediction":pred,"actual":actual})
+                row={"t":decision_time_ms,"symbol":symbol,"prediction":pred,"actual":actual}
+                if name=="reversal_4h_probe":
+                    row["features"]=reversal_features
+                rec[name][h].append(row)
     return rec
 
 def main():
@@ -371,6 +454,7 @@ def main():
         "vs_analyst_stack_v2":compare_metrics(merged["alpha_core_v2"],merged["analyst_stack_v2"]),
         "vs_htf_consensus":compare_metrics(merged["alpha_core_v2"],merged["htf_consensus"]),
       },
+      "reversal4h_attribution":reversal_attribution(merged["reversal_4h_probe"]),
       "temporal_robustness":{
         e:{str(h)+"h":temporal_thirds(merged[e][h]) for h in HORIZONS}
         for e in ("alpha_core_v2","reversal_4h_probe","htf_consensus","legacy_1h")
