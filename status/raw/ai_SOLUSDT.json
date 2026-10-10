@@ -6,11 +6,11 @@
   "product_horizon": "4-12H",
   "product_lane": "CORE_4_12H",
   "entry_confirmation_horizon": "1H",
-  "generated_at": "2026-10-10T19:25:57.301238+00:00",
+  "generated_at": "2026-10-10T22:45:56.670869+00:00",
   "entry": 110.845395,
   "direction": "LONG",
   "verdict": "WAIT",
-  "confidence": 60,
+  "confidence": 56,
   "reason": "CONFLICTING_EVIDENCE",
   "canonical_action": {
     "status": "WAIT",
@@ -20,25 +20,28 @@
     "product_horizon": "4-12H"
   },
   "bull_analyst": {
-    "score": 0.212,
+    "score": 0.131,
     "best_case": [
       "LONG 3 vs SHORT 1",
-      "24h momentum 1.82%",
       "trend_base +64.00",
-      "Price/EMA20/EMA50 structure 110.845/110.043/110.697",
-      "Validated futures score 20.0"
+      "Price/EMA20/EMA50 structure 110.845/110.12/110.657",
+      "24h momentum 1.04%",
+      "RSI14 56.6"
     ]
   },
   "bear_analyst": {
-    "score": -0.212,
+    "score": -0.131,
     "best_case": [
       "obstacle_adjustment -8.00",
-      "RV 0.43x"
+      "Validated futures score -26.0",
+      "RS 43.8",
+      "RV 0.78x",
+      "futures_adjustment -2.60"
     ]
   },
   "judge": {
-    "net_strength": 0.212,
-    "tactical_rr": 1.142,
+    "net_strength": 0.131,
+    "tactical_rr": 1.325,
     "canonical_trade_plan": {
       "version": "PRODUCTION_TRADE_PLAN_V11_ACCEPTED_BREAKOUT",
       "geometry_version": "ATLAS_GEOMETRY_V6_MIN_1_5_ATR_INVALIDATION",
@@ -57,9 +60,9 @@
       "canonical_lane": "CORE_4_12H",
       "entry": 110.845395,
       "entry_trigger": "LONG analysis activates only after a verified 1H close/hold above 110.79.",
-      "stop_loss": 110.2100378571,
-      "tp1": 111.4807521429,
-      "tp2": 112.1161092857,
+      "stop_loss": 110.2089664286,
+      "tp1": 111.4818235714,
+      "tp2": 112.1182521429,
       "rr_tp1": 1.0,
       "rr_tp2": 2.0,
       "geometry_provenance": {
@@ -70,9 +73,9 @@
         "tp2_basis": "MAX_2R_OR_1_8ATR",
         "reference_structure": 110.79,
         "reference_structure_source": "PRIOR_24H_HIGH",
-        "atr14": 0.4235714286,
+        "atr14": 0.4242857143,
         "risk_atr": 1.5,
-        "risk_pct": 0.5732,
+        "risk_pct": 0.5742,
         "breakout_confirmed": false,
         "continuation_strong": false,
         "score_or_threshold_changed": false
@@ -94,9 +97,9 @@
         "entry_mode": "BREAKOUT",
         "entry": 110.845395,
         "entry_trigger": "LONG analysis activates only after a verified 1H close/hold above 110.79.",
-        "stop_loss": 110.2100378571,
-        "tp1": 111.4807521429,
-        "tp2": 112.1161092857,
+        "stop_loss": 110.2089664286,
+        "tp1": 111.4818235714,
+        "tp2": 112.1182521429,
         "rr_tp1": 1.0,
         "rr_tp2": 2.0,
         "geometry_provenance": {
@@ -107,9 +110,9 @@
           "tp2_basis": "MAX_2R_OR_1_8ATR",
           "reference_structure": 110.79,
           "reference_structure_source": "PRIOR_24H_HIGH",
-          "atr14": 0.4235714286,
+          "atr14": 0.4242857143,
           "risk_atr": 1.5,
-          "risk_pct": 0.5732,
+          "risk_pct": 0.5742,
           "breakout_confirmed": false,
           "continuation_strong": false,
           "score_or_threshold_changed": false
@@ -119,13 +122,13 @@
         "live_execution": false,
         "research_only": true,
         "trade_ready": false,
-        "final_trade_ready_reason": "HTF_THESIS_1H_NOT_CONFIRMED_HTF"
+        "final_trade_ready_reason": "HTF_THESIS_ENTRY_CONFIRMATION_MISSING"
       },
       "quick_plan": {
         "role": "CONTEXT_ONLY",
         "horizon": "1-3H",
-        "tp1": 111.4807521429,
-        "tp2": 112.1161092857,
+        "tp1": 111.4818235714,
+        "tp2": 112.1182521429,
         "rr_tp1": 1.0,
         "rr_tp2": 2.0,
         "can_override_core": false
@@ -137,14 +140,14 @@
         "direction": "LONG",
         "horizon": "12-24H",
         "entry": 110.845395,
-        "stop_loss": 110.2100378571,
-        "tp1": 111.6395914286,
-        "tp2": 112.4337878571,
-        "tp3_runner": 113.069145,
+        "stop_loss": 110.2089664286,
+        "tp1": 111.6409307143,
+        "tp2": 112.4364664286,
+        "tp3_runner": 113.072895,
         "rr_tp1": 1.25,
         "rr_tp2": 2.5,
         "rr_tp3": 3.5,
-        "projected_tp2_move_pct": 1.433,
+        "projected_tp2_move_pct": 1.435,
         "tp2_source": "MIN_SWING_R",
         "minimum_swing_move_pct": 1.5,
         "minimum_swing_rr": 2.5,
@@ -181,11 +184,23 @@
         "analysis_only": true,
         "live_execution": false
       },
-      "conditional_scenario": null,
+      "conditional_scenario": {
+        "direction": "SHORT",
+        "trigger_type": "BREAKDOWN_RETEST_FAIL",
+        "trigger_level": 108.45,
+        "trigger_condition": "4H close below support, then failed retest while 12H thesis does not turn bullish",
+        "confirmation": [
+          "4H_BOS_DOWN_OR_BEARISH_RETEST",
+          "12H_NOT_BULLISH",
+          "NO_LOW_SWEEP_RECLAIM"
+        ],
+        "invalidation_level": 110.79,
+        "invalidation_condition": "4H closes back above structural resistance or 4H+12H thesis loses bearish alignment"
+      },
       "bull_case": {
         "direction": "LONG",
         "trigger_type": "BREAKOUT_RETEST_HOLD",
-        "trigger_level": 112.06,
+        "trigger_level": 110.79,
         "trigger_condition": "4H close above resistance, then retest holds while 12H thesis does not turn bearish",
         "confirmation": [
           "4H_BOS_UP_OR_BULLISH_RETEST",
@@ -205,13 +220,13 @@
           "12H_NOT_BULLISH",
           "NO_LOW_SWEEP_RECLAIM"
         ],
-        "invalidation_level": 112.06,
+        "invalidation_level": 110.79,
         "invalidation_condition": "4H closes back above structural resistance or 4H+12H thesis loses bearish alignment"
       },
-      "scenario_readiness": "WAIT_FOR_HTF_ALIGNMENT",
-      "scenario_reason": "1H_NOT_CONFIRMED_HTF",
+      "scenario_readiness": "CONDITIONAL_SCENARIO_READY",
+      "scenario_reason": "HTF_THESIS_AND_PRICE_ACTION_COMPATIBLE",
       "trade_ready": false,
-      "final_trade_ready_reason": "HTF_THESIS_1H_NOT_CONFIRMED_HTF"
+      "final_trade_ready_reason": "HTF_THESIS_ENTRY_CONFIRMATION_MISSING"
     },
     "invalidation": "4-12H Production trade_plan is canonical; 1H is confirmation/context only."
   },
@@ -220,9 +235,9 @@
       "scenario": "ENTER_NOW",
       "direction": "LONG",
       "entry": 110.845395,
-      "stop_loss": 110.1846785714,
-      "target": 110.7745,
-      "risk_reward": 0.107,
+      "stop_loss": 110.0742142857,
+      "target": 110.7155,
+      "risk_reward": 0.168,
       "trigger": "1H confirmation while 4-12H thesis remains valid",
       "thesis": "Shadow entry-timing comparison only.",
       "shadow_only": true,
@@ -232,10 +247,10 @@
     {
       "scenario": "WAIT_PULLBACK",
       "direction": "LONG",
-      "entry": 110.697145,
-      "stop_loss": 110.3794664286,
-      "target": 110.7745,
-      "risk_reward": 0.244,
+      "entry": 110.696895,
+      "stop_loss": 110.3786807143,
+      "target": 110.7155,
+      "risk_reward": 0.058,
       "trigger": "Price retraces ~0.35 ATR without 4H structure failure",
       "thesis": "Requalify entry timing; do not replace 4-12H thesis.",
       "shadow_only": true,
@@ -272,13 +287,13 @@
   "hybrid_judge": {
     "decision": "WAIT",
     "production_direction": "LONG",
-    "production_score": 58.0,
+    "production_score": 53.0,
     "production_qualified": false,
-    "execution_ready": false,
+    "execution_ready": true,
     "ai_direction": "LONG",
     "ai_verdict": "WAIT",
     "agreement": true,
-    "production_priority": false
+    "production_priority": true
   },
   "evidence": [
     {
@@ -292,49 +307,49 @@
       "name": "ema_structure",
       "value": 0.402,
       "weight": 1.2,
-      "detail": "Price/EMA20/EMA50 structure 110.845/110.043/110.697",
+      "detail": "Price/EMA20/EMA50 structure 110.845/110.12/110.657",
       "source": "production_decision"
     },
     {
       "name": "rsi",
-      "value": 0.21,
+      "value": 0.264,
       "weight": 0.7,
-      "detail": "RSI14 55.2",
+      "detail": "RSI14 56.6",
       "source": "production_decision"
     },
     {
       "name": "momentum",
-      "value": 0.605,
+      "value": 0.348,
       "weight": 0.9,
-      "detail": "24h momentum 1.82%",
+      "detail": "24h momentum 1.04%",
       "source": "production_decision"
     },
     {
       "name": "relative_volume",
-      "value": -0.683,
+      "value": -0.27,
       "weight": 0.75,
-      "detail": "RV 0.43x",
+      "detail": "RV 0.78x",
       "source": "production_decision"
     },
     {
       "name": "relative_strength",
-      "value": 0.022,
+      "value": -0.247,
       "weight": 1.0,
-      "detail": "RS 50.5",
+      "detail": "RS 43.8",
       "source": "production_decision"
     },
     {
       "name": "futures",
-      "value": 0.2,
+      "value": -0.26,
       "weight": 1.05,
-      "detail": "Validated futures score 20.0",
+      "detail": "Validated futures score -26.0",
       "source": "production_decision"
     },
     {
       "name": "tactical_geometry",
-      "value": 0.228,
+      "value": 0.35,
       "weight": 0.45,
-      "detail": "1H tactical RR 1.14 (entry context only)",
+      "detail": "1H tactical RR 1.32 (entry context only)",
       "source": "entry_confirmation_context"
     },
     {
@@ -346,9 +361,9 @@
     },
     {
       "name": "scorer_futures_adjustment",
-      "value": 0.2,
+      "value": -0.26,
       "weight": 0.45,
-      "detail": "futures_adjustment +2.00",
+      "detail": "futures_adjustment -2.60",
       "source": "production_scorer"
     },
     {
@@ -360,7 +375,7 @@
     }
   ],
   "production_decision": "WAIT",
-  "production_score": 58.0,
+  "production_score": 53.0,
   "production_qualified": false,
   "safety": {
     "can_execute": false,
