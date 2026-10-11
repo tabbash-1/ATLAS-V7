@@ -40,7 +40,10 @@ def test_terminal_links_and_renders_evidence_center():
     root=Path(__file__).resolve().parents[1]
     index=(root/"index.html").read_text(encoding="utf-8")
     page=(root/"evidence-control-center.html").read_text(encoding="utf-8")
-    assert "/evidence-control-center.html" in index
+    advanced=(root/"advanced-terminal.html").read_text(encoding="utf-8")
+    # Navigation contract: Home -> Advanced Terminal -> Evidence Center.
+    assert 'href="/advanced-terminal.html"' in index
+    assert "/evidence-control-center.html" in advanced
     assert "/api/evidence/control-center" in page
     assert "Opportunity Replay Shadow" in page
 
