@@ -1,0 +1,44 @@
+name: walk-forward-screen
+
+# One-shot research screen. Run manually from the GitHub app: Actions -> walk-forward-screen -> Run workflow.
+# Does not commit anything: the report appears in the run summary and as a downloadable artifact.
+
+on:
+  workflow_dispatch:
+    inputs:
+      years:
+        description: "Years of hourly history"
+        default: "3"
+      cost:
+        description: "Round-trip cost in percent of price"
+        default: "0.15"
+
+permissions:
+  contents: read
+
+jobs:
+  screen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Self-test (synthetic random walk, must not pass)
+        run: python research/walk_forward_screen.py --selftest
+
+      - name: Run screen
+        env:
+          YEARS: ${{ inputs.years }}
+          COST: ${{ inputs.cost }}
+        run: |
+          python research/walk_forward_screen.py --years "$YEARS" --cost "$COST" --out wf_out
+          cat wf_out/report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: walk-forward-report
+          path: wf_out/
