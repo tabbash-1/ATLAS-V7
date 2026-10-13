@@ -6,12 +6,12 @@
   "product_horizon": "4-12H",
   "product_lane": "CORE_4_12H",
   "entry_confirmation_horizon": "1H",
-  "generated_at": "2026-10-13T16:30:19.927766+00:00",
-  "entry": 1.3745,
-  "direction": "LONG",
-  "verdict": "REJECT",
-  "confidence": 60,
-  "reason": "RISK_GEOMETRY_FAIL",
+  "generated_at": "2026-10-13T21:36:39.397274+00:00",
+  "entry": 1.3698,
+  "direction": "SHORT",
+  "verdict": "WAIT",
+  "confidence": 55,
+  "reason": "CONFLICTING_EVIDENCE",
   "canonical_action": {
     "status": "WAIT",
     "action": "WAIT",
@@ -20,24 +20,22 @@
     "product_horizon": "4-12H"
   },
   "bull_analyst": {
-    "score": 0.224,
+    "score": -0.113,
     "best_case": [
-      "LONG 3 vs SHORT 1",
-      "24h momentum 1.13%",
-      "RSI14 57.5",
-      "Price/EMA20/EMA50 structure 1.3745/1.36879/1.37728"
+      "24h momentum 1.29%"
     ]
   },
   "bear_analyst": {
-    "score": -0.224,
+    "score": 0.113,
     "best_case": [
-      "RV 0.75x",
-      "1H tactical RR 0.73 (entry context only)"
+      "RV 0.52x",
+      "Price/EMA20/EMA50 structure 1.3698/1.36895/1.37617",
+      "RSI14 43.5"
     ]
   },
   "judge": {
-    "net_strength": 0.224,
-    "tactical_rr": 0.731,
+    "net_strength": 0.113,
+    "tactical_rr": null,
     "canonical_trade_plan": {
       "status": "WAIT",
       "direction": null,
@@ -67,13 +65,13 @@
           "12H_NOT_BEARISH",
           "NO_HIGH_SWEEP_REJECTION"
         ],
-        "invalidation_level": 1.368,
+        "invalidation_level": 1.3112,
         "invalidation_condition": "4H closes back below structural support or 4H+12H thesis loses bullish alignment"
       },
       "bear_case": {
         "direction": "SHORT",
         "trigger_type": "BREAKDOWN_RETEST_FAIL",
-        "trigger_level": 1.368,
+        "trigger_level": 1.3112,
         "trigger_condition": "4H close below support, then failed retest while 12H thesis does not turn bullish",
         "confirmation": [
           "4H_BOS_DOWN_OR_BEARISH_RETEST",
@@ -84,24 +82,24 @@
         "invalidation_condition": "4H closes back above structural resistance or 4H+12H thesis loses bearish alignment"
       },
       "scenario_readiness": "WAIT_FOR_HTF_ALIGNMENT",
-      "scenario_reason": "1H_NOT_CONFIRMED_HTF",
+      "scenario_reason": "SHORT_INTO_HTF_SUPPORT",
       "action": "WAIT",
       "analysis_action": "WAIT",
       "analysis_ready": false,
       "can_execute": false,
       "trade_ready": false,
-      "final_trade_ready_reason": "HTF_THESIS_1H_NOT_CONFIRMED_HTF"
+      "final_trade_ready_reason": "HTF_THESIS_SHORT_INTO_HTF_SUPPORT"
     },
     "invalidation": "4-12H Production trade_plan is canonical; 1H is confirmation/context only."
   },
   "counterfactuals": [
     {
       "scenario": "ENTER_NOW",
-      "direction": "LONG",
-      "entry": 1.3745,
-      "stop_loss": 1.3669367857,
-      "target": 1.380025,
-      "risk_reward": 0.731,
+      "direction": "SHORT",
+      "entry": 1.3698,
+      "stop_loss": 1.3771171429,
+      "target": 1.3562914286,
+      "risk_reward": 1.846,
       "trigger": "1H confirmation while 4-12H thesis remains valid",
       "thesis": "Shadow entry-timing comparison only.",
       "shadow_only": true,
@@ -110,11 +108,11 @@
     },
     {
       "scenario": "WAIT_PULLBACK",
-      "direction": "LONG",
-      "entry": 1.3704275,
-      "stop_loss": 1.3617007143,
-      "target": 1.380025,
-      "risk_reward": 1.1,
+      "direction": "SHORT",
+      "entry": 1.37374,
+      "stop_loss": 1.3821828571,
+      "target": 1.3568542857,
+      "risk_reward": 2.0,
       "trigger": "Price retraces ~0.35 ATR without 4H structure failure",
       "thesis": "Requalify entry timing; do not replace 4-12H thesis.",
       "shadow_only": true,
@@ -137,11 +135,11 @@
   ],
   "best_counterfactual": {
     "scenario": "WAIT_PULLBACK",
-    "direction": "LONG",
-    "entry": 1.3704275,
-    "stop_loss": 1.3617007143,
-    "target": 1.380025,
-    "risk_reward": 1.1,
+    "direction": "SHORT",
+    "entry": 1.37374,
+    "stop_loss": 1.3821828571,
+    "target": 1.3568542857,
+    "risk_reward": 2.0,
     "trigger": "Price retraces ~0.35 ATR without 4H structure failure",
     "thesis": "Requalify entry timing; do not replace 4-12H thesis.",
     "shadow_only": true,
@@ -149,58 +147,51 @@
     "research_horizon": "1-3H_CONTEXT_ONLY"
   },
   "hybrid_judge": {
-    "decision": "REJECT",
+    "decision": "WAIT",
     "production_direction": null,
     "production_score": null,
     "production_qualified": false,
     "execution_ready": false,
-    "ai_direction": "LONG",
-    "ai_verdict": "REJECT",
+    "ai_direction": "SHORT",
+    "ai_verdict": "WAIT",
     "agreement": false,
     "production_priority": false
   },
   "evidence": [
     {
       "name": "direction_votes",
-      "value": 0.5,
+      "value": 0.0,
       "weight": 2.1,
-      "detail": "LONG 3 vs SHORT 1",
+      "detail": "LONG 2 vs SHORT 2",
       "source": "production_decision"
     },
     {
       "name": "ema_structure",
-      "value": 0.008,
+      "value": -0.345,
       "weight": 1.2,
-      "detail": "Price/EMA20/EMA50 structure 1.3745/1.36879/1.37728",
+      "detail": "Price/EMA20/EMA50 structure 1.3698/1.36895/1.37617",
       "source": "production_decision"
     },
     {
       "name": "rsi",
-      "value": 0.302,
+      "value": -0.261,
       "weight": 0.7,
-      "detail": "RSI14 57.5",
+      "detail": "RSI14 43.5",
       "source": "production_decision"
     },
     {
       "name": "momentum",
-      "value": 0.378,
+      "value": 0.429,
       "weight": 0.9,
-      "detail": "24h momentum 1.13%",
+      "detail": "24h momentum 1.29%",
       "source": "production_decision"
     },
     {
       "name": "relative_volume",
-      "value": -0.299,
+      "value": -0.571,
       "weight": 0.75,
-      "detail": "RV 0.75x",
+      "detail": "RV 0.52x",
       "source": "production_decision"
-    },
-    {
-      "name": "tactical_geometry",
-      "value": -0.046,
-      "weight": 0.45,
-      "detail": "1H tactical RR 0.73 (entry context only)",
-      "source": "entry_confirmation_context"
     }
   ],
   "production_decision": "WAIT",
