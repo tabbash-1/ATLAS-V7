@@ -9,10 +9,11 @@ behavior cannot silently drive a current Production change.
 from __future__ import annotations
 import argparse, json, math, statistics
 from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
 
 SCHEMA='ATLAS_PRODUCTION_LOSS_AUTOPSY_V3_COHORT_AWARE'
-CURRENT_GEOMETRY_VERSION='ATLAS_GEOMETRY_V3_STRUCTURAL_TP2_FROZEN_RR'
+CURRENT_GEOMETRY_VERSION='ATLAS_GEOMETRY_V6_MIN_1_5_ATR_INVALIDATION'
 MIN_CURRENT_TERMINAL_SAMPLE=30
 TIGHT_STOP_PCT=0.35
 STOP_BANDS=(0.25,0.35,0.50,0.75,1.00)
@@ -34,6 +35,54 @@ def _median(xs):
     return round(statistics.median(xs),4) if xs else None
 
 
+def normalize_row(r):
+    """Read frozen canonical settlement without changing any recorded outcome.
+
+    The live/paper ledger nests terminal, status and R inside settlement.
+    A missing or noncanonical provenance must never be promoted to current
+    Production evidence. Flat legacy diagnostic records remain supported.
+    """
+    if not isinstance(r, dict):
+        return None
+    if not isinstance(r.get('settlement'), dict):
+        return dict(r)
+    if (r.get('decision_source') != 'FINAL_TRADE_GATE'
+            or r.get('decision_action') != 'TRADE_READY'
+            or r.get('outcome_known_at_entry') is not False):
+        return None
+    settlement = r['settlement']
+    provenance = r.get('decision_provenance')
+    frozen = provenance.get('geometry_version') if isinstance(provenance, dict) else None
+    normalized = dict(r)
+    normalized.update({
+        'terminal': settlement.get('terminal') is True,
+        'path_outcome': settlement.get('status'),
+        'r_multiple': settlement.get('r_multiple'),
+        'tp1_reached': settlement.get('tp1_reached', False),
+        'entry': (r.get('geometry') or {}).get('entry'),
+        '_canonical_nested': True,
+        '_frozen_geometry_version': frozen if isinstance(frozen, str) else None,
+    })
+    return normalized
+
+
+def is_current_geometry(r, current_start_ms=None):
+    if geometry_generation(r) != CURRENT_GEOMETRY_VERSION:
+        return False
+    if r.get('_canonical_nested'):
+        # Older V6-shaped plans without explicit frozen decision provenance
+        # are not part of the strict V6 validation cohort.
+        if r.get('_frozen_geometry_version') != CURRENT_GEOMETRY_VERSION:
+            return False
+    if current_start_ms is not None:
+        try:
+            if int(r.get('captured_at_ms')) < current_start_ms:
+                return False
+        except (TypeError, ValueError):
+            return False
+    return True
+
+
 def stop_distance_pct(r):
     g=r.get('geometry') or {}
     entry=_f(r.get('entry')); stop=_f(g.get('stop_loss'))
@@ -52,7 +101,8 @@ def geometry_generation(r):
 
 
 def classify_loss(r):
-    if r.get('path_outcome')!='LOSS': return None
+    if r.get('path_outcome')!='LOSS':
+        return 'NEGATIVE_NON_STOP_TERMINAL' if (_f(r.get('r_multiple')) or 0)<0 else None
     if r.get('tp1_reached'): return 'POST_TP1_REVERSAL'
     g=r.get('geometry') or {}
     rr=_f(g.get('rr_tp2'))
@@ -113,8 +163,8 @@ def _cohort_summary(rows):
     }
 
 
-def build_report(rows):
-    rows=list(rows or [])
+def build_report(rows, current_start_ms=None):
+    rows=[n for r in (rows or []) if (n:=normalize_row(r)) is not None]
     terminal=[r for r in rows if r.get('terminal') and r.get('path_outcome') not in ('AMBIGUOUS','MARKET_DATA_ERROR')]
     wins=[r for r in terminal if _f(r.get('r_multiple')) is not None and _f(r.get('r_multiple'))>0]
     losses=[r for r in terminal if _f(r.get('r_multiple')) is not None and _f(r.get('r_multiple'))<0]
@@ -150,13 +200,14 @@ def build_report(rows):
         'tight_stop_loss_share_pct':round(100*tight_loss_count/len(losses),2) if losses else None,
     }
 
-    current_rows=[r for r in terminal if geometry_generation(r)==CURRENT_GEOMETRY_VERSION]
-    legacy_rows=[r for r in terminal if geometry_generation(r)!=CURRENT_GEOMETRY_VERSION]
+    current_rows=[r for r in terminal if is_current_geometry(r, current_start_ms)]
+    legacy_rows=[r for r in terminal if not is_current_geometry(r, current_start_ms)]
     current_summary=_cohort_summary(current_rows)
     legacy_summary=_cohort_summary(legacy_rows)
     current_ready=len(current_rows)>=MIN_CURRENT_TERMINAL_SAMPLE
     cohort_focus={
         'current_geometry_version':CURRENT_GEOMETRY_VERSION,
+        'current_cohort_start_ms':current_start_ms,
         'minimum_current_terminal_sample':MIN_CURRENT_TERMINAL_SAMPLE,
         'current_terminal_progress':f'{len(current_rows)}/{MIN_CURRENT_TERMINAL_SAMPLE}',
         'current_sample_ready':current_ready,
@@ -198,7 +249,36 @@ def build_report(rows):
 
 
 def main():
-    p=argparse.ArgumentParser(); p.add_argument('--input',required=True); p.add_argument('--output',default='status/production-loss-autopsy.json'); a=p.parse_args()
-    x=json.loads(Path(a.input).read_text()); rows=x.get('rows') if isinstance(x,dict) else x
-    out=build_report(rows or []); Path(a.output).parent.mkdir(parents=True,exist_ok=True); Path(a.output).write_text(json.dumps(out,indent=2)+'\n'); print(json.dumps(out,sort_keys=True))
+    p=argparse.ArgumentParser()
+    p.add_argument('--input', required=True)
+    p.add_argument('--validation', default=None)
+    p.add_argument('--output', default='status/production-loss-autopsy.json')
+    a=p.parse_args()
+    x=json.loads(Path(a.input).read_text())
+    current_start_ms=None
+    validation=None
+    if isinstance(x, dict) and 'trades' in x:
+        # The paper portfolio is the canonical append-only FINAL_TRADE_GATE
+        # cohort; it must be checked against the independent scorecard.
+        if not a.validation:
+            p.error('--validation is required for canonical paper trades')
+        if x.get('decision_source_of_truth') != 'FINAL_TRADE_GATE':
+            raise ValueError('Noncanonical trade source')
+        validation=json.loads(Path(a.validation).read_text())
+        geometry=validation['current_geometry']
+        if geometry['version'] != CURRENT_GEOMETRY_VERSION:
+            raise ValueError('Current geometry differs from independent scorecard')
+        current_start_ms=int(datetime.fromisoformat(geometry['start'].replace('Z','+00:00')).timestamp()*1000)
+        rows=x['trades']
+    else:
+        rows=x.get('rows') if isinstance(x,dict) else x
+    out=build_report(rows or [], current_start_ms=current_start_ms)
+    if validation is not None:
+        expected=validation['current_geometry']['summary']['terminal']
+        actual=out['cohort_focus']['current']['terminal']
+        if actual != expected:
+            raise ValueError(f'Canonical cohort mismatch: autopsy={actual}, scorecard={expected}')
+    Path(a.output).parent.mkdir(parents=True,exist_ok=True)
+    Path(a.output).write_text(json.dumps(out,indent=2)+'\n')
+    print(json.dumps(out,sort_keys=True))
 if __name__=='__main__': main()
