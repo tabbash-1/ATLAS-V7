@@ -1,0 +1,40 @@
+name: ATLAS Production Loss Autopsy Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'production_loss_autopsy.py'
+      - 'tests/test_production_loss_autopsy.py'
+      - '.github/workflows/production-loss-autopsy-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  autopsy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax and regression
+        run: |
+          python -m py_compile production_loss_autopsy.py tests/test_production_loss_autopsy.py
+          PYTHONPATH=. python tests/test_production_loss_autopsy.py
+      - name: Reconcile frozen canonical production cohort
+        run: |
+          python production_loss_autopsy.py --input status/paper-portfolio-10k-latest.json --validation status/production-validation-latest.json --output /tmp/atlas-autopsy.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          x=json.loads(Path('/tmp/atlas-autopsy.json').read_text())
+          assert x['cohort_focus']['current']['terminal']==5
+          assert x['cohort_focus']['current_sample_ready'] is False
+          assert x['production_threshold_changed'] is False
+          assert x['production_stop_policy_changed'] is False
+          print('Canonical autopsy cohort reconciled, no Production policy change')
+          PY
