@@ -6,12 +6,12 @@
   "product_horizon": "4-12H",
   "product_lane": "CORE_4_12H",
   "entry_confirmation_horizon": "1H",
-  "generated_at": "2026-10-13T08:30:51.976002+00:00",
-  "entry": 2532.75,
+  "generated_at": "2026-10-13T16:30:19.887315+00:00",
+  "entry": 2517.97,
   "direction": "LONG",
-  "verdict": "WAIT",
-  "confidence": 59,
-  "reason": "CONFLICTING_EVIDENCE",
+  "verdict": "REJECT",
+  "confidence": 60,
+  "reason": "RISK_GEOMETRY_FAIL",
   "canonical_action": {
     "status": "WAIT",
     "action": "WAIT",
@@ -20,22 +20,24 @@
     "product_horizon": "4-12H"
   },
   "bull_analyst": {
-    "score": 0.19,
+    "score": 0.216,
     "best_case": [
-      "Price/EMA20/EMA50 structure 2532.75/2512.75/2516.72",
-      "RV 1.21x",
-      "RSI14 54.1"
+      "LONG 3 vs SHORT 1",
+      "RSI14 62.9",
+      "Price/EMA20/EMA50 structure 2517.97/2510.91/2513.34",
+      "24h momentum 0.16%"
     ]
   },
   "bear_analyst": {
-    "score": -0.19,
+    "score": -0.216,
     "best_case": [
-      "24h momentum -0.76%"
+      "RV 0.55x",
+      "1H tactical RR 0.64 (entry context only)"
     ]
   },
   "judge": {
-    "net_strength": 0.19,
-    "tactical_rr": null,
+    "net_strength": 0.216,
+    "tactical_rr": 0.642,
     "canonical_trade_plan": {
       "status": "WAIT",
       "direction": null,
@@ -54,11 +56,23 @@
         "analysis_only": true,
         "live_execution": false
       },
-      "conditional_scenario": null,
+      "conditional_scenario": {
+        "direction": "SHORT",
+        "trigger_type": "BREAKDOWN_RETEST_FAIL",
+        "trigger_level": 2497.85,
+        "trigger_condition": "4H close below support, then failed retest while 12H thesis does not turn bullish",
+        "confirmation": [
+          "4H_BOS_DOWN_OR_BEARISH_RETEST",
+          "12H_NOT_BULLISH",
+          "NO_LOW_SWEEP_RECLAIM"
+        ],
+        "invalidation_level": 2520.54,
+        "invalidation_condition": "4H closes back above structural resistance or 4H+12H thesis loses bearish alignment"
+      },
       "bull_case": {
         "direction": "LONG",
         "trigger_type": "BREAKOUT_RETEST_HOLD",
-        "trigger_level": 2587.28,
+        "trigger_level": 2520.54,
         "trigger_condition": "4H close above resistance, then retest holds while 12H thesis does not turn bearish",
         "confirmation": [
           "4H_BOS_UP_OR_BULLISH_RETEST",
@@ -78,17 +92,17 @@
           "12H_NOT_BULLISH",
           "NO_LOW_SWEEP_RECLAIM"
         ],
-        "invalidation_level": 2587.28,
+        "invalidation_level": 2520.54,
         "invalidation_condition": "4H closes back above structural resistance or 4H+12H thesis loses bearish alignment"
       },
-      "scenario_readiness": "WAIT_FOR_HTF_ALIGNMENT",
-      "scenario_reason": "4H_12H_NOT_ALIGNED",
+      "scenario_readiness": "CONDITIONAL_SCENARIO_READY",
+      "scenario_reason": "HTF_THESIS_AND_PRICE_ACTION_COMPATIBLE",
       "action": "WAIT",
       "analysis_action": "WAIT",
       "analysis_ready": false,
       "can_execute": false,
       "trade_ready": false,
-      "final_trade_ready_reason": "HTF_THESIS_4H_12H_NOT_ALIGNED"
+      "final_trade_ready_reason": "HTF_THESIS_ENTRY_CONFIRMATION_MISSING"
     },
     "invalidation": "4-12H Production trade_plan is canonical; 1H is confirmation/context only."
   },
@@ -96,10 +110,10 @@
     {
       "scenario": "ENTER_NOW",
       "direction": "LONG",
-      "entry": 2532.75,
-      "stop_loss": 2516.7878571429,
-      "target": 2562.2185714286,
-      "risk_reward": 1.846,
+      "entry": 2517.97,
+      "stop_loss": 2505.3544285714,
+      "target": 2526.0705,
+      "risk_reward": 0.642,
       "trigger": "1H confirmation while 4-12H thesis remains valid",
       "thesis": "Shadow entry-timing comparison only.",
       "shadow_only": true,
@@ -109,10 +123,10 @@
     {
       "scenario": "WAIT_PULLBACK",
       "direction": "LONG",
-      "entry": 2524.155,
-      "stop_loss": 2505.7371428571,
-      "target": 2560.9907142857,
-      "risk_reward": 2.0,
+      "entry": 2511.177,
+      "stop_loss": 2496.6205714286,
+      "target": 2526.0705,
+      "risk_reward": 1.023,
       "trigger": "Price retraces ~0.35 ATR without 4H structure failure",
       "thesis": "Requalify entry timing; do not replace 4-12H thesis.",
       "shadow_only": true,
@@ -136,10 +150,10 @@
   "best_counterfactual": {
     "scenario": "WAIT_PULLBACK",
     "direction": "LONG",
-    "entry": 2524.155,
-    "stop_loss": 2505.7371428571,
-    "target": 2560.9907142857,
-    "risk_reward": 2.0,
+    "entry": 2511.177,
+    "stop_loss": 2496.6205714286,
+    "target": 2526.0705,
+    "risk_reward": 1.023,
     "trigger": "Price retraces ~0.35 ATR without 4H structure failure",
     "thesis": "Requalify entry timing; do not replace 4-12H thesis.",
     "shadow_only": true,
@@ -147,51 +161,58 @@
     "research_horizon": "1-3H_CONTEXT_ONLY"
   },
   "hybrid_judge": {
-    "decision": "WAIT",
+    "decision": "REJECT",
     "production_direction": null,
     "production_score": null,
     "production_qualified": false,
     "execution_ready": false,
     "ai_direction": "LONG",
-    "ai_verdict": "WAIT",
+    "ai_verdict": "REJECT",
     "agreement": false,
     "production_priority": false
   },
   "evidence": [
     {
       "name": "direction_votes",
-      "value": 0.0,
+      "value": 0.5,
       "weight": 2.1,
-      "detail": "LONG 2 vs SHORT 2",
+      "detail": "LONG 3 vs SHORT 1",
       "source": "production_decision"
     },
     {
       "name": "ema_structure",
-      "value": 0.829,
+      "value": 0.26,
       "weight": 1.2,
-      "detail": "Price/EMA20/EMA50 structure 2532.75/2512.75/2516.72",
+      "detail": "Price/EMA20/EMA50 structure 2517.97/2510.91/2513.34",
       "source": "production_decision"
     },
     {
       "name": "rsi",
-      "value": 0.162,
+      "value": 0.517,
       "weight": 0.7,
-      "detail": "RSI14 54.1",
+      "detail": "RSI14 62.9",
       "source": "production_decision"
     },
     {
       "name": "momentum",
-      "value": -0.254,
+      "value": 0.054,
       "weight": 0.9,
-      "detail": "24h momentum -0.76%",
+      "detail": "24h momentum 0.16%",
       "source": "production_decision"
     },
     {
       "name": "relative_volume",
-      "value": 0.257,
+      "value": -0.544,
       "weight": 0.75,
-      "detail": "RV 1.21x",
+      "detail": "RV 0.55x",
       "source": "production_decision"
+    },
+    {
+      "name": "tactical_geometry",
+      "value": -0.105,
+      "weight": 0.45,
+      "detail": "1H tactical RR 0.64 (entry context only)",
+      "source": "entry_confirmation_context"
     }
   ],
   "production_decision": "WAIT",
