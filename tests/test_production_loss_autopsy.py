@@ -51,6 +51,8 @@ def test_current_geometry_becomes_evaluable_only_at_30_terminal():
 def canonical(outcome='LOSS', r=-1, frozen=True):
     x=row(outcome=outcome,r=r,version=a.CURRENT_GEOMETRY_VERSION)
     x.pop('terminal'); x.pop('path_outcome'); x.pop('r_multiple')
+    # Canonical trade plans freeze the entry inside geometry, not at row root.
+    x['geometry']['entry']=x.pop('entry')
     x['decision_source']='FINAL_TRADE_GATE'
     x['decision_action']='TRADE_READY'
     x['outcome_known_at_entry']=False
