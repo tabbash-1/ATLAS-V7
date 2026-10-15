@@ -81,3 +81,13 @@ def test_evidence_status_writers_retry_if_main_moves():
         assert "git fetch origin main" in y
         assert "git rebase origin/main" in y
         assert "main moved during evidence push" in y
+
+
+def test_evidence_control_center_ci_tracks_index_changes():
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    workflow = (root / '.github/workflows/atlas-evidence-control-center.yml').read_text(encoding='utf-8')
+    pr_section, remainder = workflow.split('  push:', 1)
+    push_section = remainder.split('  schedule:', 1)[0]
+    assert "      - 'index.html'" in pr_section
+    assert "      - 'index.html'" in push_section
