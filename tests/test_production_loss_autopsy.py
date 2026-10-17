@@ -80,9 +80,27 @@ def test_noncanonical_source_rejected():
     result=a.build_report([x,canonical()],current_start_ms=1790664387000)
     assert result['terminal']==1
 
+
+def test_real_canonical_generation_is_decision_provenance_not_plan_name():
+    x=canonical()
+    x['geometry'].pop('geometry_version')
+    x['geometry']['plan_version']='PRODUCTION_TRADE_PLAN_V11_ACCEPTED_BREAKOUT'
+    result=a.build_report([x],current_start_ms=1790664387000)
+    assert result['cohort_focus']['current']['terminal']==1
+    assert result['entry_quality_evidence']['geometry_generations'][a.CURRENT_GEOMETRY_VERSION]['n']==1
+
+def test_missing_frozen_provenance_cannot_join_current_cohort():
+    x=canonical()
+    x['geometry'].pop('geometry_version')
+    x['geometry']['plan_version']='PRODUCTION_TRADE_PLAN_V11_ACCEPTED_BREAKOUT'
+    x.pop('decision_provenance')
+    result=a.build_report([x],current_start_ms=1790664387000)
+    assert result['cohort_focus']['current']['terminal']==0
+    assert result['cohort_focus']['legacy_or_other']['terminal']==1
+
 def test_negative_expiry_not_stop_loss():
     result=a.build_report([canonical(outcome='EXPIRED',r=-0.2)])
     assert result['loss_cause_counts']=={'NEGATIVE_NON_STOP_TERMINAL':1}
 
 if __name__=='__main__':
- test_post_tp1_is_separate_failure_mode(); test_tight_stop_candidate_detected_without_mutating_policy(); test_pre_tp1_failure_not_blindly_called_stop_problem(); test_geometry_generations_are_separated(); test_current_geometry_becomes_evaluable_only_at_30_terminal(); test_nested_canonical_settlement(); test_unfrozen_legacy_excluded_from_current(); test_noncanonical_source_rejected(); test_negative_expiry_not_stop_loss(); print('production loss autopsy tests: ok')
+ test_post_tp1_is_separate_failure_mode(); test_tight_stop_candidate_detected_without_mutating_policy(); test_pre_tp1_failure_not_blindly_called_stop_problem(); test_geometry_generations_are_separated(); test_current_geometry_becomes_evaluable_only_at_30_terminal(); test_nested_canonical_settlement(); test_unfrozen_legacy_excluded_from_current(); test_noncanonical_source_rejected(); test_negative_expiry_not_stop_loss(); test_real_canonical_generation_is_decision_provenance_not_plan_name(); test_missing_frozen_provenance_cannot_join_current_cohort(); print('production loss autopsy tests: ok')
