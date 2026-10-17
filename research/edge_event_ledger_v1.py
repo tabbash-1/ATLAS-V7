@@ -37,6 +37,7 @@ def _number(value):
 def normalize_candles(items, as_of_ms):
     """Only completed, uninterrupted, chronologically ordered 1H candles."""
     result = []
+    previous_input_time = None
     for item in items:
         if not isinstance(item, dict):
             raise ValueError("Candle must be a dict")
@@ -47,8 +48,9 @@ def normalize_candles(items, as_of_ms):
         values = {k: _number(item[k]) for k in ("open", "high", "low", "close", "volume")}
         if values["low"] <= 0 or values["high"] < max(values["open"], values["close"]) or values["low"] > min(values["open"], values["close"]) or values["volume"] < 0:
             raise ValueError("Invalid candle prices or volume")
-        if result and t - result[-1]["time"] != HOUR_MS:
+        if previous_input_time is not None and t - previous_input_time != HOUR_MS:
             raise ValueError("Duplicate, missing or unsorted 1H candles")
+        previous_input_time = t
         if end <= as_of_ms:
             result.append({"time": t, "close_time": end, **values})
     return result
