@@ -48,7 +48,7 @@ jobs:
           python - <<'PY'
           import json
           p=json.load(open('status/opportunity-path-replay-latest.json'))
-          assert p['schema']=='ATLAS_OPPORTUNITY_PATH_REPLAY_V1'
+          assert p['schema']=='ATLAS_OPPORTUNITY_PATH_REPLAY_V2_VERSIONED_COHORTS'
           assert p['activation_at']=='2026-09-18T07:10:00+00:00'
           assert p['criteria_locked_before_evaluation'] is True
           assert p['path_rules']['failfast_adverse_r']==-0.25
@@ -59,6 +59,7 @@ jobs:
           assert p['safety']['production_threshold']==68
           assert p['safety']['can_override_production'] is False
           assert all(x['promotion_allowed'] is False for x in p['hypotheses'])
+          assert all(x['formal_ready'] == bool(x['formal_ready_cohorts']) for x in p['hypotheses'])
           print('PATH_REPLAY_OK',p['eligible_prospective_rows'],len(p['market_data_errors']))
           PY
       - name: Upload replay artifact
