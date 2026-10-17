@@ -91,7 +91,16 @@ def stop_distance_pct(r):
 
 
 def geometry_generation(r):
-    """Best-effort cohort tag; never invents a version when the ledger lacks one."""
+    """Use the frozen *decision* generation, never infer it from trade-plan names.
+
+    Canonical paper entries store their current geometry generation inside
+    decision_provenance.geometry_version, while geometry.plan_version is a
+    separate, independently evolving trade-plan version. A missing frozen
+    generation remains legacy, never current.
+    """
+    if r.get('_canonical_nested'):
+        version = r.get('_frozen_geometry_version')
+        return version if isinstance(version, str) and version else 'UNVERSIONED_LEGACY_OR_UNKNOWN'
     g=r.get('geometry') or {}
     for key in ('geometry_generation','decision_engine_version','geometry_version','version'):
         value=r.get(key) if key=='geometry_generation' else (g.get(key) or r.get(key))
