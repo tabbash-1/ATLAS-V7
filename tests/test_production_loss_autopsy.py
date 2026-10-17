@@ -47,5 +47,69 @@ def test_current_geometry_becomes_evaluable_only_at_30_terminal():
  assert r['research_recommendation']['action']=='EVALUATE_CURRENT_GEOMETRY_ONLY'
  assert r['research_recommendation']['change_production_stop_policy_now'] is False
 
+
+def canonical(outcome='LOSS', r=-1, frozen=True):
+    x=row(outcome=outcome,r=r,version=a.CURRENT_GEOMETRY_VERSION)
+    x.pop('terminal'); x.pop('path_outcome'); x.pop('r_multiple')
+    # Canonical trade plans freeze the entry inside geometry, not at row root.
+    x['geometry']['entry']=x.pop('entry')
+    x['decision_source']='FINAL_TRADE_GATE'
+    x['decision_action']='TRADE_READY'
+    x['outcome_known_at_entry']=False
+    x['captured_at_ms']=1791470723569
+    x['decision_provenance']={'geometry_version':a.CURRENT_GEOMETRY_VERSION if frozen else {'legacy':'unfrozen'}}
+    x['settlement']={'status':outcome,'r_multiple':r,'terminal':True,'tp1_reached':False}
+    return x
+
+def test_nested_canonical_settlement():
+    x=canonical()
+    result=a.build_report([x],current_start_ms=1790664387000)
+    assert result['terminal']==1 and result['losses']==1
+    assert result['cohort_focus']['current']['terminal']==1
+    assert result['loss_rows'][0]['stop_distance_pct']==1.0
+
+def test_unfrozen_legacy_excluded_from_current():
+    result=a.build_report([canonical() for _ in range(5)]+[canonical(frozen=False) for _ in range(3)],current_start_ms=1790664387000)
+    assert result['terminal']==8
+    assert result['cohort_focus']['current']['terminal']==5
+    assert result['cohort_focus']['legacy_or_other']['terminal']==3
+
+def test_noncanonical_source_rejected():
+    x=canonical()
+    x['decision_source']='RESEARCH_SHADOW'
+    result=a.build_report([x,canonical()],current_start_ms=1790664387000)
+    assert result['terminal']==1
+
+
+def test_real_canonical_generation_is_decision_provenance_not_plan_name():
+    x=canonical()
+    x['geometry'].pop('geometry_version')
+    x['geometry']['plan_version']='PRODUCTION_TRADE_PLAN_V11_ACCEPTED_BREAKOUT'
+    result=a.build_report([x],current_start_ms=1790664387000)
+    assert result['cohort_focus']['current']['terminal']==1
+    assert result['entry_quality_evidence']['geometry_generations'][a.CURRENT_GEOMETRY_VERSION]['n']==1
+
+def test_missing_frozen_provenance_cannot_join_current_cohort():
+    x=canonical()
+    x['geometry'].pop('geometry_version')
+    x['geometry']['plan_version']='PRODUCTION_TRADE_PLAN_V11_ACCEPTED_BREAKOUT'
+    x.pop('decision_provenance')
+    result=a.build_report([x],current_start_ms=1790664387000)
+    assert result['cohort_focus']['current']['terminal']==0
+    assert result['cohort_focus']['legacy_or_other']['terminal']==1
+
+def test_flat_expiry_counts_in_portfolio_win_rate():
+    rows=[canonical(outcome='WIN_TP2',r=2),canonical(outcome='LOSS',r=-1),canonical(outcome='EXPIRED',r=0)]
+    report=a.build_report(rows,current_start_ms=1790664387000)
+    assert report['terminal']==3
+    assert report['wins']==1 and report['losses']==1
+    assert report['win_rate_pct']==33.33
+    assert report['cohort_focus']['current']['win_rate_pct']==33.33
+
+
+def test_negative_expiry_not_stop_loss():
+    result=a.build_report([canonical(outcome='EXPIRED',r=-0.2)])
+    assert result['loss_cause_counts']=={'NEGATIVE_NON_STOP_TERMINAL':1}
+
 if __name__=='__main__':
- test_post_tp1_is_separate_failure_mode(); test_tight_stop_candidate_detected_without_mutating_policy(); test_pre_tp1_failure_not_blindly_called_stop_problem(); test_geometry_generations_are_separated(); test_current_geometry_becomes_evaluable_only_at_30_terminal(); print('production loss autopsy tests: ok')
+ test_post_tp1_is_separate_failure_mode(); test_tight_stop_candidate_detected_without_mutating_policy(); test_pre_tp1_failure_not_blindly_called_stop_problem(); test_geometry_generations_are_separated(); test_current_geometry_becomes_evaluable_only_at_30_terminal(); test_nested_canonical_settlement(); test_unfrozen_legacy_excluded_from_current(); test_noncanonical_source_rejected(); test_negative_expiry_not_stop_loss(); test_real_canonical_generation_is_decision_provenance_not_plan_name(); test_missing_frozen_provenance_cannot_join_current_cohort(); test_flat_expiry_counts_in_portfolio_win_rate(); print('production loss autopsy tests: ok')
