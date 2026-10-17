@@ -131,7 +131,7 @@ def summarize(ledgers, train_pct=70):
             lane["ALL"].append(chosen)
             lane[_btc_regime(f)].append(chosen)
             lane["SIDE_" + direction].append(chosen)
-            lane["BTC_" + _extension_regime(f)].append(chosen)
+            lane["ASSET_" + _extension_regime(f)].append(chosen)
             lane[_volatility_regime(f)].append(chosen)
             lane["ASSET_" + symbol].append(chosen)
     return {
