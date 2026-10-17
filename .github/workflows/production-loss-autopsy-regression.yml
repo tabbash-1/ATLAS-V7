@@ -38,7 +38,7 @@ jobs:
           assert x['cohort_focus']['current']['terminal']==validation['current_geometry']['summary']['terminal']
           assert x['cohort_focus']['current']['terminal']==len(validation['current_geometry']['cost_adjusted']['rows'])
           assert x['win_rate_pct']==portfolio['portfolio']['win_rate_pct']
-          assert x['cohort_focus']['current_sample_ready'] is False
+          assert x['cohort_focus']['current_sample_ready'] == (x['cohort_focus']['current']['terminal'] >= x['cohort_focus']['minimum_current_terminal_sample'])
           assert x['production_threshold_changed'] is False
           assert x['production_stop_policy_changed'] is False
           print('Canonical autopsy cohort reconciled, no Production policy change')
