@@ -1,0 +1,47 @@
+name: ATLAS Edge Event Ledger Research CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'research/edge_event_ledger_v1.py'
+      - 'tests/test_edge_event_ledger_v1.py'
+      - '.github/workflows/edge-event-ledger-v1-ci.yml'
+      - 'research/EDGE_EVENT_LEDGER_V1.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  edge-event-ledger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile and execute research safety regressions
+        run: |
+          python -m py_compile research/edge_event_ledger_v1.py tests/test_edge_event_ledger_v1.py
+          PYTHONPATH=. python tests/test_edge_event_ledger_v1.py
+      - name: Verify research cannot modify Production or create trades
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import ast
+          root = Path('research/edge_event_ledger_v1.py')
+          tree = ast.parse(root.read_text())
+          # Self-contained offline OHLCV research. No network/trading/Production imports.
+          forbidden = {'requests','urllib','socket','ccxt','subprocess','production_signal_scoring','collector_server','final_trade_ready_guard'}
+          modules = {node.module.split('.')[0] for node in ast.walk(tree) if isinstance(node, ast.ImportFrom) and node.module}
+          modules.update(alias.name.split('.')[0] for node in ast.walk(tree) if isinstance(node, ast.Import) for alias in node.names)
+          assert not (forbidden & modules), forbidden & modules
+          code=root.read_text()
+          assert '"can_override_production": False' in code
+          assert '"can_create_trade": False' in code
+          assert '"live_execution": False' in code
+          assert '"profitability_validated": False' in code
+          print('EDGE_LEDGER_RESEARCH_ONLY_VERIFIED')
+          PY
