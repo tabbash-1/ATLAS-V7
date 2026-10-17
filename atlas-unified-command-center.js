@@ -16,6 +16,11 @@
   };
   const esc = v => String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const tile=(label,value,sub="")=>`<div class="atlas-unified-tile"><span>${esc(label)}</span><b>${esc(value)}</b><small>${esc(sub)}</small></div>`;
+  function removeLiteralScriptSeparator(){
+    const script=document.currentScript || Array.from(document.scripts).find(s=>String(s.src||"").includes("atlas-unified-command-center.js"));
+    const previous=script && script.previousSibling;
+    if(previous && previous.nodeType===Node.TEXT_NODE && /^\\n\s*$/.test(previous.nodeValue||"")) previous.remove();
+  }
   function ensure(){
     if(document.getElementById("atlasUnifiedCommandCenter")) return;
     const main=document.querySelector("main.main");
@@ -77,5 +82,6 @@
     const health=document.getElementById("atlasUnifiedHealth");
     if(health){health.textContent="LIVE VIEW"; health.className="pill live";}
   }
+  removeLiteralScriptSeparator();
   window.addEventListener("DOMContentLoaded",()=>{ensure();sync();setInterval(sync,2000);});
 })();
