@@ -1,0 +1,89 @@
+name: ATLAS Edge Real Market Baselines CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'research/edge_event_ledger_v1.py'
+      - 'research/edge_real_market_baselines_v1.py'
+      - 'tests/test_edge_event_ledger_v1.py'
+      - 'tests/test_edge_real_market_baselines_v1.py'
+      - '.github/workflows/edge-real-market-baselines-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile and execute offline determinism/regression tests
+        run: |
+          python3 -m py_compile research/edge_event_ledger_v1.py research/edge_real_market_baselines_v1.py tests/test_edge_event_ledger_v1.py tests/test_edge_real_market_baselines_v1.py
+          PYTHONPATH=. python3 tests/test_edge_event_ledger_v1.py
+          PYTHONPATH=. python3 tests/test_edge_real_market_baselines_v1.py
+      - name: Assert research-only and no execution authority
+        run: |
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          p=Path('research/edge_real_market_baselines_v1.py')
+          tree=ast.parse(p.read_text())
+          text=p.read_text()
+          imports={node.module.split('.')[0] for node in ast.walk(tree)
+                   if isinstance(node,ast.ImportFrom) and node.module}
+          imports.update(name.name.split('.')[0] for node in ast.walk(tree)
+                         if isinstance(node,ast.Import) for name in node.names)
+          forbidden={'ccxt','binance','collector_server','final_trade_ready_guard',
+                     'production_signal_scoring','subprocess','os'}
+          assert not (imports & forbidden), imports & forbidden
+          for declaration in ['"research_only":True','"live_execution":False',
+                              '"can_create_trade":False','"can_override_production":False',
+                              '"profitability_validated":False']:
+              assert declaration in text, declaration
+          print("EDGE_BASELINES_NO_PRODUCTION_AUTHORITY")
+          PY
+
+  real-market-sample:
+    needs: regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fetch public Binance spot OHLCV and build comparative report
+        run: |
+          PYTHONPATH=. python3 research/edge_real_market_baselines_v1.py \
+            --symbols BTCUSDT,ETHUSDT,SOLUSDT \
+            --days 30 \
+            --modeled-cost-bps 17 \
+            --output edge-real-market-baselines-report.json
+      - name: Assert live-data evidence is a research report only
+        run: |
+          python3 - <<'PY'
+          import json
+          r=json.load(open('edge-real-market-baselines-report.json'))
+          assert r['schema']=='ATLAS_EDGE_REAL_MARKET_BASELINES_V1'
+          assert r['symbols']==['BTCUSDT','ETHUSDT','SOLUSDT']
+          assert all(q['continuity_validated'] and q['bars']==720 for q in r['market_data_quality'])
+          assert r['research_only'] and not r['live_execution']
+          assert not r['can_create_trade'] and not r['can_override_production']
+          assert r['profitability_validated'] is False
+          assert not r['winner_selected_from_holdout']
+          assert r['unique_timestamp_counts']['holdout']>0
+          print('REAL_SPOT_SAMPLE_SUCCESS',r['scores']['holdout'])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atlas-edge-real-market-research-report
+          path: edge-real-market-baselines-report.json
+          retention-days: 7
+          if-no-files-found: error
