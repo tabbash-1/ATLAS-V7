@@ -7,6 +7,7 @@ on:
       - 'production_loss_autopsy.py'
       - 'tests/test_production_loss_autopsy.py'
       - '.github/workflows/production-loss-autopsy-regression.yml'
+      - '.github/workflows/production-loss-autopsy.yml'
   workflow_dispatch:
 
 permissions:
@@ -32,7 +33,11 @@ jobs:
           import json
           from pathlib import Path
           x=json.loads(Path('/tmp/atlas-autopsy.json').read_text())
-          assert x['cohort_focus']['current']['terminal']==5
+          validation=json.loads(Path('status/production-validation-latest.json').read_text())
+          portfolio=json.loads(Path('status/paper-portfolio-10k-latest.json').read_text())
+          assert x['cohort_focus']['current']['terminal']==validation['current_geometry']['summary']['terminal']
+          assert x['cohort_focus']['current']['terminal']==len(validation['current_geometry']['cost_adjusted']['rows'])
+          assert x['win_rate_pct']==portfolio['portfolio']['win_rate_pct']
           assert x['cohort_focus']['current_sample_ready'] is False
           assert x['production_threshold_changed'] is False
           assert x['production_stop_policy_changed'] is False
