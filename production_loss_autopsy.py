@@ -242,7 +242,7 @@ def build_report(rows, current_start_ms=None):
 
     return {
         'schema':SCHEMA,'terminal':len(terminal),'wins':len(wins),'losses':len(losses),
-        'win_rate_pct':round(100*len(wins)/(len(wins)+len(losses)),2) if wins or losses else None,
+        'win_rate_pct':round(100*len(wins)/len(terminal),2) if terminal else None,
         'net_r':round(sum(_f(r.get('r_multiple')) or 0 for r in terminal),4),
         'avg_win_score':_mean([_f(r.get('score')) for r in wins]),
         'avg_loss_score':_mean([_f(r.get('score')) for r in losses]),
