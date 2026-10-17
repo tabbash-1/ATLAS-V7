@@ -47,7 +47,7 @@ jobs:
           PY
       - name: Contract check
         run: |
-          jq -e '.schema=="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V6_ALPHA_CORE_V2" and .research_only==true and .production_effect=="NONE" and .can_override_production==false and (.horizons_h==[4,8,12])' status/on-demand-analysis-benchmark-latest.json
+          jq -e '.schema=="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V7_ALPHA_BOUNDED_HISTORY" and .research_only==true and .production_effect=="NONE" and .can_override_production==false and (.horizons_h==[4,8,12])' status/on-demand-analysis-benchmark-latest.json
       - name: Print benchmark summary
         run: |
           jq '{schema,overall:{legacy_1h:.overall.legacy_1h,htf_consensus:.overall.htf_consensus,analyst_stack_v2:.overall.analyst_stack_v2,alpha_core_v2:.overall.alpha_core_v2}}' status/on-demand-analysis-benchmark-latest.json
