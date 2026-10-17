@@ -1,0 +1,83 @@
+name: ATLAS Edge 90D Market Regime Research
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'research/edge_real_market_regime_audit_v1.py'
+      - 'tests/test_edge_real_market_regime_audit_v1.py'
+      - '.github/workflows/edge-90d-regime-audit-ci.yml'
+      - 'research/EDGE_90D_REGIME_AUDIT.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Offline audit and legacy ledger regressions
+        run: |
+          python3 -m py_compile research/edge_event_ledger_v1.py research/edge_real_market_baselines_v1.py research/edge_real_market_regime_audit_v1.py tests/test_edge_real_market_regime_audit_v1.py
+          PYTHONPATH=. python3 tests/test_edge_event_ledger_v1.py
+          PYTHONPATH=. python3 tests/test_edge_real_market_baselines_v1.py
+          PYTHONPATH=. python3 tests/test_edge_real_market_regime_audit_v1.py
+      - name: Check research-only authority
+        run: |
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          s=Path('research/edge_real_market_regime_audit_v1.py').read_text()
+          node=ast.parse(s)
+          im={x.module.split('.')[0] for x in ast.walk(node) if isinstance(x,ast.ImportFrom) and x.module}
+          im.update(a.name.split('.')[0] for x in ast.walk(node) if isinstance(x,ast.Import) for a in x.names)
+          assert not im.intersection({'collector_server','production_signal_scoring','final_trade_ready_guard','ccxt','subprocess'})
+          for safe in ['"profitability_validated": False','"can_change_production": False','"can_create_trade": False','"can_override_final_trade_gate": False']:
+              assert safe in s
+          print('RESEARCH_ONLY_REGIME_FIREWALL')
+          PY
+
+  real-90d:
+    needs: offline-guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Audit 90 days of real closed hourly BTC and supported spot assets
+        run: |
+          PYTHONPATH=. python3 research/edge_real_market_regime_audit_v1.py \
+            --days 90 --cost-bps 17 --output atlas-edge-90d-market-regime-report.json
+      - name: Strict audit report verification
+        run: |
+          python3 - <<'PY'
+          import json
+          r=json.load(open('atlas-edge-90d-market-regime-report.json'))
+          assert r['schema']=='ATLAS_EDGE_90D_REAL_MARKET_REGIME_AUDIT_V1'
+          assert len(r['symbols'])==11 and len(r['data_quality'])==11
+          assert r['calendar_days']==90
+          assert all(q['continuity_validated'] and q['bars']==2160 for q in r['data_quality'])
+          assert not r['profitability_validated'] and r['research_only']
+          assert not r['can_change_production'] and not r['can_create_trade']
+          assert not r['model_comparison']['winner_selected']
+          assert not r['model_comparison']['model_fitted']
+          assert r['model_comparison']['split']['purged_asset_time_events'] > 0
+          assert all(x['valid_settlements'] > 0 for x in r['overall_holdout'].values())
+          print('EDGE_90D_VERIFIED',json.dumps({
+              k:{'n':v['valid_settlements'],'mean_net_R':v['mean_modeled_net_r'],'win_pct':v['modeled_net_positive_pct']}
+              for k,v in r['overall_holdout'].items()},sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atlas-edge-90d-market-regime-evidence
+          path: atlas-edge-90d-market-regime-report.json
+          retention-days: 14
+          if-no-files-found: error
