@@ -7,7 +7,7 @@ P=Path(__file__).resolve().parents[1]/"research"/"on_demand_analysis_benchmark.p
 spec=importlib.util.spec_from_file_location("bench",P);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
 
 def test_product_contract_is_analysis_not_trade_discovery():
-    assert m.VERSION=="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V6_ALPHA_CORE_V2"
+    assert m.VERSION=="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V7_REVERSAL4H_ATTRIBUTION"
     assert m.HORIZONS==(4,8,12)
 
 
@@ -123,6 +123,36 @@ def test_temporal_thirds_keep_timestamp_groups_intact():
     assert x["late"]["n"]==6
     assert x["early"]["directional_precision_pct"]==100.0
     assert x["late"]["directional_precision_pct"]==100.0
+
+
+def test_reversal_feature_groups_are_descriptive_and_directional_only():
+    rows=[
+      {"t":1,"prediction":"LONG","actual":"LONG","features":{"htf_relation":"WITH_12H"}},
+      {"t":2,"prediction":"LONG","actual":"SHORT","features":{"htf_relation":"WITH_12H"}},
+      {"t":3,"prediction":"WAIT","actual":"LONG","features":{"htf_relation":"WITH_12H"}},
+      {"t":4,"prediction":"SHORT","actual":"SHORT","features":{"htf_relation":"AGAINST_12H"}},
+    ]
+    g=m._feature_groups(rows,"htf_relation")
+    assert g["WITH_12H"]["n"]==2
+    assert g["WITH_12H"]["directional_precision_pct"]==50.0
+    assert g["AGAINST_12H"]["directional_precision_pct"]==100.0
+
+
+def test_reversal_attribution_has_fixed_dimensions():
+    sample={h:[
+      {"t":i,"prediction":"LONG","actual":"LONG","features":{
+        "move4_atr_bucket":"0.75_TO_1.25_ATR",
+        "htf_relation":"WITH_12H",
+        "btc_relation":"BTC_4H_ALIGNED",
+        "efficiency12_bucket":"RANGE_LIKE_LE_0.35",
+        "alpha_regime":"PULLBACK",
+      }} for i in range(9)
+    ] for h in m.HORIZONS}
+    out=m.reversal_attribution(sample)
+    assert out["historical_only"] is True
+    assert out["production_effect"]=="NONE"
+    assert set(out["dimensions"])=={"move4_atr_bucket","htf_relation","btc_relation","efficiency12_bucket","alpha_regime"}
+    assert out["late_third"]["htf_relation"]["12h"]["WITH_12H"]["directional_precision_pct"]==100.0
 
 
 def test_future_label_has_real_wait_deadband(monkeypatch):
