@@ -1,0 +1,102 @@
+name: ATLAS Edge Daily 180D Alignment Research
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'research/edge_daily_confluence_180d_v1.py'
+      - 'tests/test_edge_daily_confluence_180d_v1.py'
+      - 'research/EDGE_DAILY_CONFLUENCE_180D_V1.md'
+      - '.github/workflows/edge-daily-confluence-180d.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run immutable completed 1D research regressions
+        run: |
+          python3 -m py_compile rc10_1_deep_analysis_overlay.py research/edge_event_ledger_v1.py research/edge_daily_confluence_180d_v1.py tests/test_edge_daily_confluence_180d_v1.py
+          PYTHONPATH=. python3 tests/test_edge_daily_confluence_180d_v1.py
+          PYTHONPATH=. python3 tests/test_rc10_daily_context.py
+          PYTHONPATH=. python3 tests/test_edge_event_ledger_v1.py
+      - name: Verify daily research cannot promote live scoring
+        run: |
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          s=Path('research/edge_daily_confluence_180d_v1.py').read_text()
+          tree=ast.parse(s)
+          imported={n.module for n in ast.walk(tree)
+                    if isinstance(n,ast.ImportFrom) and n.module}
+          forbidden={'production_signal_scoring','collector_server','final_trade_ready_guard',
+                     'cloud_production_canonical','production_trade_plan','ccxt'}
+          assert not imported.intersection(forbidden)
+          for item in ('"daily_filter_can_be_promoted":False',
+                       '"profitability_validated":False',
+                       '"can_change_production":False',
+                       '"can_override_final_trade_gate":False',
+                       '"policy_or_filter_selected_based_on_outcomes":False'):
+              assert item in s,item
+          print('DAILY_RESEARCH_ONLY_SAFETY_PASS')
+          PY
+
+  real-180d:
+    needs: offline-guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run 11-asset 180-day daily-bias 3-phase real spot audit
+        run: |
+          PYTHONPATH=. python3 research/edge_daily_confluence_180d_v1.py \
+            --days 180 \
+            --output atlas-edge-daily-confluence-180d-report.json
+      - name: Verify report is complete and not Production promoted
+        run: |
+          python3 - <<'PY'
+          import json
+          r=json.load(open('atlas-edge-daily-confluence-180d-report.json'))
+          assert r['schema']=='ATLAS_EDGE_1D_CONFLUENCE_180D_AUDIT_V1'
+          assert len(r['symbols'])==11
+          assert r['days']==180 and r['cost_bps_scenario']==17
+          assert all(q['continuity_validated'] and q['bars']==4320
+                     for q in r['public_spot_market_data'].values())
+          assert set(r['all_three_12h_nonoverlap_phases'])=={'0','1','2'}
+          assert not r['profitability_validated']
+          assert not r['daily_filter_can_be_promoted']
+          assert r['research_only'] and not r['can_create_trade']
+          for slot in ('0','1','2'):
+              for p in ('MOMENTUM_4H','REVERSAL_4H','BTC_ALIGNED_4H','HTF_ALIGNED_12H'):
+                  a=r['all_three_12h_nonoverlap_phases'][slot]
+                  for part in ('discovery','holdout'):
+                      stats=a[part][p]
+                      assert stats['ALL']['settled']>0
+                      assert sum(stats[k]['selected']
+                                 for k in ('DAILY_ALIGNED','DAILY_COUNTER','DAILY_NEUTRAL'))==stats['ALL']['selected']
+                  d=a['discovery'][p]
+                  h=a['holdout'][p]
+                  print('DAILY_180D_RESULT',
+                        'phase='+slot,'policy='+p,
+                        'DISCOVERY', {k:(v['settled'],v['mean_modelled_net_r'])
+                                     for k,v in d.items()},
+                        'HOLDOUT', {k:(v['settled'],v['mean_modelled_net_r'])
+                                   for k,v in h.items()})
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atlas-edge-daily-confluence-180d-real-evidence
+          path: atlas-edge-daily-confluence-180d-report.json
+          retention-days: 14
+          if-no-files-found: error
