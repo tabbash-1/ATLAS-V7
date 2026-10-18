@@ -94,6 +94,9 @@ def test_run_persists_immutable_snapshots_and_settles_later():
         second = run(NOW, m, lp, latest)
         assert second["new_observation_ids"] == []
         assert {x["id"]: x["capture_sha256"] for x in load(lp)["observations"]} == old_snapshots
+        hourly = run(NOW + HOUR_MS, Market(NOW + HOUR_MS), lp, latest)
+        assert hourly["new_observation_ids"] == []
+        assert hourly["observations"] == len(old_snapshots)
 
         before_maturity = run(NOW + 8 * HOUR_MS, Market(NOW + 8 * HOUR_MS), lp, latest)
         assert before_maturity["settled_directional_count"] == 0
