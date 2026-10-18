@@ -40,6 +40,7 @@ STOP_ATR = 1.5
 TP_R = 2.5
 ROUNDTRIP_FEE_BPS_SCENARIO = 11.0  # NOT a documented account fee
 MAX_SETTLE_PER_RUN = 48
+MIN_CAPTURE_SPACING_MS = 4 * HOUR_MS
 
 
 def utc(ms):
@@ -314,6 +315,11 @@ def run(now_ms=None, request_fn=None,
                     sym, 60, now_ms, request_fn=request_fn)
                 if bars[-1]["close_time"] != btc[-1]["close_time"]:
                     raise ValueError("Asset/BTC timestamp mismatch")
+                previous = max((x["decision_at_ms"] for x in ledger["observations"]
+                                if x["symbol"] == sym), default=None)
+                decision_at = bars[-1]["close_time"] + 1
+                if previous is not None and decision_at - previous < MIN_CAPTURE_SPACING_MS:
+                    continue  # Hourly scheduler with minimum 4h capture spacing.
                 book = book_snapshot(sym, now_ms, request_fn)
                 frozen = freeze(sym, bars, btc, book, now_ms)
                 for row in frozen:
