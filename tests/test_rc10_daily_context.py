@@ -42,8 +42,8 @@ def test_daily_context_alignment_and_prior_unseen_bar_geometry():
     assert out['structural_trend']=='UPTREND'
     assert out['daily_phase']=='IMPULSE_UP'
     assert out['direction_alignment']=='WITH_DAILY'
-    assert out['prior_20d_support']==min(x['low'] for x in d[-21:-1])
-    assert out['prior_20d_resistance']==max(x['high'] for x in d[-21:-1])
+    assert out['prior_20d_support']==round(min(x['low'] for x in d[-21:-1]),10)
+    assert out['prior_20d_resistance']==round(max(x['high'] for x in d[-21:-1]),10)
     assert out['last_closed_day_end_ms']==d[-1]['close_time']
     assert out['daily_context_not_a_new_signal']
     assert not out['can_override_production']
