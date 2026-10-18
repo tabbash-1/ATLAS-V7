@@ -1,0 +1,56 @@
+name: ATLAS Closed Daily Context CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'rc10_1_deep_analysis_overlay.py'
+      - 'atlas-deep-analysis-ui.js'
+      - 'tests/test_rc10_daily_context.py'
+      - '.github/workflows/rc10-daily-context-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'rc10_1_deep_analysis_overlay.py'
+      - 'atlas-deep-analysis-ui.js'
+      - 'tests/test_rc10_daily_context.py'
+      - '.github/workflows/rc10-daily-context-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  closed-daily-research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile analysis and run daily-causal test
+        run: |
+          python3 -m py_compile rc10_1_deep_analysis_overlay.py tests/test_rc10_daily_context.py
+          PYTHONPATH=. python3 tests/test_rc10_daily_context.py
+      - name: JavaScript syntax and visible daily context contract
+        run: |
+          node --check atlas-deep-analysis-ui.js
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('atlas-deep-analysis-ui.js').read_text()
+          assert 'deepDaily' in s and 'd.daily_context' in s
+          assert 'CLOSED CANDLES ONLY' in s
+          print('DAILY_CONTEXT_UI_VERIFIED')
+          PY
+      - name: No Production decision or score override
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('rc10_1_deep_analysis_overlay.py').read_text()
+          assert "'daily_context':daily" in s
+          assert "'can_override_production':False" in s
+          assert "'can_change_threshold':False" in s
+          assert "if closed_at>now_ms:continue" in s
+          assert "daily=daily_macro_context(" in s
+          print('DAILY_CONTEXT_ANALYSIS_ONLY_VERIFIED')
+          PY
