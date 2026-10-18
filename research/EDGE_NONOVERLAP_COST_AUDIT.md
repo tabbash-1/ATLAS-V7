@@ -14,9 +14,11 @@ trading signal, profitability promotion or active production change.
   4H reversal, BTC-aligned 4H, BTC-aligned 12H.
 - Same initial research stop (1.5 ATR), target (2.5R) and hypothetical
   next-open entry, following first TP/SL touch within 12h.
-- To reduce within-coin outcome-window overlap, select **one common
-  fixed 12h phase** from earliest eligible 4h timestamp. Separate by
-  chronological 70/30 split with 24h pre-holdout gap.
+- To reduce within-coin outcome-window overlap, evaluate **all three
+  fixed 12h clock phases** derived from the original 4h observation grid.
+  Phase 0 is retained as the comparison with the prior report; phases 1 and 2
+  are included explicitly as robustness tests, never chosen after outcomes.
+  Separate each phase by chronological 70/30 split with 24h pre-holdout gap.
 - Recompute the same frozen gross price paths under round-trip costs
   0, 5, 10, 17, 25bps. These costs are deliberately scenario-only.
 - Cluster resampling by **UTC calendar day** (500 fixed-seed draws) retains
