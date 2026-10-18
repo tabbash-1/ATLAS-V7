@@ -47,8 +47,16 @@ def _klines(atlas,symbol,interval,limit=220):
     ]
     raw=atlas.get_json_fallback(urls,'spot')
     out=[]
+    now_ms=int(time.time()*1000)
     for x in raw:
-        out.append({'open_time':int(x[0]),'open':float(x[1]),'high':float(x[2]),'low':float(x[3]),'close':float(x[4]),'volume':float(x[5]),'close_time':int(x[6])})
+        # Never use the current unfinished candle (especially 1D):
+        # OHLC, RSI, EMA and structure must reflect information already known.
+        closed_at=int(x[6])
+        if closed_at>now_ms:continue
+        out.append({'open_time':int(x[0]),'open':float(x[1]),'high':float(x[2]),'low':float(x[3]),'close':float(x[4]),'volume':float(x[5]),'close_time':closed_at})
+    out.sort(key=lambda item:item['open_time'])
+    if len(out)<60:
+        raise ValueError(f'INSUFFICIENT_CLOSED_{interval.upper()}_CANDLES')
     return out
 
 
@@ -59,6 +67,68 @@ def _bias(rows):
     dn=sum([px<e20 if e20 else False,e20<e50 if e20 and e50 else False,r<=50 if r is not None else False])
     b='LONG' if up>=2 and up>dn else 'SHORT' if dn>=2 and dn>up else 'NEUTRAL'
     return {'bias':b,'close':px,'ema20':e20,'ema50':e50,'rsi14':r,'atr14':_atr(rows,14)}
+
+
+def daily_macro_context(daily, direction=None, precomputed=None):
+    """Daily *closed-candle* environment for a 4-12H swing setup.
+
+    It reports trend vs pullback, prior-20D price levels and whether the
+    candidate follows/counters the daily bias. It never issues or blocks a
+    trade, edits scores/thresholds, or calls Production.
+    """
+    if len(daily)<60:
+        return {'status':'UNAVAILABLE','reason':'INSUFFICIENT_CLOSED_1D_CANDLES',
+                'direction_alignment':'UNKNOWN','can_override_production':False,
+                'analysis_only':True}
+    state=precomputed if precomputed is not None else _bias(daily)
+    closes=[r['close'] for r in daily]
+    px=closes[-1]; e20=state.get('ema20'); e50=state.get('ema50')
+    bias=state.get('bias','NEUTRAL')
+    prior=daily[-21:-1]
+    support=min(r['low'] for r in prior)
+    resistance=max(r['high'] for r in prior)
+    if support>=resistance:location='NO_VALID_RANGE'
+    elif px>resistance:location='ABOVE_PRIOR_20D_HIGH'
+    elif px<support:location='BELOW_PRIOR_20D_LOW'
+    else:
+        position=(px-support)/(resistance-support)
+        location='NEAR_PRIOR_20D_SUPPORT' if position<=.20 else (
+            'NEAR_PRIOR_20D_RESISTANCE' if position>=.80 else 'MID_PRIOR_20D_RANGE')
+    momentum5=100*(px/closes[-6]-1) if closes[-6]>0 else None
+    if e20 is not None and e50 is not None and px>e20>e50:
+        structural='UPTREND'
+        phase='PULLBACK' if momentum5 is not None and momentum5<0 else 'IMPULSE_UP'
+    elif e20 is not None and e50 is not None and px<e20<e50:
+        structural='DOWNTREND'
+        phase='PULLBACK' if momentum5 is not None and momentum5>0 else 'IMPULSE_DOWN'
+    else:
+        structural='RANGE_OR_TRANSITION';phase='MIXED'
+    if direction not in ('LONG','SHORT'):
+        alignment='NO_PROPOSED_DIRECTION'
+    elif bias=='NEUTRAL':
+        alignment='NEUTRAL_DAILY'
+    elif bias==direction:
+        alignment='WITH_DAILY'
+    else:
+        alignment='COUNTER_DAILY'
+    return {
+        'status':'READY','timeframe':'1d','based_on':'CLOSED_DAILY_CANDLES_ONLY',
+        'last_closed_day_end_ms':daily[-1]['close_time'],
+        'candles':len(daily),'bias':bias,'structural_trend':structural,
+        'daily_phase':phase,'direction_alignment':alignment,
+        'close':round(px,10),
+        'ema20':round(e20,10) if e20 is not None else None,
+        'ema50':round(e50,10) if e50 is not None else None,
+        'rsi14':round(state['rsi14'],2) if state.get('rsi14') is not None else None,
+        'atr14':round(state['atr14'],10) if state.get('atr14') is not None else None,
+        'momentum_5d_pct':round(momentum5,3) if momentum5 is not None else None,
+        'prior_20d_support':round(support,10),
+        'prior_20d_resistance':round(resistance,10),
+        'price_location':location,
+        'daily_context_not_a_new_signal':True,
+        'can_override_production':False,'can_change_threshold':False,
+        'can_create_trade':False,'analysis_only':True,
+    }
 
 
 def _pivots(rows,window=3):
@@ -202,6 +272,7 @@ def analyze(atlas,symbol):
     states={tf:_bias(rows) for tf,rows in frames.items()}
     weights={'1d':1,'12h':2.5,'6h':3,'4h':3.5,'1h':1}; longw=sum(weights.get(tf,0) for tf,s in states.items() if s['bias']=='LONG'); shortw=sum(weights.get(tf,0) for tf,s in states.items() if s['bias']=='SHORT')
     direction='LONG' if longw>shortw else 'SHORT' if shortw>longw else None
+    daily=daily_macro_context(frames.get('1d') or [],direction,states.get('1d'))
     r4=frames['4h']; r1=frames['1h']; st=_structure(r4); bos=_bos_choch(r4,st); vwap=_anchored_vwap(r4,st); profile=_volume_profile(r4); delta=_volume_delta(r1); liq=_liquidity(r4); fvg=_fvg(r4); hist=_historical(r4)
     px=r1[-1]['close']; atr1=_atr(r1,14) or px*.005; atr4=_atr(r4,14) or px*.015
     evidence=[]; risks=[]; blockers=[]
@@ -243,7 +314,7 @@ def analyze(atlas,symbol):
     trigger_ready=bool(direction in ('LONG','SHORT') and near and directional and (momentum or abs(last1['close']-entry)<=.2*atr1))
     execution_state='READY_ON_TRIGGER' if trigger_ready and not blockers else 'WAIT_TRIGGER' if direction in ('LONG','SHORT') else 'WAIT'
     decision=direction if execution_state=='READY_ON_TRIGGER' and tech>=72 and scenario['score']>=68 else 'WAIT'
-    return {'ok':True,'version':VERSION,'symbol':symbol,'generated_at_ms':int(time.time()*1000),'research_only':True,'live_execution':False,'horizon':'4-12H','decision':decision,'candidate_direction':direction,'execution_state':execution_state,'trigger_ready':trigger_ready,'technical_score':tech,'scenario':scenario,'mtf_states':states,'mtf_vote':{'long_weight':longw,'short_weight':shortw},'structure_4h':st,'bos_choch_4h':bos,'anchored_vwap_4h':vwap,'volume_profile_4h':profile,'delta_cvd_proxy_1h':delta,'liquidity_4h':liq,'order_block_4h':ob,'fvg_4h':fvg,'historical_context_4h':hist,'entry_plan':{'entry':entry,'stop_loss':stop,'tp1':tp1,'tp2':tp2,'tp3':tp3,'rr_tp1':rr1,'rr_tp2':rr2,'rr_tp3':rr3,'entry_trigger':trigger,'invalidation':invalidation,'expected_holding_hours':'4-12'},'evidence_for':evidence,'evidence_against':risks,'hard_blockers':sorted(set(blockers)),'decision_audit':{'technical_depth_pass':tech>=52,'scenario_coherence_pass':scenario['score']>=60,'rr_pass':rr2 is not None and rr2>=1.8,'trigger_pass':trigger_ready,'no_hard_blockers':not blockers,'final_ready':decision in ('LONG','SHORT')},'errors':errors}
+    return {'ok':True,'version':VERSION,'symbol':symbol,'generated_at_ms':int(time.time()*1000),'research_only':True,'live_execution':False,'horizon':'4-12H','decision':decision,'candidate_direction':direction,'execution_state':execution_state,'trigger_ready':trigger_ready,'technical_score':tech,'scenario':scenario,'mtf_states':states,'mtf_vote':{'long_weight':longw,'short_weight':shortw},'daily_context':daily,'structure_4h':st,'bos_choch_4h':bos,'anchored_vwap_4h':vwap,'volume_profile_4h':profile,'delta_cvd_proxy_1h':delta,'liquidity_4h':liq,'order_block_4h':ob,'fvg_4h':fvg,'historical_context_4h':hist,'entry_plan':{'entry':entry,'stop_loss':stop,'tp1':tp1,'tp2':tp2,'tp3':tp3,'rr_tp1':rr1,'rr_tp2':rr2,'rr_tp3':rr3,'entry_trigger':trigger,'invalidation':invalidation,'expected_holding_hours':'4-12'},'evidence_for':evidence,'evidence_against':risks,'hard_blockers':sorted(set(blockers)),'decision_audit':{'technical_depth_pass':tech>=52,'scenario_coherence_pass':scenario['score']>=60,'rr_pass':rr2 is not None and rr2>=1.8,'trigger_pass':trigger_ready,'no_hard_blockers':not blockers,'final_ready':decision in ('LONG','SHORT')},'errors':errors}
 
 
 def install(atlas):
