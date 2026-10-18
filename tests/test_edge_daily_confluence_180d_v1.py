@@ -109,16 +109,13 @@ def test_freeze_does_not_know_future_day():
     asof=180*DAY_MS-1
     candles=market(180,asof,.01)
     last=completed_daily_from_hourly(candles)[-1]["close_time"]
-    # A hypothetical corrupted completed candle from the next day is not
-    # accepted by the observation bisect before its actual closing time.
+    # One *valid* newly closed hour from the next UTC day is not a
+    # completed daily candle. It must not shift the daily context.
     future={**candles[-1],"time":asof+1,"close_time":asof+HOUR_MS}
-    corrupted=candles+[future]
-    try:
-        completed_daily_from_hourly(corrupted)
-    except ValueError:
-        pass
-    else:
-        raise AssertionError("Bad future close-time semantics must fail")
+    extended=candles+[future]
+    assert completed_daily_from_hourly(extended)==completed_daily_from_hourly(candles)
+    states,_=daily_by_observation(extended,[asof+HOUR_MS])
+    assert states[asof+HOUR_MS]["last_closed_day_end_ms"]==last
 
 
 if __name__=="__main__":
