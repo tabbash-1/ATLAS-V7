@@ -31,7 +31,9 @@ HOLDOUT_RATIO = 0.30
 PURGE_HOURS = 24
 
 
-def prepare_event_rows(ledgers):
+def prepare_event_rows(ledgers, phase_slot=0):
+    if phase_slot not in (0, 1, 2):
+        raise ValueError("Only the three 4h-offset research phases are supported")
     pairs = defaultdict(dict)
     for ledger in ledgers:
         if ledger.get("schema") != "ATLAS_EDGE_EVENT_LEDGER_V1":
@@ -48,7 +50,7 @@ def prepare_event_rows(ledgers):
         raise ValueError("Insufficient market event timestamps")
     # Choose one fixed 12h phase from the earliest 4h observation in the
     # complete universe; it is independent of outcomes and common across coins.
-    phase = all_times[0] % (HORIZON_H * HOUR_MS)
+    phase = (all_times[0] + phase_slot * 4 * HOUR_MS) % (HORIZON_H * HOUR_MS)
     times = [t for t in all_times if t % (HORIZON_H * HOUR_MS) == phase]
     for t1,t2 in zip(times,times[1:]):
         if t2 - t1 != HORIZON_H * HOUR_MS:
@@ -82,6 +84,7 @@ def prepare_event_rows(ledgers):
         "original_4h_timestamps":len(all_times),
         "nonoverlap_12h_timestamps":len(times),
         "phase_ms":phase,
+        "phase_slot":phase_slot,
         "cutoff_ms":cutoff,
         "purged_asset_events":purged,
         "excluded_unpaired_asset_events":unmatched,
@@ -168,12 +171,26 @@ def _evaluate(rows):
 
 
 def compare(ledgers):
-    selected,info=prepare_event_rows(ledgers)
-    result={part:{p:_evaluate(selected[part][p]) for p in POLICIES}
-            for part in ("discovery","holdout")}
+    # Predeclared robustness check: three disjoint 12h phases covering the
+    # original 4h research event grid. A genuine signal should not depend
+    # strongly on picking one favorable clock phase after observing returns.
+    all_phase_results={}
+    all_phase_info={}
+    for slot in (0,1,2):
+        by_period,phase_info=prepare_event_rows(ledgers,phase_slot=slot)
+        all_phase_results[str(slot)]={
+            part:{p:_evaluate(by_period[part][p]) for p in POLICIES}
+            for part in ("discovery","holdout")
+        }
+        all_phase_info[str(slot)]=phase_info
+    result=all_phase_results["0"]
+    info=all_phase_info["0"]
     return {"schema":SCHEMA,
             "periods":result,
             "split":info,
+            "all_three_nonoverlap_phases":all_phase_results,
+            "three_phase_metadata":all_phase_info,
+            "phase_selected_from_outcomes":False,
             "cost_basis":"FIXED_GROSS_FIRST_TOUCH_REPRICED_AT_BPS_SCENARIOS",
             "cost_scenarios_bps":list(COST_BPS),
             "confidence_intervals_are_cluster_descriptive_only":True,
@@ -215,6 +232,7 @@ def run(symbols, days=90, as_of_ms=None, fetcher=fetch_completed_1h):
         "overlapping_positions_across_assets_not_accounted":True,
         "venue_trade_costs_unverified":True,
         "no_prospective_evidence":True,
+        "clock_phase_robustness_tested":True,
     })
     return report
 
