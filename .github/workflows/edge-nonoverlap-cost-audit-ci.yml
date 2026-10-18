@@ -72,6 +72,9 @@ jobs:
           assert r['split']['per_symbol_12h_path_overlap'] is False
           assert r['split']['cross_symbol_btc_shock_dependence'] is True
           assert r['reused_historical_holdout_not_blind'] is True
+          assert r['phase_selected_from_outcomes'] is False
+          assert r['clock_phase_robustness_tested'] is True
+          assert set(r['all_three_nonoverlap_phases'])=={'0','1','2'}
           assert r['research_only'] is True and r['profitability_validated'] is False
           assert r['can_create_trade'] is False and r['can_change_production'] is False
           for p,metrics in r['periods']['holdout'].items():
@@ -81,6 +84,9 @@ jobs:
                     '17bp_netR=',metrics['cost_scenarios']['17']['mean_net_r'],
                     'cost_break_even_bp=',metrics['breakeven_roundtrip_bps_descriptive'],
                     'ci95=',metrics['cost_scenarios']['17']['calendar_day_cluster_ci95_descriptive'])
+              print('PHASE_ROBUSTNESS',p,[
+                  (i,r['all_three_nonoverlap_phases'][i]['holdout'][p]['cost_scenarios']['17']['mean_net_r'])
+                  for i in ('0','1','2')])
           PY
       - uses: actions/upload-artifact@v4
         with:
