@@ -79,3 +79,42 @@ spot-candle audit. All measurements are hypothetical, not wallet P&L.
 
 Production scoring, Final Trade Gate, current paper portfolio and
 execution remain unchanged. The entire audit is research-only.
+
+## Additional predeclared clock-phase robustness audit
+
+We then checked **all three** nonoverlapping 12h phases spanning the same
+original four-hour event grid (phase 0/1/2), rather than publishing only
+the first phase. This is an important robustness result.
+
+**Holdout 17bp modeled mean R** (same four frozen rules, all 11 coins):
+
+| Policy | 12h phase 0 | 12h phase 1 | 12h phase 2 |
+|---|---:|---:|---:|
+| 4H Momentum | -0.23071 | -0.07573 | +0.04774 |
+| 4H Reversal | -0.01770 | -0.11220 | -0.22254 |
+| BTC-aligned 4H | -0.25600 | -0.11843 | +0.17328 |
+| BTC-aligned 12H | -0.26676 | +0.10126 | -0.03113 |
+
+**Discovery 17bp modeled mean R**:
+
+| Policy | 12h phase 0 | 12h phase 1 | 12h phase 2 |
+|---|---:|---:|---:|
+| 4H Momentum | -0.14853 | -0.06676 | -0.14846 |
+| 4H Reversal | -0.14087 | -0.27596 | -0.18788 |
+| BTC-aligned 4H | -0.18747 | -0.05170 | -0.18332 |
+| BTC-aligned 12H | -0.02907 | -0.07593 | -0.00015 |
+
+None of the four policies cleared modeled costs in any of the three
+discovery phases. The occasional positive holdout phase **does not**
+replicate across phases or between discovery and holdout. The positive
+phase-2 BTC4H outcome (+0.17328R) had a UTC-day cluster descriptive
+interval **[-0.07579R, +0.44348R]** at 17bp; the positive phase-1
+BTC12H outcome (+0.10126R) had **[-0.16738R, +0.38370R]**. Both cross
+zero; neither validates positive expectancy.
+
+**Decision is strengthened: no phase or baseline may be promoted.**
+Picking the best clock time based on these outcomes would be
+retrospective tuning, exactly the behavior Edge is designed to prevent.
+
+Reproducible 3-phase CI:
+https://github.com/tabbash-1/ATLAS-V7/actions/runs/39082645083
