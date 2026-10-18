@@ -35,6 +35,15 @@ def test_run_nonoverlap_dependent_assets_and_all_costs():
     assert report["can_create_trade"] is False
     assert report["profitability_validated"] is False
     assert report["reused_historical_holdout_not_blind"] is True
+    assert report["clock_phase_robustness_tested"] is True
+    assert report["phase_selected_from_outcomes"] is False
+    assert set(report["all_three_nonoverlap_phases"]) == {"0","1","2"}
+    assert set(report["three_phase_metadata"]) == {"0","1","2"}
+    phases={report["three_phase_metadata"][str(i)]["phase_ms"] for i in range(3)}
+    assert len(phases)==3
+    for slot in range(3):
+        holdout=report["all_three_nonoverlap_phases"][str(slot)]["holdout"]
+        assert all(holdout[p]["settled"]>0 for p in holdout)
     for section in ("discovery","holdout"):
         for policy,metrics in report["periods"][section].items():
             assert metrics["settled"]>0, (section,policy)
