@@ -190,7 +190,7 @@ if __name__ == "__main__":
     test_live_quote_and_causal_closed_candles()
     test_run_persists_immutable_snapshots_and_settles_later()
     test_missing_future_minute_refuses_to_settle_and_retry()
-    test_stale_quote_cannot_create_fictional_signal()
+    test_missing_spot_book_cannot_create_fictional_signal()
     test_no_catch_up_after_missed_close()
     test_first_hit_ambiguous_minute_and_execution_cost_only_scenario()
     test_frozen_hash_tamper_detection()
