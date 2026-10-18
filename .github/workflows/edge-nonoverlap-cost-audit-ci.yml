@@ -1,0 +1,90 @@
+name: ATLAS Edge Nonoverlap Cost Sensitivity Research
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'research/edge_nonoverlap_cost_audit_v1.py'
+      - 'tests/test_edge_nonoverlap_cost_audit_v1.py'
+      - '.github/workflows/edge-nonoverlap-cost-audit-ci.yml'
+      - 'research/EDGE_NONOVERLAP_COST_AUDIT.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile and execute all Edge research regressions
+        run: |
+          python3 -m py_compile research/edge_event_ledger_v1.py research/edge_real_market_baselines_v1.py research/edge_real_market_regime_audit_v1.py research/edge_nonoverlap_cost_audit_v1.py tests/test_edge_nonoverlap_cost_audit_v1.py
+          PYTHONPATH=. python3 tests/test_edge_event_ledger_v1.py
+          PYTHONPATH=. python3 tests/test_edge_real_market_baselines_v1.py
+          PYTHONPATH=. python3 tests/test_edge_real_market_regime_audit_v1.py
+          PYTHONPATH=. python3 tests/test_edge_nonoverlap_cost_audit_v1.py
+      - name: Verify research cannot alter production
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import ast
+          text=Path('research/edge_nonoverlap_cost_audit_v1.py').read_text()
+          parsed=ast.parse(text)
+          imports={x.module.split('.')[0] for x in ast.walk(parsed)
+                   if isinstance(x,ast.ImportFrom) and x.module}
+          assert not imports.intersection({
+              'collector_server','final_trade_ready_guard','production_signal_scoring','ccxt'
+          })
+          for val in ('"can_change_production":False','"can_create_trade":False',
+                      '"profitability_validated":False','"research_only":True'):
+              assert val in text, val
+          print('RESEARCH_ONLY_GATE_PASSED')
+          PY
+
+  real-90d-nonoverlap:
+    needs: offline-regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Re-run 11-asset 90-day full real-market cost sensitivity
+        run: |
+          PYTHONPATH=. python3 research/edge_nonoverlap_cost_audit_v1.py \
+            --days 90 \
+            --output edge-nonoverlap-cost-audit-report.json
+      - name: Verify analytical evidence and no promotion
+        run: |
+          python3 - <<'PY'
+          import json
+          r=json.load(open('edge-nonoverlap-cost-audit-report.json'))
+          assert r['schema']=='ATLAS_EDGE_NONOVERLAP_COST_AUDIT_V1'
+          assert len(r['symbols'])==11 and len(r['data_quality'])==11
+          assert all(x['continuity_validated'] and x['bars']==2160 for x in r['data_quality'])
+          assert r['split']['per_symbol_12h_path_overlap'] is False
+          assert r['split']['cross_symbol_btc_shock_dependence'] is True
+          assert r['reused_historical_holdout_not_blind'] is True
+          assert r['research_only'] is True and r['profitability_validated'] is False
+          assert r['can_create_trade'] is False and r['can_change_production'] is False
+          for p,metrics in r['periods']['holdout'].items():
+              assert metrics['settled']>0
+              assert all(str(k) in metrics['cost_scenarios'] for k in (0,5,10,17,25))
+              print('RESULT',p,'n=',metrics['settled'],'grossR=',metrics['gross_mean_r'],
+                    '17bp_netR=',metrics['cost_scenarios']['17']['mean_net_r'],
+                    'cost_break_even_bp=',metrics['breakeven_roundtrip_bps_descriptive'],
+                    'ci95=',metrics['cost_scenarios']['17']['calendar_day_cluster_ci95_descriptive'])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atlas-edge-90d-nonoverlap-cost-evidence
+          path: edge-nonoverlap-cost-audit-report.json
+          retention-days: 14
+          if-no-files-found: error
