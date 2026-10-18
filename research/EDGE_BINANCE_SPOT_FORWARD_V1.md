@@ -16,8 +16,12 @@ only and cannot be executed as ordinary unborrowed spot sales.
 
 - An hourly scheduled check (at minute :13 UTC) attempts to read 1000 recent fully closed 1H
   BTC, ETH and SOL Binance Spot candles and a public best bid/ask quote.
-- Captures only while latest closed 1H is less than 20m old.
-  Scheduler delay or unavailable provider yields **no reconstructed trade**.
+- Captures only while latest closed 1H is at most **55 minutes** old.
+  Every row stores explicit `capture_lag_minutes_since_closed_hour`,
+  as well as the true runtime book quote observation; lagged quotes do not
+  pretend to be a fill immediately at candle close.
+  Scheduler delay beyond 55 minutes or an unavailable provider yields
+  **no reconstructed trade**.
   A new capture for a symbol is allowed only if the previous frozen capture
   is at least **4 hours** old, even though the scheduler checks hourly.
 - The Binance public bookTicker has no exchange timestamp. The ledger records
@@ -66,3 +70,13 @@ new observations mature, adequate independent sample size is reached,
 and the exchange-specific cost and incomplete initial-minute
 limitations have been addressed. Positive aggregate modeled outcomes do
 not authorize strategy promotion or changing thresholds.
+
+## Bootstrapping the first prospective cohort
+
+In addition to the hourly schedule, changing the Edge implementation,
+tests or workflow on `main` triggers one GitHub Actions `push` run. This
+allows immediate initial capture from the currently observed bid/ask quote
+rather than depending on GitHub's best-effort first cron registration.
+PR runs remain read-only and must never write evidence. The workflow's
+`[skip ci] [skip render]` research-only JSON commit cannot trigger another
+bootstrap run because status JSON paths are excluded from the push paths.

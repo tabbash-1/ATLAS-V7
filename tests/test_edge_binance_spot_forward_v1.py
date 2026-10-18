@@ -76,6 +76,7 @@ def test_live_quote_and_causal_closed_candles():
     assert all(x["quote_exchange_timestamp_unavailable"] for x in entries)
     assert all(x["short_spot_is_counterfactual_without_borrow"] for x in entries if x["direction"] == "SHORT")
     assert all(x["settlement_window_start_ms"] > NOW for x in entries)
+    assert all(x["capture_lag_minutes_since_closed_hour"] == 13 for x in entries)
     assert all(x["features"]["observed_close_time_ms"] < x["quote_at_ms"]
                for x in entries)
 
@@ -144,11 +145,23 @@ def test_no_catch_up_after_missed_close():
     bars = market_candles("BTCUSDT", 60, NOW, request_fn=m)
     book = book_snapshot("BTCUSDT", NOW, request_fn=m)
     try:
-        freeze("BTCUSDT", bars, bars, book, NOW + 35 * MINUTE_MS)
+        freeze("BTCUSDT", bars, bars, book, NOW + 65 * MINUTE_MS)
     except ValueError as ex:
         assert "Missed capture" in str(ex)
     else:
         raise AssertionError("Must not backfill missed interval")
+
+
+def test_delayed_capture_50min_uses_actual_quote_not_backfill():
+    now = 150 * HOUR_MS + 50 * MINUTE_MS
+    m = Market(now)
+    bars = market_candles("BTCUSDT", 60, now, request_fn=m)
+    quote = book_snapshot("BTCUSDT", now, request_fn=m)
+    samples = freeze("BTCUSDT", bars, bars, quote, now)
+    assert len(samples) == len(POLICIES)
+    assert all(x["capture_lag_minutes_since_closed_hour"] == 50 for x in samples)
+    assert all(x["quote_at_ms"] == now for x in samples)
+    assert all(x["settlement_window_start_ms"] > now for x in samples)
 
 
 def test_first_hit_ambiguous_minute_and_execution_cost_only_scenario():
@@ -195,6 +208,7 @@ if __name__ == "__main__":
     test_missing_future_minute_refuses_to_settle_and_retry()
     test_missing_spot_book_cannot_create_fictional_signal()
     test_no_catch_up_after_missed_close()
+    test_delayed_capture_50min_uses_actual_quote_not_backfill()
     test_first_hit_ambiguous_minute_and_execution_cost_only_scenario()
     test_frozen_hash_tamper_detection()
     print("Binance spot venue forward shadow regression: ok")

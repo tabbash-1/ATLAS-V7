@@ -8,6 +8,12 @@ on:
       - 'tests/test_edge_binance_spot_forward_v1.py'
       - '.github/workflows/edge-binance-spot-forward.yml'
       - 'research/EDGE_BINANCE_SPOT_FORWARD_V1.md'
+  push:
+    branches: [main]
+    paths:
+      - 'research/edge_binance_spot_forward_v1.py'
+      - 'tests/test_edge_binance_spot_forward_v1.py'
+      - '.github/workflows/edge-binance-spot-forward.yml'
   workflow_dispatch:
   schedule:
     - cron: '13 * * * *'
@@ -70,7 +76,7 @@ jobs:
           })
           PY
       - name: Capture and settle strictly later research observations on main only
-        if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push'
         run: |
           PYTHONPATH=. python3 research/edge_binance_spot_forward_v1.py \
             --ledger status/edge-binance-spot-forward-ledger.json \
@@ -87,7 +93,7 @@ jobs:
           print('PROSPECTIVE_VENUE_LEDGER_VERIFIED',len(x['observations']))
           PY
       - name: Commit research evidence only (never on PR)
-        if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push'
         run: |
           if [ -z "$(git status --porcelain -- status/edge-binance-spot-forward-ledger.json status/edge-binance-spot-forward-latest.json)" ]; then exit 0; fi
           git config user.name 'atlas-edge-research-bot'
