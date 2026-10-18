@@ -1,0 +1,97 @@
+name: ATLAS Edge Bybit Venue Forward (Research Only)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'research/edge_bybit_venue_forward_v1.py'
+      - 'tests/test_edge_bybit_venue_forward_v1.py'
+      - '.github/workflows/edge-bybit-venue-forward.yml'
+      - 'research/EDGE_BYBIT_VENUE_FORWARD_V1.md'
+  workflow_dispatch:
+  schedule:
+    - cron: '13 */4 * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atlas-edge-bybit-venue-forward
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile + verify isolated prospective shadow regressions
+        run: |
+          python3 -m py_compile research/edge_bybit_venue_forward_v1.py tests/test_edge_bybit_venue_forward_v1.py
+          PYTHONPATH=. python3 tests/test_edge_event_ledger_v1.py
+          PYTHONPATH=. python3 tests/test_edge_real_market_baselines_v1.py
+          PYTHONPATH=. python3 tests/test_edge_bybit_venue_forward_v1.py
+      - name: Guard no Production route or trading endpoints
+        run: |
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          s=Path('research/edge_bybit_venue_forward_v1.py').read_text()
+          tree=ast.parse(s)
+          imported={n.module for n in ast.walk(tree) if isinstance(n,ast.ImportFrom) and n.module}
+          forbidden=('production_signal_scoring','final_trade_ready_guard','cloud_production_canonical','ccxt','pybit')
+          assert not any(m.startswith(x) for m in imported for x in forbidden)
+          assert '/v5/order/' not in s and '/v5/position/' not in s
+          assert '"can_create_trade": False' in s
+          assert '"can_override_final_trade_gate": False' in s
+          assert '"profitability_validated": False' in s
+          print('BYBIT_EDGE_FORWARD_RESEARCH_ONLY')
+          PY
+      - name: Smoke-test current public Bybit linear BTC market (no keys/orders)
+        run: |
+          PYTHONPATH=. python3 - <<'PY'
+          import time
+          from research.edge_bybit_venue_forward_v1 import book_snapshot, market_candles
+          now=int(time.time()*1000)
+          book=book_snapshot('BTCUSDT',now)
+          bars=market_candles('BTCUSDT',60,now)
+          assert len(bars)>=40
+          assert 0 < book['bid'] < book['ask']
+          assert bars[-1]['close_time'] < now
+          print('PUBLIC_BYBIT_MARKET_SMOKE_OK',{
+              'quote_age_ms': now-book['quote_at_ms'], 'spread_bps':book['spread_bps'],
+              'latest_closed_hour_ms':bars[-1]['close_time'],'count':len(bars),
+          })
+          PY
+      - name: Capture and settle strictly later research observations on main only
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+        run: |
+          PYTHONPATH=. python3 research/edge_bybit_venue_forward_v1.py \
+            --ledger status/edge-bybit-venue-forward-ledger.json \
+            --latest status/edge-bybit-venue-forward-latest.json
+          python3 - <<'PY'
+          import json
+          from research.edge_bybit_venue_forward_v1 import load, LATEST_SCHEMA
+          x=load('status/edge-bybit-venue-forward-ledger.json')
+          y=json.load(open('status/edge-bybit-venue-forward-latest.json'))
+          assert y['schema']==LATEST_SCHEMA
+          assert x['research_only'] and not x['can_create_trade']
+          assert not y['profitability_validated']
+          assert not y['can_override_final_trade_gate']
+          print('PROSPECTIVE_VENUE_LEDGER_VERIFIED',len(x['observations']))
+          PY
+      - name: Commit research evidence only (never on PR)
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+        run: |
+          if [ -z "$(git status --porcelain -- status/edge-bybit-venue-forward-ledger.json status/edge-bybit-venue-forward-latest.json)" ]; then exit 0; fi
+          git config user.name 'atlas-edge-research-bot'
+          git config user.email 'atlas-edge-research-bot@users.noreply.github.com'
+          git add status/edge-bybit-venue-forward-ledger.json status/edge-bybit-venue-forward-latest.json
+          git commit -m 'research: freeze Bybit quote snapshots and matured paths [skip ci] [skip render]'
+          git pull --rebase origin main
+          git push origin HEAD:main
