@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Binance linear venue-aware *prospective* Edge evidence (research only).
+"""Binance spot venue-aware *prospective* Edge evidence (research only).
 
 This is not a trading system: no private endpoints, keys, orders, or
 Production imports. Capture stores immutable closed-bar features, public
@@ -376,6 +376,9 @@ def run(now_ms=None, request_fn=None,
         "errors": errors,
         "no_new_capture_when_quote_stale_or_missing": True,
         "profitability_validated": False,
+        "venue": "BINANCE_SPOT_USDT",
+        "quote_has_no_exchange_timestamp": True,
+        "spot_shorts_nonexecutable_without_borrow": True,
         "live_execution": False, "research_only": True,
         "can_create_trade": False, "can_override_production": False,
         "can_override_final_trade_gate": False,
