@@ -32,7 +32,7 @@ ROOT = "https://data-api.binance.vision"
 MINUTE_MS = 60_000
 HORIZON_MIN = 720
 SYMBOLS = ("BTCUSDT", "ETHUSDT", "SOLUSDT")
-CLOSED_BAR_MAX_AGE_MS = 20 * MINUTE_MS
+CLOSED_BAR_MAX_AGE_MS = 55 * MINUTE_MS
 QUOTE_MAX_AGE_MS = 60_000
 MAX_SPREAD_BPS_OBSERVABLE = 75
 MIN_HISTORY = 40
@@ -177,6 +177,7 @@ def freeze(symbol, market, btc, book, now_ms):
         path_start = (book["quote_at_ms"] // MINUTE_MS + 1) * MINUTE_MS
         frozen = {
             "market": "BINANCE_SPOT_USDT",
+            "capture_lag_minutes_since_closed_hour": round((now_ms - decision_at) / MINUTE_MS, 3),
             "short_spot_is_counterfactual_without_borrow": side == "SHORT",
             "quote_exchange_timestamp_unavailable": True,
             "id": hashlib.sha256(
@@ -381,6 +382,7 @@ def run(now_ms=None, request_fn=None,
         "preselected_policies": list(POLICIES), "symbols": list(SYMBOLS),
         "errors": errors,
         "no_new_capture_when_quote_stale_or_missing": True,
+        "maximum_capture_lag_minutes": CLOSED_BAR_MAX_AGE_MS // MINUTE_MS,
         "profitability_validated": False,
         "venue": "BINANCE_SPOT_USDT",
         "quote_has_no_exchange_timestamp": True,
