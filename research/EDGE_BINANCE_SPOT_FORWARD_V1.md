@@ -14,10 +14,12 @@ only and cannot be executed as ordinary unborrowed spot sales.
 
 ## Prospective evidence rather than hindsight
 
-- Each 4h scheduled capture attempts to read 1000 recent fully closed 1H
+- An hourly scheduled check (at minute :13 UTC) attempts to read 1000 recent fully closed 1H
   BTC, ETH and SOL Binance Spot candles and a public best bid/ask quote.
 - Captures only while latest closed 1H is less than 20m old.
   Scheduler delay or unavailable provider yields **no reconstructed trade**.
+  A new capture for a symbol is allowed only if the previous frozen capture
+  is at least **4 hours** old, even though the scheduler checks hourly.
 - The Binance public bookTicker has no exchange timestamp. The ledger records
   a LOCAL_CAPTURE_CLOCK timestamp and flags absence of a true venue quote
   timestamp. Therefore its quote is observed at call time, but strict
@@ -51,7 +53,7 @@ PYTHONPATH=. python3 research/edge_binance_spot_forward_v1.py \
   --latest status/edge-binance-spot-forward-latest.json
 ```
 
-The workflow runs 4-hourly at :13 UTC and allows explicit manual dispatch.
+The workflow checks hourly at :13 UTC, captures at most every four hours per symbol and allows explicit manual dispatch.
 Pull requests only test offline cases and read-only public market endpoints.
 The scheduled capture can legitimately produce zero new observations when
 the runner is late. Existing prospective Alpha V2 and Reversal4H research
