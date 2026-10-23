@@ -24,7 +24,7 @@ if str(ROOT) not in sys.path:
 from historical_core_4_12h_replay import fetch_1h, direction, atr, ema, rsi
 from research.alpha_core_v2 import decision as alpha_core_v2_decision
 
-VERSION="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V6_ALPHA_CORE_V2"
+VERSION="ATLAS_ON_DEMAND_ANALYSIS_BENCHMARK_V7_ALPHA_BOUNDED_HISTORY"
 SYMBOLS=["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","BNBUSDT","DOGEUSDT","ZECUSDT","ADAUSDT","LINKUSDT","AVAXUSDT","LTCUSDT"]
 HORIZONS=(4,8,12)
 HOUR_MS=60*60*1000
@@ -145,8 +145,30 @@ def analyst_stack_v2(hist,decision_time_ms=None,btc_hist=None,symbol=None):
     return side
 
 
+ALPHA_SYMBOL_HISTORY_HOURS=1400
+ALPHA_BTC_HISTORY_HOURS=700
+
+
+def _bounded_alpha_inputs(hist,decision_time_ms=None,btc_hist=None):
+    """Keep only history that can influence Alpha Core V2's current decision.
+
+    Symbol context needs at most 55 completed daily bars plus alignment safety;
+    BTC context needs at most 55 completed 12H bars plus alignment safety.
+    Earlier candles cannot affect direction(), ATR/RSI, EMA20, volume ratio,
+    extension, efficiency, or the current regime.
+    """
+    as_of=int(decision_time_ms if decision_time_ms is not None else (hist[-1]["t"]+HOUR_MS if hist else 0))
+    sh=list(hist or [])[-ALPHA_SYMBOL_HISTORY_HOURS:]
+    eligible_btc=[x for x in (btc_hist or []) if int(x["t"])+HOUR_MS<=as_of]
+    bh=eligible_btc[-ALPHA_BTC_HISTORY_HOURS:]
+    return sh,bh
+
+
 def alpha_core_v2_engine(hist,decision_time_ms=None,btc_hist=None,symbol=None):
-    return alpha_core_v2_decision(hist,decision_time_ms,btc_hist,symbol)
+    if not hist:
+        return "WAIT"
+    sh,bh=_bounded_alpha_inputs(hist,decision_time_ms,btc_hist)
+    return alpha_core_v2_decision(sh,decision_time_ms,bh,symbol)
 
 
 def recent_move_probe(hist,bars,invert=False,deadband_atr=.35):
