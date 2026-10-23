@@ -3,8 +3,11 @@ on:
   pull_request:
     paths:
       - 'research/adp/**'
+      - 'tests/test_adp_v8_forward_provenance.py'
       - '.github/workflows/adp-direction-research-v1.yml'
   workflow_dispatch:
+permissions:
+  contents: read
 jobs:
   adp-direction:
     runs-on: ubuntu-latest
@@ -14,10 +17,20 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Install regression test runner
+        run: python -m pip install pytest
+      - name: Test ADP V8 forward capture integrity
+        run: python -m pytest -q tests/test_adp_v8_forward_provenance.py
       - name: Run frozen ADP V1
-        run: |\n          set -o pipefail\n          python research/adp/ohlcv_direction_experiment_v1.py --days 365 | tee /tmp/adp.log
+        shell: bash
+        run: |
+          set -o pipefail
+          python research/adp/ohlcv_direction_experiment_v1.py --days 365 | tee /tmp/adp.log
       - name: Extract result
-        run: |\n          grep '^ADP_RESULT=' /tmp/adp.log | sed 's/^ADP_RESULT=//' > research/adp/ohlcv_direction_experiment_v1_result.json\n          test -s research/adp/ohlcv_direction_experiment_v1_result.json
+        shell: bash
+        run: |
+          grep '^ADP_RESULT=' /tmp/adp.log | sed 's/^ADP_RESULT=//' > research/adp/ohlcv_direction_experiment_v1_result.json
+          test -s research/adp/ohlcv_direction_experiment_v1_result.json
       - uses: actions/upload-artifact@v4
         with:
           name: adp-direction-v1-result
