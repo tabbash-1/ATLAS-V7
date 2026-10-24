@@ -66,6 +66,50 @@ def test_cost_model_matches_locked_phase4_assumptions_at_12h():
     assert round(m._cost_usd(10000,12),2)==17.00
 
 
+def _cohort_row(decision_id, geometry="G6", plan="V11", gate="V15"):
+    return {"decision_id":decision_id,
+            "geometry":{"geometry_version":geometry,"plan_version":plan},
+            "decision_provenance":{"geometry_version":geometry,"trade_plan_version":plan,
+                                   "final_trade_gate_version":gate}}
+
+
+def test_version_cohort_separates_plan_and_gate_generations():
+    a=m._version_cohort(_cohort_row("a",plan="V10",gate="V14"))
+    b=m._version_cohort(_cohort_row("b",plan="V11",gate="V15"))
+    assert a["fully_versioned"] and b["fully_versioned"]
+    assert a["key"]!=b["key"]
+
+
+def test_missing_version_provenance_never_pools():
+    a=m._version_cohort({"decision_id":"a","geometry":{},"decision_provenance":{}})
+    b=m._version_cohort({"decision_id":"b","geometry":{},"decision_provenance":{}})
+    assert not a["fully_versioned"] and not b["fully_versioned"]
+    assert a["key"]!=b["key"]
+
+
+def test_thirty_rows_from_mixed_generations_do_not_unlock_formal_sample():
+    paired=[]
+    for i in range(15):
+        c=m._version_cohort(_cohort_row(f"a{i}",plan="V10",gate="V14"))
+        paired.append({"version_cohort":c,"champion_net_r":-1.0,"shadow_net_r":0.0})
+    for i in range(15):
+        c=m._version_cohort(_cohort_row(f"b{i}",plan="V11",gate="V15"))
+        paired.append({"version_cohort":c,"champion_net_r":-1.0,"shadow_net_r":0.0})
+    cohorts=m._summarize_version_cohorts(paired)
+    assert sum(x["paired_n"] for x in cohorts)==30
+    assert len(cohorts)==2
+    assert not any(x["formal_ready"] for x in cohorts)
+
+
+def test_thirty_rows_from_one_fully_versioned_generation_unlock_formal_sample():
+    paired=[]
+    for i in range(30):
+        c=m._version_cohort(_cohort_row(f"a{i}"))
+        paired.append({"version_cohort":c,"champion_net_r":-1.0,"shadow_net_r":0.0})
+    cohorts=m._summarize_version_cohorts(paired)
+    assert len(cohorts)==1 and cohorts[0]["formal_ready"] is True
+
+
 def test_safety_constants_are_locked():
     assert m.ACTIVATION_AT=="2026-09-18T07:10:00+00:00"
     assert m.THRESHOLD==68 and m.MIN_N==30
