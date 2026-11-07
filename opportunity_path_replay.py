@@ -14,7 +14,7 @@ from typing import Any
 
 from offline_production_path_settlement import market_klines, event_from
 
-VERSION="ATLAS_OPPORTUNITY_PATH_REPLAY_V1"
+VERSION="ATLAS_OPPORTUNITY_PATH_REPLAY_V2_VERSIONED_COHORTS"
 SOURCE_SCHEMA="ATLAS_PRODUCTION_VALIDATION_SCORECARD_V2_DIAGNOSTICS"
 EPOCH_ID="HTF_SR_V2_2026-09-14"
 ACTIVATION_AT="2026-09-18T07:10:00+00:00"
@@ -118,6 +118,44 @@ def _eligible(row,cost_map):
     if p.get("strategy_epoch_id")!=EPOCH_ID or p.get("product_horizon")!="4-12H" or p.get("production_threshold_locked")!=68:return False
     if s.get("terminal") is not True or (cost_map.get(did) or {}).get("net_r") is None:return False
     return all(_f(g.get(k)) is not None for k in ("entry","stop_loss","tp1","tp2","risk_abs")) and str(row.get("direction")) in {"LONG","SHORT"}
+
+
+
+def _version_cohort(row:dict[str,Any])->dict[str,Any]:
+    """Identify an exact scoring/geometry generation; incomplete versions never pool."""
+    p=row.get("decision_provenance") or {}
+    g=row.get("geometry") or {}
+    did=str(row.get("decision_id") or row.get("id") or "UNKNOWN_DECISION")
+    geometry_version=p.get("geometry_version") or g.get("geometry_version")
+    plan_version=p.get("trade_plan_version") or g.get("plan_version")
+    gate_version=p.get("final_trade_gate_version")
+    versions={"geometry_version":geometry_version,"trade_plan_version":plan_version,
+              "final_trade_gate_version":gate_version}
+    complete=all(bool(v) for v in versions.values())
+    # Give every incomplete decision its own cohort so missing provenance cannot
+    # accidentally combine records from different Production generations.
+    key="|".join(f"{name}={value if value else 'UNVERSIONED:'+did}" for name,value in versions.items())
+    return {**versions,"fully_versioned":complete,"key":key}
+
+
+def _summarize_version_cohorts(paired:list[dict[str,Any]])->list[dict[str,Any]]:
+    groups={}
+    for row in paired:
+        cohort=row.get("version_cohort") or {}
+        groups.setdefault(cohort.get("key") or "UNVERSIONED",[]).append(row)
+    out=[]
+    for key,rows in sorted(groups.items()):
+        c=rows[0].get("version_cohort") or {}
+        champion=sum(float(x["champion_net_r"]) for x in rows)
+        shadow=sum(float(x["shadow_net_r"]) for x in rows)
+        ready=bool(c.get("fully_versioned")) and len(rows)>=MIN_N
+        out.append({"key":key,"geometry_version":c.get("geometry_version"),
+                    "trade_plan_version":c.get("trade_plan_version"),
+                    "final_trade_gate_version":c.get("final_trade_gate_version"),
+                    "fully_versioned":bool(c.get("fully_versioned")),"paired_n":len(rows),
+                    "champion_net_r":round(champion,4),"shadow_net_r":round(shadow,4),
+                    "delta_net_r":round(shadow-champion,4),"formal_ready":ready})
+    return out
 
 
 def replay_delay(row,candles):
@@ -237,6 +275,7 @@ def build(root:Path):
             shadow_net_r,policy_effect=shadow_pair_value(h["id"],out,champion)
             results[h["id"]].append({"decision_id":row.get("decision_id"),"symbol":row.get("symbol"),"direction":row.get("direction"),
                                      "captured_at":row.get("captured_at"),"provider":provider,
+                                     "version_cohort":_version_cohort(row),
                                      "champion_net_r":champion,"shadow_net_r":shadow_net_r,"policy_effect":policy_effect,**out})
     reports=[]
     for h in PATH_HYPOTHESES:
@@ -244,12 +283,23 @@ def build(root:Path):
         paired=[x for x in rr if x.get("shadow_net_r") is not None and x.get("champion_net_r") is not None]
         changed=[x for x in paired if x.get("policy_effect") in {"REPRICED_PATH","SKIPPED_BY_SHADOW_POLICY"}]
         delta=sum(float(x["shadow_net_r"])-float(x["champion_net_r"]) for x in paired)
-        reports.append({**h,"state":"FORMAL_SHADOW_SAMPLE_READY" if len(paired)>=MIN_N else "COLLECTING_PATH_REPLAY",
+        cohorts=_summarize_version_cohorts(paired)
+        ready_cohorts=[x["key"] for x in cohorts if x["formal_ready"]]
+        aggregate_comparable=(len(cohorts)==1 and cohorts[0]["fully_versioned"]) if cohorts else False
+        pooled_champion=round(sum(float(x["champion_net_r"]) for x in paired),4) if paired else None
+        pooled_shadow=round(sum(float(x["shadow_net_r"]) for x in paired),4) if paired else None
+        reports.append({**h,"state":"FORMAL_SHADOW_SAMPLE_READY" if ready_cohorts else "COLLECTING_VERSIONED_COHORTS",
                         "eligible":len(eligible),"evaluable":len(paired),"changed":len(changed),"paired_n":len(paired),"min_n":MIN_N,
-                        "formal_ready":len(paired)>=MIN_N,
-                        "champion_net_r":round(sum(float(x["champion_net_r"]) for x in paired),4) if paired else None,
-                        "shadow_net_r":round(sum(float(x["shadow_net_r"]) for x in paired),4) if paired else None,
-                        "delta_net_r":round(delta,4) if paired else None,
+                        "formal_ready":bool(ready_cohorts),"formal_ready_cohorts":ready_cohorts,
+                        "aggregate_comparable":aggregate_comparable,
+                        "aggregate_comparison_note":"Only same geometry, trade-plan, and Final Trade Gate versions may count toward the formal sample.",
+                        "champion_net_r":pooled_champion if aggregate_comparable else None,
+                        "shadow_net_r":pooled_shadow if aggregate_comparable else None,
+                        "delta_net_r":round(delta,4) if paired and aggregate_comparable else None,
+                        "pooled_diagnostic_champion_net_r":pooled_champion,
+                        "pooled_diagnostic_shadow_net_r":pooled_shadow,
+                        "pooled_diagnostic_delta_net_r":round(delta,4) if paired else None,
+                        "version_cohorts":cohorts,
                         "promotion_allowed":False,"production_impact":"NONE","rows":rr})
     return {"schema":VERSION,"generated_at":dt.datetime.now(dt.timezone.utc).isoformat(),"activation_at":ACTIVATION_AT,
             "epoch_id":EPOCH_ID,"product_horizon":"4-12H","criteria_locked_before_evaluation":True,
@@ -270,6 +320,8 @@ def build(root:Path):
 def validate(x):
     assert x["schema"]==VERSION and x["criteria_locked_before_evaluation"] is True
     assert x["epoch_id"]==EPOCH_ID and x["safety"]["production_threshold"]==68
+    assert all(h["formal_ready"] == bool(h["formal_ready_cohorts"]) for h in x["hypotheses"])
+    assert all(not h["aggregate_comparable"] or len(h["version_cohorts"]) == 1 for h in x["hypotheses"])
     assert x["safety"]["can_override_production"] is False
     assert x["interpretation"]["best_variant_selection_allowed"] is False
     assert all(h["promotion_allowed"] is False for h in x["hypotheses"])
